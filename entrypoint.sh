@@ -12,7 +12,7 @@ if [ ! -e /code/.installed ]; then
 fi
 
 mkdir -p /code/.server
-TARGET="/code/.server" /install/code-server-autoinstall/install.sh
+TARGET="/code/.server" /install/code/install.sh
 if [ ! -e "/code/.server/config.yaml" ]; then
     if [ -e /install/code-override.yaml ]; then
         cp /install/code-override.yaml /code/.server/config.yaml
@@ -20,4 +20,4 @@ if [ ! -e "/code/.server/config.yaml" ]; then
         cp /install/code-default.yaml /code/.server/config.yaml
     fi
 fi
-TARGET="/code/.server" /install/code-server-autoinstall/start.sh
+TARGET="/code/.server" /install/code/start.sh
