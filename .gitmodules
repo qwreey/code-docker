@@ -1,0 +1,3 @@
+[submodule "code-server-autoinstall"]
+	path = code-server-autoinstall
+	url = https://github.com/qwreey/code-server-autoinstall

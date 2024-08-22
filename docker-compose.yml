@@ -1,0 +1,10 @@
+services:
+  code-docker:
+    container_name: code-docker
+    hostname: code-docker
+    build: .
+      # Remote
+      # ports:
+      # - 5900:5900
+    volumes:
+      - ./code:/code
