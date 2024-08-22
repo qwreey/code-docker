@@ -1,3 +1,3 @@
 #!/bin/sh
 
-pacman -Suy base-devel cmake gdu btop bash zsh --noconfirm
+pacman -Suy git base-devel cmake gdu btop bash zsh --noconfirm
