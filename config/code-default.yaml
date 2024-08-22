@@ -1,4 +1,4 @@
-bind-addr: 127.0.0.1:80
+bind-addr: 0.0.0.0:80
 auth: none
 cert: false
 disable-telemetry: true
