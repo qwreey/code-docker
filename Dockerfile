@@ -6,6 +6,9 @@ COPY --chown=root:root code-server-autoinstall /install/code
 COPY --chown=root:root install.sh              /install/install.sh
 
 RUN --mount=type=cache,target=/var/cache/pacman /install/install.sh
-RUN mkdir /code && chsh root --shell /bin/zsh && usermod -d /code root
+
+USER code
+USER root
+RUN mkdir /code && chsh code --shell /bin/zsh && chown code -R /code && usermod -m /code code
 
 ENTRYPOINT /sbin/entrypoint quiet loglevel=3
