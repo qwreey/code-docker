@@ -20,4 +20,9 @@ if [ ! -e "/code/.server/config.yaml" ]; then
         cp /install/code-default.yaml /code/.server/config.yaml
     fi
 fi
-TARGET="/code/.server" /install/code/start.sh
+
+if [ -e "/install/start-override.sh" ]; then
+    /install/start-override.sh
+else
+    /install/start-default.sh
+fi
