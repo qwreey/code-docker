@@ -6,6 +6,7 @@ COPY --chown=root:root code-server-autoinstall /install/code
 COPY --chown=root:root package.sh              /install/package.sh
 COPY --chown=root:root start.sh                /install/start.sh
 COPY --chown=root:root entrypoint.sh           /sbin/entrypoint
+COPY --chown=root:root bin                     /install/bin
 
 RUN --mount=type=cache,target=/var/cache/pacman /install/package.sh
 
