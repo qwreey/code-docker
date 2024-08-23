@@ -8,7 +8,7 @@ COPY --chown=root:root install.sh              /install/install.sh
 RUN --mount=type=cache,target=/var/cache/pacman /install/install.sh
 
 RUN mkdir /code &&\
-    chsh code --shell /bin/zsh &&\
+    chsh root --shell /bin/zsh &&\
     sed -E 's|^(root:[^:]*:[^:]*:[^:]*:[^:]*:)/root(:[^:]*)$|\1/code\2|' -i /etc/passwd
 
 ENTRYPOINT /sbin/entrypoint quiet loglevel=3
