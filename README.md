@@ -7,7 +7,7 @@
  - nodejs (fnvm): qwreey/zsh 가 제공하는 그대로 제공됩니다.
  - python (pyenv): qwreey/zsh 가 제공하는 그대로 제공됩니다.
 
-기타 패키지: gdu btop bash zsh
+기타 패키지: gdu btop bash zsh vim
 
 # 커스터마이징
 
