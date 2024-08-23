@@ -1,3 +1,3 @@
 #!/bin/sh
 
-pacman -Suy supervisor vim git base-devel cmake gdu btop bash zsh --noconfirm
+pacman -Suy supervisor openssh vim git base-devel cmake gdu btop bash zsh --noconfirm
