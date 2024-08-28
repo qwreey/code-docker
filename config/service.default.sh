@@ -29,8 +29,8 @@ else
 fi
 
 # Run code-server in userenv
-if [ -e /install/code-override-override.sh ]; then
-    exec /install/code-override.override.sh
+if [ -e /install/code-override.sh ]; then
+    exec /install/code.override.sh
 else
-    exec /install/code-override.default.sh
+    exec /install/code.default.sh
 fi
