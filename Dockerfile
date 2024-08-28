@@ -8,7 +8,7 @@ COPY --chown=root:root service.sh              /install/service.sh
 COPY --chown=root:root entrypoint.sh           /sbin/entrypoint
 COPY --chown=root:root bin                     /install/bin
 
-RUN --mount=type=cache,target=/var/cache/pacman /install/package.sh
+RUN --mount=type=cache,target=/var/cache/pacman /install/build.sh
 
 STOPSIGNAL 15
 
