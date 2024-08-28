@@ -11,7 +11,7 @@
  - java (javaenv): qwreey/zsh 가 제공하는 그대로 제공됩니다.
  - go (gvm): qwreey/zsh 가 제공하는 그대로 제공됩니다.
 
-기타 패키지: gdu btop bash zsh vim openssh less
+기타 패키지: gdu btop bash zsh vim openssh less cloc
 
 # 커스터마이징
 
