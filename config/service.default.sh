@@ -2,10 +2,10 @@
 
 # If user not inited
 if [ ! -e /code/.installed ]; then
-    if [ -e /install/user-override.sh ]; then
-        /install/user-override.sh
+    if [ -e /install/user.override.sh ]; then
+        /install/user.override.sh
     else
-        /install/user-default.sh
+        /install/user.default.sh
     fi
     touch /code/.installed
 fi
