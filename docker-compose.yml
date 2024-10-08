@@ -3,7 +3,9 @@ services:
     container_name: code-docker
     hostname: code-docker
     build: .
-    ports:
-      - 80:80
+    # ports:
+    #   - 80:80
+    #   - 22:22
     volumes:
       - ./code:/code
+      - ./sshd:/etc/ssh
