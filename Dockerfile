@@ -14,7 +14,7 @@ STOPSIGNAL 15
 
 RUN mkdir /code &&\
     chsh root --shell /bin/zsh &&\
-    sed -E 's|^(root:[^:]*:[^:]*:[^:]*:[^:]*:)/root(:[^:]*)$|\1/code\2|' -i /etc/passwd\
+    sed -E 's|^(root:[^:]*:[^:]*:[^:]*:[^:]*:)/root(:[^:]*)$|\1/code\2|' -i /etc/passwd &&\
     mv /etc/ssh /etc/default
 
 ENTRYPOINT /sbin/entrypoint
