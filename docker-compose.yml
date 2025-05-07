@@ -3,6 +3,7 @@ services:
     container_name: code-docker
     hostname: code-docker
     build: .
+    restart: unless-stopped
     # ports:
     #   - 80:80
     #   - 22:22
