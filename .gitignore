@@ -1,3 +1,4 @@
 code/
 config/*-override*
+config/*.override*
 sshd/
