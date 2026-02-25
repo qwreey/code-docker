@@ -14,10 +14,48 @@
  - go (gvm): qwreey/zsh 가 제공하는 그대로 제공됩니다.
 
 기타 패키지: gdu btop bash zsh vim openssh less cloc
+필요한 경우 패키지를 임의로 추가할 수 있습니다 아래 커스터마이징을 확인하세요
+
+# 기본 사용법
+
+먼저 이 레포지토리를 적당한 폴더에 클론해야합니다. 아래 명령을 기호에 맞추어 수행하세요.
+```sh
+mkdir -p ~/code-docker/builds
+git clone --recurse-submodules https://github.com/qwreey/code-docker.git ~/code-docker/builds/code-docker
+cd ~/code-docker
+```
+
+그런 다음 아래의 내용을 가진 `docker-compose.yml` 파일을 생성하세요
+```yaml
+services:
+  code-docker:
+    container_name: code-docker
+    hostname: code-docker
+    restart: unless-stopped
+    build: ./builds/code-docker
+    volumes:
+      - ./yaeji-code:/code
+      - ./yaeji-code/.sshd:/etc/ssh
+    environment:
+      # PWA_NAME: "qwreey-code"
+      # 옵션과 패치 방법은 아래를 확인하세요
+	# 80 http 포트를 리버스 프록시에 물려 외부에 노출하거나
+	# 직접 노출하세요, *단 보안 설정에 유의하세요, 가능한 리버스 프록시와*
+	# *forward proxy auth 를 적용하는것이 좋습니다, 이를 위해 caddy 와 같은*
+	# *웹서버를 사용하세요*
+	# ports:
+	#   - "8080:80"
+```
+이제 `docker compose build` 를 수행하고 잘 빌드가 되는지 확인합니다.
+만약 빌드에 성공했다면 `docker compose up -d` 를 수행하세요.
+잘 구동된다면 성공입니다!
+> Note: 시스템 패키지 업데이트를 위해 주기적으로 build 와 up 을 다시 수행해주세요.
+> Note: code-docker 업데이트를 수행하려면 `git -C builds/code-docker pull origin master --recurse-submodules` 를 수행하세요
 
 # 커스터마이징
 
 각각의 config 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 build.default.sh 를 build.override.sh 로 복사하여 원하는대로 변경할 수 있습니다.
+각 override 파일은 편집 후, 컨테이너 재빌드가 필요합니다. `docker compose build 컨테이너명 && docker compose up -d` 를 수행하세요
 
 ## build.\*.sh
 
@@ -51,7 +89,7 @@ supervisord 에 사용될 설정파일입니다.
 
 # Patch
 
-폰트나 css, js 를 커스텀으로 로드하고 싶은 경우 /code/.server/patch 폴더를 만들어 안에 css, js 를 만들어줄 수 있습니다.
+폰트나 css, js 를 커스텀으로 로드하고 싶은 경우 `/code/.server/patch` 폴더를 만들어 안에 css, js 를 만들어줄 수 있습니다.
 
 ![image](https://github.com/user-attachments/assets/1cd9f7ad-d510-4d89-aa64-15524f68b4c5)
 
@@ -66,6 +104,25 @@ CSS 에서는 에셋을 상대 경로로 불러올 수 있습니다. 폰트를 �
 }
 ```
 
-주의사항: patch 바로 아래에 있는 css, js 만 바로 로드됩니다. patch 안에 폴더를 만들어 파일을 넣는 경우 에셋으로 취급됩니다.
+> 주의사항: patch 바로 아래에 있는 css, js 만 바로 로드됩니다. patch 안에 폴더를 만들어 파일을 넣는 경우 에셋으로 취급됩니다.
 
 css, js 를 변경한 경우 코드 터미널에서 restart 를 입력하고, 윈도우 리로드가 뜰 때 리로드를 해주면 적용된 code-server 를 보실 수 있습니다.
+
+## PWA 이름과 아이콘
+
+patch 디렉터리에 `icons/pwa-icon-512.png` 와 `icons/pwa-icon-192.png` 를 크기에 맞게 생성하세요.
+
+ffmpeg 를 통해 특정 이미지를 크기를 변경하여 아이콘으로 적용하려면 다음을 수행하세요
+```sh
+IMAGE=./myimage.png
+PATCH_FOLDER=/code/.server/patch
+
+mkdir -p "$PATCH_FOLDER/icons"
+ffmpeg -i "$IMAGE" -vf scale=512:512 "$PATCH_FOLDER/icons/pwa-icon-512.png"
+ffmpeg -i "$IMAGE" -vf scale=192:192 "$PATCH_FOLDER/icons/pwa-icon-192.png"
+```
+
+## window-appicon.{png,webp,jpg,jpeg,gif}
+
+추가적으로, 만약 창 왼쪽 위의 타이틀바 아이콘을 변경하려면 `window-appicon.*` 파일을 patch 디렉터리에 생성하여 원하는 이미지로 변경할 수 있습니다.
+이미지 추가 예정
