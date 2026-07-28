@@ -1,2 +1,2 @@
 #!/bin/sh
-supervisorctl restart code-server
+setsid supervisorctl restart code-server &

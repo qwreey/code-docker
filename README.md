@@ -2,19 +2,12 @@
 
 ![image](https://github.com/user-attachments/assets/ebd212a9-e620-46c4-9cd0-dbcbf1a55b69)
 
-개인적인 목적의 code-server 도커 이미지입니다. qwreey/zsh 와 통합되어있습니다. 아래의 툴킷이 제공됩니다.
+개인적인 목적의 code-server 도커 이미지입니다. qwreey/qwreey-fish 와 통합되어있습니다. mise 환경이 제공되며, `mise use -g node@26.4.0 uv` 등의 명령으로 원하는 개발 도구를 빌드 타임이 아닌 런타임에 설치할 수 있습니다.
 
- - GCC: arch linux 의 base-devel, cmake 가 제공됩니다.
- - rust (rustup): qwreey/zsh 가 제공하는 그대로 제공됩니다.
- - nodejs (fnvm): qwreey/zsh 가 제공하는 그대로 제공됩니다.
- - python (pyenv): qwreey/zsh 가 제공하는 그대로 제공됩니다.
+ - GCC: arch linux 의 base-devel, cmake 패키지가 제공됩니다.
+ - openssh: arch linux 의 openssh 패키지가 제공됩니다. 또한 호스트키가 미리 설정됩니다. code-server 안에서 /code/.ssh 폴더를 생성하고 authorized_keys 를 적절하게 설정하면 됩니다.
 
-예정:
- - java (javaenv): qwreey/zsh 가 제공하는 그대로 제공됩니다.
- - go (gvm): qwreey/zsh 가 제공하는 그대로 제공됩니다.
-
-기타 패키지: gdu btop bash zsh vim openssh less cloc
-필요한 경우 패키지를 임의로 추가할 수 있습니다 아래 커스터마이징을 확인하세요
+필요한 경우 시스템 패키지를 임의로 추가할 수 있습니다 아래 커스터마이징을 확인하세요
 
 # 기본 사용법
 
@@ -52,6 +45,10 @@ services:
 > Note: 시스템 패키지 업데이트를 위해 주기적으로 build 와 up 을 다시 수행해주세요.
 > Note: code-docker 업데이트를 수행하려면 `git -C builds/code-docker pull origin master --recurse-submodules` 를 수행하세요
 
+# 환경 변수 재로드
+
+만약 mise 의 global 이 달라졌으며, 이를 code-server 에 적용하고 싶다면 code-server 터미널에 `restart` 를 입력하세요. 이렇게 하면 supervisord 의 code-server 서비스가 재시작됩니다.
+
 # 커스터마이징
 
 각각의 config 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 build.default.sh 를 build.override.sh 로 복사하여 원하는대로 변경할 수 있습니다.
@@ -61,9 +58,9 @@ services:
 
 이미지 build 타임에 수행되는 스크립트입니다. pacman 으로 패키지를 설치하기 위해서 사용됩니다. 또한 이 스크립트는 캐시가 마운트된 상태에서 실행됩니다.
 
-## service.\*.sh
+## code-service.\*.sh
 
-code-server 서비스 엔트리포인트입니다. code-server 의 업데이트/설치와 초기 환경설정이 여기에서 이루워집니다. 동작 보장을 위해서 일반적으로 수정하지 말아야합니다. 환경변수를 설정하고 싶은경우 소싱되는 `editor-env.*.sh` 를 편집하세요. 또는 실행 방식을 바꾸려면 `code.*.sh` 를 수정하세요. code-server 의 설정은 `code-config.*.yaml` 이 초기값으로 복사됩니다.
+code-server 서비스 엔트리포인트입니다. code-server 의 업데이트/설치와 초기 환경설정이 여기에서 이루워집니다. 동작 보장을 위해서 일반적으로 수정하지 말아야합니다. 환경변수를 설정하고 싶은경우 소싱되는 `code-env.*.sh` 를 편집하세요. 또는 실행 방식을 바꾸려면 `code-runner.*.sh` 를 수정하세요. code-server 의 설정은 `code-config.*.yaml` 이 초기값으로 복사됩니다.
 
 ## code-config.\*.yaml
 
@@ -71,23 +68,49 @@ code-server 서비스 엔트리포인트입니다. code-server 의 업데이트/
 
 여기의 각 요소는 /code/.server/code-server/bin/code-server --help 를 통해 확인해볼 수 있습니다. 각각의 인자 `--some=value` 는 `some: value` 로 작성할 수 있습니다.
 
-## editor-env.\*.sh
+## code-env.\*.sh
 
-`service.*.sh` 가 code-server 를 실행하기전 소싱하는 파일입니다. 일반적으로 환경변수를 설정하는데 사용합니다.
+`code-service.*.sh` 가 code-server 를 실행하기전 소싱하는 파일입니다. 일반적으로 환경변수를 설정하는데 사용합니다.
 
-## code.\*.sh
+## code-runner.\*.sh
 
-code-server 를 어떻게 수행할지 정의합니다. qwreey/code-server-autoinstall 이 제공하는 start.sh 의 래퍼이며 qwreey/zsh 가 제공하는 툴킷을 code-server 에 환경변수로써 알려주기 위해서 /code/.zsh/userenv 래퍼를 사용합니다.
+code-server 를 어떻게 수행할지 정의합니다. qwreey/code-server-autoinstall 이 제공하는 start.sh 의 래퍼이며 mise 가 제공하는 툴킷을 code-server 에 환경변수로써 알려주기 위해서 mise env 를 수행합니다.
 
 ## supervisord.\*.conf
 
 supervisord 에 사용될 설정파일입니다.
 
-## user.\*.sh
+## user-init.\*.sh
 
 유저 홈폴더 (/code) 가 처음 생성될 때 수행됩니다. 모든 동작은 /code 안에서 행해야합니다. 그렇지 않으면 컨테이너가 꺼질 때 작업이 저장되지 않습니다.
 
-# Patch
+여기에서 fish 셸의 설정이 초기화됩니다. 만약 fish 이외의 다른 셸의 설정을 초기화 시키고 싶은 경우 덮어써야합니다.
+
+## shell.\*
+
+`chsh` 명령을 통해 `root` 유저의 셸을 설정할 때 사용할 셸 바이너리의 path 를 가르킵니다. 기본적으로 `/bin/fish` 이지만, `/bin/bash` 또는 `/bin/zsh` 등으로 바꾸는데 사용할 수 있습니다.
+
+## supervisord/\*.conf
+
+supervisord 에 원하는 프로그램을 서비스로 등록하고 싶을 때 사용할 수 있습니다. 기본적으로 `supervisord.default` 의 `include` 부분에 의해서 임포트 됩니다. [파일 포멧에 관해서는 supervisord 의 공식 문서 program 부분](https://supervisord.org/configuration.html#program-x-section-settings)을 확인하세요
+
+# adb 연결
+
+먼저 컨테이너 빌드 상 `android-tools` 가 설치되도록 `build` 스크립트 파일을 편집해주어야합니다.
+
+로컬 데스크탑/랩탑에서 adb 서버를 실행해야합니다. 이를 위해 로컬에서 `adb start-server`를 수행하세요. 반대로 대상 code-docker는 adb 서버를 실행중이지 않아야합니다. 이를 위해 code-docker 에서 `adb kill-server`를 수행하세요
+
+그런 다음 adb 소켓을 code-docker에 연결해야합니다. 이는 방법이 크게 2개 정도 존재합니다
+
+1. ssh 를 통해 소켓을 전송합니다.
+`ssh -R 5037:localhost:5037 code -TN` 를 로컬에서 수행하여 로컬 adb 소켓을 code-docker에 연결해줍니다.
+
+2. 환경 변수를 설정하고, 연결 가능하도록 네트워크를 조정
+code-docker의 요청이 나가는 네트워크를 잘 구성했다면, 호스트 시스템의 tailscale ip 등의 서브넷으로도 요청을 전송할 수 있습니다. 따라서 환경 변수로써 `ANDROID_ADB_SERVER_ADDRESS` 와 `ANDROID_ADB_SERVER_PORT` 를 적절한 tailscale ip, private ip로 설정하면 항상 원하는 기기의 adb 서버를 사용하게 됩니다.
+
+두 작업 중 하나를 수행하고 나면 code-docker에서 `adb devices`를 수행하면 연결된 장치가 보일것입니다. 이 상태에서 react native metro builder 나 gradle 등으로 장치에 설치 테스트를 수행하면 잘 작동하게 됩니다.
+
+# 코드 서버 패치
 
 폰트나 css, js 를 커스텀으로 로드하고 싶은 경우 `/code/.server/patch` 폴더를 만들어 안에 css, js 를 만들어줄 수 있습니다.
 
@@ -106,7 +129,7 @@ CSS 에서는 에셋을 상대 경로로 불러올 수 있습니다. 폰트를 �
 
 > 주의사항: patch 바로 아래에 있는 css, js 만 바로 로드됩니다. patch 안에 폴더를 만들어 파일을 넣는 경우 에셋으로 취급됩니다.
 
-css, js 를 변경한 경우 코드 터미널에서 restart 를 입력하고, 윈도우 리로드가 뜰 때 리로드를 해주면 적용된 code-server 를 보실 수 있습니다.
+css, js 를 변경한 경우 코드 터미널에서 `restart` 를 입력하고, 윈도우 리로드가 뜰 때 리로드를 해주면 적용된 code-server 를 보실 수 있습니다.
 
 ## PWA 이름과 아이콘
 

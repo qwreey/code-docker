@@ -1,0 +1,17 @@
+code/
+sshd/
+.git/
+.gitignore
+.gitmodules
+README.md
+docker-compose.yml
+code-server-autoinstall/bin/
+code-server-autoinstall/code-server/
+code-server-autoinstall/extensions/
+code-server-autoinstall/patch/
+code-server-autoinstall/user-data/
+code-server-autoinstall/.gitignore
+code-server-autoinstall/installed-version
+code-server-autoinstall/last-check
+code-server-autoinstall/config.yaml
+code-server-autoinstall/.git/

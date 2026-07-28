@@ -2,4 +2,4 @@ bind-addr: 0.0.0.0:80
 auth: none
 cert: false
 disable-telemetry: true
-disable-workspace-trust: true
+disable-workspace-trust: false

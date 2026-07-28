@@ -1,26 +1,30 @@
 FROM archlinux
 
-COPY --chown=root:root entrypoint.sh           /install/entrypoint
-COPY --chown=root:root config                  /install
-COPY --chown=root:root code-server-autoinstall /install/code
-COPY --chown=root:root build.sh                /install/build.sh
-COPY --chown=root:root install-yay.sh          /install/install-yay.sh
-COPY --chown=root:root service.sh              /install/service.sh
-COPY --chown=root:root entrypoint.sh           /sbin/entrypoint
-COPY --chown=root:root bin                     /install/bin
+# Init makepkg user and install yay
+COPY --chown=root:root script/install-yay.sh /etc/code-docker/
+RUN --mount=type=cache,target=/home/makepkg \
+    --mount=type=cache,target=/var/yay-bin \
+    --mount=type=cache,target=/var/cache/pacman \
+    /etc/code-docker/install-yay.sh
 
-RUN useradd --system --create-home makepkg \
-    && mkdir -p /etc/sudoers.d \
-    && echo "makepkg ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/makepkg
+# Run build script
+COPY --chown=root:root script/build.sh config/build.* /etc/code-docker/
+RUN --mount=type=cache,target=/var/cache/pacman /etc/code-docker/build.sh
 
-RUN --mount=type=cache,target=/home/makepkg --mount=type=cache,target=/var/yay-bin --mount=type=cache,target=/var/cache/pacman /install/install-yay.sh && /install/build.sh
+# Copy config & static files
+COPY --chown=root:root \
+    config script/entrypoint.sh script/code-service.sh \
+    script/get-user-shell.sh /etc/code-docker/
+COPY --chown=root:root code-server-autoinstall/*.sh \
+    /etc/code-docker/code-server-autoinstall/
+COPY --chown=root:root bin /etc/code-docker/bin/
 
-STOPSIGNAL 15
-
-RUN mkdir /code &&\
-    chsh root --shell /bin/zsh &&\
+# Setup user shell and home
+RUN chsh root --shell $(/etc/code-docker/get-user-shell.sh) &&\
     sed -E 's|^(root:[^:]*:[^:]*:[^:]*:[^:]*:)/root(:[^:]*)$|\1/code\2|' -i /etc/passwd &&\
     mv /etc/ssh /etc/default
 
-ENTRYPOINT /sbin/entrypoint
-
+# Metadata
+EXPOSE 22 80
+STOPSIGNAL 15
+ENTRYPOINT ["/etc/code-docker/entrypoint.sh"]

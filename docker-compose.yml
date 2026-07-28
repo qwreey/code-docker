@@ -2,11 +2,16 @@ services:
   code-docker:
     container_name: code-docker
     hostname: code-docker
-    build: .
+    build:
+      context: .
+      network: host
     restart: unless-stopped
-    # ports:
-    #   - 80:80
-    #   - 22:22
+    ports:
+      - 80:80
+      # - 22:22
     volumes:
       - ./code:/code
       - ./sshd:/etc/ssh
+    cap_add:
+      - SYS_PTRACE
+      - IPC_LOCK
