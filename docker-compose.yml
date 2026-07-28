@@ -15,3 +15,17 @@ services:
     cap_add:
       - SYS_PTRACE
       - IPC_LOCK
+    # Change max logging size
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"  # Max size of a single log file
+        max-file: "3"    # Keep a maximum of 3 rotated files
+    # Use graphic backend. code-docker doesn't require this but
+    # you can enable this if you need
+    #devices:
+    #  - /dev/dri:/dev/dri
+    #  - /dev/kfd:/dev/kfd
+    #group_add:
+    #  - video
+    #  - render
