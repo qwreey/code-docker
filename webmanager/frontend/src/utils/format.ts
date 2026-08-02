@@ -17,6 +17,15 @@ export function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`
 }
 
+export function formatCompactNumber(value: number): string {
+  if (!Number.isFinite(value)) return '-'
+  const abs = Math.abs(value)
+  if (abs < 1000) return `${value}`
+  if (abs < 1_000_000) return `${(value / 1000).toFixed(1).replace(/\.0$/, '')}K`
+  if (abs < 1_000_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  return `${(value / 1_000_000_000).toFixed(1).replace(/\.0$/, '')}B`
+}
+
 export function formatDurationMs(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return '-'
 

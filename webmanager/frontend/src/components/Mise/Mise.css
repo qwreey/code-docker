@@ -1,0 +1,185 @@
+.mise-section {
+  margin-top: 1.75rem;
+}
+
+.mise-section h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.4rem;
+}
+
+.mise-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.mise-recommend-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mise-group {
+  margin-bottom: 1.25rem;
+}
+
+.mise-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0 0 0.5rem;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+
+.mise-chevron {
+  display: inline-flex;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: transform 0.12s ease;
+}
+
+.mise-chevron-open {
+  transform: rotate(90deg);
+}
+
+.mise-group-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.mise-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.mise-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 0.85rem 1.1rem;
+}
+
+.mise-row-info {
+  min-width: 0;
+}
+
+.mise-row-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.mise-row-description {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.mise-row-id {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.3rem;
+}
+
+.mise-status-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mise-tool-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.mise-remove-config-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.mise-job-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.25rem;
+}
+
+.mise-job-panel.mise-job-success {
+  border-color: var(--color-green-border);
+  background: var(--color-green-bg);
+}
+
+.mise-job-panel.mise-job-error {
+  border-color: var(--color-red-border);
+  background: var(--color-red-bg);
+}
+
+.mise-job-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.mise-job-status {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.mise-job-log {
+  max-height: 14rem;
+  overflow-y: auto;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.8rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0 0 0.6rem;
+}
+
+.mise-restart-note {
+  font-size: 0.85rem;
+  margin: 0 0 0.6rem;
+}
+
+.mise-env-table-wrapper {
+  margin-top: 0.9rem;
+}
+
+.mise-env-value {
+  word-break: break-all;
+  white-space: pre-wrap;
+}

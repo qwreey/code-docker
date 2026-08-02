@@ -111,3 +111,347 @@
   border-radius: 4px;
   font-size: 0.85rem;
 }
+
+/* ── charts (M2) ──────────────────────────────────────────────────────── */
+
+.claude-viz {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+
+  /* sequential ramp (blue, light -> dark = low -> high magnitude) */
+  --viz-seq-0: var(--color-gray-bg);
+  --viz-seq-1: #9ec5f4;
+  --viz-seq-2: #3987e5;
+  --viz-seq-3: #1c5cab;
+  --viz-seq-4: #0d366b;
+
+  /* categorical, fixed order (slot 1 blue, slot 2 orange, slot 3 aqua) */
+  --viz-cat-1: #2a78d6;
+  --viz-cat-2: #eb6834;
+  --viz-cat-3: #1baf7a;
+}
+
+@media (prefers-color-scheme: dark) {
+  .claude-viz {
+    --viz-seq-0: #2c2c2a;
+    --viz-seq-1: #184f95;
+    --viz-seq-2: #2a78d6;
+    --viz-seq-3: #6da7ec;
+    --viz-seq-4: #b7d3f6;
+
+    --viz-cat-1: #3987e5;
+    --viz-cat-2: #d95926;
+    --viz-cat-3: #199e70;
+  }
+}
+
+.claude-viz .card {
+  margin-top: 0;
+}
+
+.claude-viz .card:first-child {
+  grid-column: 1 / -1;
+}
+
+/* heatmap */
+
+.claude-heatmap-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.claude-heatmap-month {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-heading);
+  min-width: 8rem;
+  text-align: center;
+}
+
+.claude-heatmap-weekdays,
+.claude-heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  max-width: 22rem;
+  margin: 0 auto;
+}
+
+.claude-heatmap-weekday {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding-bottom: 0.2rem;
+}
+
+.claude-heatmap-cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 3px;
+  background: var(--viz-seq-0);
+  cursor: default;
+}
+
+.claude-heatmap-cell[data-level='1'] {
+  background: var(--viz-seq-1);
+}
+
+.claude-heatmap-cell[data-level='2'] {
+  background: var(--viz-seq-2);
+}
+
+.claude-heatmap-cell[data-level='3'] {
+  background: var(--viz-seq-3);
+}
+
+.claude-heatmap-cell[data-level='4'] {
+  background: var(--viz-seq-4);
+}
+
+.claude-heatmap-cell:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 1px;
+}
+
+.claude-heatmap-cell-blank {
+  background: transparent;
+}
+
+.claude-heatmap-daynum {
+  position: absolute;
+  bottom: 1px;
+  right: 2px;
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.claude-heatmap-cell[data-level='3'] .claude-heatmap-daynum,
+.claude-heatmap-cell[data-level='4'] .claude-heatmap-daynum {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.claude-heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  margin-top: 0.75rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.claude-heatmap-legend-swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  background: var(--viz-seq-0);
+}
+
+.claude-heatmap-legend-swatch[data-level='1'] {
+  background: var(--viz-seq-1);
+}
+
+.claude-heatmap-legend-swatch[data-level='2'] {
+  background: var(--viz-seq-2);
+}
+
+.claude-heatmap-legend-swatch[data-level='3'] {
+  background: var(--viz-seq-3);
+}
+
+.claude-heatmap-legend-swatch[data-level='4'] {
+  background: var(--viz-seq-4);
+}
+
+/* weekly bar chart */
+
+.claude-weekly-legend {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.claude-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.claude-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.claude-legend-swatch-1 {
+  background: var(--viz-cat-1);
+}
+
+.claude-legend-swatch-2 {
+  background: var(--viz-cat-2);
+}
+
+.claude-weekly-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.4rem;
+  height: 8.5rem;
+}
+
+.claude-weekly-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+}
+
+.claude-weekly-bar-pair {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  flex: 1;
+  width: 100%;
+  justify-content: center;
+}
+
+.claude-weekly-bar-track {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  width: 14px;
+}
+
+.claude-weekly-bar-label {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-bottom: 0.15rem;
+}
+
+.claude-weekly-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+}
+
+.claude-weekly-bar-1 {
+  background: var(--viz-cat-1);
+}
+
+.claude-weekly-bar-2 {
+  background: var(--viz-cat-2);
+}
+
+.claude-weekly-bar:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 1px;
+}
+
+.claude-weekly-axis-label {
+  margin-top: 0.4rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* model usage */
+
+.claude-model-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.claude-model-panel-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.5rem;
+}
+
+.claude-model-panel-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.claude-model-row {
+  display: grid;
+  grid-template-columns: 8rem 1fr 3.5rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.claude-model-row-name {
+  font-size: 0.78rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.claude-model-row-track {
+  height: 14px;
+  background: var(--color-gray-bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.claude-model-row-track:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 1px;
+}
+
+.claude-model-row-bar {
+  height: 100%;
+  min-width: 2px;
+  background: var(--viz-cat-1);
+  border-radius: 4px;
+}
+
+.claude-model-row-value {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* skills/plugins table (M3) */
+
+.claude-plugins-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.claude-plugins-table th,
+.claude-plugins-table td {
+  text-align: left;
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.claude-plugins-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.claude-plugin-marketplace {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}

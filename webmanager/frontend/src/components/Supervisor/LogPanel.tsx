@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { LogResponse, LogStream } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Sheet } from '../common/Sheet'
 import './Supervisor.css'
 
 const TAIL = 10000
@@ -32,10 +33,12 @@ export function LogPanel({ processName, onClose }: { processName: string; onClos
   }, [load])
 
   return (
-    <div className="log-panel">
-      <div className="log-panel-header">
-        <h3>{processName} 로그</h3>
-        <div className="log-panel-controls">
+    <Sheet
+      open
+      onClose={onClose}
+      title={`${processName} 로그`}
+      headerActions={
+        <>
           <div className="log-stream-toggle">
             <button
               type="button"
@@ -55,13 +58,11 @@ export function LogPanel({ processName, onClose }: { processName: string; onClos
           <button type="button" className="btn btn-secondary btn-small" onClick={load} disabled={loading}>
             {loading ? '불러오는 중...' : '새로고침'}
           </button>
-          <button type="button" className="btn btn-secondary btn-small" onClick={onClose}>
-            닫기
-          </button>
-        </div>
-      </div>
+        </>
+      }
+    >
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <pre className="log-panel-body">{text || (loading ? '' : '(로그 없음)')}</pre>
-    </div>
+    </Sheet>
   )
 }

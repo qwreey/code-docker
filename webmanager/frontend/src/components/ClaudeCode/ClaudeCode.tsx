@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
-import type { ClaudeStatus } from '../../api/types'
+import type { ClaudePlugin, ClaudePluginsResponse, ClaudeStatus } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { formatDurationMs } from '../../utils/format'
+import { Heatmap } from './Heatmap'
+import { WeeklyChart } from './WeeklyChart'
+import { ModelUsageChart } from './ModelUsageChart'
 import '../common/common.css'
 import './ClaudeCode.css'
 
@@ -28,12 +31,77 @@ function NotInstalled() {
   )
 }
 
-function InstalledView({ status }: { status: ClaudeStatus }) {
+function InstalledCharts({ stats }: { stats: NonNullable<ClaudeStatus['stats']> }) {
+  return (
+    <div className="claude-viz">
+      <div className="card">
+        <h2>활동 히트맵</h2>
+        <Heatmap dailyActivity={stats.dailyActivity ?? []} />
+      </div>
+
+      <div className="card">
+        <h2>최근 7일</h2>
+        <WeeklyChart dailyActivity={stats.dailyActivity ?? []} />
+      </div>
+
+      <div className="card">
+        <h2>모델별 토큰 사용량</h2>
+        <ModelUsageChart modelUsage={stats.modelUsage ?? {}} />
+      </div>
+    </div>
+  )
+}
+
+function PluginsTable({ plugins }: { plugins: ClaudePlugin[] }) {
+  if (plugins.length === 0) {
+    return <p className="empty-state">설치된 스킬/플러그인이 없습니다.</p>
+  }
+
+  return (
+    <div className="table-wrapper">
+      <table className="claude-plugins-table">
+        <thead>
+          <tr>
+            <th>이름</th>
+            <th>버전</th>
+            <th>Scope</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          {plugins.map((plugin) => {
+            const [name, marketplace] = plugin.id.split('@')
+            return (
+              <tr key={plugin.id}>
+                <td>
+                  <div>{name || plugin.id}</div>
+                  {marketplace && <div className="claude-plugin-marketplace">{marketplace}</div>}
+                </td>
+                <td>{plugin.version}</td>
+                <td>{plugin.scope}</td>
+                <td>
+                  {plugin.enabled ? (
+                    <span className="badge badge-green">활성</span>
+                  ) : (
+                    <span className="badge badge-gray">비활성</span>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function InstalledView({ status, plugins }: { status: ClaudeStatus; plugins: ClaudePlugin[] }) {
   const auth = status.auth ?? null
   const stats = status.stats ?? null
 
   return (
-    <div className="claude-cards">
+    <>
+      <div className="claude-cards">
       <div className="claude-card">
         <div className="claude-card-label">로그인 상태</div>
         {auth?.loggedIn ? (
@@ -92,12 +160,19 @@ function InstalledView({ status }: { status: ClaudeStatus }) {
           <div className="claude-card-note">통계를 확인할 수 없습니다.</div>
         )}
       </div>
-    </div>
+      </div>
+      {stats && <InstalledCharts stats={stats} />}
+      <div className="card">
+        <h2>Skills / Plugins</h2>
+        <PluginsTable plugins={plugins} />
+      </div>
+    </>
   )
 }
 
 export function ClaudeCode() {
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
+  const [plugins, setPlugins] = useState<ClaudePlugin[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -108,8 +183,12 @@ export function ClaudeCode() {
     loadingRef.current = true
     setLoading(true)
     try {
-      const data = await api.get<ClaudeStatus>('/claude/status')
-      setStatus(data)
+      const [statusData, pluginsData] = await Promise.all([
+        api.get<ClaudeStatus>('/claude/status'),
+        api.get<ClaudePluginsResponse>('/claude/plugins'),
+      ])
+      setStatus(statusData)
+      setPlugins(pluginsData.plugins)
       setError(null)
     } catch (e) {
       setError(errorMessage(e))
@@ -136,7 +215,7 @@ export function ClaudeCode() {
       {loading && !status ? (
         <p className="empty-state">불러오는 중...</p>
       ) : (
-        status && (status.installed ? <InstalledView status={status} /> : <NotInstalled />)
+        status && (status.installed ? <InstalledView status={status} plugins={plugins} /> : <NotInstalled />)
       )}
     </section>
   )

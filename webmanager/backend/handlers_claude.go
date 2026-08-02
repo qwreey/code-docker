@@ -45,3 +45,28 @@ func (s *Server) handleClaudeStatus(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, resp)
 }
+
+// claudePluginsResponse is GET /api/claude/plugins's body. Plugins is never
+// nil — see handleClaudePlugins.
+type claudePluginsResponse struct {
+	Plugins []claudecode.Plugin `json:"plugins"`
+}
+
+// handleClaudePlugins reports the installed Claude Code skills/plugins
+// (M3, read-only). Like handleClaudeStatus, this degrades to an empty list
+// rather than an HTTP error for every failure mode (claude not installed,
+// command error, timeout, unparseable output) — the frontend already knows
+// whether Claude is installed at all from /api/claude/status and only
+// renders this section when that's true, so this endpoint just needs to
+// never fail the whole response.
+func (s *Server) handleClaudePlugins(w http.ResponseWriter, r *http.Request) {
+	resp := claudePluginsResponse{Plugins: []claudecode.Plugin{}}
+
+	if binPath, ok := claudecode.FindBinary(s.cfg.ClaudeBinPath); ok {
+		if plugins := claudecode.ListPlugins(r.Context(), binPath); plugins != nil {
+			resp.Plugins = plugins
+		}
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}

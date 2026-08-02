@@ -7,7 +7,24 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+// Resolves once the user has unlocked (e.g. via a password prompt modal),
+// rejects if they cancel. Registered by a UI component mounted near the app
+// root (see UnlockModalHost) so that any api.get/post/put/del call gets
+// transparent "prompt on 401, retry once, then continue" behavior without
+// every write call-site needing to know about the password gate.
+type UnlockPrompter = () => Promise<void>
+let unlockPrompter: UnlockPrompter | null = null
+
+export function setUnlockPrompter(fn: UnlockPrompter | null) {
+  unlockPrompter = fn
+}
+
+// The unlock endpoint itself is excluded from the retry dance below — a
+// wrong-password 401 from it must surface directly to its own form instead
+// of re-triggering the prompter (which could otherwise recurse).
+const UNLOCK_PATH = '/auth/unlock'
+
+async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
   const res = await fetch(`/api${path}`, init)
 
   if (res.status === 204) {
@@ -26,6 +43,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
+    if (res.status === 401 && !retried && unlockPrompter && path !== UNLOCK_PATH) {
+      let unlocked = false
+      try {
+        await unlockPrompter()
+        unlocked = true
+      } catch {
+        // User cancelled the prompt — fall through to the original error below.
+      }
+      if (unlocked) {
+        // Re-issue the exact same request once, with retried=true so a
+        // second 401 (or any other error) just falls through to its own
+        // normal throw instead of prompting again.
+        return request<T>(path, init, true)
+      }
+    }
+
     const message =
       data && typeof data === 'object' && 'error' in data && typeof (data as { error: unknown }).error === 'string'
         ? (data as { error: string }).error
@@ -50,7 +83,7 @@ export const api = {
     request<T>(path, { method: 'POST', ...withJsonBody(body) }),
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', ...withJsonBody(body) }),
-  del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  del: <T>(path: string, body?: unknown) => request<T>(path, { method: 'DELETE', ...withJsonBody(body) }),
 }
 
 export function errorMessage(err: unknown): string {

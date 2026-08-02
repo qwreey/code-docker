@@ -1,0 +1,123 @@
+.terminal-settings-section {
+  margin-bottom: 1.5rem;
+}
+
+.terminal-settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.terminal-settings-section h4 {
+  margin: 0 0 0.35rem;
+}
+
+.terminal-keybinding-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.terminal-keybinding-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.terminal-keybinding-row input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.55rem;
+  font-size: 0.85rem;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.terminal-keybinding-bytes {
+  font-family: var(--mono);
+}
+
+.terminal-keybinding-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.terminal-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.terminal-theme-swatch {
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.terminal-theme-swatch.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-border);
+}
+
+.terminal-theme-custom-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.terminal-theme-custom-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.terminal-theme-editor {
+  margin-top: 0.9rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+}
+
+.terminal-theme-color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.terminal-theme-color-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.5rem;
+}
+
+.terminal-theme-color-field input[type='color'] {
+  width: 2.2rem;
+  height: 1.6rem;
+  border: none;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .terminal-keybinding-row {
+    grid-template-columns: 1fr;
+  }
+}

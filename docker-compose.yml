@@ -73,10 +73,10 @@ services:
       # authentication tool like Authentik.
       - 80:80
       # - 22:22
-      # webmanager admin panel (see webmanager/plan.md). No auth of its own -
-      # relies entirely on a reverse proxy in front of it. Bind-address
-      # strategy (host publish vs internal-only alias) is still undecided,
-      # so this is just open on 0.0.0.0 for now while it's under development.
+      # webmanager admin panel. No auth of its own - relies entirely on a
+      # reverse proxy in front of it. Bind-address strategy (host publish vs
+      # internal-only alias) is still undecided, so this is just open on
+      # 0.0.0.0 for now while it's under development.
       - 81:81
     volumes:
       - ./code:/code

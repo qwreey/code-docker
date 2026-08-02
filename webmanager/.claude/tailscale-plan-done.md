@@ -5,6 +5,11 @@
 tailscale-design.md`(레포 루트) — 프로젝트 전체에 걸친 내용이라 webmanager
 전용이 아님.
 
+## 업데이트 (2026-08-02, 두 번째 라운드)
+
+쓰기(config PUT, forwards/publish의 POST·DELETE)에 비밀번호 게이트 적용됨,
+읽기는 그대로 열림 — 자세히는 `.claude/authgate-plan-done.md`.
+
 ## 기능
 
 `/code/.tailscale/config.yaml`의 `forwards`/`publish` 항목 조회/추가/삭제,

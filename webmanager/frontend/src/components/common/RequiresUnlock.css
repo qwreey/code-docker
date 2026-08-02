@@ -1,0 +1,18 @@
+.requires-unlock {
+  display: flex;
+  justify-content: center;
+  padding-top: 2rem;
+}
+
+.requires-unlock-card {
+  width: 100%;
+  max-width: 360px;
+  margin-top: 0;
+}
+
+.requires-unlock-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}

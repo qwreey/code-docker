@@ -122,3 +122,40 @@ func (s *Server) handleDeleteCredential(w http.ResponseWriter, r *http.Request) 
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (s *Server) handleGetLFSStatus(w http.ResponseWriter, r *http.Request) {
+	installed := gitconfig.LFSStatus(s.cfg.GitConfigPath)
+	writeJSON(w, http.StatusOK, map[string]bool{"installed": installed})
+}
+
+func (s *Server) handleInstallLFS(w http.ResponseWriter, r *http.Request) {
+	if err := gitconfig.InstallLFS(s.cfg.GitConfigPath); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (s *Server) handleGetGitConfigRaw(w http.ResponseWriter, r *http.Request) {
+	content, err := gitconfig.ReadRaw(s.cfg.GitConfigPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"content": content})
+}
+
+func (s *Server) handlePutGitConfigRaw(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := gitconfig.WriteRaw(s.cfg.GitConfigPath, body.Content); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}

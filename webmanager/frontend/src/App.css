@@ -1,12 +1,42 @@
 .app-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .app-content {
   flex: 1;
   min-width: 0;
   padding: 2rem 2.5rem;
+  overflow-y: auto;
+}
+
+.mobile-topbar {
+  display: none;
+}
+
+.hamburger-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.hamburger-btn:hover {
+  background: var(--surface-hover);
+}
+
+.mobile-topbar-title {
+  font-weight: 700;
+  color: var(--text-heading);
 }
 
 @media (max-width: 720px) {
@@ -14,7 +44,25 @@
     flex-direction: column;
   }
 
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+
   .app-content {
     padding: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-content {
+    padding: 1rem 0.85rem;
   }
 }

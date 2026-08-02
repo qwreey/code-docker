@@ -1,6 +1,10 @@
-# Caddy 기반 dev 서버 expose 어댑터 조사 (설계 중 - 미구현)
+# Caddy 기반 dev 서버 expose 어댑터 조사 (설계 조사, 미구현 — 우선순위 낮음)
 
-> **이 문서는 설계 조사 문서임 — 구현은 다른 세션/에이전트가 진행 중이므로 이 문서 작성 과정에서 코드/설정 파일은 건드리지 않았음.** `../../.claude/archive/tailscale-design.md` 와 동일한 성격의 문서 (구현 전 조사 기록), 구현 착수 시 이 파일을 참고해서 실제 구현 계획으로 전환하면 됨.
+> **이 문서는 구현 전 설계 조사 문서임.** `../../.claude/archive/tailscale-design.md` 와
+> 동일한 성격(구현 전 조사 기록) — 구현 착수 시 이 파일을 참고해서 실제 구현 계획으로
+> 전환하면 됨. 대부분의 설계 결정은 이 문서 안에서 이미 확정됐지만(아래 "남은 질문"
+> 참고), 남은 소소한 결정(`preserve_host` 기본값 등)이 있는 데다 다른 큐(dind/웹쉘)
+> 대비 우선순위가 낮게 재조정됨 — `webmanager/plan.md`/`CLAUDE.md` 우선순위 목록 참고.
 
 > 이 저장소의 일반적인 구조/컨벤션(override 패턴, supervisord 프로세스 모델, docker-compose 토폴로지 등)은 저장소 루트의 `CLAUDE.md` 를 참고. `webmanager/` 관련 컨벤션은 `webmanager/CLAUDE.md`, `webmanager/plan.md` 참고.
 
@@ -75,7 +79,7 @@ http://*.dev.yaeji.moe:8082 {
 ```
 /code/.caddy-adapter/
 ├── Caddyfile              # 최상위 파일, caddy가 이걸 로드 (고정, 거의 안 바뀜)
-├── managed/                # expose 하나당 파일 하나 - webmanager 폼 또는 Monaco로 직접 편집 (아래 "방향 전환" 참고)
+├── managed/                # expose 하나당 파일 하나 - webmanager 폼 또는 CodeEditor로 직접 편집 (아래 "방향 전환" 참고)
 │   ├── myapp.caddy
 │   └── legacy-app.caddy
 └── custom/                 # webmanager가 관여하지 않는, 사용자가 완전히 직접 쓰는 영역 (다른 도메인의 사이트 블록 등)
@@ -116,7 +120,14 @@ import /code/.caddy-adapter/custom/*.caddy
 
 - **expose 하나 = `.caddy` 파일 하나.** `managed.caddy`처럼 전부 합쳐진 단일 파일이 아니라, `/code/.caddy-adapter/managed/myapp.caddy`, `.../otherapp.caddy`처럼 항목별로 분리. "새 expose 추가" = 새 파일 하나 생성.
 - **일반적인 설정은 webmanager UI의 구조화된 폼으로**: 이름(서브도메인), target, 경로 분리(uri strip 포함), 헤더 추가/치환 같은 흔한 패턴 — `handle`/`route`/`reverse_proxy`/`header`/`uri strip_prefix` 정도만 다루는 작은 폼. 폼이 저장하는 것도 결국 `.caddy` 텍스트 파일이라, 폼이 못 다루는 걸 만나면 그냥 아래로 내려가서 직접 고치면 됨 (폼 ↔ 텍스트 사이 벽이 없음 — 다만 폼으로 만든 걸 텍스트로 손댄 뒤 다시 폼으로 열면 그 폼이 이해 못하는 구조로 바뀌어 있을 수 있음, 이 경우 "이 파일은 더 이상 폼으로 편집 불가, 텍스트 전용" 취급하는 정도의 얕은 감지만 있으면 충분해 보임).
-- **깊은/특이 케이스는 Monaco 텍스트 에디터**로 직접 `.caddy` 파일을 편집 (webmanager 프론트엔드는 이미 다른 곳에서 에디터가 필요해질 걸 감안하면 Monaco 도입 자체는 자연스러움 — 별도 조사 필요 없이 그냥 `@monaco-editor/react` 붙이면 됨, Caddyfile 문법 하이라이팅은 Monaco에 기본 내장이 안 되어 있어 커스텀 language 등록이 필요할 수 있음).
+- **깊은/특이 케이스는 텍스트 에디터**로 직접 `.caddy` 파일을 편집 — **이제 새로
+  고를 필요 없이 이미 있는 `src/components/common/{CodeEditor,LazyCodeEditor,
+  ExpandableEditor}.tsx`(CodeMirror 6, 지연 로딩 청크 분리, git raw 설정 편집/
+  파일 매니저가 이미 재사용 중)를 그대로 씀 — 원래 이 문서가 고민하던 "Monaco
+  도입" 질문 자체가 해소됨. Caddyfile 전용 문법 하이라이팅은 아직 없음
+  (`CodeEditorProps.language`가 지금은 `'ini' | 'plain'`만 지원) — 필요해지면
+  Lezer 문법을 하나 추가하는 정도의 작업, CodeMirror 6가 커스텀 언어 등록을
+  지원하므로 기술적으로 막히지 않음.
 - **적용 전 검증**: 저장/reload 하기 전에 Caddy 자신의 admin API `POST http://localhost:2019/adapt` (`Content-Type: text/caddyfile`)로 문법 검증 — 여기서 에러가 나면 reload 하지 않고 UI에 에러 그대로 보여줌. Caddy CLI의 `caddy adapt`/`caddy validate`와 동일한 경로. ([Config Adapters — Caddy Documentation](https://caddyserver.com/docs/config-adapters))
 - **적용**: 파일 저장 후 `caddy reload` 한 번 — 위 "설정 반영 흐름"과 동일, 무중단.
 
@@ -197,17 +208,21 @@ README에는 "이 포트를 바깥 프록시에 연결하는 법" 정도의 짧�
 - `config/supervisord.default.conf`: `[program:caddy-adapter]` 추가 (다른 program들과 동일하게 stdout/stderr 로그 경로 패턴 유지)
 - `docker-compose.yml`: 필요 시 새 포트 퍼블리시 (위 "네트워크 노출" 절 참고 — 사용자가 자신의 배치에 맞게 직접 결정하는 영역이라 code-docker 기본값으로 강제하지 않음)
 - webmanager 백엔드: `managed/*.caddy` 파일 CRUD API + `/adapt` 검증 호출 + `caddy reload` 트리거 (핸들러 위치는 `handlers_tailscale.go` 같은 기존 핸들러들과 동일한 패턴)
-- webmanager 프론트엔드: 새 페이지 (예: "Dev Proxy" 또는 "Expose") — expose 목록, 구조화된 생성/수정 폼(이름/타겟/경로분리/헤더), Monaco 기반 raw 편집 fallback, 최근 reload 결과 표시
+- webmanager 프론트엔드: 새 페이지 (예: "Dev Proxy" 또는 "Expose") — expose 목록, 구조화된 생성/수정 폼(이름/타겟/경로분리/헤더), 기존 `ExpandableEditor`/`CodeEditor` 기반 raw 편집 fallback, 최근 reload 결과 표시
 - `bin/dev-expose`: webmanager 로컬 API를 호출하는 CLI 래퍼
 - README.md: 새 "tips" 절 추가 (dev 서버 노출 방법, 바깥 프록시 연결 예시(nginx/Caddy), 호스트 포트 퍼블리시를 택했을 때 tailnet ACL grant 추가 필요성 — 기존 tailscale/ssh/adb 절과 같은 톤)
-- `webmanager/plan.md`/`CLAUDE.md`: 우선순위 목록에 "웹 터미널 다음, mise 이전"으로 이 기능 추가 — 실제 파일 반영은 이 기능 우선순위 재배치를 전담하는 시점에 (다른 에이전트가 작업 중일 수 있어 이 조사 문서에서는 직접 편집하지 않음)
+- `webmanager/plan.md`/`CLAUDE.md`: 우선순위 목록 반영 완료 — mise보다도 아래로 내려감
+  (남은 결정이 많아 우선순위를 낮게 두기로 재조정, 아래 "남은 질문" 4번 참고)
 
 ## 남은 질문 / 구현 착수 전 확정 필요
 
 1. ~~네트워크 노출 방식~~ — 해결: code-docker가 강제하지 않고 README에 안내만 (위 "네트워크 노출" 절 참고).
 2. ~~생성 로직 위치~~ — 해결: YAML 생성 방식을 버리고 "`.caddy` 파일 자체를 편집하는 도구" 방향으로 전환 (위 "방향 전환" 절 참고), Go/셸 중 어디가 소유하냐는 질문 자체가 사라짐.
 3. **`preserve_host`(`header_up Host {host}`) 기본값** — 급하지 않음, 나중에 결정해도 됨 (아래 "preserve_host 상세" 참고). 폼이 생성하는 템플릿의 기본 스위치 하나일 뿐이라 바꾸기 쉬움.
-4. **webmanager 우선순위 배치** — 사용자 확정: 웹 터미널 다음(도커/dind, 웹 터미널과 비슷한 난이도지만 이건 "에디팅 도구 만들기"라 그 아래), mise보다는 위. 실제 문서 반영은 구현 착수 시.
+4. **webmanager 우선순위 배치** — 재조정됨: 애초엔 "웹 터미널 다음, mise 이전"으로 뒀으나,
+   남은 결정(특히 `preserve_host` 기본값 같은 디테일)이 아직 여럿 남아있어 mise보다도
+   아래로 내림 — dind/웹쉘 큐가 끝난 뒤 가장 마지막에 착수. 문서 반영 완료
+   (`plan.md`/`CLAUDE.md`).
 5. ~~`base_domain` 다중 지원~~ — 해결(아래 "base_domain 관련 재질문" 참고): YAML 스키마를 버렸으므로 애초에 스키마가 도메인 개수를 제한할 이유가 없어짐 — `custom/`이나 `managed/`에 다른 도메인용 wildcard 사이트 블록을 얼마든지 추가 가능. 남은 건 UI 쪽 "빠른 생성 폼이 기본으로 어떤 도메인을 붙여줄지"라는 훨씬 작은 UX 질문뿐.
 
 ### `preserve_host` 상세 설명

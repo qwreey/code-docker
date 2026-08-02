@@ -81,3 +81,26 @@
   display: flex;
   gap: 0.5rem;
 }
+
+.git-lfs-not-installed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.raw-config-note {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-top: -0.4rem;
+}
+
+.raw-config-actions {
+  margin-top: 0.75rem;
+}
+
+.mono-textarea {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  resize: vertical;
+}

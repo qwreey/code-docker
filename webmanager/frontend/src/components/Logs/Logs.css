@@ -6,6 +6,13 @@
   margin-bottom: 1rem;
 }
 
+/* .btn-small's padding is shorter than .form-field input/select's, so this
+   button (sitting in a .form-field next to them) looked visibly shorter —
+   match the input height instead of the generic small-button height. */
+#logs-all-time {
+  padding: 0.45rem 0.6rem;
+}
+
 .logs-live-toggle {
   display: flex;
   align-items: center;
@@ -13,6 +20,13 @@
   font-size: 0.9rem;
   cursor: pointer;
   padding-bottom: 0.45rem;
+}
+
+/* Filter controls (.logs-controls) stay in normal page flow above this, so
+   they're always visible; only the table body scrolls internally. */
+.logs-table-wrapper {
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .logs-table {
@@ -41,4 +55,10 @@
 .logs-message-blank {
   color: var(--text-muted);
   font-style: italic;
+}
+
+.logs-load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
 }

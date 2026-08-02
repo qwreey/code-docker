@@ -1,5 +1,11 @@
 # SSH authorized_keys 관리 — 완료
 
+## 업데이트 (2026-08-02, 두 번째 라운드)
+
+추가/삭제(쓰기)에 비밀번호 게이트 적용됨 — 목록 조회(읽기)는 그대로 열려있음
+("퍼블릭 키라 조회는 상관없다"는 사용자 판단). 자세히는
+`.claude/authgate-plan-done.md`.
+
 ## 기능
 
 `/code/.ssh/authorized_keys` 목록 조회/추가/삭제, fingerprint/타입/comment 표시.

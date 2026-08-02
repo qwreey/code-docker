@@ -1,0 +1,64 @@
+extensions:
+  - id: anthropic.claude-code
+    label: Claude Code
+    description: Claude Code CLI를 VS Code/code-server와 통합합니다.
+    category: AI 도구
+  - id: rust-lang.rust-analyzer
+    label: rust-analyzer
+    description: Rust 언어 서버 (자동완성, 진단, 리팩터링).
+    category: 언어 지원 (LSP)
+  - id: golang.go
+    label: Go
+    description: Go 언어 지원 (gopls 기반 자동완성/디버깅).
+    category: 언어 지원 (LSP)
+  - id: ms-python.python
+    label: Python
+    description: Python 언어 지원 (Pylance, 디버깅 포함).
+    category: 언어 지원 (LSP)
+  - id: dbaeumer.vscode-eslint
+    label: ESLint
+    description: JavaScript/TypeScript 린팅.
+    category: 코드 품질
+  - id: esbenp.prettier-vscode
+    label: Prettier
+    description: 코드 포매터.
+    category: 코드 품질
+
+mise:
+  - category: 언어 런타임/툴체인
+    tools:
+      - id: node
+        label: Node.js
+        description: JavaScript/TypeScript 런타임
+      - id: go
+        label: Go
+      - id: rust
+        label: Rust
+      - id: deno
+        label: Deno
+      - id: bun
+        label: Bun
+      - id: zig
+        label: Zig
+      - id: java
+        label: Java
+      - id: haskell
+        label: GHC (Haskell)
+  - category: CLI 유틸리티
+    tools:
+      - id: gh
+        label: GitHub CLI
+      - id: fzf
+        label: fzf
+      - id: ripgrep
+        label: ripgrep
+      - id: fd
+        label: fd
+      - id: bat
+        label: bat
+      - id: jq
+        label: jq
+      - id: direnv
+        label: direnv
+      - id: lazygit
+        label: lazygit

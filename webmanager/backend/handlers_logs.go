@@ -1,12 +1,15 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"sort"
 	"strconv"
 
 	"webmanager/internal/logstore"
 )
+
+var errInvalidUnixMs = errors.New("value must be a non-negative integer")
 
 // GET /api/logs/apps returns real supervisord process names (unchanged from
 // before) and GET /api/logs/entries now reads real vector-produced JSONL
@@ -63,7 +66,23 @@ func (s *Server) handleListLogEntries(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 
-	storeEntries, err := logstore.ReadEntries(s.cfg.VectorLogDir, app, level, limit)
+	start, err := parseOptionalUnixMs(q.Get("start"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "start must be a non-negative integer")
+		return
+	}
+	end, err := parseOptionalUnixMs(q.Get("end"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "end must be a non-negative integer")
+		return
+	}
+	before, err := parseOptionalUnixMs(q.Get("before"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "before must be a non-negative integer")
+		return
+	}
+
+	storeEntries, hasMore, err := logstore.ReadEntries(s.cfg.VectorLogDir, app, level, start, end, before, limit)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -81,6 +100,36 @@ func (s *Server) handleListLogEntries(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"entries": entries,
+		"hasMore": hasMore,
 		"mock":    false,
+	})
+}
+
+// parseOptionalUnixMs parses an optional unix-millis query param: "" means
+// unset (returns 0, the "unbounded"/"no cursor" sentinel throughout
+// logstore.ReadEntries), anything else must be a non-negative integer.
+func parseOptionalUnixMs(v string) (int64, error) {
+	if v == "" {
+		return 0, nil
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil || n < 0 {
+		return 0, errInvalidUnixMs
+	}
+	return n, nil
+}
+
+func (s *Server) handleLogRange(w http.ResponseWriter, r *http.Request) {
+	earliest, latest, ok := logstore.AvailableRange(s.cfg.VectorLogDir)
+	if !ok {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"earliest": nil,
+			"latest":   nil,
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"earliest": earliest.UnixMilli(),
+		"latest":   latest.UnixMilli(),
 	})
 }

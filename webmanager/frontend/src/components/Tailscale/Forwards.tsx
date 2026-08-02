@@ -84,6 +84,13 @@ export function Forwards() {
     <div className="card">
       <h2>Forwards</h2>
       <p className="section-description">원격 tailnet 피어의 포트를 로컬로 끌어옵니다.</p>
+      <div className="info-note">
+        <span aria-hidden="true">ℹ</span>
+        <span>
+          이 항목으로 가져온 포트는 컨테이너 안에서 <code>localhost</code>가 아니라 <code>forward</code>{' '}
+          호스트네임으로 접근하세요.
+        </span>
+      </div>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {notice && <p className="success-note">{notice}</p>}
 

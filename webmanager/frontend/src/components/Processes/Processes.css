@@ -6,6 +6,11 @@
   margin-bottom: 1rem;
 }
 
+.processes-maintabs {
+  margin-bottom: 0;
+  flex: none;
+}
+
 .processes-tab {
   border: none;
   background: var(--surface);
@@ -143,4 +148,321 @@
   border: 1px solid var(--color-gray-border);
   font-size: 0.82rem;
   margin-bottom: 1.25rem;
+}
+
+/* ── process filters / search / pagination ───────────────────────────── */
+
+.process-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+.process-search-input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+  background: var(--bg);
+  color: var(--text);
+  min-width: 14rem;
+  flex: 1 1 14rem;
+}
+
+.process-search-input:focus {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 1px;
+}
+
+.process-status-select,
+.process-pagesize-select {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.process-match-highlight {
+  background: var(--color-yellow-bg);
+  color: var(--color-yellow-fg);
+  border-radius: 2px;
+  padding: 0 1px;
+  font-weight: 600;
+}
+
+.process-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.process-tree-toggle {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0 0.2rem;
+  line-height: 1;
+  flex: none;
+}
+
+.process-tree-toggle:hover {
+  color: var(--text);
+}
+
+.process-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.process-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.process-pagination-page {
+  font-variant-numeric: tabular-nums;
+  min-width: 3.5rem;
+  text-align: center;
+}
+
+/* ── performance sub-tab ──────────────────────────────────────────────── */
+
+.perf-top-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+
+  /* same validated categorical/sequential slots as ClaudeCode.css's
+     .claude-heatmap and ResourceHistory.css's .rh-section, re-declared
+     locally since this grid sits outside both of those scopes. */
+  --viz-seq-0: var(--color-gray-bg);
+  --viz-seq-1: #9ec5f4;
+  --viz-seq-2: #3987e5;
+  --viz-seq-3: #1c5cab;
+  --viz-seq-4: #0d366b;
+
+  --viz-cat-1: #2a78d6;
+  --viz-cat-2: #eb6834;
+  --viz-cat-3: #1baf7a;
+}
+
+@media (prefers-color-scheme: dark) {
+  .perf-top-grid {
+    --viz-seq-0: #2c2c2a;
+    --viz-seq-1: #184f95;
+    --viz-seq-2: #2a78d6;
+    --viz-seq-3: #6da7ec;
+    --viz-seq-4: #b7d3f6;
+
+    --viz-cat-1: #3987e5;
+    --viz-cat-2: #d95926;
+    --viz-cat-3: #199e70;
+  }
+}
+
+.perf-card {
+  margin-top: 0;
+}
+
+.perf-card h2 {
+  font-size: 1rem;
+}
+
+.perf-card-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: -0.35rem 0 0.75rem;
+}
+
+.perf-card-disk {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* cpu heatmap */
+
+.perf-cpu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.1rem, 1fr));
+  gap: 4px;
+}
+
+.perf-cpu-cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 4px;
+  background: var(--viz-seq-0);
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.perf-cpu-cell[data-level='1'] {
+  background: var(--viz-seq-1);
+}
+
+.perf-cpu-cell[data-level='2'] {
+  background: var(--viz-seq-2);
+}
+
+.perf-cpu-cell[data-level='3'] {
+  background: var(--viz-seq-3);
+}
+
+.perf-cpu-cell[data-level='4'] {
+  background: var(--viz-seq-4);
+}
+
+.perf-cpu-cell:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 1px;
+}
+
+.perf-cpu-cell-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.perf-cpu-cell[data-level='3'] .perf-cpu-cell-label,
+.perf-cpu-cell[data-level='4'] .perf-cpu-cell-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.perf-cpu-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.75rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.perf-cpu-legend-swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  background: var(--viz-seq-0);
+}
+
+.perf-cpu-legend-swatch[data-level='1'] {
+  background: var(--viz-seq-1);
+}
+
+.perf-cpu-legend-swatch[data-level='2'] {
+  background: var(--viz-seq-2);
+}
+
+.perf-cpu-legend-swatch[data-level='3'] {
+  background: var(--viz-seq-3);
+}
+
+.perf-cpu-legend-swatch[data-level='4'] {
+  background: var(--viz-seq-4);
+}
+
+/* memory breakdown */
+
+.perf-mem-scope {
+  margin-bottom: 0.9rem;
+}
+
+.perf-mem-scope:last-child {
+  margin-bottom: 0;
+}
+
+.perf-mem-scope-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.3rem;
+}
+
+.perf-mem-scope-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.perf-mem-stack {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.4rem;
+}
+
+.perf-mem-seg {
+  height: 100%;
+  border-radius: 3px;
+  min-width: 3px;
+}
+
+.perf-mem-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.perf-mem-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.perf-mem-legend-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.perf-mem-legend-total {
+  color: var(--text-heading);
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* thermal readout */
+
+.perf-thermal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.perf-thermal-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.perf-thermal-label {
+  color: var(--text-muted);
+}
+
+.perf-thermal-value {
+  font-weight: 600;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
 }

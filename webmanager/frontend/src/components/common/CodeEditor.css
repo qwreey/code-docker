@@ -1,0 +1,14 @@
+.code-editor {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.code-editor .cm-editor {
+  height: 100%;
+}
+
+.code-editor .cm-editor.cm-focused {
+  outline: 2px solid var(--accent-border);
+  outline-offset: -1px;
+}

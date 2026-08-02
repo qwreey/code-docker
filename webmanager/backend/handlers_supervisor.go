@@ -14,13 +14,47 @@ import (
 // tail client-side.
 const maxLogFetch = 10 * 1024 * 1024
 
+// processResponse is ProcessInfo enriched with this program's metadata (see
+// config/supervisor-metadata.default.yaml / internal/supervisor.LoadMetadata)
+// so the frontend can disable start/stop/restart/logs controls and show an
+// explanatory note without a second round-trip.
+type processResponse struct {
+	supervisor.ProcessInfo
+	Label          string `json:"label,omitempty"`
+	Note           string `json:"note,omitempty"`
+	DisableStart   bool   `json:"disableStart"`
+	DisableStop    bool   `json:"disableStop"`
+	DisableRestart bool   `json:"disableRestart"`
+	DisableLogs    bool   `json:"disableLogs"`
+}
+
 func (s *Server) handleListProcesses(w http.ResponseWriter, r *http.Request) {
 	procs, err := s.sup.GetAllProcessInfo(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, procs)
+
+	meta, err := supervisor.LoadMetadata(s.cfg.SupervisorMetadataDefaultPath, s.cfg.SupervisorMetadataOverridePath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	out := make([]processResponse, 0, len(procs))
+	for _, p := range procs {
+		m := meta[p.Name]
+		out = append(out, processResponse{
+			ProcessInfo:    p,
+			Label:          m.Label,
+			Note:           m.Note,
+			DisableStart:   m.DisableStart,
+			DisableStop:    m.DisableStop,
+			DisableRestart: m.DisableRestart,
+			DisableLogs:    m.DisableLogs,
+		})
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // statusForFault maps supervisord's own fault codes (supervisor/xmlrpc.py)

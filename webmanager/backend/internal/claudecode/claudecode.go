@@ -116,7 +116,8 @@ type Counts struct {
 // Stats is the quick-overview subset of stats-cache.json this package
 // exposes, plus the derived Today/Week aggregates (the cache file has no
 // pre-computed "week" field — it's a slice of the most recent 7
-// dailyActivity entries).
+// dailyActivity entries), plus the raw per-day/per-model arrays M2 needs for
+// the heatmap/weekly graph/model-token-usage breakdown.
 type Stats struct {
 	TotalSessions              int    `json:"totalSessions"`
 	TotalMessages              int    `json:"totalMessages"`
@@ -125,6 +126,37 @@ type Stats struct {
 	LongestSessionDurationMs   int64  `json:"longestSessionDurationMs"`
 	Today                      Counts `json:"today"`
 	Week                       Counts `json:"week"`
+
+	DailyActivity    []DailyActivity              `json:"dailyActivity"`
+	DailyModelTokens []DailyModelTokens           `json:"dailyModelTokens"`
+	HourCounts       map[string]int               `json:"hourCounts"`
+	ModelUsage       map[string]ModelUsageSummary `json:"modelUsage"`
+}
+
+// DailyActivity is one day's worth of activity counts, as recorded in
+// stats-cache.json's dailyActivity array (M2: contribution-graph heatmap +
+// weekly bar chart).
+type DailyActivity struct {
+	Date          string `json:"date"`
+	MessageCount  int    `json:"messageCount"`
+	SessionCount  int    `json:"sessionCount"`
+	ToolCallCount int    `json:"toolCallCount"`
+}
+
+// DailyModelTokens is one day's token counts broken down by model, as
+// recorded in stats-cache.json's dailyModelTokens array.
+type DailyModelTokens struct {
+	Date          string           `json:"date"`
+	TokensByModel map[string]int64 `json:"tokensByModel"`
+}
+
+// ModelUsageSummary is the subset of stats-cache.json's per-model
+// modelUsage entry this package keeps; the real file has more fields, but
+// input/output/cache-read tokens are enough for a per-model usage summary.
+type ModelUsageSummary struct {
+	InputTokens          int64 `json:"inputTokens"`
+	OutputTokens         int64 `json:"outputTokens"`
+	CacheReadInputTokens int64 `json:"cacheReadInputTokens"`
 }
 
 // dailyActivityRaw mirrors one entry of stats-cache.json's dailyActivity
@@ -132,9 +164,17 @@ type Stats struct {
 // claude-plan.md's research), which sorts correctly as a plain string
 // comparison — no need to parse it into a time.Time for ordering.
 type dailyActivityRaw struct {
-	Date         string `json:"date"`
-	MessageCount int    `json:"messageCount"`
-	SessionCount int    `json:"sessionCount"`
+	Date          string `json:"date"`
+	MessageCount  int    `json:"messageCount"`
+	SessionCount  int    `json:"sessionCount"`
+	ToolCallCount int    `json:"toolCallCount"`
+}
+
+// dailyModelTokensRaw mirrors one entry of stats-cache.json's
+// dailyModelTokens array.
+type dailyModelTokensRaw struct {
+	Date          string           `json:"date"`
+	TokensByModel map[string]int64 `json:"tokensByModel"`
 }
 
 type longestSessionRaw struct {
@@ -143,14 +183,17 @@ type longestSessionRaw struct {
 }
 
 // statsCacheRaw mirrors stats-cache.json's on-disk schema, limited to the
-// fields M1's quick overview needs (dailyModelTokens/modelUsage/hourCounts
-// are M2+ territory).
+// fields M1+M2 need. modelUsage entries carry more fields than
+// ModelUsageSummary decodes; the rest are ignored.
 type statsCacheRaw struct {
-	DailyActivity    []dailyActivityRaw `json:"dailyActivity"`
-	TotalSessions    int                `json:"totalSessions"`
-	TotalMessages    int                `json:"totalMessages"`
-	LongestSession   longestSessionRaw  `json:"longestSession"`
-	FirstSessionDate string             `json:"firstSessionDate"`
+	DailyActivity    []dailyActivityRaw           `json:"dailyActivity"`
+	DailyModelTokens []dailyModelTokensRaw        `json:"dailyModelTokens"`
+	HourCounts       map[string]int               `json:"hourCounts"`
+	ModelUsage       map[string]ModelUsageSummary `json:"modelUsage"`
+	TotalSessions    int                          `json:"totalSessions"`
+	TotalMessages    int                          `json:"totalMessages"`
+	LongestSession   longestSessionRaw            `json:"longestSession"`
+	FirstSessionDate string                       `json:"firstSessionDate"`
 }
 
 // LoadStats reads and parses <configDir>/stats-cache.json, computing
@@ -195,6 +238,35 @@ func LoadStats(configDir string) (Stats, error) {
 		weekCounts.MessageCount += d.MessageCount
 	}
 
+	dailyActivity := make([]DailyActivity, len(raw.DailyActivity))
+	for i, d := range raw.DailyActivity {
+		dailyActivity[i] = DailyActivity{
+			Date:          d.Date,
+			MessageCount:  d.MessageCount,
+			SessionCount:  d.SessionCount,
+			ToolCallCount: d.ToolCallCount,
+		}
+	}
+
+	dailyModelTokens := make([]DailyModelTokens, len(raw.DailyModelTokens))
+	for i, d := range raw.DailyModelTokens {
+		tokensByModel := d.TokensByModel
+		if tokensByModel == nil {
+			tokensByModel = map[string]int64{}
+		}
+		dailyModelTokens[i] = DailyModelTokens{Date: d.Date, TokensByModel: tokensByModel}
+	}
+
+	hourCounts := raw.HourCounts
+	if hourCounts == nil {
+		hourCounts = map[string]int{}
+	}
+
+	modelUsage := raw.ModelUsage
+	if modelUsage == nil {
+		modelUsage = map[string]ModelUsageSummary{}
+	}
+
 	return Stats{
 		TotalSessions:              raw.TotalSessions,
 		TotalMessages:              raw.TotalMessages,
@@ -203,5 +275,45 @@ func LoadStats(configDir string) (Stats, error) {
 		LongestSessionDurationMs:   raw.LongestSession.Duration,
 		Today:                      todayCounts,
 		Week:                       weekCounts,
+		DailyActivity:              dailyActivity,
+		DailyModelTokens:           dailyModelTokens,
+		HourCounts:                 hourCounts,
+		ModelUsage:                 modelUsage,
 	}, nil
+}
+
+// Plugin is one entry of `claude plugin list --json`'s output — installed
+// skills/plugins, read-only (M3). Field names/shape verified against
+// claude-plan.md's recorded real output.
+type Plugin struct {
+	ID          string `json:"id"`
+	Version     string `json:"version"`
+	Scope       string `json:"scope"`
+	Enabled     bool   `json:"enabled"`
+	InstallPath string `json:"installPath"`
+	InstalledAt string `json:"installedAt"`
+	LastUpdated string `json:"lastUpdated"`
+}
+
+// ListPlugins runs `claude plugin list --json` with a bounded timeout. Any
+// failure (binary missing/broken, non-zero exit, timeout, unparseable
+// output) degrades to a nil slice with no error surfaced to the HTTP layer —
+// an empty/unavailable plugin list is a normal state here, not exceptional,
+// matching GetAuthStatus/LoadStats's convention above.
+func ListPlugins(ctx context.Context, binPath string) []Plugin {
+	ctx, cancel := context.WithTimeout(ctx, authTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, binPath, "plugin", "list", "--json")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	var plugins []Plugin
+	if err := json.Unmarshal(out, &plugins); err != nil {
+		return nil
+	}
+
+	return plugins
 }

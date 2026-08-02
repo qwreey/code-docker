@@ -16,6 +16,12 @@ export interface SupervisorProcess {
   pid: number
   start: number
   now: number
+  label?: string
+  note?: string
+  disableStart: boolean
+  disableStop: boolean
+  disableRestart: boolean
+  disableLogs: boolean
 }
 
 export type LogStream = 'stdout' | 'stderr'
@@ -48,6 +54,13 @@ export interface GitSshHost {
 export interface GitCredential {
   host: string
   username: string
+}
+
+export interface KnownHostEntry {
+  host: string
+  keyType: string
+  fingerprint: string
+  raw: string
 }
 
 export interface TailscaleGlobalConfig {
@@ -114,6 +127,12 @@ export interface LogsAppsResponse {
 export interface LogEntriesResponse {
   entries: LogEntry[]
   mock: boolean
+  hasMore: boolean
+}
+
+export interface LogsRangeResponse {
+  earliest: number | null // unix ms
+  latest: number | null // unix ms
 }
 
 export interface ProcessInfo {
@@ -152,6 +171,24 @@ export interface ClaudeStatsWindow {
   messageCount: number
 }
 
+export interface DailyActivity {
+  date: string // "YYYY-MM-DD"
+  messageCount: number
+  sessionCount: number
+  toolCallCount: number
+}
+
+export interface DailyModelTokens {
+  date: string
+  tokensByModel: Record<string, number>
+}
+
+export interface ModelUsageSummary {
+  inputTokens: number
+  outputTokens: number
+  cacheReadInputTokens: number
+}
+
 export interface ClaudeStats {
   totalSessions: number
   totalMessages: number
@@ -160,12 +197,81 @@ export interface ClaudeStats {
   longestSessionDurationMs: number
   today: ClaudeStatsWindow
   week: ClaudeStatsWindow
+  dailyActivity: DailyActivity[]
+  dailyModelTokens: DailyModelTokens[]
+  hourCounts: Record<string, number>
+  modelUsage: Record<string, ModelUsageSummary>
 }
 
 export interface ClaudeStatus {
   installed: boolean
   auth?: ClaudeAuthStatus | null
   stats?: ClaudeStats | null
+}
+
+export interface ClaudePlugin {
+  id: string
+  version: string
+  scope: string
+  enabled: boolean
+  installPath: string
+  installedAt: string
+  lastUpdated: string
+}
+
+export interface ClaudePluginsResponse {
+  plugins: ClaudePlugin[]
+}
+
+export interface ReclaimableEntry {
+  pattern: string
+  path: string
+  sizeBytes: number
+}
+
+export interface ProjectInfo {
+  root: string
+  name: string
+  path: string
+  totalSizeBytes: number
+  reclaimableSizeBytes: number
+  reclaimable: ReclaimableEntry[]
+  lastModified: string
+  stale: boolean
+  techStack: string[]
+  scannedAt: string
+}
+
+export interface ProjectsResponse {
+  roots: string[]
+  scanning: boolean
+  scannedAt: string | null
+  projects: ProjectInfo[]
+  codeServerUrl: string
+}
+
+// HostMemoryBreakdown/HostCpuInfo/ThermalZoneInfo mirror the real, merged
+// backend contract exactly (handlers_system.go's hostMemoryResources/
+// cpuCoreResources/thermalZone) — HOST-WIDE data (not scoped to this
+// container's cgroup, see the Go doc comments), deliberately kept separate
+// from `memory`/`cpu` above.
+export interface HostMemoryBreakdown {
+  totalBytes: number
+  freeBytes: number
+  buffersBytes: number
+  cachedBytes: number
+  available: boolean
+}
+
+export interface HostCpuInfo {
+  hostPercent: number[] // indexed by host core number
+  hostClockMHz?: number[] // parallel to hostPercent; absent if unreadable
+  available: boolean
+}
+
+export interface ThermalZoneInfo {
+  label: string
+  celsius: number
 }
 
 export interface SystemResources {
@@ -187,4 +293,156 @@ export interface SystemResources {
     freeBytes: number
     available: boolean
   }
+  hostMemory: HostMemoryBreakdown
+  cpuCores: HostCpuInfo
+  thermal: ThermalZoneInfo[] // empty array, not a flag, means "nothing readable"
+}
+
+export interface RecommendedExtension {
+  id: string
+  label: string
+  description: string
+  category: string
+}
+
+export interface RecommendationsResponse {
+  extensions: RecommendedExtension[]
+  mise?: MiseRecommendationCategory[]
+}
+
+export interface ResourceHistoryPoint {
+  timestamp: number // unix ms
+  cpuPercent: number
+  memUsedBytes: number
+  memLimitBytes: number | null
+  diskReadBytesPerSec: number
+  diskWriteBytesPerSec: number
+  netRxBytesPerSec: number
+  netTxBytesPerSec: number
+  // HOST-WIDE per-core percent for this tick — omitted (not present in the
+  // JSON at all) on ticks where the read failed; check the response-level
+  // hostCpuAvailable flag rather than per-point presence to distinguish
+  // "no visibility at all" from "this one tick failed".
+  hostPerCorePercent?: number[]
+  // HOST-WIDE physical memory breakdown for this tick — unrelated to
+  // memUsedBytes/memLimitBytes above, which stay cgroup-scoped. Zeroed
+  // (not omitted) on ticks where the read failed; check hostMemAvailable.
+  hostMemTotalBytes: number
+  hostMemFreeBytes: number
+  hostMemBuffersBytes: number
+  hostMemCachedBytes: number
+}
+
+export interface ResourceHistoryResponse {
+  intervalSeconds: number
+  windowSeconds: number
+  diskIOAvailable: boolean
+  netIOAvailable: boolean
+  hostCpuAvailable: boolean
+  hostMemAvailable: boolean
+  points: ResourceHistoryPoint[]
+}
+
+export interface CodeExtensionsResponse {
+  installed: string[]
+}
+
+export interface MiseRecommendedTool {
+  id: string
+  label: string
+  description: string
+}
+
+export interface MiseRecommendationCategory {
+  category: string
+  tools: MiseRecommendedTool[]
+}
+
+export interface MiseToolEntry {
+  version: string
+  requestedVersion: string
+  installPath: string
+  source: { type: string; path: string }
+  installed: boolean
+  active: boolean
+}
+
+export type MiseToolsResponse = Record<string, MiseToolEntry>
+
+export interface MiseJob {
+  jobId: string
+}
+
+export interface MiseJobStatus {
+  running: boolean
+  exitCode: number | null
+  lines: string[]
+}
+
+export type MiseEnvResponse = Record<string, string>
+
+export interface LFSStatus {
+  installed: boolean
+}
+
+export interface AuthStatus {
+  required: boolean
+  unlocked: boolean
+}
+
+export interface FileEntry {
+  name: string
+  path: string
+  isDir: boolean
+  isSymlink: boolean
+  symlinkTarget?: string
+  size: number
+  mode: string // e.g. "-rw-r--r--"
+  modTime: string
+}
+
+export interface FileStat extends FileEntry {
+  modeOctal: string
+  uid: number
+  gid: number
+  owner?: string
+  group?: string
+  changeTime: string
+  createdTime?: string
+  createdTimeAvailable: boolean
+}
+
+export interface FileContent {
+  content: string
+  truncated: boolean
+}
+
+export interface FileOpResult {
+  path: string
+  ok: boolean
+  error?: string
+}
+
+export interface FileUploadResult {
+  name: string
+  ok: boolean
+  error?: string
+}
+
+export interface KeyBinding {
+  id: string
+  label: string
+  bytes: string // literal bytes/escape sequence sent to the PTY, e.g. "\x1b" for Escape, "\x03" for Ctrl+C
+}
+
+export interface TerminalTheme {
+  id: string
+  name: string
+  colors: Record<string, string> // xterm.js theme keys -> hex color strings
+}
+
+export interface TerminalSettings {
+  keybindings: KeyBinding[]
+  themeId: string
+  customThemes: TerminalTheme[]
 }

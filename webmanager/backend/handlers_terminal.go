@@ -1,0 +1,202 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"log"
+	"net/http"
+	"os"
+	"os/exec"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
+	"github.com/coder/websocket"
+	"github.com/creack/pty"
+)
+
+// terminalReadBufferSize is the chunk size used when copying PTY output to
+// the WebSocket connection.
+const terminalReadBufferSize = 32 * 1024
+
+// terminalKillGrace is how long a SIGHUP'd shell gets to exit on its own
+// before handleTerminal escalates to SIGKILL.
+const terminalKillGrace = 3 * time.Second
+
+// terminalControlMessage is the JSON shape of text WebSocket frames sent by
+// the client. M1 only defines "resize"; unknown types are ignored so the
+// protocol can grow without breaking older clients.
+type terminalControlMessage struct {
+	Type string `json:"type"`
+	Cols uint16 `json:"cols"`
+	Rows uint16 `json:"rows"`
+}
+
+// handleTerminal upgrades the request to a WebSocket and relays a single
+// ephemeral PTY session for the lifetime of that connection: on connect it
+// spawns the container's login shell, then shuttles PTY output to the client
+// as binary frames and client input back to the PTY, until the WebSocket
+// closes — at which point the shell is killed. No session persistence, no
+// reconnect (M1 scope; see webmanager/.claude/terminal-plan.md).
+//
+// SECURITY: this endpoint opens an unauthenticated, interactive root shell
+// to anyone who can reach webmanager. There is no login of its own — same
+// trust model as the rest of webmanager (the fronting reverse proxy's
+// forward-auth is the only real gate, see README's "보안 (로그인)") — but
+// this is the single most powerful capability webmanager exposes, on par
+// with the dind Docker API. Do not expose webmanager's port directly to an
+// untrusted network.
+func (s *Server) handleTerminal(w http.ResponseWriter, r *http.Request) {
+	// Deliberately not setting InsecureSkipVerify: Accept's default
+	// same-origin check (Origin host must match the request Host) stays
+	// on. This doesn't replace real auth (there isn't any for M1, see
+	// above) — it just stops an unrelated site's page from opening a
+	// WebSocket to this endpoint through a victim's browser.
+	conn, err := websocket.Accept(w, r, nil)
+	if err != nil {
+		log.Printf("terminal: websocket accept failed: %v", err)
+		return
+	}
+
+	shell := rootLoginShell()
+	cmd := exec.Command(shell)
+	cmd.Dir = "/code"
+	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+
+	ptmx, err := pty.Start(cmd)
+	if err != nil {
+		log.Printf("terminal: failed to start pty (shell=%s): %v", shell, err)
+		_ = conn.Close(websocket.StatusInternalError, "failed to start shell")
+		return
+	}
+	log.Printf("terminal: session started shell=%s pid=%d", shell, cmd.Process.Pid)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// teardown is called from whichever side (PTY EOF/error, or WS
+	// close/error) notices the session is over first. sync.Once makes it
+	// safe to call from both the relay goroutine and the main loop below
+	// without double-closing anything.
+	var teardownOnce sync.Once
+	teardown := func() {
+		teardownOnce.Do(func() {
+			cancel()
+			_ = ptmx.Close()
+			killShell(cmd)
+		})
+	}
+	defer teardown()
+
+	// PTY output -> WS binary frames.
+	go func() {
+		defer teardown()
+		buf := make([]byte, terminalReadBufferSize)
+		for {
+			n, rerr := ptmx.Read(buf)
+			if n > 0 {
+				if werr := conn.Write(ctx, websocket.MessageBinary, buf[:n]); werr != nil {
+					return
+				}
+			}
+			if rerr != nil {
+				return
+			}
+		}
+	}()
+
+	// WS input (binary = keystrokes, text = JSON control messages) -> PTY.
+readLoop:
+	for {
+		msgType, data, rerr := conn.Read(ctx)
+		if rerr != nil {
+			break readLoop
+		}
+		switch msgType {
+		case websocket.MessageBinary:
+			if _, werr := ptmx.Write(data); werr != nil {
+				break readLoop
+			}
+		case websocket.MessageText:
+			var ctl terminalControlMessage
+			if jerr := json.Unmarshal(data, &ctl); jerr != nil {
+				log.Printf("terminal: ignoring malformed control message: %v", jerr)
+				continue
+			}
+			if ctl.Type != "resize" || ctl.Cols == 0 || ctl.Rows == 0 {
+				continue
+			}
+			if serr := pty.Setsize(ptmx, &pty.Winsize{Rows: ctl.Rows, Cols: ctl.Cols}); serr != nil {
+				log.Printf("terminal: resize failed: %v", serr)
+			}
+		}
+	}
+
+	_ = conn.Close(websocket.StatusNormalClosure, "")
+}
+
+// killShell asks the shell to exit gracefully (SIGHUP) and escalates to
+// SIGKILL if it hasn't exited within terminalKillGrace. cmd.Wait() always
+// runs to completion in its own goroutine so the process is reaped and
+// never left behind as a zombie, regardless of which path exits it.
+func killShell(cmd *exec.Cmd) {
+	proc := cmd.Process
+	if proc == nil {
+		return
+	}
+
+	done := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(done)
+	}()
+
+	_ = proc.Signal(syscall.SIGHUP)
+
+	select {
+	case <-done:
+		return
+	case <-time.After(terminalKillGrace):
+	}
+
+	_ = proc.Kill()
+	<-done
+}
+
+// rootLoginShell reads root's login shell straight from /etc/passwd (field
+// index 6, 0-indexed) rather than re-parsing config/shell.*: chsh already
+// baked the resolved choice in at image build time (see root Dockerfile),
+// so /etc/passwd is the single authoritative source at runtime. Falls back
+// to /bin/bash (logging a warning) if the file can't be read or parsed —
+// this is a convenience default, not something that should ever fail the
+// whole endpoint.
+func rootLoginShell() string {
+	const fallback = "/bin/bash"
+
+	data, err := os.ReadFile("/etc/passwd")
+	if err != nil {
+		log.Printf("terminal: reading /etc/passwd failed, falling back to %s: %v", fallback, err)
+		return fallback
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		if !strings.HasPrefix(line, "root:") {
+			continue
+		}
+		fields := strings.Split(line, ":")
+		if len(fields) < 7 {
+			log.Printf("terminal: root entry in /etc/passwd has too few fields, falling back to %s", fallback)
+			return fallback
+		}
+		shell := strings.TrimSpace(fields[6])
+		if shell == "" {
+			log.Printf("terminal: root entry in /etc/passwd has an empty shell field, falling back to %s", fallback)
+			return fallback
+		}
+		return shell
+	}
+
+	log.Printf("terminal: no root entry found in /etc/passwd, falling back to %s", fallback)
+	return fallback
+}

@@ -1,6 +1,7 @@
 // Package gitconfig manages the pieces of git configuration webmanager
 // exposes: user.name/user.email, SSH-key-based host auth (~/.ssh/config +
-// generated keypairs), and HTTPS credential-store entries.
+// generated keypairs), HTTPS credential-store entries, git-lfs install
+// status, and raw read/write access to the gitconfig file itself.
 package gitconfig
 
 import (

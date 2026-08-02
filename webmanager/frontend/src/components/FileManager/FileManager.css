@@ -1,0 +1,174 @@
+.file-manager-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+  margin-bottom: 0.9rem;
+  font-size: 0.88rem;
+}
+
+.file-manager-breadcrumb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.file-manager-breadcrumb-sep {
+  color: var(--text-muted);
+  margin-right: 0.15rem;
+}
+
+.file-manager-breadcrumb-item button {
+  background: none;
+  border: none;
+  padding: 0.15rem 0.3rem;
+  border-radius: var(--radius);
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+}
+
+.file-manager-breadcrumb-item button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.file-manager-breadcrumb-item button:disabled {
+  color: var(--text-heading);
+  font-weight: 600;
+  cursor: default;
+}
+
+.file-manager-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.file-manager-upload-label {
+  cursor: pointer;
+}
+
+.file-manager-inline-form {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.file-manager-inline-form input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.file-manager-selection-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  margin-bottom: 0.9rem;
+  font-size: 0.85rem;
+}
+
+.file-manager-selection-count {
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.file-manager-row-dir .file-manager-name-cell {
+  cursor: pointer;
+}
+
+.file-manager-name-cell {
+  min-width: 10rem;
+}
+
+.file-manager-name {
+  font-weight: 500;
+}
+
+.file-manager-symlink-target {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.file-manager-type {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.file-manager-symlink-badge {
+  margin-left: 0.3rem;
+}
+
+.file-manager-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.file-manager-rename-form {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.file-manager-rename-form input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  min-width: 8rem;
+}
+
+.file-manager-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.file-manager-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.file-manager-info-list > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.file-manager-info-list dt {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.file-manager-info-list dd {
+  margin: 0;
+  font-size: 0.9rem;
+  word-break: break-all;
+}
+
+.file-manager-info-note {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  margin-top: 0.1rem;
+}

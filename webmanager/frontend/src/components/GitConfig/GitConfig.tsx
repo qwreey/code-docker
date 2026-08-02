@@ -1,7 +1,10 @@
 import { GitUserForm } from './GitUserForm'
 import { SshHosts } from './SshHosts'
+import { KnownHosts } from './KnownHosts'
 import { CommitSigning } from './CommitSigning'
 import { HttpsCredentials } from './HttpsCredentials'
+import { GitLFS } from './GitLFS'
+import { RawConfigEditor } from './RawConfigEditor'
 import '../common/common.css'
 import './GitConfig.css'
 
@@ -13,8 +16,11 @@ export function GitConfig() {
       </div>
       <GitUserForm />
       <SshHosts />
+      <KnownHosts />
       <CommitSigning />
       <HttpsCredentials />
+      <GitLFS />
+      <RawConfigEditor />
     </section>
   )
 }

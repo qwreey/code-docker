@@ -6,6 +6,20 @@
 - 커밋 사이닝: SSH 또는 GPG 방식 선택, GPG 키 자체 생성/조회/삭제
 - 호스트별 SSH 키(ed25519 자동 생성) — `~/.ssh/config` Host 블록 관리
 - HTTPS credential store(`~/.git-credentials`, 평문 저장 — UI에 경고 문구)
+- **(2026-08-02 추가)** `git lfs install` 실행 버튼(`internal/gitconfig/lfs.go`,
+  `git-lfs` PATH 미존재 시 "이미지 리빌드 필요" 안내) + `.gitconfig` 원본 편집
+  (`internal/gitconfig/raw.go` — 저장 전 임시파일에 써서 `git config -f <tmp> -l`
+  로 문법 검증 후 `os.Rename`으로 원자적 교체, 검증 실패 시 원본 파일 안 건드림).
+  프론트는 새 `src/components/common/{CodeEditor,LazyCodeEditor,
+  ExpandableEditor}.tsx`(CodeMirror 6, 지연 로딩 청크 분리) 재사용 —
+  `GitConfig.tsx`에 `GitLFS.tsx`/`RawConfigEditor.tsx` 추가. `config/build.default.sh`
+  에 `git-lfs` pacman 패키지 추가.
+- **(2026-08-02 두 번째 라운드 추가)** `~/.ssh/known_hosts` 조회/추가(raw 라인
+  붙여넣기)/삭제(`internal/gitconfig/knownhosts.go`, 기존 SSH 키 기능과 동일한
+  fingerprint 계산 재사용) — `GitConfig.tsx`에 `KnownHosts.tsx` 추가.
+  **비밀번호 게이트**: 이 문서에 나온 모든 쓰기(user/signing/ssh-hosts/
+  credentials/lfs-install/raw-편집/gpg-keys/known-hosts의 POST·PUT·DELETE)에
+  적용됨, 읽기는 그대로 열림 — 자세히는 `.claude/authgate-plan-done.md`.
 
 ## 어떻게 동작하는가 (`internal/gitconfig`)
 

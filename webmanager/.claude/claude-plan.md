@@ -1,21 +1,40 @@
-# Claude Code 상태/관리 패널 조사 (설계 완료, 구현 착수 가능 — M1부터)
+# Claude Code 상태/관리 패널 조사 (M1+M2+M3 구현 완료, M4부터 미착수)
+
+## 구현 완료 (2026-08-02): M3
+
+`internal/claudecode`에 `ListPlugins`(`claude plugin list --json` 래핑, 실패 시
+빈 배열로 열화) 추가, `GET /api/claude/plugins` 신규. 프론트는 기존
+`InstalledView`에 `PluginsTable` 카드 추가(이름/버전/scope/활성 여부, id를 `@`로
+split해서 마켓플레이스 서픽스는 서브텍스트로). `go build`/`go vet`/`gofmt`,
+`npm run build`/`npm run lint` 전부 클린.
 
 > `caddy-plan.md`/`.claude/archive/tailscale-design.md`(레포 루트)와 같은 성격으로
 > 시작한 문서였으나, 이제 마일스톤까지 정리돼서 **M1은 바로 구현 착수 가능한 상태**.
 > 저장소 일반 컨벤션은 루트 `CLAUDE.md`, webmanager 컨벤션은 `webmanager/CLAUDE.md`,
 > `webmanager/plan.md` 참고.
 
-## 구현 마일스톤 (확정)
+## 구현 완료 (2026-08-02): M1 + M2
 
-기능을 한 번에 다 만들지 않고 단계적으로 진행 — M1을 먼저 구현해보고 괜찮으면 이어서
-다음 단계로.
+**M1**: `internal/claudecode`(바이너리 탐지, `CLAUDE_CONFIG_DIR` 존중, 5초
+타임아웃) + `handlers_claude.go`의 `GET /api/claude/status`. 프론트
+`src/components/ClaudeCode/ClaudeCode.tsx` — 미설치 시 유령/스켈레톤 오버레이,
+설치 시 로그인 상태/총 사용량/오늘·이번 주/최장 세션 카드.
 
-- **M1 (지금 착수 가능, 최우선)**: 퀵 오버뷰만 — 로그인 상태(`claude auth status
-  --json`) + `stats-cache.json` 기반 기본 숫자(총 세션 수, 오늘/이번 주 세션·메시지
-  수, longest session). 그래프/히트맵 없이 숫자 카드 정도로 최대한 단순하게. 감지
-  로직(설치 안 됨 상태 표시)도 M1에 포함 — 이게 없으면 다른 카드들도 의미가 없음.
-- **M2**: 히트맵(`dailyActivity` 월간 뷰) + 주간 그래프 + 모델별 토큰 사용량 — 반드시
-  `dataviz` 스킬 가이드를 따를 것.
+**M2**: `internal/claudecode`의 `Stats`에 `dailyActivity`/`dailyModelTokens`/
+`hourCounts`/`modelUsage` 추가(같은 `stats-cache.json`을 확장 파싱, 새 라우트
+불필요 — 기존 `GET /api/claude/status` 응답만 확장). 프론트에 `dataviz` 스킬을
+따라 `Heatmap.tsx`(월간 뷰, `messageCount` 단일 지표, 5단계 sequential 버킷),
+`WeeklyChart.tsx`(최근 7일 message/toolCall 그룹 바 차트), `ModelUsageChart.tsx`
+(모델별 input/output/cache-read 토큰, 크기 차이가 커서 단일 축 대신 패널 분리)
+추가 — 외부 차트 라이브러리 없이 SVG/CSS로 직접 구현. `go build`/`go vet`/`gofmt`,
+`npm run build`/`npm run lint` 전부 클린 확인.
+
+## 구현 마일스톤
+
+기능을 한 번에 다 만들지 않고 단계적으로 진행 — M1/M2 완료, 다음은 M3.
+
+- ~~**M1**~~: 완료 (위 참고).
+- ~~**M2**~~: 완료 (위 참고).
 - **M3**: Skills/Plugins 목록 조회(`claude plugin list --json`, 조회 전용).
 - **M4**: 확장 설치 배너 — `extensions-plan.md`의 API(있다면)를 재사용, 없으면 이
   기능 자체에서 최소하게 구현. webmanager 설정 저장소(`/code/.webmanager/

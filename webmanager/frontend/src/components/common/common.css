@@ -213,6 +213,19 @@
   margin-bottom: 1rem;
 }
 
+.info-note {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--color-gray-bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
 .success-note {
   padding: 0.5rem 0.85rem;
   border-radius: var(--radius);

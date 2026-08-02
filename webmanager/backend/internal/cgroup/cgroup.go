@@ -240,3 +240,110 @@ func (s *Sampler) CPU() (percent float64, limitCores *float64, numCPU int, ok bo
 	}
 	return pct, limitCores, numCPU, true
 }
+
+// DiskIOBytes sums rbytes/wbytes across every device line in io.stat for
+// the calling process's cgroup. ok is false if the cgroup dir or io.stat
+// itself couldn't be read/parsed (e.g. the io controller isn't enabled) —
+// callers should treat this as "unavailable", not zero.
+func DiskIOBytes() (readBytes, writeBytes uint64, ok bool) {
+	d, err := dir()
+	if err != nil {
+		return 0, 0, false
+	}
+
+	f, err := os.Open(filepath.Join(d, "io.stat"))
+	if err != nil {
+		return 0, 0, false
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	found := false
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 2 {
+			continue
+		}
+		found = true
+		// fields[0] is the "<major>:<minor>" device id; the rest are
+		// key=value pairs (rbytes/wbytes/rios/wios/dbytes/dios).
+		for _, kv := range fields[1:] {
+			k, v, ok := strings.Cut(kv, "=")
+			if !ok {
+				continue
+			}
+			n, err := strconv.ParseUint(v, 10, 64)
+			if err != nil {
+				continue
+			}
+			switch k {
+			case "rbytes":
+				readBytes += n
+			case "wbytes":
+				writeBytes += n
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return 0, 0, false
+	}
+	if !found {
+		return 0, 0, false
+	}
+	return readBytes, writeBytes, true
+}
+
+// NetworkIOBytes sums rx/tx bytes across every non-loopback interface in
+// /proc/net/dev. ok is false if the file couldn't be read/parsed. This
+// container has its own network namespace, so /proc/net/dev is already
+// scoped to just this container's interfaces — no cgroup involvement
+// needed here, unlike DiskIOBytes/CPU/Memory above.
+func NetworkIOBytes() (rxBytes, txBytes uint64, ok bool) {
+	f, err := os.Open("/proc/net/dev")
+	if err != nil {
+		return 0, 0, false
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	line := 0
+	found := false
+	for scanner.Scan() {
+		line++
+		if line <= 2 {
+			// Two header lines before the per-interface rows.
+			continue
+		}
+		text := scanner.Text()
+		name, rest, ok := strings.Cut(text, ":")
+		if !ok {
+			continue
+		}
+		name = strings.TrimSpace(name)
+		if name == "" || name == "lo" {
+			continue
+		}
+		fields := strings.Fields(rest)
+		if len(fields) < 16 {
+			continue
+		}
+		rx, err := strconv.ParseUint(fields[0], 10, 64)
+		if err != nil {
+			continue
+		}
+		tx, err := strconv.ParseUint(fields[8], 10, 64)
+		if err != nil {
+			continue
+		}
+		rxBytes += rx
+		txBytes += tx
+		found = true
+	}
+	if err := scanner.Err(); err != nil {
+		return 0, 0, false
+	}
+	if !found {
+		return 0, 0, false
+	}
+	return rxBytes, txBytes, true
+}

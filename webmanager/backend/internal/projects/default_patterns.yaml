@@ -1,0 +1,13 @@
+patterns:
+  - node_modules
+  - target
+  - .venv
+  - venv
+  - __pycache__
+  - dist
+  - build
+  - .next
+  - .nuxt
+  - .turbo
+  - .gradle
+  - .cache

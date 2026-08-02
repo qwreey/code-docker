@@ -2,10 +2,10 @@
 // pipeline (see webmanager/.claude/vector-logs-plan-done.md): one file per day at
 // <dir>/<YYYY-MM-DD>.jsonl, newline-delimited JSON objects with fields
 // timestamp/app_name/level/message. That producer is a separate, parallel
-// effort — this package must tolerate the directory or today's/yesterday's
-// file not existing yet (that's just "no entries", not an error) and must
-// skip individual malformed lines rather than fail the whole read (a
-// partially-written line from an in-progress append is expected).
+// effort — this package must tolerate the directory or any day-file not
+// existing (that's just "no entries", not an error) and must skip individual
+// malformed lines rather than fail the whole read (a partially-written line
+// from an in-progress append is expected).
 package logstore
 
 import (
@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -37,53 +38,125 @@ type rawLine struct {
 	Message   string `json:"message"`
 }
 
-// dayFileNames returns the filenames (not full paths) for today and
-// yesterday, most-recent first. Day-partitioned files are read instead of
-// globbing every file the producer has ever written, since this container
-// is long-lived and an unbounded glob would mean unbounded I/O per request
-// as history accumulates; two days is enough of a buffer for a "recent
-// logs" viewer without that cost.
-func dayFileNames(now time.Time) []string {
-	const layout = "2006-01-02.jsonl"
-	return []string{
-		now.Format(layout),
-		now.AddDate(0, 0, -1).Format(layout),
+// dateFileLayout is both the on-disk filename format (sans extension) and
+// the format day-files are named with: <dir>/<dateFileLayout>.jsonl.
+const dateFileLayout = "2006-01-02"
+
+// availableDates globs dir for day-files and parses each filename (UTC, per
+// the package doc) into the date it represents, in no particular order.
+// Filenames that don't match the expected format are silently skipped —
+// vector is the only writer into this directory, but a stray file shouldn't
+// break the read. A missing dir just yields zero dates, not an error.
+func availableDates(dir string) ([]time.Time, error) {
+	matches, err := filepath.Glob(filepath.Join(dir, "*.jsonl"))
+	if err != nil {
+		return nil, err
 	}
+	dates := make([]time.Time, 0, len(matches))
+	for _, m := range matches {
+		name := strings.TrimSuffix(filepath.Base(m), ".jsonl")
+		d, err := time.Parse(dateFileLayout, name)
+		if err != nil {
+			continue
+		}
+		dates = append(dates, d)
+	}
+	return dates, nil
 }
 
-// ReadEntries loads log entries from the most recent day-files in dir,
-// optionally filtered by app (exact match on app_name) and level (exact
-// match on level), sorted by timestamp descending, and clamped to limit
-// entries. A missing dir, missing day-files, or an empty dir all just yield
-// zero entries rather than an error.
-func ReadEntries(dir string, app, level string, limit int) ([]Entry, error) {
-	entries := make([]Entry, 0)
+// AvailableRange returns the earliest and latest dates for which a log file
+// exists in dir (by filename, UTC), or ok=false if none exist.
+func AvailableRange(dir string) (earliest, latest time.Time, ok bool) {
+	dates, err := availableDates(dir)
+	if err != nil || len(dates) == 0 {
+		return time.Time{}, time.Time{}, false
+	}
+	earliest, latest = dates[0], dates[0]
+	for _, d := range dates[1:] {
+		if d.Before(earliest) {
+			earliest = d
+		}
+		if d.After(latest) {
+			latest = d
+		}
+	}
+	return earliest, latest, true
+}
 
-	// UTC, not local time: vector's own file-sink path templating keys
-	// day-filenames off each event's (UTC) timestamp, so computing "today"
-	// in local time would drift from vector's filenames for several hours
-	// around local midnight if this container's TZ is ever set to a
-	// non-UTC zone.
-	for _, name := range dayFileNames(time.Now().UTC()) {
-		path := filepath.Join(dir, name)
+// ReadEntries reads log entries matching app/level, restricted to
+// [startMs, endMs] (either may be 0 meaning unbounded on that side, unix
+// millis), and further restricted to entries strictly older than beforeMs
+// (0 = no cursor, i.e. start from the newest matching entry). Returns at
+// most limit entries (already sorted newest-first) plus hasMore indicating
+// whether at least one more matching entry exists beyond what was returned.
+func ReadEntries(dir string, app, level string, startMs, endMs, beforeMs int64, limit int) ([]Entry, bool, error) {
+	dates, err := availableDates(dir)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// A day-file can contain entries from anywhere in that UTC day, so keep
+	// any date whose [00:00, 24:00) range intersects [startMs, endMs], not
+	// just dates falling exactly within it.
+	filtered := make([]time.Time, 0, len(dates))
+	for _, d := range dates {
+		dayStart := d.UnixMilli()
+		dayEnd := d.AddDate(0, 0, 1).UnixMilli()
+		if startMs != 0 && dayEnd <= startMs {
+			continue
+		}
+		if endMs != 0 && dayStart > endMs {
+			continue
+		}
+		filtered = append(filtered, d)
+	}
+	sort.Slice(filtered, func(i, j int) bool { return filtered[i].After(filtered[j]) })
+
+	entries := make([]Entry, 0)
+	for _, d := range filtered {
+		path := filepath.Join(dir, d.Format(dateFileLayout)+".jsonl")
 		fileEntries, err := readFile(path, app, level)
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue
 			}
-			return nil, err
+			return nil, false, err
 		}
-		entries = append(entries, fileEntries...)
+
+		dayEntries := make([]Entry, 0, len(fileEntries))
+		for _, e := range fileEntries {
+			if startMs != 0 && e.Timestamp < startMs {
+				continue
+			}
+			if endMs != 0 && e.Timestamp > endMs {
+				continue
+			}
+			if beforeMs != 0 && e.Timestamp >= beforeMs {
+				continue
+			}
+			dayEntries = append(dayEntries, e)
+		}
+		sort.Slice(dayEntries, func(i, j int) bool {
+			return dayEntries[i].Timestamp > dayEntries[j].Timestamp
+		})
+		entries = append(entries, dayEntries...)
+
+		// Only check the stopping condition *after* a day-file has been
+		// fully read and merged in: cutting a day short mid-file would risk
+		// dropping entries from that day that sort ahead of ones we already
+		// have from an earlier (older) day-file, corrupting the newest-first
+		// order across the day boundary.
+		if limit > 0 && len(entries) > limit {
+			break
+		}
 	}
 
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Timestamp > entries[j].Timestamp
-	})
-
+	hasMore := false
 	if limit > 0 && len(entries) > limit {
 		entries = entries[:limit]
+		hasMore = true
 	}
-	return entries, nil
+	return entries, hasMore, nil
 }
 
 // readFile parses one day-file, already applying the app/level filters so

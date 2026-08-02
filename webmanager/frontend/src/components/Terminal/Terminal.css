@@ -1,0 +1,83 @@
+.terminal-section {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 4rem);
+}
+
+.terminal-container {
+  flex: 1;
+  min-height: 300px;
+  min-width: 0;
+  padding: 0.5rem;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.terminal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.terminal-controls {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.4rem 0.1rem;
+  margin-bottom: 0.5rem;
+  flex: none;
+}
+
+.terminal-key-btn {
+  flex: none;
+  min-width: 2.6rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: var(--mono);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.terminal-key-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.terminal-key-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.terminal-key-modifier.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.terminal-container .xterm {
+  height: 100%;
+}
+
+.terminal-container .xterm-viewport {
+  overflow-y: auto;
+}
+
+@media (max-width: 720px) {
+  .terminal-section {
+    height: calc(100vh - 6.1rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .terminal-section {
+    height: calc(100vh - 5.6rem);
+  }
+}

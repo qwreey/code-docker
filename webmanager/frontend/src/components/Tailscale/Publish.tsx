@@ -81,6 +81,13 @@ export function Publish() {
     <div className="card">
       <h2>Publish</h2>
       <p className="section-description">로컬 포트를 tailnet 전체에 명시적으로 노출합니다.</p>
+      <div className="info-note">
+        <span aria-hidden="true">ℹ</span>
+        <span>
+          게시하려는 서비스는 <code>0.0.0.0</code>/<code>localhost</code>가 아니라 <code>private</code>{' '}
+          호스트네임(전용 tailscale IP)에 바인드되어 있어야 합니다.
+        </span>
+      </div>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {notice && <p className="success-note">{notice}</p>}
 

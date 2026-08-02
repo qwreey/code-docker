@@ -137,7 +137,15 @@ cgroup/statfs 읽기가 실패하면 해당 섹션이 그냥 0으로 채워져�
   여전히 `/dev/fd/1` 직결) — **의도적으로 그대로 둠**. 사용자 확인: "웹 패널에선
   vector에 대해서 안 보여주는 게 맞다", fd1 유지가 기술적으로 더 가볍다는 판단.
 
-## 사용자 질문에 대한 조사 결과: supervisord 프로그램에 커스텀 메타데이터/라벨을 달 수 있는가?
+## 사용자 질문에 대한 조사 결과: supervisord 프로그램에 커스텀 메타데이터/라벨을 달 수 있는가? — **구현 완료 (2026-08-02)**
+
+아래 조사 결과 그대로 "webmanager 자체에서 처리"하는 방향으로 실제 구현됨:
+`config/supervisor-metadata.default.yaml`(override 패턴) + `internal/supervisor`의
+`LoadMetadata`가 `GET /api/supervisor/processes` 응답에 프로그램별
+`label`/`note`/`disableStart`/`disableStop`/`disableRestart`/`disableLogs`를
+병합 — vector는 `disableLogs: true`로 기본 설정됨(자세히는
+`.claude/supervisor-plan-done.md`). 아래는 원 조사 기록(여전히 정확함, 왜 이
+방식을 택했는지의 근거로 남겨둠).
 
 **결론: 안 됨 — supervisord 자체에는 자유 형식 메타데이터/라벨 필드가 없음.**
 

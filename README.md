@@ -199,22 +199,70 @@ publish:
 ## webmanager (관리자 패널)
 
 80번 포트의 code-server 와 별개로, `81`번 포트에 브라우저 관리자 패널이 함께 떠 있습니다 (Go
-백엔드 + React 프론트엔드, `webmanager/` 폴더에서 개발됩니다 — 현재 상태와 남은 작업은
-`webmanager/plan.md` 참고). 구현된 기능:
+백엔드 + React 프론트엔드, `webmanager/` 폴더에서 개발됩니다). 구현된 기능:
 
-- **Supervisor**: supervisord 프로그램 목록 조회 및 start/stop/restart, 표준출력/표준에러 로그 확인
+- **Supervisor**: supervisord 프로그램 목록 조회 및 start/stop/restart, 표준출력/표준에러 로그 확인.
+  프로그램별로 특정 컨트롤을 비활성화(설명 노트와 함께)할 수 있는 메타데이터 지원(아래
+  `supervisor-metadata.*.yaml` 참고 — `vector`는 기본적으로 로그 보기가 꺼져 있습니다), 프로그램의
+  PID를 루트로 한 자식 프로세스 트리 펼쳐보기
 - **SSH Keys**: `/code/.ssh/authorized_keys` 목록 조회/추가/삭제
 - **Git Config**: `/code/.gitconfig` 의 user.name/email, 커밋 사이닝(SSH 키 또는 GPG, GPG 키
   자체 생성/조회/삭제 포함), 호스트별 SSH 키(ed25519 자동 생성), HTTPS credential store
-  (`~/.git-credentials`, 평문 저장) 관리
+  (`~/.git-credentials`, 평문 저장), `~/.ssh/known_hosts` 관리, `git lfs install` 실행,
+  `.gitconfig` 원본 직접 편집(저장 전 문법 검증)
 - **Tailscale**: `/code/.tailscale/config.yaml`의 `forwards`/`publish` 항목 조회/추가/삭제
   (저장 시 `tailscale-forward` 자동 재시작 — `forward-reload`와 동일 효과). 로그인
   상태/URL은 다루지 않음 — 아래 tailscale 배너를 그대로 씁니다
-- **Logs**: 프로그램별 구조화 로그를 앱/레벨로 필터링해서 조회 (아래 vector 문단 참고)
-- **Processes**: 컨테이너 안 프로세스 목록(cpu%/mem%/커맨드) + 리스닝 포트별 점유 프로세스
-  조회, 종료(SIGTERM/SIGKILL) — `btop`을 안 열어도 포트 점유 프로세스를 찾아 끌 수 있음
+- **Logs**: 프로그램별 구조화 로그를 앱/레벨/시간 범위(존재하는 로그 기준으로 자동
+  clamp됨)로 필터링해서 조회, 커서 기반 페이지네이션, 실시간 새로고침(신규 항목 누적)
+  (아래 vector 문단 참고) — 로그에 시크릿이 노출될 수 있어 이 탭 전체가 비밀번호
+  게이트 대상입니다(아래 보안 문단 참고)
+- **작업 관리자**(구 "Processes"): "성능"/"프로세스" 두 서브탭. 성능 탭은 호스트 전체
+  기준 코어별 CPU 사용률 히트맵, 메모리 구성요소별(캐시/버퍼/사용/여유) 분해(cgroup
+  제한과 호스트 물리 총량을 나란히), 가능하면 클럭/온도, 최근 10분 히스토리 그래프.
+  프로세스 탭은 리스트/트리 뷰 전환, 상태 필터, 이름/커맨드 퍼지 검색(일치 부분
+  강조), 페이지네이션, 리스닝 포트별 점유 프로세스 조회/종료(SIGTERM/SIGKILL) —
+  `btop`을 안 열어도 다 됩니다
+- **Claude Code**: 설치 여부 감지, 로그인 상태, 사용 통계(총 세션/오늘·이번 주/최장
+  세션, 월간 히트맵, 주간 그래프, 모델별 토큰 사용량), 설치된 Skills/Plugins 목록
+- **익스텐션**: `recommendations.*.yaml`의 추천 code-server 익스텐션 목록을 카테고리별로
+  접었다 펼치며 보고 설치, 이미 설치된 익스텐션 전체 목록(기본 접힘), 추천 목록
+  표시 여부 토글(기기별 저장)
+- **프로젝트**: `$HOME/Projects` 아래 프로젝트별 용량, `node_modules`/`target` 등
+  재생성 가능한 폴더 브레이크다운, 오래된 프로젝트 표시, 최근 편집순 정렬, 프로젝트별
+  mise 사용 도구 목록(읽기 전용), 설정된 경우 code-server로 바로 열기 (읽기 전용 —
+  삭제 기능은 아직 없음)
+- **mise**: 추천 도구 목록을 카테고리별로 접었다 펼치며(기본 접힘) 보고 설치
+  (`mise use -g`), 전역으로 설치된 도구 목록/삭제, 환경변수 미리보기(`mise env`) —
+  전역 도구를 바꾼 뒤 code-server 통합 터미널에 반영하려면 `restart` 명령이 여전히
+  필요합니다
+- **Terminal**: 브라우저에서 바로 여는 쉘(xterm.js + WebSocket) — code-server 자체가
+  죽었을 때의 최소 복구 수단이자, code-server 세션과 무관하게 dev 서버를 잠깐 띄워두는
+  용도. 탭을 닫으면 세션도 즉시 종료됩니다(아직 이름 붙은 영속 세션은 없음). 모바일에서도
+  쓸 수 있게 Esc/Ctrl/Alt/Shift/Tab/방향키 온스크린 버튼(커스터마이징 가능)과 색상
+  테마(프리셋 10개 + 사용자 정의) 지원
+- **파일**: `/code` 아래(설정으로 넓힐 수 있음) 파일시스템을 code-server가 지금 열어둔
+  프로젝트 폴더에 국한되지 않고 브라우징 — 업로드/다운로드/삭제/이동/복사/이름변경/폴더
+  생성/멀티선택, 텍스트 파일은 바로 편집(CodeMirror), 권한/생성·수정 시각 정보 패널
 
-mise, dind, 웹쉘(터미널) 관리는 아직 자리만 잡아둔 상태이고 구현되어있지 않습니다.
+git-lfs 는 `config/build.default.sh`에 포함되어 기본으로 설치됩니다(패키지 설치만 —
+저장소별 `git lfs install`은 위 Git Config 탭에서 직접 실행). dind(Docker) 관리는 아직
+구현되어있지 않습니다.
+
+> **주의: webmanager는 자체 비밀번호 게이트를 지원합니다(선택 사항, 기본은 꺼짐).**
+> `WEBMANAGER_AUTH_PASSWORD_HASH` 환경변수에 argon2id로 해시한 비밀번호를 설정하면
+> `/api/auth/unlock`으로 풀기 전까진 접근할 수 없는 라우트가 생깁니다(해제하면 10분간
+> 다시 안 물어봄). 원칙은 **조회(읽기)는 그대로 열어두고, 변경(쓰기)만 게이트** —
+> Supervisor의 start/stop/restart, Git Config/Tailscale의 모든 추가·수정·삭제, SSH
+> Keys 추가·삭제 등이 여기 해당합니다. 예외로 **Terminal, 파일 탭, Logs, Supervisor의
+> 프로그램별 로그 조회는 조회까지 통째로 게이트**됩니다(각각 root 쉘/임의 파일
+> 접근/로그 속 시크릿 노출 위험 때문). 값은 반드시 환경변수로만 주입해야 하며(설정
+> 파일에 저장하면 컨테이너 안에서 프로세스를 재시작해 우회할 수 있어 일부러 지원하지
+> 않습니다), `/etc/environment`에도 같은 이름의 변수가 있으면 조작 가능성으로 보고
+> 게이트가 무시됩니다. 설정하지 않으면 이 게이트는 기본적으로 열려 있으므로(다른
+> 탭과 동일하게 리버스 프록시 인증에만 의존), 컨테이너 밖에 노출한다면 반드시 설정을
+> 권장합니다 — 특히 Terminal(브라우저에서 곧바로 root 쉘)과 파일 탭(임의 파일시스템
+> read/write/delete)은 webmanager 안에서 가장 강한 권한을 가진 기능입니다.
 
 각 supervisord program의 표준출력은 이제 `/var/log/<프로그램명>/stdout.log` 로 실제 파일에
 회전(rotate)되어 남으며, [vector](https://vector.dev)가 이 파일들을 tail 하여
@@ -227,7 +275,11 @@ mise, dind, 웹쉘(터미널) 관리는 아직 자리만 잡아둔 상태이고 
 > 리버스 프록시의 forward-auth 에만 의존하므로, 프록시 설정 없이 81번 포트를 그대로
 > 인터넷에 노출하면 안 됩니다 ([보안 (로그인)](#보안-로그인) 절과 동일한 방식으로 프록시를
 > 구성하세요). SSH 키/git credential 파일을 직접 다루는 기능이라 code-server 의
-> `auth: none` 보다 더 신중한 접근 통제가 필요합니다.
+> `auth: none` 보다 더 신중한 접근 통제가 필요합니다. **특히 Terminal(브라우저에서
+> 곧바로 root 쉘)과 파일(임의 파일시스템 read/write/delete) 탭은 webmanager 안에서
+> 가장 강한 권한을 가진 기능**이라 위 "webmanager (관리자 패널)" 절에 설명된 자체
+> 비밀번호 게이트(`WEBMANAGER_AUTH_PASSWORD_HASH`, 기본은 꺼짐)를 함께 설정하는 걸
+> 강력히 권장합니다.
 
 # 빌드 커스터마이징
 
@@ -248,6 +300,32 @@ code-server 서비스 엔트리포인트입니다. code-server 의 업데이트/
 유저가 적절한 설정을 가지고 있지 않을 때(일반적으로 초기 설치에) 복사되는 기본 code-server 설정파일입니다. 이미 설정된 경우 /code/.server/config.yaml 를 수정해야합니다.
 
 여기의 각 요소는 /code/.server/code-server/bin/code-server --help 를 통해 확인해볼 수 있습니다. 각각의 인자 `--some=value` 는 `some: value` 로 작성할 수 있습니다.
+
+## recommendations.\*.yaml
+
+webmanager의 "익스텐션" 탭이 추천 목록으로 보여주는 code-server 익스텐션 목록입니다
+(추후 mise 도구 추천 목록도 이 파일에 `mise:` 최상위 키로 추가될 예정). 여러 사용자에게
+같은 이미지를 배포하는 경우, 이 파일을 override해서 조직에 맞는 추천 목록으로 완전히
+교체할 수 있습니다.
+
+## supervisor-metadata.\*.yaml
+
+webmanager의 "Supervisor" 탭이 각 supervisord 프로그램에 대해 보여주는 메타데이터입니다.
+프로그램 이름을 키로 하여 표시 라벨(`label`), 설명 노트(`note`), 그리고 시작/중지/재시작/
+로그보기 버튼을 각각 비활성화할지(`disableStart`/`disableStop`/`disableRestart`/
+`disableLogs`, 모두 boolean) 지정할 수 있습니다. 모든 필드는 선택 사항이며, 목록에 없는
+프로그램은 아무것도 비활성화되지 않습니다.
+
+기본값은 `vector`(로그 파이프라인 프로세스)의 로그보기 버튼만 비활성화합니다 — 이 프로세스가
+만드는 로그를 다른 프로그램들의 로그로 가공해 Logs 탭에서 보여주는 것이 이 프로세스의 역할이므로,
+자기 자신의 표준출력을 이 메커니즘으로 다시 보여줄 이유가 없기 때문입니다.
+
+```yaml
+programs:
+  vector:
+    note: 내부 로그 파이프라인 프로세스입니다. ...
+    disableLogs: true
+```
 
 ## code-env.\*.sh
 
