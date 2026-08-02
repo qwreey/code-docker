@@ -189,6 +189,8 @@ services:
       # use of IPC (extensions, LSP, etc.)
       - IPC_LOCK
     # Change max logging size
+    # Please note that without this setting,
+    # log files could grow to tens of gigabytes in size.
     logging:
       driver: "json-file"
       options:
