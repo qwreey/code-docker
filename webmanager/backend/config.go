@@ -52,6 +52,10 @@ type Config struct {
 	// TerminalSettingsPath is where the web terminal's user-customizable
 	// keybindings/color themes are persisted (see internal/terminalsettings).
 	TerminalSettingsPath string
+
+	// SidebarOrderPath is where the user's drag-and-drop sidebar tab order
+	// is persisted (see internal/uiprefs). Not gated — purely cosmetic.
+	SidebarOrderPath string
 }
 
 func getenv(key, def string) string {
@@ -104,5 +108,6 @@ func loadConfig() Config {
 		FilesMaxUploadBytes: getenv("WEBMANAGER_FILES_MAX_UPLOAD_BYTES", "2147483648"),
 
 		TerminalSettingsPath: getenv("WEBMANAGER_TERMINAL_SETTINGS_PATH", "/code/.webmanager/terminal-settings.json"),
+		SidebarOrderPath:     getenv("WEBMANAGER_SIDEBAR_ORDER_PATH", "/code/.webmanager/sidebar-order.json"),
 	}
 }

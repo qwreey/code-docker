@@ -208,7 +208,7 @@ export function FileManager() {
   return (
     <section>
       <div className="section-header">
-        <h1>파일</h1>
+        <h1>Files</h1>
         <button type="button" className="btn btn-secondary btn-small" onClick={load} disabled={loading}>
           {loading ? '불러오는 중...' : '새로고침'}
         </button>

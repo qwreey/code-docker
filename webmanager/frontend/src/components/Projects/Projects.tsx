@@ -67,7 +67,7 @@ export function Projects() {
   return (
     <section>
       <div className="section-header">
-        <h1>프로젝트</h1>
+        <h1>Projects</h1>
         <button type="button" className="btn btn-secondary btn-small" onClick={rescanAll} disabled={loading}>
           {loading ? '스캔 중...' : '전체 다시 스캔'}
         </button>

@@ -156,6 +156,9 @@ func main() {
 	mux.HandleFunc("POST /api/auth/unlock", s.handleAuthUnlock)
 	mux.HandleFunc("GET /api/auth/status", s.handleAuthStatus)
 
+	mux.HandleFunc("GET /api/ui/sidebar-order", s.handleGetSidebarOrder)
+	mux.HandleFunc("PUT /api/ui/sidebar-order", s.handlePutSidebarOrder)
+
 	// SECURITY: opens an unauthenticated-by-default, interactive root
 	// shell (PTY) over WebSocket to anyone who can reach webmanager — no
 	// login of its own beyond the fronting reverse proxy's forward-auth

@@ -446,3 +446,7 @@ export interface TerminalSettings {
   themeId: string
   customThemes: TerminalTheme[]
 }
+
+export interface SidebarOrder {
+  order: string[] // SectionId values, in user-chosen display order
+}

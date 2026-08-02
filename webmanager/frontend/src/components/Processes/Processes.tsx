@@ -15,7 +15,7 @@ export function Processes() {
   return (
     <section>
       <div className="section-header">
-        <h1>작업 관리자</h1>
+        <h1>Task Manager</h1>
         <div className="processes-tabs processes-maintabs">
           <button
             type="button"

@@ -122,7 +122,7 @@ export function Extensions() {
   return (
     <section>
       <div className="section-header">
-        <h1>익스텐션</h1>
+        <h1>Code Extensions</h1>
         <div className="extensions-header-controls">
           <label className="extensions-recommend-toggle">
             <input
