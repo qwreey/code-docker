@@ -1,0 +1,34 @@
+.git-config-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.git-config-table th,
+.git-config-table td {
+  text-align: left;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.git-config-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.form-grid-inline {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+.new-key-callout {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+}
+
+.new-key-callout p {
+  margin-top: 0;
+}

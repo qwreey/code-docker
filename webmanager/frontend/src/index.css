@@ -1,0 +1,85 @@
+:root {
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-hover: #f0f1f4;
+  --border: #dfe2e7;
+
+  --text: #33394a;
+  --text-heading: #171a21;
+  --text-muted: #6b7280;
+
+  --accent: #2f6feb;
+  --accent-hover: #2558c4;
+  --accent-bg: #eaf1fe;
+  --accent-border: #b9d1fb;
+  --accent-contrast: #ffffff;
+
+  --code-bg: #1e2230;
+  --code-text: #e5e7eb;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  --color-green-bg: #e7f7ee;
+  --color-green-fg: #1a7f4b;
+  --color-green-border: #b9e6cc;
+
+  --color-red-bg: #fdecec;
+  --color-red-fg: #b3261e;
+  --color-red-border: #f5c2c0;
+
+  --color-yellow-bg: #fdf3e0;
+  --color-yellow-fg: #935700;
+  --color-yellow-border: #f3dca6;
+
+  --color-gray-bg: #eceef1;
+  --color-gray-fg: #5a6270;
+  --color-gray-border: #d7dae0;
+
+  color-scheme: light;
+  color: var(--text);
+  background: var(--bg);
+  font: 15px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--text-heading);
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+}
+
+p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--mono);
+}
+
+button {
+  font: inherit;
+}

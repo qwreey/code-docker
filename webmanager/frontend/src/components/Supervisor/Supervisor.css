@@ -1,0 +1,91 @@
+.process-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.process-table th,
+.process-table td {
+  text-align: left;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.process-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.process-description {
+  color: var(--text-muted);
+  white-space: normal;
+  max-width: 20rem;
+}
+
+.process-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+}
+
+.log-panel {
+  margin-top: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 1rem;
+}
+
+.log-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.log-panel-header h3 {
+  margin: 0;
+}
+
+.log-panel-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.log-stream-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.log-stream-toggle button {
+  border: none;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.log-stream-toggle button.toggle-active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.log-panel-body {
+  max-height: 420px;
+  overflow: auto;
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 0.85rem;
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
