@@ -12,7 +12,10 @@ code-docker의 관리자 패널(webmanager) 프론트엔드. Vite + React + Type
   만드는 실제 로그 데이터를 보여줌, 응답의 `mock` 필드는 항상 `false`), Processes(상단에
   컨테이너 전체 cpu/mem/disk 사용량 요약(cgroup 기준 — `GET /api/system/resources`), 그
   아래 시스템 프로세스 목록 + 리스닝 포트 목록, btop 대체용 — 프로세스/포트 각각에서
-  SIGTERM/SIGKILL로 kill 가능)
+  SIGTERM/SIGKILL로 kill 가능), Claude Code(`GET /api/claude/status` 조회 — M1: 로그인
+  상태 + 사용 통계 퀵 오버뷰, 그래프/히트맵은 M2 이후. 다른 미구현 섹션과 달리
+  `implemented: false` placeholder가 아니라 **항상 실제 컴포넌트가 마운트**되고,
+  `installed: false`일 때 컴포넌트 내부에서 유령/스켈레톤 배경 + 설치 안내 오버레이를 표시)
 - 자리만 잡아둠 ("구현 예정"): mise, Docker (dind), Terminal
 
 ## 개발 모드 실행
@@ -68,6 +71,12 @@ src/
                   대신 요약 자리에 작은 안내문만 표시) + 프로세스 탭(정렬 가능한
                   pid/cpu%/mem%/rss/cmdline 목록) + 포트 탭(LISTEN 중인 tcp/udp 포트 +
                   점유 pid), 각 행에 종료/강제 종료 버튼
+    ClaudeCode/   Claude Code CLI 로그인 상태 + 사용 통계(stats-cache.json 기반) 조회.
+                  `installed: false`면 스켈레톤 카드 + 설치 안내 오버레이, `installed:
+                  true`면 로그인 상태/총 사용량/오늘·이번 주/최장 세션 카드. `auth`/
+                  `stats`는 서로 독립적으로 null 열화 가능(로그인 안 됨 표시와 통계
+                  "확인 불가" 표시를 각각 따로 처리). 폴링 없음 — 마운트 시 1회 조회 +
+                  수동 새로고침 버튼
     Placeholder/  미구현 섹션 공용 "구현 예정" 컴포넌트
     common/       StatusBadge, ErrorBanner, CopyButton 등 공용 UI
 ```

@@ -1,0 +1,113 @@
+.claude-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.claude-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 1.1rem 1.25rem;
+}
+
+.claude-card-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.claude-card-value {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin: 0.15rem 0 0.35rem;
+}
+
+.claude-card-sub {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.claude-card-footnote {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+}
+
+.claude-card-note {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.claude-card-note code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.claude-ghost-wrap {
+  position: relative;
+}
+
+.claude-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  opacity: 0.35;
+  filter: grayscale(1);
+  pointer-events: none;
+  user-select: none;
+}
+
+.claude-skeleton-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 1.1rem 1.25rem;
+  min-height: 6rem;
+}
+
+.claude-skeleton-line {
+  height: 0.85rem;
+  border-radius: 4px;
+  background: var(--color-gray-bg);
+  margin-bottom: 0.6rem;
+}
+
+.claude-skeleton-line-short {
+  width: 55%;
+}
+
+.claude-install-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.claude-install-message {
+  max-width: 26rem;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.1rem 1.4rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.claude-install-message code {
+  font-family: var(--mono);
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}

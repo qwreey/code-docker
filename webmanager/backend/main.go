@@ -71,6 +71,8 @@ func main() {
 
 	mux.HandleFunc("GET /api/system/resources", s.handleSystemResources)
 
+	mux.HandleFunc("GET /api/claude/status", s.handleClaudeStatus)
+
 	mux.Handle("GET /", staticHandler(cfg.StaticDir))
 
 	httpServer := &http.Server{

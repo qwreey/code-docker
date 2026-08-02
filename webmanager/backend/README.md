@@ -7,11 +7,12 @@ keys, HTTPS credential store, commit signing + GPG key management),
 tailscale forwards/publish config CRUD, a cross-service logs API backed by
 the `vector` JSONL pipeline, an OS-level process/port viewer
 (`github.com/shirou/gopsutil/v4`) for finding and killing stray processes
-squatting on a port, and a whole-container cpu/mem/disk resource endpoint
+squatting on a port, a whole-container cpu/mem/disk resource endpoint
 read directly from this container's own cgroup v2 pseudo-files (see
-`internal/cgroup`). See `../plan.md` for the wider design context —
-tailscale login/status, mise, dind, and the web terminal are deliberately
-not implemented here yet.
+`internal/cgroup`), and a read-only Claude Code status overview (login
+state + local usage stats, see `internal/claudecode`). See `../plan.md` for
+the wider design context — tailscale login/status, mise, dind, and the web
+terminal are deliberately not implemented here yet.
 
 ## Build
 
@@ -37,6 +38,7 @@ TAILSCALE_CONFIG_PATH=/tmp/wm-dev/tailscale-config.yaml \
 SSH_SIGNING_KEY_PATH=/tmp/wm-dev/signing_key \
 VECTOR_LOG_DIR=/tmp/wm-dev/vector-logs \
 SYSTEM_DISK_PATH=/tmp \
+CLAUDE_CONFIG_DIR=/tmp/wm-dev/claude \
 ./webmanager
 ```
 
@@ -61,6 +63,8 @@ shell out to `git`/`ssh-keygen`.
 | `VECTOR_LOG_DIR` | `/code/.vector/logs` | directory of day-partitioned `<YYYY-MM-DD>.jsonl` log files written by the `vector` pipeline (see `.claude/vector-logs-plan-done.md`) |
 | `SYSTEM_DISK_PATH` | `/code` | path `GET /api/system/resources` runs `statfs` on to report disk usage — `/code` is the bind-mounted volume (`./code:/code`), so this reflects real host disk usage for that mount |
 | `WEBMANAGER_STATIC_DIR` | `./static` | pre-built frontend assets (see below) |
+| `WEBMANAGER_CLAUDE_BINPATH` | *(none)* | absolute path to the `claude` (Claude Code CLI) binary; if unset, falls back to a `claude` lookup on `PATH`. Neither found means "not installed" — a normal state, not an error |
+| `CLAUDE_CONFIG_DIR` | `/code/.claude` | Claude Code's own standard env var for relocating `~/.claude`; webmanager reads `stats-cache.json` from directly under this directory and does not invent a separate `WEBMANAGER_`-prefixed equivalent |
 
 GPG-backed endpoints (`/api/git/gpg-keys*`) additionally depend on the `gpg`
 binary being on `PATH` (installed via `gnupg` in `config/build.default.sh`);
@@ -200,6 +204,32 @@ fields, invalid host/keyId format, etc.) are unaffected.
     read does this return `503 {"error": "cgroup v2 data unavailable"}` as
     a last resort. cgroup v1 is
     not supported (reads simply fail there, degrading as above)
+- `GET /api/claude/status` — read-only Claude Code (the `claude` CLI) quick
+  overview: `installed` (binary found via `WEBMANAGER_CLAUDE_BINPATH` or
+  `PATH`), `auth` (from `claude auth status --json`, run with a 5s timeout
+  since it may involve a network round-trip), and `stats` (parsed from
+  `<CLAUDE_CONFIG_DIR>/stats-cache.json`). This is always `200` in practice —
+  every sub-fetch degrades independently to a `null` field rather than
+  failing the request:
+  - `installed: false` → `auth`/`stats` are `null`, nothing else is
+    attempted (a `claude`-less instance is a normal, common case)
+  - `installed: true` but the CLI call fails/times out/produces unparseable
+    JSON → `auth: null`
+  - `stats-cache.json` missing or unparseable → `stats: null`, independent
+    of whatever happened with `auth` (a logged-out instance can still have
+    historical stats on disk)
+  - `stats.today`/`stats.week` are derived from `stats-cache.json`'s
+    `dailyActivity` array: `today` matches today's UTC calendar date
+    (`{sessionCount: 0, messageCount: 0}` if no entry exists for it, not an
+    error), `week` sums the 7 most recent dates present in the array
+    (descending, today's entry included if present) — there's no
+    pre-computed weekly field in the cache file itself
+  - Verified against the real `claude` 2.1.220 CLI: explicitly setting
+    `CLAUDE_CONFIG_DIR` in the environment (even to the exact path it would
+    have defaulted to) makes `claude auth status --json` itself null out
+    `email`/`orgId`/`orgName` while `loggedIn`/`authMethod`/
+    `subscriptionType` stay correct — a pre-existing CLI quirk, not
+    something this endpoint's wrapper introduces or can paper over
 
 All error responses are `{"error": "message"}` with an appropriate 4xx/5xx
 status.

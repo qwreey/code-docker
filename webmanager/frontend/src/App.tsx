@@ -7,6 +7,7 @@ import { GitConfig } from './components/GitConfig/GitConfig'
 import { Tailscale } from './components/Tailscale/Tailscale'
 import { Logs } from './components/Logs/Logs'
 import { Processes } from './components/Processes/Processes'
+import { ClaudeCode } from './components/ClaudeCode/ClaudeCode'
 import { Placeholder } from './components/Placeholder/Placeholder'
 import './App.css'
 
@@ -38,6 +39,7 @@ function App() {
         {active === 'tailscale' && <Tailscale />}
         {active === 'logs' && <Logs />}
         {active === 'processes' && <Processes />}
+        {active === 'claude' && <ClaudeCode />}
         {active in PLACEHOLDER_INFO && (
           <Placeholder title={PLACEHOLDER_INFO[active].title} note={PLACEHOLDER_INFO[active].note} />
         )}

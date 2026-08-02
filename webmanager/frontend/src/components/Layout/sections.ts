@@ -8,6 +8,7 @@ export type SectionId =
   | 'mise'
   | 'dind'
   | 'terminal'
+  | 'claude'
 
 export interface SectionMeta {
   id: SectionId
@@ -25,4 +26,5 @@ export const SECTIONS: SectionMeta[] = [
   { id: 'mise', label: 'mise', implemented: false },
   { id: 'dind', label: 'Docker (dind)', implemented: false },
   { id: 'terminal', label: 'Terminal', implemented: false },
+  { id: 'claude', label: 'Claude Code', implemented: true },
 ]

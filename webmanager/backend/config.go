@@ -15,6 +15,8 @@ type Config struct {
 	SSHSigningKeyPath   string
 	VectorLogDir        string
 	SystemDiskPath      string
+	ClaudeBinPath       string
+	ClaudeConfigDir     string
 }
 
 func getenv(key, def string) string {
@@ -38,5 +40,7 @@ func loadConfig() Config {
 		SSHSigningKeyPath:   getenv("SSH_SIGNING_KEY_PATH", "/code/.ssh/signing_key"),
 		VectorLogDir:        getenv("VECTOR_LOG_DIR", "/code/.vector/logs"),
 		SystemDiskPath:      getenv("SYSTEM_DISK_PATH", "/code"),
+		ClaudeBinPath:       getenv("WEBMANAGER_CLAUDE_BINPATH", ""),
+		ClaudeConfigDir:     getenv("CLAUDE_CONFIG_DIR", "/code/.claude"),
 	}
 }

@@ -140,6 +140,34 @@ export interface PortInfo {
 
 export type ProcessSignal = 'TERM' | 'KILL'
 
+export interface ClaudeAuthStatus {
+  loggedIn: boolean
+  email: string
+  subscriptionType: string
+  authMethod: string
+}
+
+export interface ClaudeStatsWindow {
+  sessionCount: number
+  messageCount: number
+}
+
+export interface ClaudeStats {
+  totalSessions: number
+  totalMessages: number
+  firstSessionDate: string
+  longestSessionMessageCount: number
+  longestSessionDurationMs: number
+  today: ClaudeStatsWindow
+  week: ClaudeStatsWindow
+}
+
+export interface ClaudeStatus {
+  installed: boolean
+  auth?: ClaudeAuthStatus | null
+  stats?: ClaudeStats | null
+}
+
 export interface SystemResources {
   memory: {
     usedBytes: number
