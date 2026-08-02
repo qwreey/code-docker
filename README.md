@@ -66,6 +66,16 @@ mise 환경이 제공되므로 `mise use -g node`, `mise use -g rust`, `mise use
 
 만약 mise 설치로 인해 global 이 달라졌으며, 이를 code-server 에 적용하고 싶다면 code-server 터미널에 `restart` 를 입력하세요. 이렇게 하면 supervisord 의 code-server 서비스가 재시작하게 되며 env 를 다시 업데이트하게 됩니다. 이는 서비스 시작 시 `mise env --shell` 를 통해 구성됩니다.
 
+## 타임존
+
+기본값은 UTC입니다. `docker-compose.yml`의 `TZ` 환경변수를 원하는 타임존 이름
+(예: `Asia/Seoul`)으로 설정하면 됩니다 — `tzdata` 패키지가 이미 설치되어 있어서
+`/etc/localtime` 심볼릭 링크를 따로 만들거나 entrypoint를 수정할 필요 없이, glibc가
+`TZ` 값만으로 바로 시간대를 계산합니다(`date`, supervisord 로그 타임스탬프,
+code-server/Node 등 대부분의 프로세스가 이 방식을 따릅니다). 값을 바꾼 뒤에는
+`docker compose up -d`로 재기동하세요(재빌드는 필요 없습니다 — 환경변수만 바뀌는
+것이므로).
+
 ## ssh 연결
 
 기본적으로 `docker-compose.yml`에서 22 포트가 expose 되지 않습니다. tailscale ip 나 원하는 곳에 `100.64.0.1:22330:22` 형태와 비슷하게 원하는 곳으로 sshd 를 내보내 주시고
@@ -93,6 +103,7 @@ Host code
 
 2. 환경 변수를 설정하고, 연결 가능하도록 네트워크를 조정
 code-docker의 요청이 나가는 네트워크를 잘 구성했다면, 호스트 시스템의 tailscale ip 등의 서브넷으로도 요청을 전송할 수 있습니다. 따라서 환경 변수로써 `ANDROID_ADB_SERVER_ADDRESS` 와 `ANDROID_ADB_SERVER_PORT` 를 적절한 tailscale ip, private ip로 설정하면 항상 원하는 기기의 adb 서버를 사용하게 됩니다.
+또한 아래의 [tailscale 연결](#tailscale-연결)을 더 확인해보세요
 
 두 작업 중 하나를 수행하고 나면 code-docker에서 `adb devices`를 수행하면 연결된 장치가 보일것입니다. 이 상태에서 react native metro builder 나 gradle 등으로 장치에 설치 테스트를 수행하면 잘 작동하게 됩니다.
 
@@ -112,11 +123,23 @@ code-docker의 요청이 나가는 네트워크를 잘 구성했다면, 호스�
 
 편의를 위해 `code-docker-dind` (`docker:dind`) 서비스가 함께 제공됩니다. redis, postgres 등 개발에 필요한 컨테이너를 code-docker 안에서 `docker run ...` 명령으로 바로 생성해 사용할 수 있습니다. `DOCKER_HOST` 환경변수가 이 dind 데몬을 가리키도록 설정되어있어, code-docker 안에서 docker cli 로 생성한 컨테이너는 실제로는 `code-docker-dind` 컨테이너 안에서 동작합니다.
 
-dind 로 생성된 컨테이너는 `code-docker-internal` 네트워크에 묶여 code-docker 에서 접근 가능합니다. 단, 컨테이너가 동작하는곳은 어디까지나 `code-docker-dind` 컨테이너이므로, 포트를 publish 하여 컨테이너를 만든 뒤에는 `localhost` 가 아닌 `code-docker-dind-internal` 호스트네임으로 접속해야합니다. 예를들어 `docker run -d --name mypg -p 5432:5432 postgres` 로 생성했다면 `postgres://code-docker-dind-internal:5432` 로 접근하세요.
+dind 로 생성된 컨테이너는 `code-docker-internal` 네트워크에 묶여 code-docker 에서 접근 가능합니다. 단, 컨테이너가 동작하는곳은 어디까지나 `code-docker-dind` 컨테이너이므로, 포트를 publish 하여 컨테이너를 만든 뒤에는 `localhost` 가 아닌 `dind` 호스트네임으로 접속해야합니다 (`code-docker-dind` 라는 이름도 있지만 쓰지 마세요, 아래 참고). 예를들어 `docker run -d --name mypg -p 5432:5432 postgres` 로 생성했다면 `postgres://dind:5432` 로 접근하세요.
 
-> `code-docker-dind` 라는 이름도 존재하지만 쓰지 마세요 — code-docker 가 `code-docker-external`/`code-docker-internal` 양쪽에 다 붙어있어서, 그 이름이 두 네트워크 모두에 등록되어있는 탓에 어느 쪽 IP로 해석될지 비결정적입니다 (dind 데몬 자체가 internal 쪽에만 바인드되어있으므로, 잘못 해석되면 연결이 안됩니다). `code-docker-dind-internal` 은 `code-docker-internal` 에만 등록되는 별도 alias라 항상 올바른 쪽으로 resolve 됩니다.
+<details>
+<summary>왜 <code>code-docker-dind</code> 대신 <code>dind</code> 를 써야 하는지</summary>
+
+code-docker 가 `code-docker-external`/`code-docker-internal` 양쪽에 다 붙어있어서, `code-docker-dind` 라는 이름이 두 네트워크 모두에 등록되어있는 탓에 어느 쪽 IP로 해석될지 비결정적입니다 (dind 데몬 자체가 internal 쪽에만 바인드되어있으므로, 잘못 해석되면 연결이 안됩니다). `dind` 는 `code-docker-internal` 에만 등록되는 별도 alias라 항상 올바른 쪽으로 resolve 됩니다.
+
+</details>
+
+`code-docker-dind` 는 `code-docker-external` 에도 연결되어있지만(`docker pull` 을 위해 필요), 데몬 소켓 자체는 `code-docker-internal` 쪽에만 바인드되어있어 그쪽에서는 노출되지 않습니다.
+
+<details>
+<summary>기술적으로 어떻게 막혀있는지</summary>
 
 `code-docker-internal` 은 `internal: true` 로 인터넷 경로가 차단되어있어 `docker pull` 이 실패하므로, `code-docker-dind` 는 `code-docker-external` 에도 연결되어있습니다. 다만 dind 데몬 자체는 `script/dind-entrypoint.sh` 를 통해 `code-docker-internal` 쪽 IP에만 바인드되도록 되어있어(스톡 `docker:dind` 이미지의 `--host=tcp://0.0.0.0:2375` 기본 동작을 오버라이드함), 이미지 pull 은 되면서도 소켓 자체는 `code-docker-external` 에서 접근할 수 없습니다.
+
+</details>
 
 dind 쪽에는 `./dind:/var/lib/docker` 볼륨이 마운트되어있어 컨테이너/이미지가 재기동 후에도 유지됩니다.
 
@@ -125,6 +148,86 @@ dind 쪽에는 `./dind:/var/lib/docker` 볼륨이 마운트되어있어 컨테�
 ## 여러 code-docker 인스턴스 사용
 
 여러 인스턴스 구동 시 container_name 이 겹칠 수 있습니다. 기본적으로 `${PREFIX:-}`를 붙여서 `docker-compose.yml`을 제공하므로 `.env` 파일을 만들고 `PREFIX`를 적절히 설정해주면 해결됩니다.
+
+## tailscale 연결
+
+`docker-compose.yml` 의 `TAILSCALE_ENABLED` 를 `"false"` 로 설정하면 tailscale 관련 기능이 전부 꺼집니다 (`tailscaled`/`tailscale-forward` 두 프로그램은 그대로 떠있지만 아무 것도 하지 않습니다). 기본값은 `"true"` 입니다.
+
+code-docker 가 고유한 tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열거나 `ssh -R` 로 소켓을 전송하지 않고도 tailnet 안 어디서든 code-docker 에 접근하거나, 반대로 code-docker 에서 다른 tailnet 기기(예: 랩탑의 adb 서버)의 포트를 가져올 수 있습니다. `NET_ADMIN`/커널 tun 디바이스 없이 tailscaled 의 userspace networking 모드만으로 동작합니다.
+
+최초 실행 시 `docker compose logs -f code-docker` 로 로그를 확인하면 `tailscaled` 프로그램 쪽에 인증 URL이 출력됩니다. 이 URL을 브라우저로 한 번 열어 로그인하면 됩니다 (auth key 대신 인터랙티브 로그인 방식). 로그인 상태는 `/code/.tailscale/state` 에 영속되므로 컨테이너를 재생성해도 다시 로그인할 필요가 없습니다.
+
+로그를 뒤질 필요 없이, code-server 화면 자체에도 로그인이 필요할 때 우측 상단에 배너로 뜹니다 (URL, 현재 상태 문자열까지 그대로 표시됩니다). 로그인이 완료되면 별도로 "Tailscale connected" 토스트도 뜹니다. 이미 브라우저 알림 권한을 허용해둔 상태라면 OS 알림도 함께 뜹니다. `code-patch` 가 기본으로 심어주는 `/code/.server/patch/tailscale-notify.js`(폴링 + 표시할 내용) 와 `/code/.server/patch/cd-dialog.js`(배너/토스트/알림을 그리는 재사용 가능한 `window.CDDialog` 모듈) 두 파일로 구성되며, 아래 [code-patch/](#code-patch) 를 통해 관리됩니다 - `patch/*.js` 자체는 [코드 서버 패치](#코드-서버-패치)와 동일하게 동작하는 파일이라 직접 편집/교체 가능합니다.
+
+기본적으로 공식 tailscale.com 컨트롤 서버에 로그인합니다. Headscale 등 자체 호스팅 서버를 쓰고싶다면 `docker-compose.yml` 의 `TAILSCALE_LOGIN_SERVER` 환경변수를 원하는 URL로 설정하세요 (`tailscale up --login-server=` 로 전달됩니다). 이미 로그인된 상태에서 이 값을 바꾼 경우, `/code/.tailscale/state` 를 지우고 컨테이너를 재시작해야 새 서버로 다시 로그인합니다.
+
+수신/발신 설정은 `/code/.tailscale/config.yaml` 을 편집합니다 (최초 실행 시 기본값이 자동 생성됩니다).
+
+```yaml
+forwards:
+  - name: adb                    # 로그/디버깅용 이름표
+    local_port: 5037
+    remote_host: laptop          # tailscale hostname 또는 IP
+    remote_port: 5037
+
+publish:
+  - name: dev-server
+    tailscale_port: 80
+    local_port: 3000
+    mode: tcp                    # tcp | tls-terminated-tcp
+```
+
+- `forwards`: 다른 tailnet 기기의 포트를 code-docker 로 가져옵니다. 컨테이너 안에서는 `forward` 라는 hostname 으로 접근하세요 (예: adb 는 `ANDROID_ADB_SERVER_ADDRESS=forward` — 위 [adb 연결](#adb-연결) 절의 환경 변수 방식과 동일한 패턴, 기존 `ssh -R` 방식의 대안입니다).
+- `publish`: code-docker 의 로컬 포트를 tailscale IP에 명시적으로 게시합니다 (포트 리매핑, 또는 `mode: tls-terminated-tcp` 로 무료 HTTPS 종단). 게시하려는 서비스는 `0.0.0.0`/`localhost` 가 아니라 `private` hostname(자기 자신의 tailscale용 전용 IP)에 bind 되어 있어야 합니다.
+- 편집 후에는 `forward-reload` 명령으로 반영합니다 (`tailscale-forward` 서비스만 재시작하며, 로그인 세션은 그대로 유지됩니다).
+
+> **주의: sshd(22), code-server(80), webmanager(81)는 `config.yaml`에 없어도 항상 tailnet 에 자동 노출됩니다.** tailscaled 는 `tailscale serve` 규칙이 없는 포트도 같은 번호로 `127.0.0.1`/`0.0.0.0` 에 떠있는 서비스에 자동으로 연결해주기 때문입니다 — 이 세 서비스는 전부 `0.0.0.0` 에 바인드되어 있어서(sshd/code-server는 호스트 포트 퍼블리시 때문에, webmanager는 바인드 주소 전략이 아직 미정이라) 이 자동 노출을 피할 방법이 없습니다. `code-config.default.yaml` 은 `auth: none` 이고 webmanager는 아예 자체 로그인이 없으므로(SSH 키/git credential 을 다루는 만큼 code-server 보다 더 민감), code-docker 가 tailnet 에 들어가는 순간 인증 없이 두 서비스에 접근 가능한 사람이 tailnet 전체로 넓어집니다.
+>
+> **그래서 tailnet 관리 콘솔(ACL)에서 code-docker 태그로 접근 가능한 포트를 반드시 제한하세요.** 예:
+> ```json
+> {
+>   "tagOwners": { "tag:code-docker": ["autogroup:admin"] },
+>   "grants": [
+>     { "src": ["autogroup:member"], "dst": ["tag:code-docker"], "ip": ["tcp:22", "tcp:80", "tcp:81"] }
+>   ]
+> }
+> ```
+> 이게 없으면 sshd/code-server/webmanager 는 항상 tailnet 전체에 열려있는 상태입니다.
+>
+> 반대로 `forwards`/`publish` 는 이런 자동 노출에 걸리지 않도록 이미 전용 네트워크의 자기 자신 IP에만 바인드되어 있어서 안전합니다 — private 하게 유지하고 싶은, 직접 띄운 서비스(dev 서버 등)는 `0.0.0.0`/`localhost` 대신 `private` 에 bind 하고 필요할 때만 `publish:` 에 추가하세요. `forwards:` 로 가져온 것들은 `forward` hostname 으로만 접근 가능하니 혼동하지 마세요.
+
+## webmanager (관리자 패널)
+
+80번 포트의 code-server 와 별개로, `81`번 포트에 브라우저 관리자 패널이 함께 떠 있습니다 (Go
+백엔드 + React 프론트엔드, `webmanager/` 폴더에서 개발됩니다 — 현재 상태와 남은 작업은
+`webmanager/plan.md` 참고). 구현된 기능:
+
+- **Supervisor**: supervisord 프로그램 목록 조회 및 start/stop/restart, 표준출력/표준에러 로그 확인
+- **SSH Keys**: `/code/.ssh/authorized_keys` 목록 조회/추가/삭제
+- **Git Config**: `/code/.gitconfig` 의 user.name/email, 커밋 사이닝(SSH 키 또는 GPG, GPG 키
+  자체 생성/조회/삭제 포함), 호스트별 SSH 키(ed25519 자동 생성), HTTPS credential store
+  (`~/.git-credentials`, 평문 저장) 관리
+- **Tailscale**: `/code/.tailscale/config.yaml`의 `forwards`/`publish` 항목 조회/추가/삭제
+  (저장 시 `tailscale-forward` 자동 재시작 — `forward-reload`와 동일 효과). 로그인
+  상태/URL은 다루지 않음 — 아래 tailscale 배너를 그대로 씁니다
+- **Logs**: 프로그램별 구조화 로그를 앱/레벨로 필터링해서 조회 (아래 vector 문단 참고)
+- **Processes**: 컨테이너 안 프로세스 목록(cpu%/mem%/커맨드) + 리스닝 포트별 점유 프로세스
+  조회, 종료(SIGTERM/SIGKILL) — `btop`을 안 열어도 포트 점유 프로세스를 찾아 끌 수 있음
+
+mise, dind, 웹쉘(터미널) 관리는 아직 자리만 잡아둔 상태이고 구현되어있지 않습니다.
+
+각 supervisord program의 표준출력은 이제 `/var/log/<프로그램명>/stdout.log` 로 실제 파일에
+회전(rotate)되어 남으며, [vector](https://vector.dev)가 이 파일들을 tail 하여
+`[프로그램명] ...` 형태로 라벨링해서 컨테이너 stdout으로 다시 흘려보냅니다 — 따라서
+`docker compose logs` 로도 이제 어느 program의 로그인지 구분됩니다(아래 `vector.*.toml`
+참고). webmanager의 로그 뷰어(Logs 페이지)도 vector가 함께 쓰는 구조화 로그
+(`/code/.vector/logs/*.jsonl`)를 읽어 실제 데이터를 보여줍니다(이전엔 목업 데이터였습니다).
+
+> **주의: webmanager 는 자체 로그인 화면이 없습니다.** code-server 와 마찬가지로 앞단
+> 리버스 프록시의 forward-auth 에만 의존하므로, 프록시 설정 없이 81번 포트를 그대로
+> 인터넷에 노출하면 안 됩니다 ([보안 (로그인)](#보안-로그인) 절과 동일한 방식으로 프록시를
+> 구성하세요). SSH 키/git credential 파일을 직접 다루는 기능이라 code-server 의
+> `auth: none` 보다 더 신중한 접근 통제가 필요합니다.
 
 # 빌드 커스터마이징
 
@@ -168,6 +271,32 @@ supervisord 에 사용될 설정파일입니다.
 
 sshd 를 설정하고 실행합니다. 기본적으로 `/etc/ssh`는 적절한 마운트가 있어 유지됩니다. 따라서 `user-init` 과 유사하게 작성할 수 있습니다.
 
+## tailscale-service.\*.sh
+
+`tailscaled` 를 설정하고 실행합니다 (userspace networking 모드). 로그인 세션은 `/code/.tailscale/state` 에 영속되므로, `sshd-service.*.sh` 와 유사하게 재작성할 수 있습니다.
+
+## tailscale-forward.\*.sh
+
+`/code/.tailscale/config.yaml` 을 읽어 `forwards`(socat + SOCKS5)/`publish`(`tailscale serve`) 를 구성하는 스크립트입니다. `tailscaled`/`tailscale-status` 와 별도 supervisord program 으로 등록되어 있어, 이 스크립트만 (`forward-reload` 로) 재시작해도 `tailscaled` 의 로그인 세션에는 영향을 주지 않습니다.
+
+## tailscale-status.\*.sh
+
+`tailscale status --json` 를 주기적으로 확인해 로그인 필요 여부/URL을 `/code/.server/patch/tailscale/status.json` 에 기록하는 스크립트입니다 (`tailscale-notify.js` 가 폴링하는 대상). `tailscaled`/`tailscale-forward` 와도 별도 supervisord program 이라, 로그인이나 포워딩 상태와 무관하게 항상 동작합니다.
+
+## tailscale-config.\*.yaml
+
+`/code/.tailscale/config.yaml` 이 아직 없을 때(최초 실행 시) 복사되는 기본값입니다. 이미 생성된 경우 `/code/.tailscale/config.yaml` 을 직접 수정하세요.
+
+## code-patch.\*.sh
+
+`code-patch/` 폴더(아래 참고)의 내용을 `/code/.server/patch/` 로 심는 스크립트입니다. `user-init` 과 마찬가지로 매 부팅마다 항상 실행되지만, `user-init` 과는 별도로 `code-service.*.sh` 에서 (`install.sh` 로 실제 `/code/.server` 가 만들어진 *이후에*) 실행됩니다 - `user-init` 은 fish 설정 등 홈 폴더/셸 초기화를 위한 곳이라, code-server 내부(`/code/.server`)를 다루는 이 로직과는 관심사를 분리했습니다.
+
+## code-patch/
+
+code-docker 자체가 기본으로 제공하는 브라우저 패치들(현재는 tailscale 알림용 `tailscale-notify.js`/`cd-dialog.js`) 을 모아두는 폴더입니다. 이 폴더 안의 `<이름>.default.<확장자>` 파일은 각각 `/code/.server/patch/<이름>.<확장자>` 로 - 이미 그 이름의 파일이 없을 때만 - 복사됩니다 (`code-patch.*.sh` 가 매 부팅마다 확인). 같은 폴더에 `<이름>.override.<확장자>` 를 두면(다른 곳의 `*.override.*` 와 동일하게 gitignore 되어 커밋되지 않음) default 대신 그 파일이 복사됩니다. 이미 유저가 오버라이드해서 쓸 수 있는 파일들이라 폴더 이름에는 "default" 를 붙이지 않았습니다.
+
+한 번 `/code/.server/patch/` 에 복사된 뒤에는 직접 수정해도 다음 부팅에 덮어써지지 않습니다 (다른 [코드 서버 패치](#코드-서버-패치) 파일과 동일). 다만 이후 code-docker 버전에서 해당 `.default.` 파일이 아예 없어지면, 이전에 심어졌던 사본도 함께 삭제됩니다(`/code/.server/.code-patch-manifest` 로 추적).
+
 ## shell.\*
 
 `chsh` 명령을 통해 `root` 유저의 셸을 설정할 때 사용할 셸 바이너리의 path 를 가르킵니다. 기본적으로 `/bin/fish` 이지만, `/bin/bash` 또는 `/bin/zsh` 등으로 바꾸는데 사용할 수 있습니다.
@@ -175,6 +304,32 @@ sshd 를 설정하고 실행합니다. 기본적으로 `/etc/ssh`는 적절한 �
 ## supervisord/\*.conf
 
 supervisord 에 원하는 프로그램을 서비스로 등록하고 싶을 때 사용할 수 있습니다. 기본적으로 `supervisord.default` 의 `include` 부분에 의해서 임포트 됩니다. [파일 포멧에 관해서는 supervisord 의 공식 문서 program 부분](https://supervisord.org/configuration.html#program-x-section-settings)을 확인하세요
+
+## webmanager.\*.sh
+
+webmanager 바이너리를 실행합니다 ([webmanager (관리자 패널)](#webmanager-관리자-패널) 참고).
+바이너리와 프론트엔드 정적 파일은 `webmanager/backend`, `webmanager/frontend` 를 빌드 타임에
+컴파일/빌드하여 `/etc/code-docker/webmanager/` 에 넣어둔 것이라, 이 스크립트에서 바로
+편집할 수 있는 부분은 없고 환경변수만 다룹니다 (`WEBMANAGER_ADDR`, `SUPERVISOR_SOCK`,
+`SSH_AUTHORIZED_KEYS` 등 — 전체 목록은 `webmanager/backend/README.md` 참고).
+
+## vector-service.\*.sh
+
+`vector` 를 실행합니다. `vector.*.toml` 을 선택해 넘겨주는 것 외에는 `/code/.vector/state`
+(체크포인트), `/code/.vector/logs`(구조화 로그) 디렉토리를 미리 만드는 역할만 합니다.
+
+## vector.\*.toml
+
+[vector](https://vector.dev) 설정 파일입니다. 각 supervisord program 의 `stdout_logfile`
+(아래 `supervisord.*.conf` 참고)을 `file` source 로 tail 해서, 파일 경로에서 프로그램
+이름(`app_name`)을 뽑아내고 메시지 내용으로 대략적인 로그 레벨(`level`)을 추정한 뒤 두 곳으로
+내보냅니다 — 라벨링된 형태(`[app_name] message`)로 다시 컨테이너 stdout에 재출력(`console`
+sink, `docker compose logs` 에서 프로그램 구분이 되도록 함)하고, 동시에
+`/code/.vector/logs/YYYY-MM-DD.jsonl` 로 하루 단위 구조화 로그 파일을 씁니다(`file` sink,
+`{"timestamp","app_name","level","message"}` 4개 필드만 담은 JSON 한 줄 — webmanager의 로그
+뷰어가 여기서 직접 읽습니다). 로그 레벨은 메시지에 `error`/`warn` 등의 문자열이 포함되는지
+보는 대략적인 추정치일 뿐이라 정확한 파싱은 아닙니다. `/code/.vector/logs` 는 별도 보존 기간
+정책 없이 계속 쌓이므로 필요하면 직접 정리하세요.
 
 # 코드 서버 패치
 

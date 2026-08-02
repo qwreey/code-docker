@@ -1,0 +1,80 @@
+# vector pipeline: tail every program's rotated stdout log file, label each
+# event with the program's name, add a best-effort log level, then:
+#   - re-emit everything to this program's own stdout, labeled `[app_name] ...`
+#     (this is what makes `docker compose logs` readable again now that every
+#     other program's stdout_logfile points at a real file instead of
+#     /dev/fd/1 - see supervisord.default.conf)
+#   - additionally write a structured JSONL copy per day under
+#     /code/.vector/logs/ for webmanager's Logs page to read directly
+
+data_dir = "/code/.vector/state"
+
+[sources.app_logs]
+type = "file"
+# stderr is tailed too - tailscaled writes its login auth URL (and all its
+# other diagnostics) there exclusively, and it needs to keep reaching
+# `docker compose logs`/the webmanager Logs page the way it did before this
+# session's stdout_logfile-to-file change (previously supervisord passed
+# both fds straight to the container's own stdout).
+include = ["/var/log/*/stdout.log*", "/var/log/*/stderr.log*"]
+
+# Extracts app_name from the tailed file's path, e.g.
+# "/var/log/code-server/stdout.log" (or a rotated "...stdout.log.1") ->
+# "code-server". Using the second-to-last path segment (rather than a fixed
+# index) keeps this correct regardless of rotation suffix and independent of
+# whether the path is absolute.
+[transforms.tag_app_name]
+type = "remap"
+inputs = ["app_logs"]
+source = '''
+path_parts = split!(.file, "/")
+.app_name = path_parts[-2]
+'''
+
+# Best-effort log level. Most of these programs' raw stdout has no explicit
+# level marker, so this is a heuristic substring match, not a real parser -
+# lines that happen to contain "error"/"fail"/"fatal"/"warn" anywhere in the
+# message will be tagged accordingly, everything else defaults to "info".
+[transforms.tag_level]
+type = "remap"
+inputs = ["tag_app_name"]
+source = '''
+msg_lower = downcase!(.message)
+if contains(msg_lower, "error") || contains(msg_lower, "fatal") || contains(msg_lower, "fail") {
+  .level = "error"
+} else if contains(msg_lower, "warn") {
+  .level = "warn"
+} else {
+  .level = "info"
+}
+'''
+
+# console sink's "text" codec only ever prints the `message` field, so the
+# "[app_name] message" label has to be baked into `message` itself. Done in
+# a separate transform (rather than in tag_level above) so the unmodified
+# original message still reaches the webmanager_logs sink below.
+[transforms.format_console]
+type = "remap"
+inputs = ["tag_level"]
+source = '''
+.message = "[" + string!(.app_name) + "] " + string!(.message)
+'''
+
+[sinks.console]
+type = "console"
+inputs = ["format_console"]
+target = "stdout"
+encoding.codec = "text"
+
+# Structured JSONL, one file per day. This is a fixed contract webmanager's
+# backend reads directly (no vector API involved): every line is a JSON
+# object with exactly these 4 fields - timestamp (RFC3339Nano, vector's
+# default event timestamp field), app_name, level ("info"|"warn"|"error"),
+# message (the original, unmodified log line). `encoding.only_fields`
+# strips vector's other auto-added fields (file, host, source_type).
+[sinks.webmanager_logs]
+type = "file"
+inputs = ["tag_level"]
+path = "/code/.vector/logs/%Y-%m-%d.jsonl"
+encoding.codec = "json"
+encoding.only_fields = ["timestamp", "app_name", "level", "message"]

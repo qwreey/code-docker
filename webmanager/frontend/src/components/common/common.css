@@ -182,7 +182,8 @@
 }
 
 .form-field input,
-.form-field textarea {
+.form-field textarea,
+.form-field select {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.45rem 0.6rem;
@@ -193,7 +194,8 @@
 }
 
 .form-field input:focus,
-.form-field textarea:focus {
+.form-field textarea:focus,
+.form-field select:focus {
   outline: 2px solid var(--accent-border);
   outline-offset: 1px;
 }
@@ -209,6 +211,16 @@
   border: 1px solid var(--color-yellow-border);
   font-size: 0.85rem;
   margin-bottom: 1rem;
+}
+
+.success-note {
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--color-green-bg);
+  color: var(--color-green-fg);
+  border: 1px solid var(--color-green-border);
+  font-size: 0.85rem;
+  margin: 0.75rem 0;
 }
 
 .copyable-block {

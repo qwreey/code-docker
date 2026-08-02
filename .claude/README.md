@@ -1,0 +1,46 @@
+# .claude/ 지식 구조 (레포 전체용 — webmanager 전용은 `webmanager/.claude/`)
+
+이 폴더는 이 레포에서 작업하는 (사람이든 에이전트든) 누군가가 컨텍스트를 필요한 만큼만
+읽을 수 있도록, 문서를 "지금 당장 필요한 것"과 "필요할 때만 찾아보는 것"으로 나눠둔
+곳이다. 매번 전부 읽을 필요는 없다 — 아래 안내를 보고 지금 하려는 작업에 맞는 것만
+열어보면 된다.
+
+**webmanager만을 위한 계획/설계 문서는 여기가 아니라 `webmanager/.claude/`에 따로
+있다** — webmanager 관련 작업은 그쪽 인덱스(`webmanager/.claude/README.md`)를 볼 것.
+여기(레포 루트 `.claude/`)는 webmanager에 국한되지 않는, 레포 전체에 걸친 것만 담는다.
+
+## 구조
+
+- **`archive/`** — 이미 실행/구현이 끝났거나(또는 애초에 참고용 조사 기록), "왜
+  이렇게 결정했는지" 전체 논증 과정이 궁금할 때만 열어보는 문서. 현재 상태 파악에는
+  필요 없음.
+  - `tailscale-design.md` — (레포 루트에 있던 `tailscale.md`를 옮김) tailscaled/
+    forwards/publish 인프라의 원본 설계 조사 — 레포 전체(root `CLAUDE.md`가 다루는
+    영역)에 걸친 내용이라 webmanager 전용이 아니어서 여기 둠. 최신 네이밍의 권위있는
+    출처는 아니고 배경/근거 참고용.
+
+- **`backlog/`** — 아직 착수하지 않은 브레인스토밍/아이디어(webmanager에 국한되지
+  않는 것). `archive/`와 달리 "완료된 것"이 아니라 "언젠가 할 수도 있는 것" — 실제로
+  작업을 시작할 때 참고
+  - `code-patch-widgets.md` — `window.CDDialog` 기반 브라우저 위젯 아이디어 (상태
+    표시줄, 확인창, 리소스 미터 등 code-server 패치 쪽)
+  - `pastebin-integration.md` — 외부 pastebin 연동 아이디어 (초기 메모 수준)
+
+- **webmanager 전용 계획/설계**: `webmanager/.claude/` — 완료된 기능은
+  `*-plan-done.md`, 아직 안 한 건 `*-plan.md`. 인덱스는 그 폴더의 `README.md`.
+
+- **살아있는 문서(이 폴더 밖)**: 각 서브프로젝트 폴더에 그대로 둠, 항상 최신 상태 유지
+  - `webmanager/plan.md`, `webmanager/CLAUDE.md`, `webmanager/ideas.md`,
+    `webmanager/review.md`, `webmanager/backend|frontend/README.md`
+  - 루트 `CLAUDE.md` — 레포 전체 아키텍처, 항상 최신
+
+## 새 지식을 추가할 때
+
+- webmanager에만 해당하는 것 → `webmanager/.claude/` (완료 여부에 따라 `-plan-done.md`
+  / `-plan.md`)
+- 레포 전체에 걸치는, 아직 안 끝난 작업의 설계/아이디어 → 여기 `backlog/`
+- 레포 전체에 걸치는, 라운드/논의가 끝나서 "현재 상태" 문서로 흡수됐지만 판단 과정
+  자체는 남겨두고 싶은 것 → 여기 `archive/` (흡수한 "현재 상태" 문서 쪽에 반드시
+  archive 경로를 가리키는 포인터를 남길 것 — 안 그러면 나중에 아무도 못 찾음)
+- 지금 당장 유효한 스펙/상태 → 해당 서브프로젝트 폴더의 `plan.md`/`README.md` 등에
+  직접 (여기로 옮기지 말 것 — 자주 갱신되는 문서는 코드 옆에 있어야 최신성이 유지됨)

@@ -32,3 +32,52 @@
 .new-key-callout p {
   margin-top: 0;
 }
+
+.radio-group {
+  display: flex;
+  gap: 1.25rem;
+  margin-bottom: 0.9rem;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-bottom: 0.9rem;
+}
+
+.commit-signing-actions {
+  margin-top: 0.25rem;
+}
+
+.ssh-signing-key-section {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+.gpg-keys-section {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+.gpg-keys-section h3 {
+  margin-top: 0;
+  font-size: 0.95rem;
+}
+
+.gpg-key-row-actions {
+  display: flex;
+  gap: 0.5rem;
+}

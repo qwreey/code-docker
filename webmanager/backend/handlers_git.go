@@ -56,11 +56,14 @@ func (s *Server) handleAddSSHHost(w http.ResponseWriter, r *http.Request) {
 
 	host, err := gitconfig.AddSSHHost(s.cfg.SSHClientConfig, s.cfg.SSHKeysDir, body.Host, body.HostName, body.User)
 	if err != nil {
-		if errors.Is(err, gitconfig.ErrHostExists) {
+		switch {
+		case errors.Is(err, gitconfig.ErrHostExists):
+			writeError(w, http.StatusConflict, err.Error())
+		case errors.Is(err, gitconfig.ErrInvalidHost):
 			writeError(w, http.StatusBadRequest, err.Error())
-			return
+		default:
+			writeError(w, http.StatusInternalServerError, err.Error())
 		}
-		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusCreated, host)

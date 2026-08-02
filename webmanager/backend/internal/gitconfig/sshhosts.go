@@ -21,9 +21,33 @@ type SSHHost struct {
 var (
 	ErrHostExists   = errors.New("host already exists")
 	ErrHostNotFound = errors.New("host not found")
+	// ErrInvalidHost is returned when host/hostname/user fail validation in
+	// AddSSHHost, before any file is touched. host must be safe to use as
+	// both a filesystem path component (filepath.Join(keysDir, host)) and an
+	// SSH config "Host" alias, so it's restricted to a conservative charset;
+	// hostname/user only need to be safe against SSH-config-line injection
+	// (a newline would let them start a bogus new directive/Host block), so
+	// they're checked for CR/LF only.
+	ErrInvalidHost = errors.New("invalid host, hostname, or user")
 )
 
 var hostLineRe = regexp.MustCompile(`(?i)^\s*Host\s+(\S+)\s*$`)
+
+// validHostRe restricts host to characters that are safe as both a
+// filesystem path component and an SSH config alias — this excludes "/",
+// "\", "..", whitespace, and anything else that could let host escape
+// keysDir (path traversal) or break out of its "Host %s" config line.
+var validHostRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+func validateAddSSHHostInput(host, hostname, user string) error {
+	if host == "" || !validHostRe.MatchString(host) {
+		return ErrInvalidHost
+	}
+	if strings.ContainsAny(hostname, "\r\n") || strings.ContainsAny(user, "\r\n") {
+		return ErrInvalidHost
+	}
+	return nil
+}
 
 // sshConfigBlock is one "Host x" section plus its raw body lines. The first
 // block (host == "") is any preamble before the first Host line. Body lines
@@ -97,6 +121,10 @@ func ListSSHHosts(configPath string) ([]SSHHost, error) {
 }
 
 func AddSSHHost(configPath, keysDir, host, hostname, user string) (SSHHost, error) {
+	if err := validateAddSSHHostInput(host, hostname, user); err != nil {
+		return SSHHost{}, err
+	}
+
 	existing, err := ListSSHHosts(configPath)
 	if err != nil {
 		return SSHHost{}, err
@@ -114,25 +142,42 @@ func AddSSHHost(configPath, keysDir, host, hostname, user string) (SSHHost, erro
 		return SSHHost{}, err
 	}
 
+	// keyPath is safe to join directly: validateAddSSHHostInput already
+	// rejected anything but [A-Za-z0-9._-] in host, so this can't escape
+	// keysDir.
 	keyPath := filepath.Join(keysDir, host)
 	cmd := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-f", keyPath, "-C", fmt.Sprintf("webmanager@%s", host))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return SSHHost{}, fmt.Errorf("ssh-keygen: %w: %s", err, strings.TrimSpace(string(out)))
 	}
+
+	// From here on, the key files exist on disk — any failure must clean
+	// them up before returning, so a retry doesn't get stuck on
+	// ssh-keygen's own interactive overwrite prompt (mirrors
+	// GenerateSSHSigningKey's pre-emptive removal in sshsigning.go).
+	cleanupKeyFiles := func() {
+		_ = os.Remove(keyPath)
+		_ = os.Remove(keyPath + ".pub")
+	}
+
 	if err := os.Chmod(keyPath, 0o600); err != nil {
+		cleanupKeyFiles()
 		return SSHHost{}, err
 	}
 	if err := os.Chmod(keyPath+".pub", 0o644); err != nil {
+		cleanupKeyFiles()
 		return SSHHost{}, err
 	}
 
 	block := fmt.Sprintf("\nHost %s\n    HostName %s\n    User %s\n    IdentityFile %s\n", host, hostname, user, keyPath)
 	f, err := os.OpenFile(configPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
+		cleanupKeyFiles()
 		return SSHHost{}, err
 	}
 	defer f.Close()
 	if _, err := f.WriteString(block); err != nil {
+		cleanupKeyFiles()
 		return SSHHost{}, err
 	}
 

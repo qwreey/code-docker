@@ -1,6 +1,8 @@
-# tailscale IP 할당 조사 (임시 메모)
+# tailscale IP 할당 조사 (구현 완료)
 
-code-docker 컨테이너가 고유한 tailscale IP를 갖도록 하는 방법 조사. 아직 구현 전, 조사한 내용과 설계 방향만 정리함.
+code-docker 컨테이너가 고유한 tailscale IP를 갖도록 하는 방법 조사. 아래 설계대로 구현 완료됨 - 사용자 문서는 `README.md` 의 "tailscale 연결" 절 참고. 이 파일은 설계 배경/근거 기록용으로 남겨둠 (남은 작업 중 5, 8번의 런타임 검증은 실제 tailnet 계정이 필요해 로컬에서 수동으로 확인 필요).
+
+> **네이밍 참고**: 아래 본문의 alias 이름(`code-docker-dind-internal`, `code-docker-internal-self`, `forwards`)은 조사 당시 이름이고, 실제 구현에서는 `dind`/`private`/`forward` 로 더 짧게 정리됨. 최신 이름은 `docker-compose.yml`/`README.md`/`CLAUDE.md` 참고.
 
 > 이 저장소의 일반적인 구조/컨벤션(override 패턴, supervisord 프로세스 모델, docker-compose 토폴로지 등)은 저장소 루트의 `CLAUDE.md` 를 참고. 구현 착수 전에 먼저 읽을 것.
 

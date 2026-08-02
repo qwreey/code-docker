@@ -4,14 +4,13 @@ import type { SectionId } from './components/Layout/sections'
 import { Supervisor } from './components/Supervisor/Supervisor'
 import { SshKeys } from './components/SshKeys/SshKeys'
 import { GitConfig } from './components/GitConfig/GitConfig'
+import { Tailscale } from './components/Tailscale/Tailscale'
+import { Logs } from './components/Logs/Logs'
+import { Processes } from './components/Processes/Processes'
 import { Placeholder } from './components/Placeholder/Placeholder'
 import './App.css'
 
 const PLACEHOLDER_INFO: Record<string, { title: string; note: string }> = {
-  tailscale: {
-    title: 'Tailscale',
-    note: 'tailscale 로그인/상태 조회 및 forward·publish 설정 관리 예정.',
-  },
   mise: {
     title: 'mise',
     note: '설치된 tool/version 목록 조회 및 mise use -g 실행 예정.',
@@ -36,6 +35,9 @@ function App() {
         {active === 'supervisor' && <Supervisor />}
         {active === 'ssh-keys' && <SshKeys />}
         {active === 'git-config' && <GitConfig />}
+        {active === 'tailscale' && <Tailscale />}
+        {active === 'logs' && <Logs />}
+        {active === 'processes' && <Processes />}
         {active in PLACEHOLDER_INFO && (
           <Placeholder title={PLACEHOLDER_INFO[active].title} note={PLACEHOLDER_INFO[active].note} />
         )}

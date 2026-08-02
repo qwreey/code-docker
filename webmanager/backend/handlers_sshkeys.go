@@ -33,6 +33,10 @@ func (s *Server) handleAddSSHKey(w http.ResponseWriter, r *http.Request) {
 
 	key, err := sshkeys.Add(s.cfg.SSHAuthorizedKeys, body.Key)
 	if err != nil {
+		if errors.Is(err, sshkeys.ErrDuplicate) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}

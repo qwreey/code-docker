@@ -10,14 +10,18 @@ import (
 	"syscall"
 	"time"
 
+	"webmanager/internal/cgroup"
+	"webmanager/internal/procinfo"
 	"webmanager/internal/supervisor"
 )
 
 func main() {
 	cfg := loadConfig()
 	s := &Server{
-		cfg: cfg,
-		sup: supervisor.NewClient(cfg.SupervisorSock),
+		cfg:           cfg,
+		sup:           supervisor.NewClient(cfg.SupervisorSock),
+		procSampler:   procinfo.NewSampler(),
+		cgroupSampler: cgroup.NewSampler(),
 	}
 
 	mux := http.NewServeMux()
@@ -41,11 +45,37 @@ func main() {
 	mux.HandleFunc("POST /api/git/credentials", s.handleAddCredential)
 	mux.HandleFunc("DELETE /api/git/credentials/{host}", s.handleDeleteCredential)
 
+	mux.HandleFunc("GET /api/git/signing", s.handleGetGitSigning)
+	mux.HandleFunc("PUT /api/git/signing", s.handlePutGitSigning)
+	mux.HandleFunc("POST /api/git/signing/ssh-key", s.handleGenerateSSHSigningKey)
+	mux.HandleFunc("GET /api/git/gpg-keys", s.handleListGPGKeys)
+	mux.HandleFunc("POST /api/git/gpg-keys", s.handleGenerateGPGKey)
+	mux.HandleFunc("GET /api/git/gpg-keys/{keyId}/public", s.handleGetGPGPublicKey)
+	mux.HandleFunc("DELETE /api/git/gpg-keys/{keyId}", s.handleDeleteGPGKey)
+
+	mux.HandleFunc("GET /api/tailscale/config", s.handleGetTailscaleConfig)
+	mux.HandleFunc("PUT /api/tailscale/config", s.handlePutTailscaleConfig)
+	mux.HandleFunc("GET /api/tailscale/forwards", s.handleListTailscaleForwards)
+	mux.HandleFunc("POST /api/tailscale/forwards", s.handleAddTailscaleForward)
+	mux.HandleFunc("DELETE /api/tailscale/forwards/{name}", s.handleDeleteTailscaleForward)
+	mux.HandleFunc("GET /api/tailscale/publish", s.handleListTailscalePublish)
+	mux.HandleFunc("POST /api/tailscale/publish", s.handleAddTailscalePublish)
+	mux.HandleFunc("DELETE /api/tailscale/publish/{name}", s.handleDeleteTailscalePublish)
+
+	mux.HandleFunc("GET /api/logs/apps", s.handleListLogApps)
+	mux.HandleFunc("GET /api/logs/entries", s.handleListLogEntries)
+
+	mux.HandleFunc("GET /api/processes", s.handleListSystemProcesses)
+	mux.HandleFunc("POST /api/processes/{pid}/signal", s.handleSignalProcess)
+	mux.HandleFunc("GET /api/ports", s.handleListPorts)
+
+	mux.HandleFunc("GET /api/system/resources", s.handleSystemResources)
+
 	mux.Handle("GET /", staticHandler(cfg.StaticDir))
 
 	httpServer := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: mux,
+		Handler: limitRequestBody(mux),
 	}
 
 	go func() {

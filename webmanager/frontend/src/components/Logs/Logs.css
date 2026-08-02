@@ -1,0 +1,44 @@
+.logs-controls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.logs-live-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding-bottom: 0.45rem;
+}
+
+.logs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.logs-table th,
+.logs-table td {
+  text-align: left;
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.logs-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.logs-message {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.logs-message-blank {
+  color: var(--text-muted);
+  font-style: italic;
+}

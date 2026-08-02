@@ -7,6 +7,13 @@ networks:
     name: "${PREFIX:-}code-docker-external"
     internal: false
     # enable_ipv6: true # If you enabled ipv6 docker engine support, enable this
+  code-docker-forwards:
+    # Dedicated network for the tailscale `forwards:` feature (config.yaml's
+    # socat listeners that pull a remote tailnet peer's port in). Kept
+    # separate from code-docker-internal so forwards/publish don't share a
+    # port namespace.
+    name: "${PREFIX:-}code-docker-forwards"
+    internal: true
 
 services:
   code-docker:
@@ -24,14 +31,40 @@ services:
       # Web app name
       PWA_NAME: "yaeji-code"
       PWA_SHORT_NAME: "yaeji-code"
+      # Timezone for all processes in the container (glibc reads this
+      # directly via tzdata, already installed - no /etc/localtime symlink
+      # or entrypoint change needed). Empty means UTC. e.g. "Asia/Seoul".
+      TZ: ""
       # Add docker in docker host. Uses the internal-only alias (not the
       # plain "code-docker-dind" service name) because code-docker sits on
       # both networks - resolving the bare name is ambiguous between the
       # two, and dind only actually listens on its code-docker-internal IP.
-      DOCKER_HOST: "tcp://code-docker-dind-internal:2375"
+      DOCKER_HOST: "tcp://dind:2375"
+      # Set to "false" to disable all tailscale integration (tailscaled +
+      # forwards/publish) - the two supervisord programs stay up but do
+      # nothing.
+      TAILSCALE_ENABLED: "true"
+      # Self-hosted control server (e.g. Headscale) for `tailscale up
+      # --login-server=`. Leave unset/empty to use the official
+      # tailscale.com control server instead.
+      TAILSCALE_LOGIN_SERVER: "" # https://tail.qwreey.moe
     networks:
-      - code-docker-external
-      - code-docker-internal
+      code-docker-external: {}
+      code-docker-internal:
+        # Self-IP alias for the tailscale `publish:` feature (config.yaml's
+        # `tailscale serve` targets). tailscaled auto re-exposes anything
+        # bound to loopback/0.0.0.0 to the whole tailnet regardless of ACLs,
+        # so services meant to be published deliberately (not automatically)
+        # should bind here instead.
+        aliases:
+          - private
+      code-docker-forwards:
+        # Self-IP alias for the tailscale `forwards:` feature (config.yaml's
+        # socat listeners) - same loopback-avoidance reasoning as `private`,
+        # on its own network so local ports can't collide between forwards:
+        # and publish:.
+        aliases:
+          - forward
     ports:
       # Expose port 80 (HTTP) externally through a reverse proxy,
       # or expose it directly, but be mindful of security settings.
@@ -40,6 +73,11 @@ services:
       # authentication tool like Authentik.
       - 80:80
       # - 22:22
+      # webmanager admin panel (see webmanager/plan.md). No auth of its own -
+      # relies entirely on a reverse proxy in front of it. Bind-address
+      # strategy (host publish vs internal-only alias) is still undecided,
+      # so this is just open on 0.0.0.0 for now while it's under development.
+      - 81:81
     volumes:
       - ./code:/code
       - ./sshd:/etc/ssh
@@ -93,7 +131,7 @@ services:
         # (which is also on code-docker-external) can reach this daemon
         # unambiguously - see DOCKER_HOST above.
         aliases:
-          - code-docker-dind-internal
+          - dind
       # code-docker-internal has no route to the internet, so this is
       # needed for `docker pull` to work.
       code-docker-external: {}

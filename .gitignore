@@ -3,4 +3,5 @@ sshd/
 dind/
 config/*-override*
 config/*.override*
+config/code-patch/*.override.*
 config/supervisord/*.conf

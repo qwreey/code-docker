@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"webmanager/internal/cgroup"
+	"webmanager/internal/procinfo"
 	"webmanager/internal/supervisor"
 )
 
 type Server struct {
-	cfg Config
-	sup *supervisor.Client
+	cfg           Config
+	sup           *supervisor.Client
+	procSampler   *procinfo.Sampler
+	cgroupSampler *cgroup.Sampler
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -20,4 +24,21 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// maxRequestBodyBytes caps every request body this API accepts. 1 MiB is
+// generous for every legitimate payload here (the largest is something like
+// an SSH public key paste, nowhere near that size) — this is defense-in-
+// depth against an unbounded read, not a real usability constraint.
+const maxRequestBodyBytes = 1 << 20
+
+// limitRequestBody wraps every request's body in http.MaxBytesReader so a
+// json.Decoder reading past the cap gets a clean error (which every handler
+// here already maps to 400 "invalid request body") instead of reading an
+// unbounded amount of attacker-controlled data.
+func limitRequestBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+		next.ServeHTTP(w, r)
+	})
 }
