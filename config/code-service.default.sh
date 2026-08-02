@@ -1,13 +1,10 @@
 #!/bin/bash
 
-# If user not inited, init first
-if [ ! -e /code/.installed ]; then
-    if [ -e /etc/code-docker/user-init.override.sh ]; then
-        /etc/code-docker/user-init.override.sh
-    else
-        /etc/code-docker/user-init.default.sh
-    fi
-    touch /code/.installed
+# Run user init script
+if [ -e /etc/code-docker/user-init.override.sh ]; then
+    /etc/code-docker/user-init.override.sh
+else
+    /etc/code-docker/user-init.default.sh
 fi
 
 # Update code server

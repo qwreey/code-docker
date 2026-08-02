@@ -1,0 +1,47 @@
+#!/bin/sh
+# wl-copy compatible shim: forwards writes to the code-server browser
+# clipboard via `code-server -c` (vscode CLI's --stdin-to-clipboard).
+# Text passed as arguments (instead of stdin) is joined and piped in.
+
+clear=0
+have_text=0
+text=""
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-c|--clear) clear=1 ;;
+		-t|--type|-s|--seat) shift ;;
+		-o|--paste-once|-f|--foreground|-p|--primary|-n|--trim-newline|-v|--version|-h|--help) ;;
+		--)
+			shift
+			while [ $# -gt 0 ]; do
+				if [ "$have_text" = 0 ]; then
+					text="$1"
+				else
+					text="$text $1"
+				fi
+				have_text=1
+				shift
+			done
+			continue
+			;;
+		-*) ;;
+		*)
+			if [ "$have_text" = 0 ]; then
+				text="$1"
+			else
+				text="$text $1"
+			fi
+			have_text=1
+			;;
+	esac
+	shift
+done
+
+if [ "$clear" = 1 ]; then
+	printf '' | code-server -c
+elif [ "$have_text" = 1 ]; then
+	printf '%s' "$text" | code-server -c
+else
+	exec code-server -c
+fi

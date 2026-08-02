@@ -1,0 +1,26 @@
+#!/bin/sh
+# xclip compatible shim: forwards writes to the code-server browser
+# clipboard via `code-server -c` (vscode CLI's --stdin-to-clipboard).
+# All -selection targets map to the same browser clipboard, and -o (paste)
+# isn't supported since there is no read-back path from the browser.
+
+mode=in
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-i|-in|--in) mode=in ;;
+		-o|-out|--out) mode=out ;;
+		-selection|--selection|-sel|-d|--display|-l|--loops|-t|--target)
+			shift
+			;;
+		*) ;;
+	esac
+	shift
+done
+
+if [ "$mode" = "out" ]; then
+	echo "xclip: paste is not supported (no read access to the browser clipboard)" >&2
+	exit 1
+fi
+
+exec code-server -c

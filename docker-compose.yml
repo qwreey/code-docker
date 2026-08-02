@@ -3,10 +3,23 @@ services:
     container_name: code-docker
     hostname: code-docker
     build:
+      # Change this if you cloned this docker-compose file to outside
+      # ex: builds/code-docker
       context: .
+      # Name resolution can fail if the host uses something like Tailscale,
+      # so we work around this by using the host network only at build time.
       network: host
     restart: unless-stopped
+    environment:
+      # Web app name
+      PWA_NAME: "yaeji-code"
+      PWA_SHORT_NAME: "yaeji-code"
     ports:
+      # Expose port 80 (HTTP) externally through a reverse proxy,
+      # or expose it directly, but be mindful of security settings.
+      # It's recommended to use a reverse proxy with forward proxy auth
+      # where possible, e.g. a web server like Caddy combined with an
+      # authentication tool like Authentik.
       - 80:80
       # - 22:22
     volumes:

@@ -14,10 +14,10 @@ RUN --mount=type=cache,target=/var/cache/pacman /etc/code-docker/build.sh
 # Copy config & static files
 COPY --chown=root:root \
     config script/entrypoint.sh script/code-service.sh \
-    script/get-user-shell.sh /etc/code-docker/
+    script/get-user-shell.sh script/sshd-service.sh /etc/code-docker/
 COPY --chown=root:root code-server-autoinstall/*.sh \
     /etc/code-docker/code-server-autoinstall/
-COPY --chown=root:root bin /etc/code-docker/bin/
+COPY --chown=root:root bin /usr/local/bin/
 
 # Setup user shell and home
 RUN chsh root --shell $(/etc/code-docker/get-user-shell.sh) &&\

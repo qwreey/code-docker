@@ -1,2 +1,2 @@
 #!/bin/sh
-code-server -c
+exec code-server -c
