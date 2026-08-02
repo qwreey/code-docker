@@ -1,0 +1,2 @@
+#!/bin/sh
+setsid supervisorctl restart tailscale-forward &

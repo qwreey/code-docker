@@ -18,6 +18,14 @@ if [ ! -e "/code/.server/config.yaml" ]; then
     fi
 fi
 
+# Seed code-docker's own default browser patches. Runs every start, like
+# user-init, but must come after install.sh so /code/.server/patch exists.
+if [ -e /etc/code-docker/code-patch.override.sh ]; then
+    /etc/code-docker/code-patch.override.sh
+else
+    /etc/code-docker/code-patch.default.sh
+fi
+
 # source code env
 if [ -e /etc/code-docker/code-env.override.sh ]; then
     source /etc/code-docker/code-env.override.sh
