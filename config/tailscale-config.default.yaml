@@ -1,0 +1,23 @@
+# See tailscale.md at the repo root and the "tailscale" section of README.md
+# for what forwards/publish mean and the security reasoning behind them.
+
+socks5_address: localhost:1055   # tailscaled's SOCKS5 listen address, usually leave as-is
+retry_intervall: 5               # default retry interval (seconds) for forwards, overridable per-entry
+
+# Pull a remote tailnet peer's port into code-docker (socat + SOCKS5).
+# Reach these from inside code-docker via the "forward" hostname, e.g.
+# forwards:
+#   - name: adb
+#     local_port: 5037
+#     remote_host: laptop
+#     remote_port: 5037
+forwards: []
+
+# Explicitly publish a local code-docker port to the tailnet (`tailscale serve`).
+# local_port must be bound on the "private" hostname's address.
+# publish:
+#   - name: dev-server
+#     tailscale_port: 80
+#     local_port: 3000
+#     mode: tcp                  # tcp | tls-terminated-tcp
+publish: []
