@@ -198,7 +198,7 @@ export function Logs() {
   const rangeMax = range?.latest != null ? toDatetimeLocalValue(range.latest) : undefined
 
   return (
-    <section>
+    <section className="logs-page">
       <div className="section-header">
         <h1>Logs</h1>
         <button type="button" className="btn btn-secondary btn-small" onClick={loadFirstPage} disabled={loading}>

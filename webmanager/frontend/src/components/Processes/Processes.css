@@ -4,6 +4,9 @@
   border-radius: var(--radius);
   overflow: hidden;
   margin-bottom: 1rem;
+  /* fixed, border-inclusive height so this group lines up exactly with the
+     other filter controls (search input/selects) next to it */
+  height: 2.15rem;
 }
 
 .processes-maintabs {
@@ -12,6 +15,9 @@
 }
 
 .processes-tab {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
   border: none;
   background: var(--surface);
   color: var(--text);
@@ -161,10 +167,15 @@
 }
 
 .process-search-input {
+  /* input[type=search] gets native appearance in Chrome/WebKit that ignores
+     our padding/height and renders shorter than the other filter controls -
+     appearance: none opts back into the regular box model. */
+  appearance: none;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.4rem 0.7rem;
   font-size: 0.85rem;
+  height: 2.15rem;
   background: var(--bg);
   color: var(--text);
   min-width: 14rem;
@@ -182,6 +193,7 @@
   border-radius: var(--radius);
   padding: 0.4rem 0.6rem;
   font-size: 0.85rem;
+  height: 2.15rem;
   background: var(--bg);
   color: var(--text);
 }
@@ -201,18 +213,24 @@
 }
 
 .process-tree-toggle {
-  border: none;
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.7rem;
-  padding: 0 0.2rem;
+  font-size: 0.85rem;
   line-height: 1;
   flex: none;
 }
 
 .process-tree-toggle:hover {
   color: var(--text);
+  background: var(--color-gray-bg);
 }
 
 .process-pagination {
@@ -248,25 +266,34 @@
 
   /* same validated categorical/sequential slots as ClaudeCode.css's
      .claude-heatmap and ResourceHistory.css's .rh-section, re-declared
-     locally since this grid sits outside both of those scopes. */
+     locally since this grid sits outside both of those scopes. Kept
+     deliberately muted (light gray -> a moderately dark blue, not a
+     saturated/near-black one) so the per-core grid doesn't visually
+     dominate the tab at a glance. */
   --viz-seq-0: var(--color-gray-bg);
-  --viz-seq-1: #9ec5f4;
-  --viz-seq-2: #3987e5;
-  --viz-seq-3: #1c5cab;
-  --viz-seq-4: #0d366b;
+  --viz-seq-1: #cfdff2;
+  --viz-seq-2: #97bce3;
+  --viz-seq-3: #6190c4;
+  --viz-seq-4: #35608f;
 
   --viz-cat-1: #2a78d6;
   --viz-cat-2: #eb6834;
   --viz-cat-3: #1baf7a;
+
+  /* every row gets the same height regardless of how items wrap (so a
+     short card like disk usage doesn't end up a different size than its
+     neighbors on narrower viewports where auto-fit drops it to its own
+     row) */
+  grid-auto-rows: 1fr;
 }
 
 @media (prefers-color-scheme: dark) {
   .perf-top-grid {
     --viz-seq-0: #2c2c2a;
-    --viz-seq-1: #184f95;
-    --viz-seq-2: #2a78d6;
-    --viz-seq-3: #6da7ec;
-    --viz-seq-4: #b7d3f6;
+    --viz-seq-1: #1f3f66;
+    --viz-seq-2: #2f5f94;
+    --viz-seq-3: #4a7ebe;
+    --viz-seq-4: #7aa6d8;
 
     --viz-cat-1: #3987e5;
     --viz-cat-2: #d95926;
@@ -282,12 +309,6 @@
   font-size: 1rem;
 }
 
-.perf-card-note {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  margin: -0.35rem 0 0.75rem;
-}
-
 .perf-card-disk {
   display: flex;
   flex-direction: column;
@@ -297,9 +318,25 @@
 /* cpu heatmap */
 
 .perf-cpu-grid {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(2.1rem, 1fr));
   gap: 4px;
+}
+
+/* custom hover tooltip (native title="" is small and appears too slowly) */
+.perf-cpu-tooltip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 8px));
+  background: var(--text-heading);
+  color: var(--surface);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  padding: 0.3rem 0.55rem;
+  border-radius: var(--radius-sm, 4px);
+  pointer-events: none;
+  z-index: 5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .perf-cpu-cell {
@@ -443,26 +480,3 @@
   margin-left: auto;
 }
 
-/* thermal readout */
-
-.perf-thermal-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.perf-thermal-item {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-}
-
-.perf-thermal-label {
-  color: var(--text-muted);
-}
-
-.perf-thermal-value {
-  font-weight: 600;
-  color: var(--text-heading);
-  font-variant-numeric: tabular-nums;
-}

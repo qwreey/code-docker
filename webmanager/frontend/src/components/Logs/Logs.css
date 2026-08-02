@@ -1,3 +1,10 @@
+.logs-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
 .logs-controls {
   display: flex;
   align-items: flex-end;
@@ -23,9 +30,13 @@
 }
 
 /* Filter controls (.logs-controls) stay in normal page flow above this, so
-   they're always visible; only the table body scrolls internally. */
+   they're always visible; only the table body scrolls internally. Flex-fills
+   whatever's left of .logs-page's height instead of a fixed max-height, so
+   it neither leaves dead space below it on tall viewports nor gets capped
+   short of the actually-available space. */
 .logs-table-wrapper {
-  max-height: 60vh;
+  flex: 1 1 auto;
+  min-height: 240px;
   overflow-y: auto;
 }
 

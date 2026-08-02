@@ -45,6 +45,7 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 | `guide-plan.md` | code-docker 도움말/가이드를 webmanager에 임베드 — 아이디어 단계, 구현 안 함 | 미정(사용자 검토 대기) |
 | `version-panel-plan.md` | code-server/mise 버전 관리 패널 — 아이디어 단계, 구현 안 함 | 최하(guide-plan과 동급) |
 | `session-viewer-plan.md` | 활성 세션 목록 보기 — 아이디어 단계, "세션"의 정의부터 불명확해서 착수 시 사용자와 인터랙티브 확인 필수 | 최하 |
+| `filemanager-rework-plan.md` | 파일 매니저 리워크(드래그앤드롭 이동, 그리드/리스트/테이블 뷰, 멀티탭) — Termix류 벤치마킹, 아이디어 단계, 착수 전 스코프를 사용자와 논의 필수 | 최하 |
 
 전체 순서/우선순위는 `webmanager/CLAUDE.md`가 최종 소스 — 위 표의 "우선순위" 칸은
 힌트일 뿐 그쪽이 바뀌면 이 표도 갱신할 것.

@@ -83,6 +83,10 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
     구현 진행하지 말 것. `.claude/session-viewer-plan.md`
 14. 다국어(i18n) 지원, 아마 LinguiJS — 모든 기능이 안정되고 문자열이 안 바뀌기
     시작할 때 착수 예정, 아이디어 단계, 문서 없음.
+15. **파일 매니저 리워크**(드래그앤드롭 이동, 그리드/리스트/테이블 뷰,
+    멀티탭) — **최하 우선순위**, Termix류 프로젝트를 벤치마킹하자는 아이디어
+    단계. 복잡하고 필수 기능은 아니라서 낮은 우선순위 — 착수 전 스코프를
+    사용자와 반드시 논의. `.claude/filemanager-rework-plan.md`
 
 ## 참고 문서
 

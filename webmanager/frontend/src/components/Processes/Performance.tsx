@@ -9,27 +9,12 @@ import './Processes.css'
 
 const POLL_INTERVAL_MS = 4000
 
-function ThermalReadout({ zones }: { zones: { label: string; celsius: number }[] }) {
-  return (
-    <div className="card perf-card perf-card-thermal">
-      <h2>온도</h2>
-      <div className="perf-thermal-list">
-        {zones.map((z) => (
-          <div className="perf-thermal-item" key={z.label}>
-            <span className="perf-thermal-label">{z.label}</span>
-            <span className="perf-thermal-value">{z.celsius.toFixed(0)}°C</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // Performance is the "성능" sub-tab: a single shared poll of
-// GET /api/system/resources feeds the CPU heatmap, memory breakdown, disk
-// card, and (when available) the clock/temperature readout, followed by the
-// existing time-series graphs (ResourceHistory, which does its own polling
-// against the /history endpoint since that's a different resource).
+// GET /api/system/resources feeds the CPU heatmap, memory breakdown, and
+// disk card, followed by the existing time-series graphs (ResourceHistory,
+// which does its own polling against the /history endpoint since that's a
+// different resource). Temperature was dropped from the UI (deemed not
+// useful) even though the backend still reports it - see SystemResources.thermal.
 export function Performance() {
   const [resources, setResources] = useState<SystemResources | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -63,8 +48,7 @@ export function Performance() {
     return <div className="system-summary-notice">컨테이너 리소스 정보를 불러오는 중...</div>
   }
 
-  const { memory, cpu, disk, hostMemory, cpuCores, thermal } = resources
-  const showThermal = thermal.length > 0
+  const { memory, cpu, disk, hostMemory, cpuCores } = resources
 
   return (
     <div>
@@ -85,7 +69,6 @@ export function Performance() {
           hostCachedBytes={hostMemory.cachedBytes}
           hostAvailable={hostMemory.available}
         />
-        {showThermal && <ThermalReadout zones={thermal} />}
         <DiskUsageCard disk={disk} />
       </div>
 

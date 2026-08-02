@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ProcessInfo } from '../../api/types'
 import type { FuzzyMatchResult } from '../../utils/fuzzyMatch'
 import { buildProcessTree, type ProcessTreeNode } from '../../utils/processTree'
@@ -33,9 +33,16 @@ interface ProcessTreeProps {
 export function ProcessTree({ processes, matches, onKilled, onError }: ProcessTreeProps) {
   const [collapsed, setCollapsed] = useState<Set<number>>(() => new Set())
 
-  const tree = buildProcessTree(processes)
-  const rows: FlatEntry[] = []
-  flatten(tree, 0, collapsed, rows)
+  // Rebuilding the tree only needs to happen when `processes` itself
+  // changes (a new poll) - without this it also reran (allocating a whole
+  // new node tree) on every collapse/expand click, since that's a state
+  // update on this same component.
+  const tree = useMemo(() => buildProcessTree(processes), [processes])
+  const rows: FlatEntry[] = useMemo(() => {
+    const out: FlatEntry[] = []
+    flatten(tree, 0, collapsed, out)
+    return out
+  }, [tree, collapsed])
 
   function toggle(pid: number) {
     setCollapsed((prev) => {

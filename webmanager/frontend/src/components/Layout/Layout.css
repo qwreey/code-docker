@@ -30,7 +30,7 @@
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
   padding: 0.55rem 0.7rem;
   border: none;
   border-radius: var(--radius);
@@ -43,9 +43,21 @@
 
 .sidebar-drag-handle {
   flex-shrink: 0;
+  width: 0.85rem;
+  text-align: center;
   color: var(--text-muted);
   cursor: grab;
   line-height: 1;
+  /* only shown on hover/focus - always-visible handles looked noisy since
+     every row has one; kept a narrow reserved width (rather than none) so
+     the label doesn't shift sideways when it fades in */
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.sidebar-item:hover .sidebar-drag-handle,
+.sidebar-item:focus-visible .sidebar-drag-handle {
+  opacity: 1;
 }
 
 .sidebar-item:hover {

@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import './Processes.css'
 
 interface CpuHeatmapProps {
@@ -5,6 +6,12 @@ interface CpuHeatmapProps {
   available: boolean
   clockMHz?: number[]
   numCpu: number
+}
+
+interface HoverState {
+  index: number
+  x: number
+  y: number
 }
 
 // Fixed absolute bands (not per-dataset quartiles like ClaudeCode/Heatmap.tsx
@@ -20,32 +27,44 @@ function levelFor(percent: number): number {
 }
 
 export function CpuHeatmap({ perCorePercent, available, clockMHz, numCpu }: CpuHeatmapProps) {
+  const gridRef = useRef<HTMLDivElement>(null)
+  const [hover, setHover] = useState<HoverState | null>(null)
+
+  function showHover(el: HTMLElement, index: number) {
+    const grid = gridRef.current
+    if (!grid) return
+    const cellRect = el.getBoundingClientRect()
+    const gridRect = grid.getBoundingClientRect()
+    setHover({ index, x: cellRect.left - gridRect.left + cellRect.width / 2, y: cellRect.top - gridRect.top })
+  }
+
   return (
     <div className="card perf-card">
-      <h2>CPU 코어 (호스트 전체)</h2>
-      <p className="perf-card-note">
-        호스트 머신의 코어 {numCpu}개 전체 사용률입니다. cgroup v2는 코어별 통계를 제공하지 않기 때문에 이 값은{' '}
-        <strong>컨테이너 사용량이 아닌 호스트 전체 기준</strong>입니다.
-      </p>
+      <h2>CPU 코어 (호스트 전체기준, {numCpu}개)</h2>
       {!available || perCorePercent.length === 0 ? (
         <p className="empty-state">코어별 CPU 정보를 사용할 수 없습니다.</p>
       ) : (
         <>
-          <div className="perf-cpu-grid">
-            {perCorePercent.map((pct, i) => {
-              const mhz = clockMHz?.[i]
-              return (
-                <div
-                  key={i}
-                  className="perf-cpu-cell"
-                  data-level={levelFor(pct)}
-                  tabIndex={0}
-                  title={`코어 ${i} · ${pct.toFixed(1)}%${mhz ? ` · ${(mhz / 1000).toFixed(2)} GHz` : ''}`}
-                >
-                  <span className="perf-cpu-cell-label">{i}</span>
-                </div>
-              )
-            })}
+          <div className="perf-cpu-grid" ref={gridRef} onMouseLeave={() => setHover(null)}>
+            {perCorePercent.map((pct, i) => (
+              <div
+                key={i}
+                className="perf-cpu-cell"
+                data-level={levelFor(pct)}
+                tabIndex={0}
+                onMouseEnter={(e) => showHover(e.currentTarget, i)}
+                onFocus={(e) => showHover(e.currentTarget, i)}
+                onBlur={() => setHover((h) => (h?.index === i ? null : h))}
+              >
+                <span className="perf-cpu-cell-label">{i}</span>
+              </div>
+            ))}
+            {hover && (
+              <div className="perf-cpu-tooltip" style={{ left: hover.x, top: hover.y }}>
+                코어 {hover.index} · {perCorePercent[hover.index].toFixed(1)}%
+                {clockMHz?.[hover.index] ? ` · ${(clockMHz[hover.index] / 1000).toFixed(2)} GHz` : ''}
+              </div>
+            )}
           </div>
           <div className="perf-cpu-legend">
             <span>낮음</span>

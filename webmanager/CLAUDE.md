@@ -92,7 +92,12 @@ questions like what signal even means "container rebuild needed"), an active
 sessions viewer (`.claude/session-viewer-plan.md` — same lowest-priority
 tier; before touching this one, the very definition of "session" needs to be
 confirmed interactively with the repo owner, don't just pick one and build
-it). `.claude/caddy-plan.md` — Caddy-based dev-server expose (wildcard subdomain reverse
+it), a file manager rework (`.claude/filemanager-rework-plan.md` — drag-drop
+move, grid/list/table views, multi-tab, benchmarked loosely against Termix;
+same lowest-priority tier, scope needs to be discussed with the repo owner
+before starting — several open questions in the doc, e.g. whether grid-view
+thumbnails conflict with the existing file manager's deliberate no-thumbnails
+decision). `.claude/caddy-plan.md` — Caddy-based dev-server expose (wildcard subdomain reverse
 proxy) — also lives here, deliberately below dind/terminal-M2: most of its
 design is settled, but it still has open decisions (e.g. `preserve_host`
 default) and was explicitly deprioritized below the rest of the active

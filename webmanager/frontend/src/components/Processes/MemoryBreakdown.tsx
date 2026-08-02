@@ -67,7 +67,7 @@ export function MemoryBreakdown({
               {formatBytes(cgroupUsedBytes)}
               {cgroupLimitBytes != null
                 ? ` / ${formatBytes(cgroupLimitBytes)} (${(cgroupPercent ?? 0).toFixed(1)}%)`
-                : ' · 제한 없음 — 아래 호스트 실제 메모리가 유의미한 상한입니다'}
+                : ' · 제한 없음 (아래 호스트 메모리 참고)'}
             </div>
           </>
         ) : (
