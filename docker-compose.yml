@@ -1,6 +1,16 @@
+networks:
+  code-docker-internal:
+    name: "${PREFIX:-}code-docker-internal"
+    internal: true
+    # enable_ipv6: true # If you enabled ipv6 docker engine support, enable this
+  code-docker-external:
+    name: "${PREFIX:-}code-docker-external"
+    internal: false
+    # enable_ipv6: true # If you enabled ipv6 docker engine support, enable this
+
 services:
   code-docker:
-    container_name: code-docker
+    container_name: "${PREFIX:-}code-docker"
     hostname: code-docker
     build:
       # Change this if you cloned this docker-compose file to outside
@@ -14,6 +24,14 @@ services:
       # Web app name
       PWA_NAME: "yaeji-code"
       PWA_SHORT_NAME: "yaeji-code"
+      # Add docker in docker host. Uses the internal-only alias (not the
+      # plain "code-docker-dind" service name) because code-docker sits on
+      # both networks - resolving the bare name is ambiguous between the
+      # two, and dind only actually listens on its code-docker-internal IP.
+      DOCKER_HOST: "tcp://code-docker-dind-internal:2375"
+    networks:
+      - code-docker-external
+      - code-docker-internal
     ports:
       # Expose port 80 (HTTP) externally through a reverse proxy,
       # or expose it directly, but be mindful of security settings.
@@ -26,7 +44,10 @@ services:
       - ./code:/code
       - ./sshd:/etc/ssh
     cap_add:
+      # Needed for debugging tools that trace other processes, e.g. gdb, btop
       - SYS_PTRACE
+      # Avoids IPC-related performance bottlenecks, since IDEs make heavy
+      # use of IPC (extensions, LSP, etc.)
       - IPC_LOCK
     # Change max logging size
     logging:
@@ -42,3 +63,38 @@ services:
     #group_add:
     #  - video
     #  - render
+
+  # Create docker in docker daemon. for creating dev dockers (redis, postgres, ...)
+  # WARNING: this daemon is privileged and has no auth/TLS on its socket.
+  # Anyone who can reach it can create privileged containers and effectively
+  # gain root on the host. dind-entrypoint.sh binds it to code-docker-internal
+  # only (not code-docker-external, see below), but treat code-docker-internal
+  # itself as fully trusted.
+  code-docker-dind:
+    container_name: "${PREFIX:-}code-docker-dind"
+    hostname: code-docker-dind
+    image: docker:dind
+    privileged: true
+    restart: unless-stopped
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      # Persist pulled images/containers across restarts
+      - ./dind:/var/lib/docker
+      # Binds the daemon to code-docker-internal only (see script) instead
+      # of the stock entrypoint's hardcoded 0.0.0.0, so it's unreachable
+      # from code-docker-external even though that network is attached
+      # below (needed for `docker pull`).
+      - ./script/dind-entrypoint.sh:/dind-entrypoint.sh:ro
+    entrypoint: ["/dind-entrypoint.sh"]
+    networks:
+      code-docker-internal:
+        # Extra name that only resolves on this network, so code-docker
+        # (which is also on code-docker-external) can reach this daemon
+        # unambiguously - see DOCKER_HOST above.
+        aliases:
+          - code-docker-dind-internal
+      # code-docker-internal has no route to the internet, so this is
+      # needed for `docker pull` to work.
+      code-docker-external: {}
+    command: ["--log-level=warn"]

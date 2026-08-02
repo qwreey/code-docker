@@ -1,5 +1,6 @@
 code/
 sshd/
+dind/
 config/*-override*
 config/*.override*
 config/supervisord/*.conf

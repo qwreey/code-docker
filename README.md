@@ -32,6 +32,8 @@ cp builds/code-docker/docker-compose.yml ./ # 컴포즈 파일 복사
 
 code-docker 환경은 컨테이너 내부에서 기본적으로 root 유저를 사용합니다. CAP을 따로 추가하지 않고 컨테이너의 네트워크를 적절히 분리한 경우 큰 문제가 되지 않습니다.
 
+`docker-compose.yml` 의 `cap_add` 로 `SYS_PTRACE`, `IPC_LOCK` 이 기본 추가되어있습니다. `SYS_PTRACE` 는 gdb, btop 등 다른 프로세스를 추적/조사하는 디버깅 도구를 위해 필요합니다. `IPC_LOCK` 은 IDE 특성상 IPC 통신이 매우 많이 발생하는데, 이 때 발생할 수 있는 성능 병목을 막기 위함입니다 (익스텐션, LSP 등의 성능에 영향을 줄 수 있습니다). 필요하지 않다면 제거해도 무방합니다.
+
 `$XDG_RUNTIME_DIR` 는 `/run/xdg`로 고정됩니다. 익스텐션이 특정 소켓을 찾는 경우 보통 여기를 찾게 됩니다.
 
 ## 보안 (로그인)
@@ -106,9 +108,28 @@ code-docker의 요청이 나가는 네트워크를 잘 구성했다면, 호스�
 `ssh -R /run/xdg/discord-ipc-0:$XDG_RUNTIME_DIR/discord-ipc-0 code` 형태로 전송하면 작동하게 됩니다.
 이것을 자동화 하기 위해 `autossh` 등의 도구를 사용하는것을 고려하세요. 이를 로컬 데스크탑 환경의 autolaunch 또는 service 요소로 등록하면 지속적으로 사용가능합니다.
 
+## Docker in Docker (dind)
+
+편의를 위해 `code-docker-dind` (`docker:dind`) 서비스가 함께 제공됩니다. redis, postgres 등 개발에 필요한 컨테이너를 code-docker 안에서 `docker run ...` 명령으로 바로 생성해 사용할 수 있습니다. `DOCKER_HOST` 환경변수가 이 dind 데몬을 가리키도록 설정되어있어, code-docker 안에서 docker cli 로 생성한 컨테이너는 실제로는 `code-docker-dind` 컨테이너 안에서 동작합니다.
+
+dind 로 생성된 컨테이너는 `code-docker-internal` 네트워크에 묶여 code-docker 에서 접근 가능합니다. 단, 컨테이너가 동작하는곳은 어디까지나 `code-docker-dind` 컨테이너이므로, 포트를 publish 하여 컨테이너를 만든 뒤에는 `localhost` 가 아닌 `code-docker-dind-internal` 호스트네임으로 접속해야합니다. 예를들어 `docker run -d --name mypg -p 5432:5432 postgres` 로 생성했다면 `postgres://code-docker-dind-internal:5432` 로 접근하세요.
+
+> `code-docker-dind` 라는 이름도 존재하지만 쓰지 마세요 — code-docker 가 `code-docker-external`/`code-docker-internal` 양쪽에 다 붙어있어서, 그 이름이 두 네트워크 모두에 등록되어있는 탓에 어느 쪽 IP로 해석될지 비결정적입니다 (dind 데몬 자체가 internal 쪽에만 바인드되어있으므로, 잘못 해석되면 연결이 안됩니다). `code-docker-dind-internal` 은 `code-docker-internal` 에만 등록되는 별도 alias라 항상 올바른 쪽으로 resolve 됩니다.
+
+`code-docker-internal` 은 `internal: true` 로 인터넷 경로가 차단되어있어 `docker pull` 이 실패하므로, `code-docker-dind` 는 `code-docker-external` 에도 연결되어있습니다. 다만 dind 데몬 자체는 `script/dind-entrypoint.sh` 를 통해 `code-docker-internal` 쪽 IP에만 바인드되도록 되어있어(스톡 `docker:dind` 이미지의 `--host=tcp://0.0.0.0:2375` 기본 동작을 오버라이드함), 이미지 pull 은 되면서도 소켓 자체는 `code-docker-external` 에서 접근할 수 없습니다.
+
+dind 쪽에는 `./dind:/var/lib/docker` 볼륨이 마운트되어있어 컨테이너/이미지가 재기동 후에도 유지됩니다.
+
+> 보안 주의: `code-docker-dind` 는 `privileged: true` 로 구동되며, 인증/TLS 없는 평문 tcp 소켓(2375)이 열려있습니다. `code-docker-external` 로부터는 격리되어있지만, `code-docker-internal` 네트워크에 연결된 컨테이너라면 누구든 이 소켓을 통해 특권 컨테이너를 자유롭게 생성할 수 있습니다. 이는 사실상 호스트 커널에 준하는 권한(컨테이너 탈출 포함)을 얻을 수 있다는 뜻이므로, `code-docker-internal` 에는 신뢰할 수 있는 서비스만 연결하고, code-docker 접근 권한 역시 신뢰할 수 없는 사용자에게 주지 마세요.
+
+## 여러 code-docker 인스턴스 사용
+
+여러 인스턴스 구동 시 container_name 이 겹칠 수 있습니다. 기본적으로 `${PREFIX:-}`를 붙여서 `docker-compose.yml`을 제공하므로 `.env` 파일을 만들고 `PREFIX`를 적절히 설정해주면 해결됩니다.
+
 # 빌드 커스터마이징
 
 각각의 config 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 build.default.sh 를 build.override.sh 로 복사하여 원하는대로 변경할 수 있습니다. 단, sh 파일들은 꼭 `chmod u+x` 를 적용하여 실행가능한 파일로 만들어야합니다.
+가급적 업스트림의 변경사항에 따라 필수 바이너리가 따라가도록 하려면 override 파일에서 `/etc/code-docker/build.default.sh` 를 실행하는것을 추천합니다. 다만 원치 않는 경우 하지 않아도 됩니다.
 각 override 파일은 편집 후, 컨테이너 재빌드가 필요합니다. `docker compose build 컨테이너명 && docker compose up -d` 를 수행하세요
 
 ## build.\*.sh

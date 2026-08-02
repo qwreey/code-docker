@@ -1,4 +1,6 @@
-FROM archlinux
+FROM docker:latest AS docker-bin
+
+FROM archlinux AS main
 
 # Init makepkg user and install yay
 COPY --chown=root:root script/install-yay.sh /etc/code-docker/
@@ -10,6 +12,9 @@ RUN --mount=type=cache,target=/home/makepkg \
 # Run build script
 COPY --chown=root:root script/build.sh config/build.* /etc/code-docker/
 RUN --mount=type=cache,target=/var/cache/pacman /etc/code-docker/build.sh
+
+# Copy dind docker cli
+COPY --from=docker-bin /usr/local/bin/docker /usr/bin/docker
 
 # Copy config & static files
 COPY --chown=root:root \
