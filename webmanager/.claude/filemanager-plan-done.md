@@ -65,7 +65,7 @@ build-custom을 택했을 때의 구체안이 있음.
   - `backend/server.go`의 `limitRequestBody` 미들웨어가 **모든 요청 바디를 1MiB로
     캡**하고 있음 — 업로드 엔드포인트는 이 제한을 그대로 받으면 안 됨(아래 "스트리밍"
     절), 라우팅 시점에 이 미들웨어를 우회하거나 별도 큰 상한을 적용해야 함.
-  - `webmanager/review.md`의 기존 경로검증 사고 이력: git SSH host의 `filepath.Join`
+  - `.claude/archive/webmanager-review.md` (레포 루트)의 기존 경로검증 사고 이력: git SSH host의 `filepath.Join`
     미검증 path traversal(critical, 이미 고침), GPG keyId 플래그 인젝션 등 — 이
     저장소가 "임의 문자열이 파일 경로/exec 인자에 들어가기 전엔 반드시 검증"이라는
     원칙을 이미 실제 사고로 학습한 상태. 파일 매니저는 그 원칙이 가장 직접적으로
@@ -164,7 +164,7 @@ GET  /api/files/stat?path=<file-or-dir>
      owner?, group?, modTime, changeTime,
      createdTime?: string, createdTimeAvailable: bool}
   정보 패널(권한/생성·수정 시각) 전용 — "생성 시각" 필드가 왜 optional/available
-  플래그를 갖는지는 아래 "info 패널: 생성 시각" 절 참고 (review.md #9의
+  플래그를 갖는지는 아래 "info 패널: 생성 시각" 절 참고 (`.claude/archive/webmanager-review.md` (레포 루트) #9의
   `available: bool` 패턴 재사용).
 
 GET  /api/files/download?path=<file>
@@ -210,7 +210,7 @@ POST /api/files/delete   body {items: [path...]}
 **결론**: `filepath.Clean` 정규화 후 `filepath.Rel`로 설정된 루트 기준 상대경로를
 구하고, 그 결과가 `".."`이거나 `".."+구분자`로 시작하면 거부 — 이 저장소의
 "임의 문자열이 파일 경로에 들어가기 전엔 반드시 검증, escape보다 reject 우선"
-원칙(review.md)을 그대로 따르되, Projects의 "사전 목록과 정확히 일치"나
+원칙(`.claude/archive/webmanager-review.md` (레포 루트))을 그대로 따르되, Projects의 "사전 목록과 정확히 일치"나
 gitconfig의 "고정 포맷 정규식" 패턴은 임의 트리 브라우징엔 못 쓰므로 **이 기능
 전용의 새 검증 헬퍼(`internal/files/path.go`류, 가칭 `ResolvePath(root, userPath)
 (string, error)`)가 필요**함을 명시해둠. 의사코드:
@@ -299,7 +299,7 @@ func ResolvePath(root, userPath string) (string, error) {
   의존성으로 들어와 있어서, 직접 의존으로 승격해도 **새 의존성 추가가 아님**),
   실패/미지원이면 `createdTimeAvailable: false` + `changeTime`(ctime, "메타데이터가
   마지막으로 바뀐 시각" — 진짜 생성 시각은 아니지만 최소한 존재하는 값)으로
-  대체 노출 — `review.md` #9(`/api/system/resources`의 "못 읽음"과 "진짜 0"을
+  대체 노출 — `.claude/archive/webmanager-review.md` (레포 루트) #9(`/api/system/resources`의 "못 읽음"과 "진짜 0"을
   구분 못 했던 버그, `available: bool` 필드로 고침)와 정확히 같은 패턴 재사용.
 
 ## 텍스트 판별 (LazyCodeEditor로 넘기기 전)

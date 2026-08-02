@@ -41,7 +41,7 @@
   안전하게 직렬화(개행/특수문자 자동 percent-encode) — credential.helper를
   `store --file=...`로 자동 설정.
 
-## 겪었던 문제와 해결 (review.md)
+## 겪었던 문제와 해결 (`.claude/archive/webmanager-review.md` (레포 루트))
 
 - **SSH 호스트 추가에서 path traversal + SSH config injection (critical)**:
   `host` 값 검증 없이 `filepath.Join(keysDir, host)`에 써서 `../`로 keysDir 밖에

@@ -75,7 +75,7 @@
   `{memory:{usedBytes,limitBytes,available}, cpu:{percent,limitCores,numCpu,
   available}, disk:{path,totalBytes,usedBytes,freeBytes,available}}`.
   `available: false`는 해당 섹션 읽기 실패(값은 0으로 채워짐, 진짜 0이 아님) —
-  review.md에서 이 구분이 없어서 프론트가 "못 읽음"과 "진짜 0"을 구별 못하는 문제가
+  `.claude/archive/webmanager-review.md` (레포 루트)에서 이 구분이 없어서 프론트가 "못 읽음"과 "진짜 0"을 구별 못하는 문제가
   발견돼 나중에 추가된 필드.
 
 ## 프론트

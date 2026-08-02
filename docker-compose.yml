@@ -35,6 +35,15 @@ services:
       # directly via tzdata, already installed - no /etc/localtime symlink
       # or entrypoint change needed). Empty means UTC. e.g. "Asia/Seoul".
       TZ: ""
+      # Locale for all processes (glibc LANG format, e.g. "en_US.UTF-8" or
+      # "ko_KR.UTF-8"). Left commented out - the base image already behaves
+      # reasonably (POSIX/C.UTF-8) without this being set, so most people
+      # won't need it. Uncomment and set if you want a specific locale, but
+      # note that locale hasn't been verified to actually be generated in
+      # this image (Arch typically needs it enabled in /etc/locale.gen +
+      # `locale-gen` at build time for anything beyond C.UTF-8) - you may
+      # need a build.*.sh override to generate it first.
+      # LANG: ""
       # Add docker in docker host. Uses the internal-only alias (not the
       # plain "code-docker-dind" service name) because code-docker sits on
       # both networks - resolving the bare name is ambiguous between the
@@ -48,6 +57,98 @@ services:
       # --login-server=`. Leave unset/empty to use the official
       # tailscale.com control server instead.
       TAILSCALE_LOGIN_SERVER: "" # https://tail.qwreey.moe
+
+      # --- webmanager (admin panel, port 81) settings ---
+      # All of these already have sane defaults (see webmanager/backend/
+      # config.go) - uncomment and set only the ones you actually need to
+      # override. Full behavior of each is documented in the referenced
+      # webmanager/.claude/*.md plan docs.
+
+      # Password gate (optional, off by default) - required to unlock the
+      # Terminal/File Manager tabs entirely, and to make any write action
+      # elsewhere (Git Config, Tailscale, SSH Keys, Supervisor start/stop/
+      # restart, etc.) require a password first. Must be an argon2id hash,
+      # never the plaintext password (generate it via
+      # internal/authgate.HashPassword) - see webmanager/.claude/
+      # authgate-plan-done.md. Leave unset to keep everything working as
+      # before (relies purely on your reverse-proxy auth in front of :81).
+      # WEBMANAGER_AUTH_PASSWORD_HASH: ""
+
+      # File manager: root path it's allowed to browse. Default is /code
+      # (deliberately narrower than the whole container) - widen to "/" if
+      # you want it to reach the rest of the filesystem too.
+      # WEBMANAGER_FILES_ROOT: ""
+      # File manager: max upload size in bytes. Default 2147483648 (2GiB).
+      # WEBMANAGER_FILES_MAX_UPLOAD_BYTES: ""
+
+      # Claude Code tab: override the `claude` binary path if it's not on
+      # webmanager's PATH (e.g. installed via mise, which uses shims that
+      # supervisord programs may not inherit).
+      # WEBMANAGER_CLAUDE_BINPATH: ""
+      # CLAUDE_CONFIG_DIR: "" # default /code/.claude
+
+      # mise tab: override the `mise` binary path (default is the fixed
+      # $HOME/.local/bin/mise mise itself installs to).
+      # WEBMANAGER_MISE_BINPATH: ""
+
+      # Projects tab: colon-separated list of root directories to scan
+      # (like $PATH), e.g. "/code/Projects:/code/AndroidStudioProjects".
+      # WEBMANAGER_PROJECTS_PATH: "" # default /code/Projects
+      # WEBMANAGER_PROJECTS_CACHE_PATH: ""
+      # WEBMANAGER_PROJECTS_STALE_AFTER: "" # default 1h
+      # WEBMANAGER_PROJECTS_OLD_DAYS: "" # default 90 - staleness threshold
+      # WEBMANAGER_PROJECTS_PATTERNS_PATH: "" # user-editable reclaimable-folder patterns
+      # Externally-reachable code-server base URL, used to build the
+      # Projects tab's "open in code-server" links (${url}/?folder=${path}).
+      # Leave empty to hide that button - webmanager can't infer this on
+      # its own (multi-instance/PREFIX/proxy setups vary too much).
+      # WEBMANAGER_CODE_SERVER_URL: ""
+
+      # System resource history graph (Task Manager tab): sampling interval
+      # and how much history to keep.
+      # WEBMANAGER_SYSTEM_HISTORY_INTERVAL_SECONDS: "" # default 5
+      # WEBMANAGER_SYSTEM_HISTORY_WINDOW_MINUTES: "" # default 10
+
+      # Code Extensions/mise recommendation list source (config/
+      # recommendations.*.yaml, baked into the image at /etc/code-docker/ -
+      # override by adding a config/recommendations.override.yaml file
+      # instead of changing this path).
+      # WEBMANAGER_RECOMMENDATIONS_DEFAULT_PATH: ""
+      # WEBMANAGER_RECOMMENDATIONS_OVERRIDE_PATH: ""
+      # code-server CLI flags used for --list-extensions/--install-extension
+      # (must match what code-server-autoinstall actually launches with).
+      # WEBMANAGER_CODE_SERVER_BIN: ""
+      # WEBMANAGER_CODE_SERVER_USER_DATA_DIR: ""
+      # WEBMANAGER_CODE_SERVER_EXTENSIONS_DIR: ""
+
+      # Supervisor tab: per-program metadata (disable specific controls +
+      # an explanatory note - config/supervisor-metadata.*.yaml, same
+      # override pattern as recommendations above).
+      # WEBMANAGER_SUPERVISOR_METADATA_DEFAULT_PATH: ""
+      # WEBMANAGER_SUPERVISOR_METADATA_OVERRIDE_PATH: ""
+
+      # Less commonly touched - these already match the rest of the
+      # container's fixed layout, only relevant if you've also changed the
+      # underlying paths elsewhere (SSH config, git config location, etc.).
+      # WEBMANAGER_ADDR: "" # default :81 - changing this also needs the port mapping below updated
+      # SUPERVISOR_SOCK: ""
+      # SSH_AUTHORIZED_KEYS: ""
+      # GIT_CONFIG_PATH: ""
+      # SSH_CLIENT_CONFIG: ""
+      # SSH_KEYS_DIR: ""
+      # WEBMANAGER_SSH_KNOWN_HOSTS_PATH: ""
+      # GIT_CREDENTIALS_PATH: ""
+      # WEBMANAGER_STATIC_DIR: ""
+      # TAILSCALE_CONFIG_PATH: "" # keep in sync with tailscale-forward's own CONFIG= path if you change this
+      # SSH_SIGNING_KEY_PATH: ""
+      # VECTOR_LOG_DIR: ""
+      # SYSTEM_DISK_PATH: ""
+
+      # Terminal tab: where user-customized on-screen keybindings/color
+      # themes are saved.
+      # WEBMANAGER_TERMINAL_SETTINGS_PATH: ""
+      # Sidebar: where your drag-and-drop tab order is saved.
+      # WEBMANAGER_SIDEBAR_ORDER_PATH: ""
     networks:
       code-docker-external: {}
       code-docker-internal:

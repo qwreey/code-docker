@@ -33,7 +33,7 @@
   유휴 상태로 확인되면 실제 빌드+기동까지 해서 재검증하는 걸 반복함(가장 최근:
   전체 리뷰 라운드 이후 실제 컨테이너에서 수정사항 전부 재검증 완료).
 
-## 보안 리뷰에서 나온 원칙 (review.md 요약, 새 기능 만들 때 지킬 것)
+## 보안 리뷰에서 나온 원칙 (`.claude/archive/webmanager-review.md` (레포 루트) 요약, 새 기능 만들 때 지킬 것)
 
 - 사용자 입력이 파일 경로(`filepath.Join`)나 다른 설정 파일 포맷(SSH config, YAML)에
   원문 그대로 들어가면 path traversal/injection 위험 — 항상 안전한 charset으로

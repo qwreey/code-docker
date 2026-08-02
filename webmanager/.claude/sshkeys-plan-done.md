@@ -25,7 +25,7 @@
 ## API
 
 `GET/POST /api/ssh/keys`, `DELETE /api/ssh/keys/{id}`. 에러는 `{"error":...}` +
-4xx(중복은 review.md에서 409로 통일).
+4xx(중복은 `.claude/archive/webmanager-review.md` (레포 루트)에서 409로 통일).
 
 ## 프론트
 

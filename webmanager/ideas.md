@@ -20,9 +20,6 @@ Claude Code 탭, Caddy dev-proxy는 전부 `webmanager/.claude/`로 이동함). 
   더 가볍게 만들 수 있음(`internal/gitconfig/raw.go`가 그 패턴의 참고 예시).
 - **GitHub CLI 연동**: `gh auth login` 토큰 상태 조회/설정 (git credential store와
   겹치는 부분이 있어 통합 여지 있음)
-- ~~**known_hosts 관리**~~ — **구현 완료** (2026-08-02, `gitconfig-plan-done.md`
-  참고): `~/.ssh/known_hosts` 조회/추가(raw 라인 붙여넣기)/삭제, 쓰기는 비밀번호
-  게이트 적용됨.
 - **환경변수/dotfiles 뷰어**: user-init이 건드리는 fish 설정이나 `.bashrc` 등을 굳이
   터미널 없이 훑어보고 싶을 때
 - **direnv `.envrc` allowlist 관리**: `direnv allow` 상태를 UI에서 확인/토글
@@ -51,17 +48,14 @@ Claude Code 탭, Caddy dev-proxy는 전부 `webmanager/.claude/`로 이동함). 
 - 결론: 여전히 보류 — 다만 "만들려면 얼마나 걸리나"라는 질문의 답은 훨씬
   가벼워졌다는 것만 기록.
 
-## locale/timezone 설정 — 후순위로 내림
+<!--
+  구 "locale/timezone 설정" 절은 삭제함(2026-08-03) — webmanager UI로 만드는
+  대신 그냥 docker-compose.yml 환경변수로 넘기는 쪽으로 확정, TZ가 이미 하던
+  방식 그대로(LANG도 추가함, docker-compose.yml의 environment 절 주석 참고).
+  webmanager UI 기능으로서는 더 이상 브레인스토밍 대상 아님.
+-->
 
-컨테이너 로케일/타임존을 재빌드 없이 바꾸고 싶다는 아이디어였는데, 따져보니 깔끔하게
-구현하기 까다로움:
+## 사용자 세션 뷰어 — 추후 구현, 실현 가능성부터 확인 필요
 
-- 컨테이너 안에서 바꾼 값이 볼륨 마운트(`./code:/code`) 밖(예: 시스템 전역 `/etc/`)에
-  저장되면 컨테이너 재생성 시 날아감 — 홈(`/code`) 안에 저장하면 되긴 하는데, 그러면
-  XDG 스펙(`XDG_CONFIG_HOME` 등) 경로 규약을 따라야 함
-- 모든 도구가 XDG 스펙을 지키는 것도 아니라서, 결국 `TZ`/`LANG` 같은 환경변수로 넘겨줘야
-  하는 케이스가 생기고, 그러려면 "값이 바뀔 때마다 동적으로 다시 읽어서 env로 주입하는"
-  세터를 하나 더 만들어야 함
-- 쉽게 만들 수는 있는데(어려운 기술 문제는 아님), 여러 계층(파일 저장 위치, XDG 대응
-  여부, env 주입 타이밍)이 얽혀서 결과물이 깔끔하지 않을 가능성이 높음 — 다시 설계할
-  시간에 다른 항목을 먼저 하는 게 나아 보여서 후순위로 내림
+`webmanager/.claude/session-viewer-plan.md` 참고 — 착수 전 리서치/실현 가능성
+확인이 필요해서 별도 계획 문서로 분리함(여기 브레인스토밍 목록에는 포인터만).

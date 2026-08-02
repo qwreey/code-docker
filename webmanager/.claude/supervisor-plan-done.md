@@ -28,7 +28,7 @@ supervisord 프로그램 목록 조회, start/stop/restart, 프로그램별 stdo
   restart`, `GET /api/supervisor/processes/{name}/log?stream=stdout|stderr&tail=N`.
 - restart는 stop(NOT_RUNNING fault 허용) 후 start. supervisord의 fault code를 HTTP
   상태로 매핑: BAD_NAME→404, ALREADY_STARTED/NOT_RUNNING→409(원래 400이었다가
-  review.md에서 통일).
+  `.claude/archive/webmanager-review.md` (레포 루트)에서 통일).
 - 로그 조회는 offset 0 + 넉넉한 length로 전체를 읽은 뒤 클라이언트 쪽에서 tail
   슬라이싱(supervisord RPC에 "마지막 N바이트" 개념이 없어서).
 
@@ -38,7 +38,7 @@ supervisord 프로그램 목록 조회, start/stop/restart, 프로그램별 stdo
   파이프라 supervisord의 `readProcessStdoutLog`가 동작 안 함. vector 도입과 함께
   모든 program의 stdout/stderr를 실제 회전 파일로 바꾸면서 해결됨(`vector-logs-
   plan-done.md` 참고). 지금은 정상 동작.
-- **프론트 확인창 누락(critical, review.md에서 발견)**: 시작/정지/재시작에 confirm이
+- **프론트 확인창 누락(critical, `.claude/archive/webmanager-review.md` (레포 루트)에서 발견)**: 시작/정지/재시작에 confirm이
   없어서 webmanager 자기 자신이나 sshd를 실수로 정지시키면 복구 수단이 없어지는
   문제였음 — 고침(모든 액션에 confirm, webmanager/sshd 정지는 추가 경고).
 

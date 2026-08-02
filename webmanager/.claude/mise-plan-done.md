@@ -259,7 +259,7 @@ mise:
   단 실제 설치(`install`/`use`)는 다운로드 시간이 걸릴 수 있어 타임아웃을
   조회성 커맨드(`ls`/`env`/`registry`)보다 넉넉하게 잡거나, 아예 별도 goroutine +
   잡(job) 방식으로 타임아웃 개념 자체를 없앰(아래 스트리밍 설계 참고).
-- 경로 인자(`path=`)는 `review.md`의 기존 관례 그대로: 임의 경로 금지, Projects
+- 경로 인자(`path=`)는 `.claude/archive/webmanager-review.md` (레포 루트)의 기존 관례 그대로: 임의 경로 금지, Projects
   캐시에 이미 있는 정확한 경로만 허용(전역 뷰는 `path` 생략).
 - 도구 id(`TOOL@VERSION`)는 `mise registry`의 `short` 값 기준 안전한 문자열만
   허용하는 정규식으로 검증 후 `exec.Command`에 전달(익스텐션 기능의 `publisher.name`

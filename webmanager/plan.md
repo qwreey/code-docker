@@ -37,6 +37,7 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 | 파일 매니저(업로드/다운로드/이동/복사/이름변경/폴더생성/멀티선택/정보패널/텍스트편집, 자체 비밀번호 게이트) | `.claude/filemanager-plan-done.md` |
 | 공용 코드 에디터(CodeMirror 6, 지연 로딩) — git raw 설정 편집/파일 매니저가 재사용 | 별도 문서 없음(공용 컴포넌트, `src/components/common/CodeEditor.tsx`) |
 | Supervisor 로그 다이얼로그/바텀시트, 반응형 레이아웃(모바일 햄버거 사이드바), 로그 페이지네이션/시간범위 필터, CPU/메모리/디스크/네트워크 사용량 히스토리 그래프, 사이드바 드래그앤드롭 순서 변경(서버에 저장, `GET/PUT /api/ui/sidebar-order`), 탭 이름 영어로 통일(Code Extensions/Projects/Task Manager/Files) | 문서 없음(UI/관측성 개선, 각 기능 자체는 위 표의 해당 기능 문서 소관) |
+| `docker-compose.yml`에 모든 `WEBMANAGER_*` env var를 주석 처리된 상태로 문서화(값 예시는 안 채움, 필요할 때 주석 해제), locale(`LANG`)도 TZ 옆에 주석으로 추가 | 문서 없음(레포 루트 `docker-compose.yml` 자체가 최신 소스) |
 
 전체 구현은 backend(Go)/frontend(React) subagent를 병렬로 여러 라운드 돌려서 진행,
 각 라운드 사이 API 계약 불일치를 직접 대조해서 잡는 패턴 반복 — 새 기능도 이 방식
@@ -44,7 +45,7 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 
 **실제 컨테이너 검증**: 2026-08-02, `docker compose build && up`으로 전체 통합 확인
 완료 (7개 supervisord program 전부 RUNNING, `docker compose logs` 라벨링 정상,
-`/api/*` 전 엔드포인트 실응답 확인). 이후 `webmanager/review.md` 리뷰 라운드에서
+`/api/*` 전 엔드포인트 실응답 확인). 이후 `.claude/archive/webmanager-review.md` (레포 루트) 리뷰 라운드에서
 나온 버그(critical 2건 포함)도 전부 수정 후 재검증 완료.
 
 ## 할 일 (우선순위 순, 문서 있으면 링크)
@@ -69,13 +70,18 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 8. tailscale 로그인 상태/URL을 webmanager UI에도 노출 — 아이디어 단계, 문서 없음
 9. 바인드 주소 전략 확정 — **최후순위**
 10. `/code/.vector/logs/*.jsonl` 보존기간(retention) 정책 없음 — 알려진 갭
-    (`review.md` 참고), 문서 없음
+    (`.claude/archive/webmanager-review.md` (레포 루트) 참고), 문서 없음
 11. code-docker 도움말/가이드를 webmanager에 임베드 — 아이디어 단계, 착수 전
     질문 정리 완료. `.claude/guide-plan.md`
 12. **code-server/mise 버전 관리 패널** — **최하 우선순위**(guide-plan과 동급),
     아이디어 단계, 착수 전 질문 다수 정리 완료(특히 "컨테이너 리빌드 필요성"
     판단 기준이 근본적으로 불확실). `.claude/version-panel-plan.md`
-13. 다국어(i18n) 지원, 아마 LinguiJS — 모든 기능이 안정되고 문자열이 안 바뀌기
+13. **활성 세션 목록 보기**(어디서 로그인/접속해있는지 보기) — **최하
+    우선순위**, 아이디어 단계. "세션"이 뭘 뜻하는지부터(webmanager 자체
+    비밀번호 게이트 세션? code-server 자신의 연결? Authentik 세션?) 불명확해서
+    착수 시 반드시 사용자와 인터랙티브하게 스코프 확인 필요 — 혼자 판단해서
+    구현 진행하지 말 것. `.claude/session-viewer-plan.md`
+14. 다국어(i18n) 지원, 아마 LinguiJS — 모든 기능이 안정되고 문자열이 안 바뀌기
     시작할 때 착수 예정, 아이디어 단계, 문서 없음.
 
 ## 참고 문서
@@ -84,5 +90,5 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
   (구현된 그대로 최신 유지되는 원본)
 - **기능별 설계/이력**: `webmanager/.claude/` (README로 인덱스)
 - **아이디어 백로그**(아직 계획 문서 없는 브레인스토밍): `webmanager/ideas.md`
-- **프로젝트 리뷰**: `webmanager/review.md`
+- **프로젝트 리뷰**: `.claude/archive/webmanager-review.md` (레포 루트)
 - **저장소 소유자가 답해야 할 질문 전체 취합**: `.claude/question.md`

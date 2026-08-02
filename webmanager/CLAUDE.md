@@ -88,8 +88,11 @@ strings stabilize), embedding a code-docker help/guide inside webmanager
 until the repo owner answers the open questions in that doc), a code-server/
 mise version-check panel (`.claude/version-panel-plan.md` — same idea-stage
 tier as guide-plan, explicitly lowest priority, several genuinely unresolved
-questions like what signal even means "container rebuild needed"). `.claude/
-caddy-plan.md` — Caddy-based dev-server expose (wildcard subdomain reverse
+questions like what signal even means "container rebuild needed"), an active
+sessions viewer (`.claude/session-viewer-plan.md` — same lowest-priority
+tier; before touching this one, the very definition of "session" needs to be
+confirmed interactively with the repo owner, don't just pick one and build
+it). `.claude/caddy-plan.md` — Caddy-based dev-server expose (wildcard subdomain reverse
 proxy) — also lives here, deliberately below dind/terminal-M2: most of its
 design is settled, but it still has open decisions (e.g. `preserve_host`
 default) and was explicitly deprioritized below the rest of the active
@@ -105,7 +108,7 @@ queue.
 - Follow the root `CLAUDE.md`'s override pattern and code style (minimal
   comments, no premature abstraction) for anything touching outside
   `webmanager/` (Dockerfile, docker-compose.yml, supervisord.conf, etc).
-- Security patterns to repeat (from `webmanager/review.md`, a full bug-fix
+- Security patterns to repeat (from `.claude/archive/webmanager-review.md` (레포 루트), a full bug-fix
   pass across the whole codebase): validate any user input that flows into a
   file path (`filepath.Join`) or another config file's own syntax (SSH
   config, YAML) before use — reject unsafe charsets rather than escaping;

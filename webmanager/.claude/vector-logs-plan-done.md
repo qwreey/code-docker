@@ -279,7 +279,7 @@ tail함 — stderr는 vector/webmanager 구조화 로그에는 안 실리고, we
 트리거되는지, webmanager 백엔드가 이 JSONL 계약대로 실제로 파싱해서 보여주는지(그쪽은
 별도 에이전트가 병행 작업 중).
 
-## 이후 업데이트 (review.md 라운드에서 실제 컨테이너 검증 + 버그 수정)
+## 이후 업데이트 (`.claude/archive/webmanager-review.md` (레포 루트) 라운드에서 실제 컨테이너 검증 + 버그 수정)
 
 - **실제 `docker compose build && up`으로 전체 통합 확인 완료**: 7개 supervisord
   program 전부 RUNNING, `docker compose logs`가 `[app_name] ...` 형태로 라벨링,
@@ -298,4 +298,4 @@ tail함 — stderr는 vector/webmanager 구조화 로그에는 안 실리고, we
 - **타임존 자정 경계 버그 수정**: 백엔드가 `time.Now()`(로컬)로 날짜 파일명을
   계산하는데 vector의 파일 경로 템플릿은 UTC 기준이라, `TZ`를 설정하면 자정 근처
   로그가 누락될 수 있었음 — 양쪽 다 UTC로 통일.
-- 자세한 내용은 `webmanager/review.md` 참고.
+- 자세한 내용은 `.claude/archive/webmanager-review.md` (레포 루트) 참고.

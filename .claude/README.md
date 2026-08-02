@@ -18,6 +18,11 @@
     forwards/publish 인프라의 원본 설계 조사 — 레포 전체(root `CLAUDE.md`가 다루는
     영역)에 걸친 내용이라 webmanager 전용이 아니어서 여기 둠. 최신 네이밍의 권위있는
     출처는 아니고 배경/근거 참고용.
+  - `webmanager-review.md` — (`webmanager/review.md`를 옮김) webmanager 전체
+    코드베이스에 대한 보안/버그 리뷰 라운드 기록 — 나온 이슈는 전부 고쳐졌거나
+    각 기능의 `webmanager/.claude/*-plan-done.md`에 흡수됨. webmanager 전용
+    내용이지만, "완료돼서 더 이상 안 바뀌는" archive 성격상 다른 webmanager
+    문서들과 달리 여기(레포 루트 archive)에 둠.
 
 - **`backlog/`** — 아직 착수하지 않은 브레인스토밍/아이디어(webmanager에 국한되지
   않는 것). `archive/`와 달리 "완료된 것"이 아니라 "언젠가 할 수도 있는 것" — 실제로
@@ -31,7 +36,7 @@
 
 - **살아있는 문서(이 폴더 밖)**: 각 서브프로젝트 폴더에 그대로 둠, 항상 최신 상태 유지
   - `webmanager/plan.md`, `webmanager/CLAUDE.md`, `webmanager/ideas.md`,
-    `webmanager/review.md`, `webmanager/backend|frontend/README.md`
+    `webmanager/.claude/question.md`, `webmanager/backend|frontend/README.md`
   - 루트 `CLAUDE.md` — 레포 전체 아키텍처, 항상 최신
 
 ## 새 지식을 추가할 때
