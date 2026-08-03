@@ -1,6 +1,7 @@
 code/
 sshd/
 /dind/
+.env
 config/*-override*
 config/*.override*
 config/code-patch/*.override.*
