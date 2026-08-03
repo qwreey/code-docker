@@ -3,6 +3,7 @@ import { api, errorMessage } from '../../api/client'
 import type { SidebarOrder } from '../../api/types'
 import { SECTIONS } from './sections'
 import type { SectionId, SectionMeta } from './sections'
+import { SidebarFooter } from './SidebarFooter'
 import './Layout.css'
 
 interface SidebarProps {
@@ -82,50 +83,53 @@ export function Sidebar({ active, onSelect, open, onClose }: SidebarProps) {
       {open && <div className="sidebar-backdrop" onClick={onClose} />}
       <nav className={'sidebar' + (open ? ' sidebar-open' : '')} aria-label="섹션 메뉴">
         <div className="sidebar-title">webmanager</div>
-        <ul className="sidebar-list">
-          {sections.map((section) => (
-            <li
-              key={section.id}
-              draggable
-              className={dragOverId === section.id ? 'sidebar-drag-over' : undefined}
-              onDragStart={() => {
-                dragIdRef.current = section.id
-              }}
-              onDragOver={(e) => {
-                e.preventDefault()
-                if (dragOverId !== section.id) setDragOverId(section.id)
-              }}
-              onDragLeave={() => setDragOverId((prev) => (prev === section.id ? null : prev))}
-              onDrop={(e) => {
-                e.preventDefault()
-                handleDrop(section.id)
-              }}
-              onDragEnd={() => {
-                dragIdRef.current = null
-                setDragOverId(null)
-              }}
-            >
-              <button
-                type="button"
-                className={
-                  'sidebar-item' +
-                  (section.id === active ? ' sidebar-item-active' : '') +
-                  (!section.implemented ? ' sidebar-item-disabled' : '')
-                }
-                onClick={() => {
-                  onSelect(section.id)
-                  onClose()
+        <div className="sidebar-list-wrap">
+          <ul className="sidebar-list">
+            {sections.map((section) => (
+              <li
+                key={section.id}
+                draggable
+                className={dragOverId === section.id ? 'sidebar-drag-over' : undefined}
+                onDragStart={() => {
+                  dragIdRef.current = section.id
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  if (dragOverId !== section.id) setDragOverId(section.id)
+                }}
+                onDragLeave={() => setDragOverId((prev) => (prev === section.id ? null : prev))}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  handleDrop(section.id)
+                }}
+                onDragEnd={() => {
+                  dragIdRef.current = null
+                  setDragOverId(null)
                 }}
               >
-                <span className="sidebar-drag-handle" aria-hidden="true">
-                  ⠿
-                </span>
-                <span>{section.label}</span>
-                {!section.implemented && <span className="sidebar-badge">구현 예정</span>}
-              </button>
-            </li>
-          ))}
-        </ul>
+                <button
+                  type="button"
+                  className={
+                    'sidebar-item' +
+                    (section.id === active ? ' sidebar-item-active' : '') +
+                    (!section.implemented ? ' sidebar-item-disabled' : '')
+                  }
+                  onClick={() => {
+                    onSelect(section.id)
+                    onClose()
+                  }}
+                >
+                  <span className="sidebar-drag-handle" aria-hidden="true">
+                    ⠿
+                  </span>
+                  <span>{section.label}</span>
+                  {!section.implemented && <span className="sidebar-badge">구현 예정</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <SidebarFooter />
       </nav>
     </>
   )

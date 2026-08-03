@@ -2,18 +2,9 @@
 
 .rh-section {
   margin-bottom: 1.5rem;
-
-  /* categorical, fixed order (slot 1 blue, slot 2 orange) — same validated
-     default palette as ClaudeCode/ClaudeCode.css's .claude-viz */
-  --viz-cat-1: #2a78d6;
-  --viz-cat-2: #eb6834;
-}
-
-@media (prefers-color-scheme: dark) {
-  .rh-section {
-    --viz-cat-1: #3987e5;
-    --viz-cat-2: #d95926;
-  }
+  /* --viz-cat-1/2 come from index.css's centralized default now (used to
+     be redeclared identically here, own prefers-color-scheme block and
+     all). */
 }
 
 .rh-section-header {

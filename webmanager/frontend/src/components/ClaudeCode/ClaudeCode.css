@@ -120,31 +120,11 @@
   gap: 1rem;
   margin-top: 1rem;
 
-  /* sequential ramp (blue, light -> dark = low -> high magnitude) */
-  --viz-seq-0: var(--color-gray-bg);
-  --viz-seq-1: #9ec5f4;
-  --viz-seq-2: #3987e5;
-  --viz-seq-3: #1c5cab;
-  --viz-seq-4: #0d366b;
-
-  /* categorical, fixed order (slot 1 blue, slot 2 orange, slot 3 aqua) */
-  --viz-cat-1: #2a78d6;
-  --viz-cat-2: #eb6834;
-  --viz-cat-3: #1baf7a;
-}
-
-@media (prefers-color-scheme: dark) {
-  .claude-viz {
-    --viz-seq-0: #2c2c2a;
-    --viz-seq-1: #184f95;
-    --viz-seq-2: #2a78d6;
-    --viz-seq-3: #6da7ec;
-    --viz-seq-4: #b7d3f6;
-
-    --viz-cat-1: #3987e5;
-    --viz-cat-2: #d95926;
-    --viz-cat-3: #199e70;
-  }
+  /* --viz-cat-N and --viz-seq-N come straight from index.css's centralized
+     defaults now (this scope used to redeclare its own identical copy,
+     including its own prefers-color-scheme block - see index.css's doc
+     comment for the light/dark/toggle three-tier pattern that replaced
+     it). Nothing chart-specific to override here. */
 }
 
 .claude-viz .card {

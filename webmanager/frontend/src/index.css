@@ -1,3 +1,23 @@
+/* Theme tokens, single source of truth for the whole app. Every component
+   should reference these vars rather than hardcoding a color — see
+   webmanager/.claude/archive/theme-toggle-plan-done.md for why (this file used to only
+   ever define light values; dark mode support existed nowhere for the base
+   UI, only for a few data-viz charts that each redeclared their own
+   duplicate copy of --viz-cat-N and --viz-seq-N with their own
+   prefers-color-scheme block).
+
+   Three tiers, in cascade order:
+   1. :root           - light values (the defaults, used whenever nothing
+                         below overrides them).
+   2. :root[data-theme="dark"]   - the viewer's explicit "dark" choice via
+      the sidebar toggle (useTheme.ts), wins regardless of OS preference.
+   3. @media (prefers-color-scheme: dark) - OS-level dark preference, but
+      only when the viewer hasn't explicitly picked "light" (the
+      :where(:not(...)) guard) - so an explicit light stamp can override an
+      OS-dark system, matching how tier 2 overrides an OS-light system.
+   This is the same three-tier pattern the dataviz skill's reference palette
+   documents for exactly this "OS preference + manual override, either can
+   win" requirement - reused verbatim here rather than inventing a new one. */
 :root {
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
@@ -39,12 +59,134 @@
   --color-gray-fg: #5a6270;
   --color-gray-border: #d7dae0;
 
+  /* Data-viz tokens: categorical (--viz-cat-1..3) and sequential
+     (--viz-seq-0..4) slots shared by every chart/heatmap in the app -
+     centralized here instead of each chart's CSS file redeclaring its own
+     copy (ClaudeCode.css/Processes.css/ResourceHistory.css all used to).
+     Categorical values are the dataviz skill's validated reference palette
+     slots 1-3 (blue/orange/aqua, already what this app used before
+     centralizing - re-validated against this file's surfaces during this
+     pass, still passes every check in both modes). Sequential is the
+     "standard" one-hue blue ramp (light->dark as value increases, per the
+     skill's sequential-encoding convention for a light surface) - the
+     *muted* variant Processes.css's CPU heatmap deliberately uses instead
+     (so the per-core grid doesn't visually dominate the tab) stays a local
+     override there on top of these defaults, not merged in here, since
+     it's an intentional visual variant rather than duplication. */
+  --viz-cat-1: #2a78d6;
+  --viz-cat-2: #eb6834;
+  --viz-cat-3: #1baf7a;
+
+  --viz-seq-0: var(--color-gray-bg);
+  --viz-seq-1: #9ec5f4;
+  --viz-seq-2: #3987e5;
+  --viz-seq-3: #1c5cab;
+  --viz-seq-4: #0d366b;
+
   color-scheme: light;
   color: var(--text);
   background: var(--bg);
   font: 15px/1.5 var(--sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme='dark'] {
+  --bg: #0d0f13;
+  --surface: #171a20;
+  --surface-hover: #20242c;
+  --border: #2b3038;
+
+  --text: #c4c9d4;
+  --text-heading: #f2f4f7;
+  --text-muted: #8992a3;
+
+  --accent: #4c8bf5;
+  --accent-hover: #6ba0f7;
+  --accent-bg: #16233c;
+  --accent-border: #2c4f8a;
+  --accent-contrast: #ffffff;
+
+  --code-bg: #262b3d;
+  --code-text: #e8eaf0;
+
+  --color-green-bg: #12301a;
+  --color-green-fg: #3ecf5b;
+  --color-green-border: #1f5c31;
+
+  --color-red-bg: #3a1616;
+  --color-red-fg: #f2726a;
+  --color-red-border: #7a2b26;
+
+  --color-yellow-bg: #3a2c0a;
+  --color-yellow-fg: #e8b23c;
+  --color-yellow-border: #7a5a18;
+
+  --color-gray-bg: #262a31;
+  --color-gray-fg: #a8b0bd;
+  --color-gray-border: #3a4049;
+
+  --viz-cat-1: #3987e5;
+  --viz-cat-2: #d95926;
+  --viz-cat-3: #199e70;
+
+  --viz-seq-0: var(--color-gray-bg);
+  --viz-seq-1: #184f95;
+  --viz-seq-2: #2a78d6;
+  --viz-seq-3: #6da7ec;
+  --viz-seq-4: #b7d3f6;
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    --bg: #0d0f13;
+    --surface: #171a20;
+    --surface-hover: #20242c;
+    --border: #2b3038;
+
+    --text: #c4c9d4;
+    --text-heading: #f2f4f7;
+    --text-muted: #8992a3;
+
+    --accent: #4c8bf5;
+    --accent-hover: #6ba0f7;
+    --accent-bg: #16233c;
+    --accent-border: #2c4f8a;
+    --accent-contrast: #ffffff;
+
+    --code-bg: #262b3d;
+    --code-text: #e8eaf0;
+
+    --color-green-bg: #12301a;
+    --color-green-fg: #3ecf5b;
+    --color-green-border: #1f5c31;
+
+    --color-red-bg: #3a1616;
+    --color-red-fg: #f2726a;
+    --color-red-border: #7a2b26;
+
+    --color-yellow-bg: #3a2c0a;
+    --color-yellow-fg: #e8b23c;
+    --color-yellow-border: #7a5a18;
+
+    --color-gray-bg: #262a31;
+    --color-gray-fg: #a8b0bd;
+    --color-gray-border: #3a4049;
+
+    --viz-cat-1: #3987e5;
+    --viz-cat-2: #d95926;
+    --viz-cat-3: #199e70;
+
+    --viz-seq-0: var(--color-gray-bg);
+    --viz-seq-1: #184f95;
+    --viz-seq-2: #2a78d6;
+    --viz-seq-3: #6da7ec;
+    --viz-seq-4: #b7d3f6;
+
+    color-scheme: dark;
+  }
 }
 
 *,

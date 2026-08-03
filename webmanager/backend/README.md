@@ -323,5 +323,13 @@ fields, invalid host/keyId format, etc.) are unaffected.
 - `DELETE /api/terminal/sessions/{name}` — kills the session immediately
   regardless of pinned state. `404` if unknown
 
+- `GET /api/auth/status` — `{required, unlocked, unlockedUntil?}`.
+  `unlockedUntil` (RFC3339) is only present when `unlocked` is true — lets
+  the sidebar show a "N분 남음" countdown instead of a bare bool
+  (`internal/authgate.Gate.UnlockedUntil`). Never gated (a locked-out client
+  has to be able to check this).
+- `POST /api/auth/unlock` — body `{"password": string}`. `401` on a wrong
+  password. Never gated, same reason as above.
+
 All error responses are `{"error": "message"}` with an appropriate 4xx/5xx
 status.

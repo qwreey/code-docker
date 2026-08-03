@@ -1,6 +1,9 @@
 package authgate
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 // CookieName is the HttpOnly cookie set on successful unlock and checked by
 // RequirePassword on every gated request.
@@ -30,14 +33,22 @@ func (g *Gate) Configured() bool {
 // cookie. Safe to call even when the gate isn't configured (always false in
 // that case, since no cookie would ever have been issued).
 func (g *Gate) Unlocked(r *http.Request) bool {
+	_, ok := g.UnlockedUntil(r)
+	return ok
+}
+
+// UnlockedUntil is like Unlocked but also returns the unlock's expiry time
+// — used by the auth status endpoint so the sidebar can show how long the
+// current unlock still has left, not just a locked/unlocked bool.
+func (g *Gate) UnlockedUntil(r *http.Request) (time.Time, bool) {
 	if g == nil {
-		return false
+		return time.Time{}, false
 	}
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		return false
+		return time.Time{}, false
 	}
-	return g.sessions.valid(cookie.Value)
+	return g.sessions.validUntil(cookie.Value)
 }
 
 // TryUnlock verifies plaintext against the configured hash. On success it

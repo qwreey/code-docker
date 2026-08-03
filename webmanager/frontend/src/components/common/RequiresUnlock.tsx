@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { api, errorMessage } from '../../api/client'
-import type { AuthStatus } from '../../api/types'
+import { useState, type FormEvent, type ReactNode } from 'react'
+import { api } from '../../api/client'
 import { ErrorBanner } from './ErrorBanner'
+import { useAuthStatus } from './useAuthStatus'
 import './RequiresUnlock.css'
 
 /**
@@ -12,29 +12,10 @@ import './RequiresUnlock.css'
  * is the first consumer, terminal is expected to reuse this unchanged later.
  */
 export function RequiresUnlock({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const { status, error: loadError, refresh } = useAuthStatus()
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await api.get<AuthStatus>('/auth/status')
-      setStatus(data)
-      setLoadError(null)
-    } catch (e) {
-      setLoadError(errorMessage(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -42,7 +23,7 @@ export function RequiresUnlock({ children }: { children: ReactNode }) {
     setSubmitError(null)
     try {
       await api.post<{ ok: true }>('/auth/unlock', { password })
-      setStatus({ required: true, unlocked: true })
+      await refresh()
       setPassword('')
     } catch {
       setSubmitError('비밀번호가 올바르지 않습니다')
@@ -51,15 +32,15 @@ export function RequiresUnlock({ children }: { children: ReactNode }) {
     }
   }
 
-  if (loading) {
+  if (loadError) {
+    return <ErrorBanner message={loadError} onDismiss={refresh} />
+  }
+
+  if (!status) {
     return <p className="empty-state">불러오는 중...</p>
   }
 
-  if (loadError) {
-    return <ErrorBanner message={loadError} onDismiss={load} />
-  }
-
-  if (!status || !status.required || status.unlocked) {
+  if (!status.required || status.unlocked) {
     return <>{children}</>
   }
 

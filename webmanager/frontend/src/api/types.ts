@@ -428,6 +428,7 @@ export interface LFSStatus {
 export interface AuthStatus {
   required: boolean
   unlocked: boolean
+  unlockedUntil?: string | null // RFC3339, only set when unlocked
 }
 
 export interface FileEntry {

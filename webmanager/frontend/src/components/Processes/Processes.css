@@ -264,21 +264,18 @@
   gap: 1rem;
   margin-bottom: 1.5rem;
 
-  /* same validated categorical/sequential slots as ClaudeCode.css's
-     .claude-heatmap and ResourceHistory.css's .rh-section, re-declared
-     locally since this grid sits outside both of those scopes. Kept
-     deliberately muted (light gray -> a moderately dark blue, not a
-     saturated/near-black one) so the per-core grid doesn't visually
-     dominate the tab at a glance. */
-  --viz-seq-0: var(--color-gray-bg);
+  /* --viz-cat-* inherits index.css's centralized default (used to be
+     redeclared identically here too). --viz-seq-* is kept as a local
+     override, deliberately muted (light gray -> a moderately dark blue, not
+     a saturated/near-black one) so the per-core grid doesn't visually
+     dominate the tab at a glance - a genuine visual variant from
+     index.css's "standard" ramp, not duplication. --viz-seq-0 isn't
+     overridden even here since var(--color-gray-bg) already resolves to
+     the correctly-themed gray on its own. */
   --viz-seq-1: #cfdff2;
   --viz-seq-2: #97bce3;
   --viz-seq-3: #6190c4;
   --viz-seq-4: #35608f;
-
-  --viz-cat-1: #2a78d6;
-  --viz-cat-2: #eb6834;
-  --viz-cat-3: #1baf7a;
 
   /* every row gets the same height regardless of how items wrap (so a
      short card like disk usage doesn't end up a different size than its
@@ -287,17 +284,22 @@
   grid-auto-rows: 1fr;
 }
 
+/* Same three-tier override pattern as index.css (see its doc comment) -
+   :root[data-theme] wins over OS preference either way, the media query
+   below only applies when the viewer hasn't explicitly picked "light". */
+:root[data-theme='dark'] .perf-top-grid {
+  --viz-seq-1: #1f3f66;
+  --viz-seq-2: #2f5f94;
+  --viz-seq-3: #4a7ebe;
+  --viz-seq-4: #7aa6d8;
+}
+
 @media (prefers-color-scheme: dark) {
-  .perf-top-grid {
-    --viz-seq-0: #2c2c2a;
+  :root:where(:not([data-theme='light'])) .perf-top-grid {
     --viz-seq-1: #1f3f66;
     --viz-seq-2: #2f5f94;
     --viz-seq-3: #4a7ebe;
     --viz-seq-4: #7aa6d8;
-
-    --viz-cat-1: #3987e5;
-    --viz-cat-2: #d95926;
-    --viz-cat-3: #199e70;
   }
 }
 

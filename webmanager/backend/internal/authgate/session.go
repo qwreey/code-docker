@@ -53,18 +53,26 @@ func (s *sessionStore) issue() (string, error) {
 // valid reports whether token is present and not yet expired. An expired
 // entry is deleted as a side effect.
 func (s *sessionStore) valid(token string) bool {
+	_, ok := s.validUntil(token)
+	return ok
+}
+
+// validUntil is like valid but also returns the token's expiry time, so a
+// caller (the auth status endpoint) can tell the viewer how long the
+// current unlock still has left instead of just true/false.
+func (s *sessionStore) validUntil(token string) (time.Time, bool) {
 	if token == "" {
-		return false
+		return time.Time{}, false
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	expiry, ok := s.tokens[token]
 	if !ok {
-		return false
+		return time.Time{}, false
 	}
 	if time.Now().After(expiry) {
 		delete(s.tokens, token)
-		return false
+		return time.Time{}, false
 	}
-	return true
+	return expiry, true
 }

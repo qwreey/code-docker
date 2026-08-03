@@ -19,6 +19,17 @@ export function setUnlockPrompter(fn: UnlockPrompter | null) {
   unlockPrompter = fn
 }
 
+// Proactive "just open the unlock modal" entry point - unlike the 401
+// interceptor below, this isn't triggered by a failed request; it's for a
+// UI affordance (the sidebar lock-status indicator) that lets the user
+// unlock ahead of time instead of waiting to hit a gated action. Reuses the
+// exact same modal/queue (UnlockModalHost), so a concurrent 401-triggered
+// prompt and a manual click share one prompt rather than stacking two.
+export function requestUnlock(): Promise<void> {
+  if (!unlockPrompter) return Promise.reject(new Error('unlock prompter not mounted'))
+  return unlockPrompter()
+}
+
 // The unlock endpoint itself is excluded from the retry dance below — a
 // wrong-password 401 from it must surface directly to its own form instead
 // of re-triggering the prompter (which could otherwise recurse).

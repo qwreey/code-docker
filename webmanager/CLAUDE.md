@@ -2,10 +2,13 @@
 
 Scoped guidance for anyone (human or agent) working under `webmanager/`. Read
 `plan.md` first — it's kept short (current status + a linked TODO table only).
-Each feature's full design/history lives in `webmanager/.claude/` (done
-features: `*-plan-done.md`; not-yet-done: `*-plan.md`, no suffix) — only open
-the one you're actually about to touch, not all of them. `webmanager/.claude/
-README.md` is the index.
+Each feature's full design/history lives in `webmanager/.claude/` — only open
+the one you're actually about to touch, not all of them. Files directly under
+`webmanager/.claude/` (no subfolder) are actionable work items only; done
+features, user-QA-pending features, joint-research-needed features,
+feedback logs, and cross-cutting context docs each live in their own
+subfolder (`archive/`, `qa-request/`, `research/`, `feedback/`, `base/`) —
+`webmanager/.claude/README.md` is the index and explains the split.
 
 ## Priority order
 
@@ -22,19 +25,35 @@ from "Processes" — split into 성능/프로세스 sub-tabs (host-wide per-core
 heatmap, host-physical memory breakdown alongside cgroup used/limit,
 best-effort clock/temperature; process list+tree dual view, status filter,
 fuzzy search with match highlighting, client-side DOM pagination), Claude Code
-status tab M1+M2+M3, code-server extension recommend/install (categorized,
+status tab M1+M2+M3, Docker/dind management M1 (read-only: container/image
+list + log tail, `internal/dind` CLI shell-out, ungated), a per-top-level-
+directory container disk breakdown in Task Manager (`internal/diskusage`,
+`du`-based, cached + explicit-trigger-only like the Projects scan), code-server extension recommend/install (categorized,
 collapsible, installed-list section, an open-vsx "더 보기" link, a
 show/hide-recommendations toggle persisted in localStorage), Projects tab
 phase 1, mise management (same collapsible/toggle treatment as extensions,
-defaults inverted — mise categories start collapsed), web terminal M1
+defaults inverted — mise categories start collapsed), web terminal M1+M2
 (ephemeral PTY session, on-screen mobile controls with sticky modifiers,
-customizable keybindings, 10 built-in + custom color themes), a shared
+customizable keybindings, 10 built-in + custom color themes, named
+persistent sessions with a real tab bar/pin-toggle backed by
+`internal/termsession`, keyboard-aware mobile layout, edge-to-edge
+theme-matched surface), a shared
 password gate (`internal/authgate` — see `.claude/authgate-plan-done.md` for
 the full list of what it gates; principle is reads-stay-open/writes-gated,
 with Terminal/File Manager/Logs/Supervisor-log-view gated entirely), a file
 manager, a shared lazy-loaded CodeMirror 6 editor component, a responsive
 layout with a mobile hamburger/drawer sidebar (now also independently
-scrollable so short viewports can reach every item). Keep extending as
+scrollable so short viewports can reach every item), a centralized
+`index.css` color-token system (light + dark values for every base UI token
+and the data-viz `--viz-cat-*`/`--viz-seq-*` palette, previously duplicated
+per-component with no real dark mode for base UI at all) with a 3-way
+manual theme toggle (system/light/dark cycled via one `lucide-react` icon
+button pinned to the sidebar footer's right edge, `data-theme` attribute +
+per-device `localStorage`, `src/theme.ts`/`src/useTheme.ts`) and a sidebar
+footer lock-status indicator on the left (shows a live "N분 남음" countdown
+from `GET /api/auth/status`'s `unlockedUntil`, click to pre-unlock via the
+shared `UnlockModalHost` queue). `lucide-react` is also used for the
+terminal's tab pin/close/add icons. Keep extending as
 needed; see `plan.md`'s "구현 완료" table before assuming something isn't
 done yet. **Open questions the repo owner still needs to weigh in on are
 consolidated in `.claude/question.md`** — none of them block further work,
@@ -50,32 +69,16 @@ dependencies on each other or on anything still queued):
    real multi-server example to design the parser against). Login/OAuth
    automation is explicitly NOT a milestone — the user does that manually;
    don't build it unless asked.
-2. `.claude/projects-plan-done.md` — Projects tab phase 2 (delete UI for
+2. `.claude/qa-request/projects-plan-done.md` — Projects tab phase 2 (delete UI for
    reclaimable folders). Phase 1 (read-only) is done; phase 2 needs the exact
    same path-validation pattern already used by phase 1's rescan endpoint
    (exact match against the cache) plus a confirm dialog, no exceptions.
-3. `.claude/terminal-plan.md` — web terminal **M2** (named persistent
-   sessions surviving tab close). Everything else about the terminal
-   (ephemeral M1, the password gate, mobile controls/keybindings/themes) is
-   done — M2 is purely about session lifecycle now. Design notes already
-   laid (avoid tmux/screen per the repo owner's explicit request — manage the
-   PTY's lifecycle directly instead).
-4. `.claude/extension-search-plan.md` — extension search + marketplace-URL
+3. `.claude/extension-search-plan.md` — extension search + marketplace-URL
    paste-to-install (with an open-vsx cross-lookup + vsix-direct-download
    fallback). Design done, not started.
-5. `.claude/theme-toggle-plan.md` — manual light/dark toggle in a sidebar
-   footer bar (alongside an unlock-status indicator for the password gate).
-   Design done, not started — check the doc's note about confirming how dark
-   mode is currently expressed across existing component CSS before
-   estimating effort.
-
-**Queued, in this order** (next big subsystem after whichever is in flight):
-
-6. `.claude/dind-plan.md` — Docker/dind management. Not started, but
-   **research is done**: CLI shell-out (not the official Go SDK, consistent
-   with every other webmanager feature), `docker run`/`exec`/`cp` explicitly
-   out of scope, log streaming via the existing polling convention (not the
-   terminal's WebSocket infra). One open scope question in `question.md`.
+4. `.claude/dind-plan.md` — Docker/dind management **M2** (start/stop/remove
+   with mandatory confirm dialogs, password-gate the writes). M1
+   (container/image list + log tail, read-only) is done.
 
 **Lower-priority / no dedicated plan doc yet** — tracked only in `plan.md`'s
 TODO table: code-server settings.json editor (revisit once caddy-plan's
@@ -84,12 +87,12 @@ this round already lowers that decision's stakes), tailscale login status
 surfaced in webmanager too, bind-address strategy (last priority), vector
 JSONL log retention policy, i18n (LinguiJS, deliberately deferred until
 strings stabilize), embedding a code-docker help/guide inside webmanager
-(`.claude/guide-plan.md` — idea stage only, explicitly not to be implemented
+(`.claude/research/guide-plan.md` — idea stage only, explicitly not to be implemented
 until the repo owner answers the open questions in that doc), a code-server/
-mise version-check panel (`.claude/version-panel-plan.md` — same idea-stage
+mise version-check panel (`.claude/research/version-panel-plan.md` — same idea-stage
 tier as guide-plan, explicitly lowest priority, several genuinely unresolved
 questions like what signal even means "container rebuild needed"), an active
-sessions viewer (`.claude/session-viewer-plan.md` — same lowest-priority
+sessions viewer (`.claude/research/session-viewer-plan.md` — same lowest-priority
 tier; before touching this one, the very definition of "session" needs to be
 confirmed interactively with the repo owner, don't just pick one and build
 it), a file manager rework (`.claude/filemanager-rework-plan.md` — drag-drop
@@ -97,7 +100,7 @@ move, grid/list/table views, multi-tab, benchmarked loosely against Termix;
 same lowest-priority tier, scope needs to be discussed with the repo owner
 before starting — several open questions in the doc, e.g. whether grid-view
 thumbnails conflict with the existing file manager's deliberate no-thumbnails
-decision). `.claude/caddy-plan.md` — Caddy-based dev-server expose (wildcard subdomain reverse
+decision). `.claude/research/caddy-plan.md` — Caddy-based dev-server expose (wildcard subdomain reverse
 proxy) — also lives here, deliberately below dind/terminal-M2: most of its
 design is settled, but it still has open decisions (e.g. `preserve_host`
 default) and was explicitly deprioritized below the rest of the active
