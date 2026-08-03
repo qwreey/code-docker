@@ -14,6 +14,7 @@ import (
 	"webmanager/internal/authgate"
 	"webmanager/internal/cgroup"
 	"webmanager/internal/diskusage"
+	"webmanager/internal/envmigrate"
 	"webmanager/internal/mise"
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
@@ -28,8 +29,28 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "--hash-password" {
 		os.Exit(hashPasswordCmd())
 	}
+	// CLI helper mode: `webmanager --env-migrate` reconciles a piped-in
+	// .env.webmanager against this image's example-env.webmanager and exits
+	// — never starts the server. See envmigratecmd.go's doc comment.
+	if len(os.Args) > 1 && os.Args[1] == "--env-migrate" {
+		os.Exit(envMigrateCmd(loadConfig()))
+	}
 
 	cfg := loadConfig()
+
+	// Env-version mismatch check (webmanager/.claude/env-migration-plan.md)
+	// — a stale .env.webmanager mostly still works fine (every key has a
+	// sane default), so this is a warning, not a startup failure. An
+	// unreadable template just means the check is skipped, not a crash.
+	envTemplateVersion := ""
+	if data, err := os.ReadFile(cfg.EnvTemplatePath); err != nil {
+		log.Printf("main: couldn't read env template at %s for version check: %v", cfg.EnvTemplatePath, err)
+	} else {
+		envTemplateVersion = envmigrate.ParseVersion(string(data))
+		if envTemplateVersion != "" && envTemplateVersion != cfg.EnvVersion {
+			log.Printf("main: ⚠️ .env.webmanager version is %q but this image's example-env.webmanager is at %q — run `webmanager --env-migrate` (see README) to pick up added/changed settings", cfg.EnvVersion, envTemplateVersion)
+		}
+	}
 
 	// Cross-check against /etc/environment: the whole point of storing
 	// this hash only in a process-start-time env var (see
@@ -89,10 +110,11 @@ func main() {
 			cfg.ProjectsOldDays,
 			cfg.CodeServerURL,
 		),
-		miseJobs:     mise.NewJobStore(),
-		diskUsage:    diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
-		termSessions: termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
-		gate:         gate,
+		miseJobs:           mise.NewJobStore(),
+		diskUsage:          diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
+		termSessions:       termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
+		gate:               gate,
+		envTemplateVersion: envTemplateVersion,
 	}
 
 	mux := http.NewServeMux()
@@ -200,6 +222,12 @@ func main() {
 
 	mux.HandleFunc("GET /api/ui/sidebar-order", s.handleGetSidebarOrder)
 	mux.HandleFunc("PUT /api/ui/sidebar-order", s.handlePutSidebarOrder)
+
+	// Read-only status + a "don't nag me again about this version" write —
+	// no gate, same tier as sidebar-order above (purely informational/UI
+	// preference, no security relevance).
+	mux.HandleFunc("GET /api/system/env-version", s.handleEnvVersion)
+	mux.HandleFunc("POST /api/system/env-version/dismiss", s.handleDismissEnvVersion)
 
 	// SECURITY: opens an unauthenticated-by-default, interactive root
 	// shell (PTY) over WebSocket to anyone who can reach webmanager — no

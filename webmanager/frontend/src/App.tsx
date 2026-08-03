@@ -15,6 +15,7 @@ import { Dind } from './components/Dind/Dind'
 import { Terminal } from './components/Terminal/Terminal'
 import { RequiresUnlock } from './components/common/RequiresUnlock'
 import { UnlockModalHost } from './components/common/UnlockModal'
+import { EnvVersionBanner } from './components/common/EnvVersionBanner'
 import './App.css'
 
 // FileManager pulls in the CodeMirror editor chunk and is a sizable feature
@@ -48,6 +49,7 @@ function App() {
         onClose={() => setSidebarOpen(false)}
       />
       <main className="app-content">
+        <EnvVersionBanner />
         {active === 'supervisor' && <Supervisor />}
         {active === 'ssh-keys' && <SshKeys />}
         {active === 'git-config' && <GitConfig />}

@@ -40,6 +40,7 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 | Supervisor 로그 다이얼로그/바텀시트, 반응형 레이아웃(모바일 햄버거 사이드바), 로그 페이지네이션/시간범위 필터, CPU/메모리/디스크/네트워크 사용량 히스토리 그래프, 사이드바 드래그앤드롭 순서 변경(서버에 저장, `GET/PUT /api/ui/sidebar-order`), 탭 이름 영어로 통일(Code Extensions/Projects/Task Manager/Files) | 문서 없음(UI/관측성 개선, 각 기능 자체는 위 표의 해당 기능 문서 소관) |
 | `docker-compose.yml`에 모든 `WEBMANAGER_*` env var를 주석 처리된 상태로 문서화(값 예시는 안 채움, 필요할 때 주석 해제), locale(`LANG`)도 TZ 옆에 주석으로 추가 | 문서 없음(레포 루트 `docker-compose.yml` 자체가 최신 소스) |
 | Light/Dark 수동 토글(3-way: 자동/라이트/다크, `data-theme` 속성 + `localStorage`) + 사이드바 하단 잠금 상태 표시/미리 해제 + `index.css` 컬러 시스템 중앙화(기본 UI 다크 값 신규 설계 포함 — 원래 전혀 없었음, dataviz 스킬로 차트 팔레트 재검증) | `.claude/archive/theme-toggle-plan-done.md` |
+| `.env.webmanager` 마이그레이션 도구(`webmanager --env-migrate` — 키 추가/삭제 반영(삭제된 키는 `#~` 아카이브 섹션으로), 유저 코멘트 보존, `#!important`/`#!` 마커로 조직 강제값·권장값-변경-충돌 표시, 경로 기반 템플릿(조직 커스텀 마운트 가능) + 기동 로그/웹 UI 경고 배너(dismiss 영속화)) | `.claude/qa-request/env-migration-plan-done.md` |
 
 전체 구현은 backend(Go)/frontend(React) subagent를 병렬로 여러 라운드 돌려서 진행,
 각 라운드 사이 API 계약 불일치를 직접 대조해서 잡는 패턴 반복 — 새 기능도 이 방식
@@ -92,6 +93,10 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
     멀티탭) — **최하 우선순위**, Termix류 프로젝트를 벤치마킹하자는 아이디어
     단계. 복잡하고 필수 기능은 아니라서 낮은 우선순위 — 착수 전 스코프를
     사용자와 반드시 논의. `.claude/filemanager-rework-plan.md`
+13. code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일
+    origin 통합 — 아키텍처/포트 재배치(code-server 내부 포트 이동,
+    `code-config.yaml` 매 시작 재생성으로 변경)/프론트엔드 변경까지 전부
+    확정, 미착수. `.claude/expose-plan.md`
 
 ## 참고 문서
 

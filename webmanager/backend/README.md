@@ -39,6 +39,20 @@ goes to stdout, everything else (prompts, errors) goes to stderr, so
 `docker compose exec` invocation this is meant to be run with in the real
 container.
 
+```sh
+webmanager --env-migrate
+```
+
+Reads a `.env.webmanager` from stdin, reconciles it against
+`WEBMANAGER_ENV_TEMPLATE_PATH`'s current `example-env.webmanager`
+(`internal/envmigrate.Migrate`), and writes the reconstructed file to
+stdout — never starts the HTTP server. Migration notes (`INFO`/`WARN`) go to
+stderr, so `cat .env.webmanager | webmanager --env-migrate >
+.env.webmanager.new` works. See `internal/envmigrate`'s package doc and
+`webmanager/.claude/env-migration-plan.md` for the full merge behavior
+(preserved user values/comments, `#!important`-forced keys, `#!`-flagged
+conflict markers, the `#~` dead-key archive).
+
 ## Run locally
 
 None of the default paths (`/run/supervisor.sock`, `/code/.ssh/...`, etc.)
@@ -86,6 +100,9 @@ shell out to `git`/`ssh-keygen`.
 | `WEBMANAGER_STATIC_DIR` | `./static` | pre-built frontend assets (see below) |
 | `WEBMANAGER_CLAUDE_BINPATH` | *(none)* | absolute path to the `claude` (Claude Code CLI) binary; if unset, falls back to a `claude` lookup on `PATH`. Neither found means "not installed" — a normal state, not an error |
 | `CLAUDE_CONFIG_DIR` | `/code/.claude` | Claude Code's own standard env var for relocating `~/.claude`; webmanager reads `stats-cache.json` from directly under this directory and does not invent a separate `WEBMANAGER_`-prefixed equivalent |
+| `WEBMANAGER_ENV_TEMPLATE_PATH` | `/etc/code-docker/webmanager/example-env.webmanager` | the `example-env.webmanager` template `--env-migrate` and the startup version check read — deliberately not `go:embed`'d so an operator running multiple instances can bind-mount their own org-customized template over this path instead of rebuilding the image. Set via `docker-compose.yml`, not `.env.webmanager` itself (see its comment there for why) |
+| `WEBMANAGER_ENV_VERSION` | *(none)* | `.env.webmanager`'s own `WEBMANAGER_ENV_VERSION` (set via `env_file`, not meant to be hand-edited — `--env-migrate` manages it). Compared at startup against the template's current version; a mismatch logs a warning and is surfaced by `GET /api/system/env-version` |
+| `WEBMANAGER_ENV_VERSION_DISMISS_PATH` | `/code/.webmanager/env-version-dismiss.json` | persisted "user has acknowledged this version's mismatch banner" flag (`internal/envversionprefs`) |
 
 GPG-backed endpoints (`/api/git/gpg-keys*`) additionally depend on the `gpg`
 binary being on `PATH` (installed via `gnupg` in `config/build.default.sh`);
@@ -330,6 +347,22 @@ fields, invalid host/keyId format, etc.) are unaffected.
   has to be able to check this).
 - `POST /api/auth/unlock` — body `{"password": string}`. `401` on a wrong
   password. Never gated, same reason as above.
+
+- `GET /api/system/env-version` — `{currentVersion, fileVersion, mismatch,
+  dismissed}`. `currentVersion` is `WEBMANAGER_ENV_TEMPLATE_PATH`'s
+  `WEBMANAGER_ENV_VERSION` as read once at startup (`""` if the template was
+  unreadable, in which case `mismatch` is always `false` — nothing to check
+  against); `fileVersion` is `.env.webmanager`'s own value (`WEBMANAGER_
+  ENV_VERSION` env var, possibly `""` for a pre-this-feature file). `dismissed`
+  reflects `internal/envversionprefs` keyed to `currentVersion` — so a later
+  image upgrade that bumps the template version automatically re-arms the
+  banner even though a dismissal record for the old version still exists.
+  Ungated (read-only, purely informational).
+- `POST /api/system/env-version/dismiss` — persists that the user has seen
+  the current mismatch warning (`internal/envversionprefs`). `400` if there's
+  no `currentVersion` to key the dismissal to (template was unreadable at
+  startup). Ungated, same tier as `PUT /api/ui/sidebar-order` — no security
+  relevance, just a "don't nag me again" UI preference.
 
 All error responses are `{"error": "message"}` with an appropriate 4xx/5xx
 status.

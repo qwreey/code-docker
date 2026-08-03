@@ -30,9 +30,14 @@ RUN --mount=type=cache,target=/var/cache/pacman /etc/code-docker/build.sh
 # Copy dind docker cli
 COPY --from=docker-bin /usr/local/bin/docker /usr/bin/docker
 
-# Copy webmanager binary + prebuilt frontend assets
+# Copy webmanager binary + prebuilt frontend assets + its example-env.webmanager
+# template (read by `webmanager --env-migrate`/the startup version check via
+# WEBMANAGER_ENV_TEMPLATE_PATH — not go:embed, so an operator running
+# multiple instances can bind-mount their own over this path instead, see
+# webmanager/.claude/env-migration-plan.md).
 COPY --from=webmanager-backend /webmanager /etc/code-docker/webmanager/webmanager
 COPY --from=webmanager-frontend /src/dist /etc/code-docker/webmanager/static
+COPY example-env.webmanager /etc/code-docker/webmanager/example-env.webmanager
 
 # Log directories for per-program rotated log files (read by vector)
 RUN mkdir -p /var/log/code-server /var/log/sshd /var/log/tailscaled \

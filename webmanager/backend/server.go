@@ -32,6 +32,12 @@ type Server struct {
 	diskUsage      *diskusage.Analyzer
 	termSessions   *termsession.Registry
 	gate           *authgate.Gate
+
+	// envTemplateVersion is cfg.EnvTemplatePath's WEBMANAGER_ENV_VERSION at
+	// startup ("" if the template was unreadable) — see
+	// webmanager/.claude/env-migration-plan.md. Computed once in main(),
+	// not re-read per request: it only changes on a container rebuild.
+	envTemplateVersion string
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

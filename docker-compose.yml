@@ -53,6 +53,17 @@ services:
       # --login-server=`. Leave unset/empty to use the official
       # tailscale.com control server instead.
       TAILSCALE_LOGIN_SERVER: "" # https://tail.qwreey.moe
+      # Path `webmanager --env-migrate`/the startup version-mismatch check
+      # read the current example-env.webmanager template from. Left unset to
+      # use the image's own copy. Deliberately not settable via
+      # .env.webmanager itself - that file is what gets migrated using this
+      # template, so pointing to it from inside would be self-referential.
+      # If you run multiple instances and want to enforce your own org
+      # policy (e.g. #!important-forced keys), bind-mount a custom template
+      # over this path instead of changing it - add this under the
+      # `volumes:` section below:
+      #   - ./custom-example-env.webmanager:/etc/code-docker/webmanager/example-env.webmanager:ro
+      # WEBMANAGER_ENV_TEMPLATE_PATH: /etc/code-docker/webmanager/example-env.webmanager
     # webmanager(admin panel, port 81) settings all live in .env.webmanager,
     # not here - copy example-env.webmanager to .env.webmanager and uncomment
     # only what you need (every value already has a sane default). See the

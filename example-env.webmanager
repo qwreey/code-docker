@@ -1,94 +1,118 @@
-# webmanager(관리자 패널, 81번 포트) 런타임 설정
-#
-# 이 파일을 .env.webmanager 로 복사한 뒤, 필요한 값만 주석을 풀어 사용하세요.
-# 전부 코드 상 합리적인 기본값이 있으므로 대부분은 건드릴 필요가 없습니다.
-#
-#   cp example-env.webmanager .env.webmanager
-#
-# 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다
-# (`docker compose restart`로는 환경변수 변경이 적용되지 않습니다).
-# 이 파일이 아예 없어도 정상 동작합니다(전부 기본값으로 실행).
+#. webmanager(관리자 패널, 81번 포트) 런타임 설정
+#.
+#. 이 파일을 .env.webmanager 로 복사한 뒤, 필요한 값만 주석을 풀어 사용하세요.
+#. 전부 코드 상 합리적인 기본값이 있으므로 대부분은 건드릴 필요가 없습니다.
+#.
+#.   cp example-env.webmanager .env.webmanager
+#.
+#. 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다
+#. (`docker compose restart`로는 환경변수 변경이 적용되지 않습니다).
+#. 이 파일이 아예 없어도 정상 동작합니다(전부 기본값으로 실행).
+#.
+#. --- 이 파일이 바뀌면(키 추가/삭제) 기존 .env.webmanager 갱신하기 ---
+#. 이미지가 업데이트되면 아래 키 목록이 바뀔 수 있습니다. 기존
+#. .env.webmanager를 최신 구조에 맞게 재구성하려면:
+#.
+#.   cp .env.webmanager .env.webmanager.bak
+#.   cat .env.webmanager | docker compose exec -T code-docker \
+#.     /etc/code-docker/webmanager/webmanager --env-migrate > .env.webmanager
+#.
+#. 활성화(주석 해제)해둔 값과 직접 남긴 코멘트는 그대로 보존되고, 더 이상
+#. 안 쓰이는 키는 지우지 않고 파일 맨 아래 "더 이상 쓰이지 않는 키" 섹션으로
+#. 옮겨집니다. 자세한 동작은 webmanager/.claude/env-migration-plan.md 참고.
+#.
+#. --- 이 파일에서 쓰는 코멘트 표기 ---
+#. `#.`로 시작하는 줄(지금 보고 있는 이 설명들)은 code-docker가 관리하는
+#. 내용이라 마이그레이션할 때마다 최신 내용으로 갈아끼워집니다. 반대로
+#. 순수 `#`로 시작하는 코멘트는 유저가 직접 남긴 것으로 취급되어 값과 함께
+#. 그대로 보존됩니다 - 이 파일에 여러분만의 메모를 남기고 싶다면 `#.`가
+#. 아니라 `#`만 쓰세요.
 
-# --- 비밀번호 게이트 (선택, 기본 꺼짐) ---
-# 설정하면 Terminal/File Manager 탭 전체가 잠기고, 다른 탭의 쓰기(추가/수정/삭제)
-# 동작에도 비밀번호가 필요해집니다. 반드시 argon2id 해시여야 하며 평문 비밀번호를
-# 넣으면 안 됩니다 - 컨테이너가 이미 떠 있는 상태에서 아래 명령으로 생성하세요:
-#
-#   docker compose exec code-docker /etc/code-docker/webmanager/webmanager --hash-password
-#
-# 비밀번호를 두 번 입력받아 오타를 확인한 뒤, $argon2id$... 로 시작하는 해시
-# 한 줄만 출력합니다 - 그 값을 그대로 아래에 붙여넣으세요.
+#!important
+WEBMANAGER_ENV_VERSION=1
+#. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
+#. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
+
+#. --- 비밀번호 게이트 (선택, 기본 꺼짐) ---
+#. 설정하면 Terminal/File Manager 탭 전체가 잠기고, 다른 탭의 쓰기(추가/수정/삭제)
+#. 동작에도 비밀번호가 필요해집니다. 반드시 argon2id 해시여야 하며 평문 비밀번호를
+#. 넣으면 안 됩니다 - 컨테이너가 이미 떠 있는 상태에서 아래 명령으로 생성하세요:
+#.
+#.   docker compose exec code-docker /etc/code-docker/webmanager/webmanager --hash-password
+#.
+#. 비밀번호를 두 번 입력받아 오타를 확인한 뒤, $argon2id$... 로 시작하는 해시
+#. 한 줄만 출력합니다 - 그 값을 그대로 아래에 붙여넣으세요.
 #WEBMANAGER_AUTH_PASSWORD_HASH=
 
-# --- File Manager ---
-# 브라우징을 허용할 최상위 경로. 컨테이너 전체를 열어주려면 "/"로.
+#. --- File Manager ---
+#. 브라우징을 허용할 최상위 경로. 컨테이너 전체를 열어주려면 "/"로.
 #WEBMANAGER_FILES_ROOT=/code
-# 업로드 최대 크기(바이트).
+#. 업로드 최대 크기(바이트).
 #WEBMANAGER_FILES_MAX_UPLOAD_BYTES=2147483648
 
-# --- Claude Code 탭 ---
-# `claude` 바이너리 경로 오버라이드 (mise로 설치한 경우 shim이 webmanager의
-# PATH에 안 잡힐 수 있습니다).
+#. --- Claude Code 탭 ---
+#. `claude` 바이너리 경로 오버라이드 (mise로 설치한 경우 shim이 webmanager의
+#. PATH에 안 잡힐 수 있습니다).
 #WEBMANAGER_CLAUDE_BINPATH=
 #CLAUDE_CONFIG_DIR=/code/.claude
 
-# --- mise 탭 ---
-# `mise` 바이너리 경로 오버라이드.
+#. --- mise 탭 ---
+#. `mise` 바이너리 경로 오버라이드.
 #WEBMANAGER_MISE_BINPATH=
 
-# --- Projects 탭 ---
-# 스캔할 최상위 디렉토리 목록 ($PATH처럼 콜론으로 구분).
+#. --- Projects 탭 ---
+#. 스캔할 최상위 디렉토리 목록 ($PATH처럼 콜론으로 구분).
 #WEBMANAGER_PROJECTS_PATH=/code/Projects
 #WEBMANAGER_PROJECTS_CACHE_PATH=
 #WEBMANAGER_PROJECTS_STALE_AFTER=1h
 #WEBMANAGER_PROJECTS_OLD_DAYS=90
-# 유저가 직접 편집하는 "재생성 가능 폴더" 패턴 파일 경로.
+#. 유저가 직접 편집하는 "재생성 가능 폴더" 패턴 파일 경로.
 #WEBMANAGER_PROJECTS_PATTERNS_PATH=
-# "code-server에서 열기" 링크(${url}/?folder=${path})를 만들 외부 접속 가능한
-# code-server 기본 URL. 비워두면 그 버튼이 안 보입니다(멀티 인스턴스/PREFIX/
-# 프록시 구성이 제각각이라 webmanager가 자체적으로 추론할 수 없음).
+#. "code-server에서 열기" 링크(${url}/?folder=${path})를 만들 외부 접속 가능한
+#. code-server 기본 URL. 비워두면 그 버튼이 안 보입니다(멀티 인스턴스/PREFIX/
+#. 프록시 구성이 제각각이라 webmanager가 자체적으로 추론할 수 없음).
 #WEBMANAGER_CODE_SERVER_URL=
 
-# --- Task Manager 탭 ---
-# 리소스 히스토리 그래프 샘플링 주기(초)와 보관 기간(분).
+#. --- Task Manager 탭 ---
+#. 리소스 히스토리 그래프 샘플링 주기(초)와 보관 기간(분).
 #WEBMANAGER_SYSTEM_HISTORY_INTERVAL_SECONDS=5
 #WEBMANAGER_SYSTEM_HISTORY_WINDOW_MINUTES=10
-# 디렉토리별 디스크 사용량 분석 대상 루트, 결과 캐시 경로.
+#. 디렉토리별 디스크 사용량 분석 대상 루트, 결과 캐시 경로.
 #SYSTEM_DISK_BREAKDOWN_ROOT=
 #WEBMANAGER_DISK_BREAKDOWN_CACHE_PATH=
 
-# --- Code Extensions / mise 추천 목록 ---
-# 보통은 이 경로를 바꾸는 대신 config/recommendations.override.yaml 파일을
-# 추가하세요(아래 빌드 커스터마이징 참고).
+#. --- Code Extensions / mise 추천 목록 ---
+#. 보통은 이 경로를 바꾸는 대신 config/recommendations.override.yaml 파일을
+#. 추가하세요(아래 빌드 커스터마이징 참고).
 #WEBMANAGER_RECOMMENDATIONS_DEFAULT_PATH=
 #WEBMANAGER_RECOMMENDATIONS_OVERRIDE_PATH=
-# --install-extension/--list-extensions에 쓰이는 code-server CLI 정보
-# (code-server-autoinstall이 실제로 띄우는 값과 일치해야 합니다).
+#. --install-extension/--list-extensions에 쓰이는 code-server CLI 정보
+#. (code-server-autoinstall이 실제로 띄우는 값과 일치해야 합니다).
 #WEBMANAGER_CODE_SERVER_BIN=
 #WEBMANAGER_CODE_SERVER_USER_DATA_DIR=
 #WEBMANAGER_CODE_SERVER_EXTENSIONS_DIR=
 
-# --- Supervisor 탭 ---
-# 프로그램별 메타데이터(컨트롤 비활성화 + 설명 노트) 경로 - 마찬가지로 보통은
-# config/supervisor-metadata.override.yaml을 추가하세요.
+#. --- Supervisor 탭 ---
+#. 프로그램별 메타데이터(컨트롤 비활성화 + 설명 노트) 경로 - 마찬가지로 보통은
+#. config/supervisor-metadata.override.yaml을 추가하세요.
 #WEBMANAGER_SUPERVISOR_METADATA_DEFAULT_PATH=
 #WEBMANAGER_SUPERVISOR_METADATA_OVERRIDE_PATH=
 
-# --- Terminal 탭 ---
-# 온스크린 키바인딩/색상 테마 저장 경로.
+#. --- Terminal 탭 ---
+#. 온스크린 키바인딩/색상 테마 저장 경로.
 #WEBMANAGER_TERMINAL_SETTINGS_PATH=
-# 영속 세션이 고정(pin)되지도, 아무도 붙어있지도 않을 때 자동 정리되기까지의
-# 유휴 시간, 세션당 스크롤백 링버퍼 크기(바이트).
+#. 영속 세션이 고정(pin)되지도, 아무도 붙어있지도 않을 때 자동 정리되기까지의
+#. 유휴 시간, 세션당 스크롤백 링버퍼 크기(바이트).
 #WEBMANAGER_TERMINAL_SESSION_IDLE_TIMEOUT=30m
 #WEBMANAGER_TERMINAL_SESSION_SCROLLBACK_BYTES=262144
 
-# --- 사이드바 ---
-# 드래그앤드롭으로 정렬한 탭 순서 저장 경로.
+#. --- 사이드바 ---
+#. 드래그앤드롭으로 정렬한 탭 순서 저장 경로.
 #WEBMANAGER_SIDEBAR_ORDER_PATH=
 
-# --- 잘 안 건드리는 값들 ---
-# 아래는 컨테이너의 기존 고정 경로와 이미 일치합니다. 그 경로 자체를 다른
-# override로 옮긴 경우에만 관련 있습니다.
+#. --- 잘 안 건드리는 값들 ---
+#. 아래는 컨테이너의 기존 고정 경로와 이미 일치합니다. 그 경로 자체를 다른
+#. override로 옮긴 경우에만 관련 있습니다.
 #SUPERVISOR_SOCK=
 #SSH_AUTHORIZED_KEYS=
 #GIT_CONFIG_PATH=
@@ -97,10 +121,10 @@
 #WEBMANAGER_SSH_KNOWN_HOSTS_PATH=
 #GIT_CREDENTIALS_PATH=
 #WEBMANAGER_STATIC_DIR=
-# tailscale-forward 프로그램 자신의 CONFIG= 경로와 같이 바꿔야 합니다.
+#. tailscale-forward 프로그램 자신의 CONFIG= 경로와 같이 바꿔야 합니다.
 #TAILSCALE_CONFIG_PATH=
 #SSH_SIGNING_KEY_PATH=
 #VECTOR_LOG_DIR=
 #SYSTEM_DISK_PATH=
-# 바꾸면 docker-compose.yml의 81:81 포트 매핑도 같이 바꿔야 합니다.
+#. 바꾸면 docker-compose.yml의 81:81 포트 매핑도 같이 바꿔야 합니다.
 #WEBMANAGER_ADDR=:81

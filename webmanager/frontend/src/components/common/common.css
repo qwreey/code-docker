@@ -57,6 +57,23 @@
   padding: 0.1rem 0.3rem;
 }
 
+.warning-banner {
+  background: var(--color-yellow-bg);
+  color: var(--color-yellow-fg);
+  border-color: var(--color-yellow-border);
+  align-items: flex-start;
+}
+
+.warning-banner code {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.08);
+  font-size: 0.85em;
+  word-break: break-all;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

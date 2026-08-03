@@ -71,6 +71,33 @@ type Config struct {
 	// sessions are exempt entirely (see terminal-plan.md's "영속 세션 토글").
 	TerminalSessionIdleTimeout     string
 	TerminalSessionScrollbackBytes string
+
+	// EnvTemplatePath points at the image's shipped example-env.webmanager
+	// (see .claude/env-migration-plan.md) — `webmanager --env-migrate` reads
+	// it to know the current key set/defaults, and startup reads just its
+	// WEBMANAGER_ENV_VERSION line to warn if .env.webmanager is stale.
+	// Deliberately NOT baked in via go:embed: a path lets an operator
+	// running multiple instances bind-mount their own template (e.g. with
+	// org-mandated #!important keys) without rebuilding the image.
+	// Deliberately NOT documented in example-env.webmanager itself (unlike
+	// every other WEBMANAGER_* var) — that file IS the thing this path
+	// points at and .env.webmanager gets rewritten by the migration tool,
+	// so referencing this path from inside it would be self-referential.
+	// See docker-compose.yml for where it's actually meant to be set.
+	EnvTemplatePath string
+
+	// EnvVersion is .env.webmanager's own WEBMANAGER_ENV_VERSION value (set
+	// via env_file, not this var directly) — compared at startup against
+	// EnvTemplatePath's current version to warn when the running file
+	// predates the image's example-env.webmanager. Don't hand-edit this in
+	// .env.webmanager; `--env-migrate` manages it via #!important.
+	EnvVersion string
+
+	// EnvVersionDismissPath persists whether the user has already
+	// acknowledged the current env-version-mismatch warning (see
+	// internal/envversionprefs) — not gated, purely a "don't nag me again
+	// about this exact version" UI preference, same tier as SidebarOrderPath.
+	EnvVersionDismissPath string
 }
 
 func getenv(key, def string) string {
@@ -130,5 +157,9 @@ func loadConfig() Config {
 
 		TerminalSessionIdleTimeout:     getenv("WEBMANAGER_TERMINAL_SESSION_IDLE_TIMEOUT", "30m"),
 		TerminalSessionScrollbackBytes: getenv("WEBMANAGER_TERMINAL_SESSION_SCROLLBACK_BYTES", "262144"),
+
+		EnvTemplatePath:       getenv("WEBMANAGER_ENV_TEMPLATE_PATH", "/etc/code-docker/webmanager/example-env.webmanager"),
+		EnvVersion:            getenv("WEBMANAGER_ENV_VERSION", ""),
+		EnvVersionDismissPath: getenv("WEBMANAGER_ENV_VERSION_DISMISS_PATH", "/code/.webmanager/env-version-dismiss.json"),
 	}
 }
