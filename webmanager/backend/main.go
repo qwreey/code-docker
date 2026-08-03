@@ -13,6 +13,7 @@ import (
 
 	"webmanager/internal/authgate"
 	"webmanager/internal/cgroup"
+	"webmanager/internal/diskusage"
 	"webmanager/internal/mise"
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
@@ -69,8 +70,9 @@ func main() {
 			cfg.ProjectsOldDays,
 			cfg.CodeServerURL,
 		),
-		miseJobs: mise.NewJobStore(),
-		gate:     gate,
+		miseJobs:  mise.NewJobStore(),
+		diskUsage: diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
+		gate:      gate,
 	}
 
 	mux := http.NewServeMux()
@@ -132,6 +134,12 @@ func main() {
 
 	mux.HandleFunc("GET /api/system/resources", s.handleSystemResources)
 	mux.HandleFunc("GET /api/system/resources/history", s.handleSystemResourcesHistory)
+
+	// Cached, explicit-trigger-only like /api/projects above — a full `du`
+	// over the container's root filesystem can take a while, so it never
+	// runs on a plain GET.
+	mux.HandleFunc("GET /api/system/disk-breakdown", s.handleDiskBreakdown)
+	mux.HandleFunc("POST /api/system/disk-breakdown/scan", s.handleScanDiskBreakdown)
 
 	// dind is DOCKER_HOST=tcp://dind:2375 (plaintext, no auth) — same trust
 	// boundary as the rest of code-docker-internal, not a new one (see

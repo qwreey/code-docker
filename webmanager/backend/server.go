@@ -6,6 +6,7 @@ import (
 
 	"webmanager/internal/authgate"
 	"webmanager/internal/cgroup"
+	"webmanager/internal/diskusage"
 	"webmanager/internal/mise"
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
@@ -27,6 +28,7 @@ type Server struct {
 	hostSensors    *cgroup.HostSensors
 	projectScanner *projects.Scanner
 	miseJobs       *mise.JobStore
+	diskUsage      *diskusage.Analyzer
 	gate           *authgate.Gate
 }
 

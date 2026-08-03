@@ -60,8 +60,10 @@ shell out to `git`/`ssh-keygen`.
 | `GIT_CREDENTIALS_PATH` | `/code/.git-credentials` | HTTPS credential store file |
 | `TAILSCALE_CONFIG_PATH` | `/code/.tailscale/config.yaml` | tailscale forwards/publish config, read by `config/tailscale-forward.default.sh` |
 | `SSH_SIGNING_KEY_PATH` | `/code/.ssh/signing_key` | dedicated ed25519 keypair generated for git SSH commit signing |
-| `VECTOR_LOG_DIR` | `/code/.vector/logs` | directory of day-partitioned `<YYYY-MM-DD>.jsonl` log files written by the `vector` pipeline (see `.claude/vector-logs-plan-done.md`) |
+| `VECTOR_LOG_DIR` | `/code/.vector/logs` | directory of day-partitioned `<YYYY-MM-DD>.jsonl` log files written by the `vector` pipeline (see `.claude/archive/vector-logs-plan-done.md`) |
 | `SYSTEM_DISK_PATH` | `/code` | path `GET /api/system/resources` runs `statfs` on to report disk usage — `/code` is the bind-mounted volume (`./code:/code`), so this reflects real host disk usage for that mount |
+| `SYSTEM_DISK_BREAKDOWN_ROOT` | `/` | root path `GET /api/system/disk-breakdown` breaks down by top-level directory (see `internal/diskusage`) — deliberately `/` (the container's own root filesystem), not `SYSTEM_DISK_PATH` |
+| `WEBMANAGER_DISK_BREAKDOWN_CACHE_PATH` | `/code/.webmanager/disk-breakdown-cache.json` | cache file for the disk breakdown scan (only recomputed on `POST .../scan`, same convention as `WEBMANAGER_PROJECTS_CACHE_PATH`) |
 | `WEBMANAGER_STATIC_DIR` | `./static` | pre-built frontend assets (see below) |
 | `WEBMANAGER_CLAUDE_BINPATH` | *(none)* | absolute path to the `claude` (Claude Code CLI) binary; if unset, falls back to a `claude` lookup on `PATH`. Neither found means "not installed" — a normal state, not an error |
 | `CLAUDE_CONFIG_DIR` | `/code/.claude` | Claude Code's own standard env var for relocating `~/.claude`; webmanager reads `stats-cache.json` from directly under this directory and does not invent a separate `WEBMANAGER_`-prefixed equivalent |
@@ -130,7 +132,7 @@ fields, invalid host/keyId format, etc.) are unaffected.
 - `GET /api/logs/apps` — real supervisord process names, `{"mock": false}`
 - `GET /api/logs/entries?app=&level=&limit=` — real log entries read from
   the `vector`-produced JSONL files at `VECTOR_LOG_DIR` (see
-  `internal/logstore` and `.claude/vector-logs-plan-done.md` for the on-disk contract);
+  `internal/logstore` and `.claude/archive/vector-logs-plan-done.md` for the on-disk contract);
   `app`/`level` are exact-match filters (case-sensitive, both optional),
   results are sorted by timestamp descending, `limit` defaults to 100 (max
   1000, `400` if not a positive integer), `level` must be `info`/`warn`/
@@ -204,6 +206,25 @@ fields, invalid host/keyId format, etc.) are unaffected.
     read does this return `503 {"error": "cgroup v2 data unavailable"}` as
     a last resort. cgroup v1 is
     not supported (reads simply fail there, degrading as above)
+- `GET /api/system/disk-breakdown` — cached per-top-level-directory disk
+  breakdown of the container's own root filesystem (`SYSTEM_DISK_BREAKDOWN_ROOT`,
+  default `/`) — a Storage-Sense/Samsung-저장공간-분석기-style "what's using
+  space where" view, distinct from `GET /api/system/resources`'s single
+  statfs number for `SYSTEM_DISK_PATH`. Always returns instantly (the cached
+  result, `internal/diskusage`) — never runs `du` on a plain GET.
+  `root`/`available`/`scanning`/`scannedAt`/`totalBytes`(statfs)/`freeBytes`/
+  `entries: [{name, path, sizeBytes}]`. Virtual/RAM-backed filesystems
+  (`proc`, `sysfs`, `tmpfs`, ...) are excluded via `/proc/mounts` fstype
+  matching; symlinked top-level dirs (e.g. Arch's usr-merge `/bin` →
+  `/usr/bin`) report only their own tiny symlink size, not their target's
+  content (GNU `du`'s own default behavior for a symlink given as a
+  command-line argument — verified, not something this endpoint special-cases)
+- `POST /api/system/disk-breakdown/scan` — triggers a fresh scan in the
+  background (`du -sb` per top-level directory) and returns the current
+  snapshot immediately (`scanning: true` while it runs); a scan already in
+  flight makes this a no-op. Same cache-then-explicit-trigger convention as
+  `POST /api/projects/scan` — a full root-filesystem `du` can take a while,
+  so it never runs implicitly
 - `GET /api/claude/status` — read-only Claude Code (the `claude` CLI) quick
   overview: `installed` (binary found via `WEBMANAGER_CLAUDE_BINPATH` or
   `PATH`), `auth` (from `claude auth status --json`, run with a 5s timeout

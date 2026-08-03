@@ -143,6 +143,11 @@ services:
       # SSH_SIGNING_KEY_PATH: ""
       # VECTOR_LOG_DIR: ""
       # SYSTEM_DISK_PATH: ""
+      # Task Manager tab: root path for the per-top-level-directory disk
+      # breakdown (a "what's using space where" view, distinct from
+      # SYSTEM_DISK_PATH above) and where its scan result is cached.
+      # SYSTEM_DISK_BREAKDOWN_ROOT: ""
+      # WEBMANAGER_DISK_BREAKDOWN_CACHE_PATH: ""
 
       # Terminal tab: where user-customized on-screen keybindings/color
       # themes are saved.

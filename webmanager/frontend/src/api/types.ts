@@ -293,6 +293,27 @@ export interface ThermalZoneInfo {
   celsius: number
 }
 
+// DiskBreakdownEntry/DiskBreakdownResponse mirror internal/diskusage's
+// Entry/Response — a separate question from SystemResources.disk above
+// (which is one statfs number for a single configured mount): this is a
+// per-top-level-directory breakdown of the container's own root filesystem,
+// cached server-side and only recomputed on an explicit POST .../scan.
+export interface DiskBreakdownEntry {
+  name: string
+  path: string
+  sizeBytes: number
+}
+
+export interface DiskBreakdownResponse {
+  root: string
+  available: boolean
+  scanning: boolean
+  scannedAt: string | null
+  totalBytes: number
+  freeBytes: number
+  entries: DiskBreakdownEntry[]
+}
+
 export interface SystemResources {
   memory: {
     usedBytes: number

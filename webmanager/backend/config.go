@@ -56,6 +56,14 @@ type Config struct {
 	// SidebarOrderPath is where the user's drag-and-drop sidebar tab order
 	// is persisted (see internal/uiprefs). Not gated — purely cosmetic.
 	SidebarOrderPath string
+
+	// DiskBreakdownRoot/DiskBreakdownCachePath back the Task Manager's
+	// per-top-level-directory disk breakdown (see internal/diskusage) — a
+	// different question from SystemDiskPath above (which is one statfs
+	// number for a single configured mount). Root defaults to "/" (the
+	// container's own root filesystem), not SystemDiskPath's default /code.
+	DiskBreakdownRoot      string
+	DiskBreakdownCachePath string
 }
 
 func getenv(key, def string) string {
@@ -109,5 +117,8 @@ func loadConfig() Config {
 
 		TerminalSettingsPath: getenv("WEBMANAGER_TERMINAL_SETTINGS_PATH", "/code/.webmanager/terminal-settings.json"),
 		SidebarOrderPath:     getenv("WEBMANAGER_SIDEBAR_ORDER_PATH", "/code/.webmanager/sidebar-order.json"),
+
+		DiskBreakdownRoot:      getenv("SYSTEM_DISK_BREAKDOWN_ROOT", "/"),
+		DiskBreakdownCachePath: getenv("WEBMANAGER_DISK_BREAKDOWN_CACHE_PATH", "/code/.webmanager/disk-breakdown-cache.json"),
 	}
 }
