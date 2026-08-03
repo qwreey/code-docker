@@ -178,6 +178,15 @@ cat .env.webmanager | docker compose exec -T code-docker \
 `vector` 를 실행합니다. `vector.*.toml` 을 선택해 넘겨주는 것 외에는 `/code/.vector/state`
 (체크포인트), `/code/.vector/logs`(구조화 로그) 디렉토리를 미리 만드는 역할만 합니다.
 
+vector 자신의 내부 진단 로그(설정 로드, 헬스체크, 파일 워처 시작/재개, 체크포인트
+로드, "Vector has started" 배너 등 — 아무 `[app_name]` 태그 없이 stdout에 그대로
+찍히는 잡음)는 `docker-compose.yml`의 `VECTOR_LOG_LEVEL`로 조절합니다. 기본값
+`warn`은 nginx의 `error_log ... warn;`과 같은 레벨로 맞춘 것으로, 위 잡음은 대부분
+사라지고 실제 파이프라인 문제(WARN 이상)만 남습니다. 이 값은 다른 프로그램들의
+로그를 실어나르는 파이프라인 데이터 자체(`console` sink 재출력,
+`/code/.vector/logs/*.jsonl`)와는 무관합니다 — 더 조용하게 하려면 `error`, 옛날
+동작으로 되돌리려면 `info`나 `debug`로 설정하세요.
+
 ### `vector.*.toml` (vector 로그 파이프라인 설정)
 
 [vector](https://vector.dev) 설정 파일입니다. 각 supervisord program 의 `stdout_logfile`

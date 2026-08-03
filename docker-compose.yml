@@ -58,6 +58,15 @@ services:
       #     $status), so routine traffic doesn't flood `docker compose logs`.
       #   all - log every request, combined format (the old behavior).
       NGINX_LOG_LEVEL: "errors"
+      # vector's own internal diagnostic log level (its startup/healthcheck/
+      # file-watch chatter - "Loading configs", "Vector has started",
+      # "Starting file server", "Loaded checkpoint data", etc). Doesn't
+      # touch the actual log pipeline data it carries (other programs'
+      # re-emitted stdout, /code/.vector/logs/*.jsonl) - see
+      # vector.default.toml for that. "warn" mirrors nginx's own
+      # `error_log ... warn;` above. Use "error" for even quieter, or
+      # "info"/"debug" to restore the old chatter.
+      VECTOR_LOG_LEVEL: "warn"
       # Path `webmanager --env-migrate`/the startup version-mismatch check
       # read the current example-env.webmanager template from. Left unset to
       # use the image's own copy. Deliberately not settable via
