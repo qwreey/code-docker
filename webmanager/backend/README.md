@@ -100,6 +100,8 @@ shell out to `git`/`ssh-keygen`.
 | `WEBMANAGER_STATIC_DIR` | `./static` | pre-built frontend assets (see below) |
 | `WEBMANAGER_CLAUDE_BINPATH` | *(none)* | absolute path to the `claude` (Claude Code CLI) binary; if unset, falls back to a `claude` lookup on `PATH`. Neither found means "not installed" — a normal state, not an error |
 | `CLAUDE_CONFIG_DIR` | `/code/.claude` | Claude Code's own standard env var for relocating `~/.claude`; webmanager reads `stats-cache.json` from directly under this directory and does not invent a separate `WEBMANAGER_`-prefixed equivalent |
+| `WEBMANAGER_CLAUDE_PREFS_PATH` | `/code/.webmanager/claude-prefs.json` | persisted `{hideVersionCheck}` toggle for the Claude tab's mise version-check banner (`internal/claudecode/prefs.go`) |
+| `WEBMANAGER_TAILSCALE_BINPATH` | *(none)* | absolute path to the `tailscale` binary; if unset, falls back to a `tailscale` lookup on `PATH`, same convention as `WEBMANAGER_CLAUDE_BINPATH` |
 | `WEBMANAGER_ENV_TEMPLATE_PATH` | `/etc/code-docker/webmanager/example-env.webmanager` | the `example-env.webmanager` template `--env-migrate` and the startup version check read — deliberately not `go:embed`'d so an operator running multiple instances can bind-mount their own org-customized template over this path instead of rebuilding the image. Set via `docker-compose.yml`, not `.env.webmanager` itself (see its comment there for why) |
 | `WEBMANAGER_ENV_VERSION` | *(none)* | `.env.webmanager`'s own `WEBMANAGER_ENV_VERSION` (set via `env_file`, not meant to be hand-edited — `--env-migrate` manages it). Compared at startup against the template's current version; a mismatch logs a warning and is surfaced by `GET /api/system/env-version` |
 | `WEBMANAGER_ENV_VERSION_DISMISS_PATH` | `/code/.webmanager/env-version-dismiss.json` | persisted "user has acknowledged this version's mismatch banner" flag (`internal/envversionprefs`) |
@@ -164,7 +166,8 @@ fields, invalid host/keyId format, etc.) are unaffected.
   `name` already exists
 - Every tailscale mutation restarts the `tailscale-forward` supervisord
   program after a successful write (same effect as `bin/forward-reload`) —
-  tailscale login/`tailscale up`/status are explicitly out of scope here
+  actually performing a login (`tailscale up`) remains out of scope, but
+  read-only status is not — see `GET /api/tailscale/status` further down
 - `GET /api/logs/apps` — real supervisord process names, `{"mock": false}`
 - `GET /api/logs/entries?app=&level=&limit=` — real log entries read from
   the `vector`-produced JSONL files at `VECTOR_LOG_DIR` (see
@@ -287,6 +290,59 @@ fields, invalid host/keyId format, etc.) are unaffected.
     `email`/`orgId`/`orgName` while `loggedIn`/`authMethod`/
     `subscriptionType` stay correct — a pre-existing CLI quirk, not
     something this endpoint's wrapper introduces or can paper over
+  - `miseVersion` (`{current, latest, outdated}` or `null`) — present only
+    when `claude-code` shows up in `mise ls -g --json`'s output (i.e. it's
+    actually managed by mise's *global* config, not just present on `PATH`
+    some other way); `latest` comes from `mise latest claude-code`. Any
+    failure anywhere in that chain (mise itself missing, tool not in the
+    global list, the latest-lookup failing) just leaves this `null`
+- `GET /api/claude/plugins` — installed Claude Code skills/plugins
+  (`claude plugin list --json`), read-only; degrades to `{"plugins": []}` on
+  any failure rather than a `5xx`
+- `POST /api/claude/install` *(gated)* — installs (or updates, since it
+  always re-resolves and installs the latest version — there's no v1 need to
+  pin an older one) Claude Code through mise: resolves `mise latest
+  claude-code` to a concrete version first (never passes the literal string
+  `"latest"` through to `mise use`), then reuses the exact same
+  `mise.JobStore` the mise tab's own install flow uses. Returns `{"jobId":
+  "..."}` — poll the existing `GET /api/mise/jobs/{id}` to track it, no
+  separate polling endpoint was added
+- `GET /api/claude/prefs` / `PUT /api/claude/prefs` *(PUT gated)* —
+  `{"hideVersionCheck": bool}`, backend-persisted (`internal/claudecode/prefs.go`,
+  `WEBMANAGER_CLAUDE_PREFS_PATH`) rather than `localStorage`, since unlike the
+  mise tab's show/hide toggles this is meant to follow the user across
+  browsers/devices
+- `POST /api/claude/login/start` *(gated)* → `{"sessionId": "..."}` — starts a
+  managed `claude auth login` background subprocess (`internal/claudecode/login.go`'s
+  `LoginManager`; only one session is ever tracked at a time, a fresh `Start`
+  kills whatever was running before). Plain `os/exec` pipes are used for
+  stdin/stdout/stderr — empirically confirmed sufficient, no PTY needed, since
+  the CLI already falls back to a paste-a-code flow when it can't reach its
+  local OAuth callback (the normal case in a container)
+- `GET /api/claude/login/{id}` *(gated)* → `{"running": bool, "lines":
+  [...], "url": "...", "exitCode": int|null}` — `url` is extracted from the
+  process's output via a bare `https://\S+` regex once the CLI prints its
+  sign-in link; `404` if `id` doesn't match the current session (superseded
+  or never existed) — the frontend should treat that as "start over," not
+  retry
+- `POST /api/claude/login/{id}/code` *(gated)*, body `{"code": "..."}` →
+  `{"ok": true}` — relays a user-pasted sign-in code to the subprocess's
+  stdin
+- `POST /api/claude/login/{id}/cancel` *(gated)* → always `{"ok": true}`,
+  idempotent — kills the session if it's still current, a harmless no-op
+  otherwise (frontend calls this best-effort on unmount)
+- `GET /api/tailscale/status` — read-only, wraps `tailscale status --json`
+  (`internal/tailscale/status.go`, `WEBMANAGER_TAILSCALE_BINPATH` or `PATH`
+  lookup for the binary): `{"available": bool, "status": {...}|omitted}`.
+  `available: false` for both "binary not found" and "command failed" — a
+  tailnet with no config yet, or `tailscaled` not up, is a normal state, not
+  an error. `status` carries `backendState`/`authUrl`/`tailnetName` plus
+  `self`/`peers` (each `{hostName, dnsName, tailscaleIPs, relay, online,
+  tags, os}`, `peers` flattened from the CLI's map-shaped `Peer` field and
+  sorted by hostname). This supersedes the note two entries up ("tailscale
+  login/status are explicitly out of scope here") for status specifically —
+  `tailscale up`/actually performing a login remains genuinely out of scope,
+  this endpoint is read-only
 
 - `GET /api/dind/containers` — every container in the `code-docker-dind`
   sidecar (running and stopped, `docker ps -a` equivalent):

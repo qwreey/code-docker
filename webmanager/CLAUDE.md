@@ -18,7 +18,11 @@ an explanatory note — `vector`'s log button is disabled this way, per-program
 PID-tree expand reusing the Processes tab's tree utility), SSH keys, git
 config (name/email, SSH+GPG signing, SSH hosts, HTTPS credentials, git-lfs
 install, raw `.gitconfig` editing, known_hosts management), Tailscale
-forwards/publish, Logs (real vector-backed data, time-range filter + cursor
+forwards/publish + a status view (`GET /api/tailscale/status`, wraps
+`tailscale status --json`: a pending-login banner with the sign-in link when
+`authUrl` is set, else self/peer info — hostname, tailscale IPs, DERP relay,
+tailnet name, peer tags — with an explicit disclaimer that ACL policy itself
+isn't queryable this way, only the visible peer/tag list), Logs (real vector-backed data, time-range filter + cursor
 pagination, sticky filters with an internally-scrolling table, live mode that
 appends instead of replacing), a "작업 관리자" (Task Manager) tab — renamed
 from "Processes" — split into 성능/프로세스 sub-tabs (host-wide per-core CPU
@@ -40,7 +44,28 @@ defaults inverted — mise categories start collapsed), web terminal M1+M2
 customizable keybindings, 10 built-in + custom color themes, named
 persistent sessions with a real tab bar/pin-toggle backed by
 `internal/termsession`, keyboard-aware mobile layout, edge-to-edge
-theme-matched surface), a shared
+theme-matched surface), a Claude Code install button (reuses the mise install
+job plumbing — `POST /api/claude/install` resolves the latest version via
+`mise latest claude-code` and installs through the same `mise.JobStore` the
+mise tab uses, `Mise/JobPanel.tsx` extracted so both tabs share the same
+progress/log UI + code-server-restart prompt), a mise-backed version check for
+Claude Code specifically (current vs. `mise latest claude-code`, shown only
+when the tool is present in the mise *global* tool list — i.e. actually
+managed by mise — with an "지금 업데이트" button reusing the same install
+endpoint, and a backend-persisted "버전 확인 끄기" checkbox,
+`internal/claudecode/prefs.go`, since this should follow the user across
+browsers/devices unlike the mise tab's `localStorage`-only toggles), and an
+in-browser Claude Code login flow (`internal/claudecode/login.go`'s
+`LoginManager` runs `claude auth login` as a managed background subprocess —
+plain `os/exec` pipes are sufficient, empirically confirmed no PTY is needed
+— extracts the sign-in URL from its output via regex, and relays a
+user-pasted code back to its stdin; entirely password-gated like Terminal,
+not read-open like most of this app, since it's a live auth flow rather than
+a passive read). This reverses `claude-plan.md`'s earlier explicit decision
+to leave login to the user's own terminal — that assumed SSH/code-server
+access was always available, which stopped being true once webmanager needed
+to support org/company deployments where webmanager itself is the only
+surface ever opened. A shared
 password gate (`internal/authgate` — see `.claude/authgate-plan-done.md` for
 the full list of what it gates; principle is reads-stay-open/writes-gated,
 with Terminal/File Manager/Logs/Supervisor-log-view gated entirely), a file
@@ -90,12 +115,12 @@ they're just recorded defaults or genuinely-undecided design questions.
 dependencies on each other or on anything still queued):
 
 1. `.claude/claude-plan.md` — Claude Code status/management tab, **M4
-   onward** (M1/M2/M3 done). M4 (extension-install banner, reuse the
+   onward** (M1/M2/M3 done; install/mise-version-check/login automation are
+   done too, as a separate track outside the M-numbering — see "Already
+   implemented" above). M4 (extension-install banner, reuse the
    now-implemented extensions API) → M5 (MCP server list, deliberately last
    within this feature — `claude mcp list` has no `--json` output and needs a
-   real multi-server example to design the parser against). Login/OAuth
-   automation is explicitly NOT a milestone — the user does that manually;
-   don't build it unless asked.
+   real multi-server example to design the parser against).
 2. `.claude/qa-request/projects-plan-done.md` — Projects tab phase 2 (delete UI for
    reclaimable folders). Phase 1 (read-only) is done; phase 2 needs the exact
    same path-validation pattern already used by phase 1's rescan endpoint
@@ -107,8 +132,7 @@ dependencies on each other or on anything still queued):
 **Lower-priority / no dedicated plan doc yet** — tracked only in `plan.md`'s
 TODO table: code-server settings.json editor (revisit once caddy-plan's
 Monaco decision lands, see `ideas.md` — though the CodeMirror editor built
-this round already lowers that decision's stakes), tailscale login status
-surfaced in webmanager too, bind-address strategy (last priority), vector
+this round already lowers that decision's stakes), bind-address strategy (last priority), vector
 JSONL log retention policy, i18n (LinguiJS, deliberately deferred until
 strings stabilize), embedding a code-docker help/guide inside webmanager
 (`.claude/research/guide-plan.md` — idea stage only, explicitly not to be implemented

@@ -59,3 +59,23 @@ Claude Code 탭, Caddy dev-proxy는 전부 `webmanager/.claude/`로 이동함). 
 
 `webmanager/.claude/research/session-viewer-plan.md` 참고 — 착수 전 리서치/실현 가능성
 확인이 필요해서 별도 계획 문서로 분리함(여기 브레인스토밍 목록에는 포인터만).
+
+## mise opt-out 플래그 — 검토했으나 보류 (2026-08-03)
+
+Tailscale의 `TAILSCALE_ENABLED`처럼 mise 자체도 옵트아웃 가능하게 만들어보자는
+아이디어가 있었으나, 재검토 결과 **구현하지 않기로 함** — 대안이 마땅치 않아서
+opt-out 자체의 실익이 낮다고 판단(mise 없이 도구를 설치/관리할 뾰족한 대체 경로가
+없고, 여전히 유저가 mise를 안 쓰는 선택 자체는 override 패턴만으로 이미 가능함, 아래
+참고). "good to have"를 넘는 우선순위는 아니라고 결론.
+
+- code-docker 자체(스크립트 레벨)는 이미 opt-out 가능한 구조라는 것만 확인해둠 —
+  `grep mise -r script`가 아무 것도 안 걸림, 즉 `script/*.sh`는 mise를 하드코딩하지
+  않고 전부 override 패턴을 통해 유저가 정의한 `config/*.override.sh`를 존중한다.
+  mise를 안 쓰고 싶은 사람은 mise를 호출하는 `default.sh`들(`code-runner.default.sh`
+  등)을 override로 갈아끼우기만 하면 됨 — 새로 만들 것 없이 이미 되는 얘기.
+- webmanager 쪽만 갭 — Mise 탭과 Claude 탭의 mise 기반 UI(설치/버전확인/업데이트
+  버튼)는 mise 존재를 가정하고 만들어짐(`webmanager/.claude/claude-plan.md` 참고).
+  이번 라운드에서 이 갭을 메우지 않기로 함.
+- 혹시 나중에 필요해지면: `WEBMANAGER_MISE_FEATURES=false`류 환경변수 하나로 Mise
+  탭 자체와 Claude 탭의 설치/버전확인 UI를 숨기는 정도가 제일 저비용인 방향으로
+  보임 — 다만 이것도 설계된 적 없는 순수 아이디어, 착수 전 다시 논의 필요.

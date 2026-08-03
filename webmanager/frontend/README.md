@@ -8,15 +8,21 @@ code-docker의 관리자 패널(webmanager) 프론트엔드. Vite + React + Type
 
 - 구현됨: Supervisor(프로세스 관리), SSH Keys(authorized_keys 관리), Git Config(gitconfig +
   SSH 호스트 + 커밋 서명(SSH/GPG) + HTTPS credential), Tailscale(전역 설정 + forwards +
-  publish 관리, 로그인/상태 UI는 범위 밖), Logs(앱/레벨 필터가 있는 로그 뷰어 — vector가
+  publish 관리 + 상태 조회 — 로그인 필요 시 배너/링크, 내 정보/피어 목록, `GET
+  /api/tailscale/status`; 실제 로그인 수행(`tailscale up`)은 범위 밖), Logs(앱/레벨 필터가 있는 로그 뷰어 — vector가
   만드는 실제 로그 데이터를 보여줌, 응답의 `mock` 필드는 항상 `false`), Processes(상단에
   컨테이너 전체 cpu/mem/disk 사용량 요약(cgroup 기준 — `GET /api/system/resources`), 그
   아래 시스템 프로세스 목록 + 리스닝 포트 목록, btop 대체용 — 프로세스/포트 각각에서
-  SIGTERM/SIGKILL로 kill 가능), Claude Code(`GET /api/claude/status` 조회 — M1: 로그인
-  상태 + 사용 통계 퀵 오버뷰, 그래프/히트맵은 M2 이후. 다른 미구현 섹션과 달리
+  SIGTERM/SIGKILL로 kill 가능), Claude Code(`GET /api/claude/status` 조회 — 로그인 상태 +
+  사용 통계 + mise 버전 확인, 그래프/히트맵/Skills/Plugins 포함. 다른 미구현 섹션과 달리
   `implemented: false` placeholder가 아니라 **항상 실제 컴포넌트가 마운트**되고,
-  `installed: false`일 때 컴포넌트 내부에서 유령/스켈레톤 배경 + 설치 안내 오버레이를 표시)
-- 자리만 잡아둠 ("구현 예정"): mise, Docker (dind), Terminal
+  `installed: false`일 때 컴포넌트 내부에서 유령/스켈레톤 배경 + 실제 설치 버튼을 표시(mise
+  설치 잡 재사용). 로그인 안 된 상태도 마찬가지로 브라우저 안에서 `claude auth login`
+  플로우를 그대로 진행할 수 있는 로그인 패널을 표시)
+- 이 문서는 그래프/히트맵 도입 이전(M1) 시점 이후로 갱신되지 않아 나머지도 상당히
+  낡아 있음 — mise, Docker (dind), Terminal 모두 이미 구현되어 있고(`../plan.md`의
+  "구현 완료" 표가 최신 소스), 테마 토글/Task Manager 개명 등도 이 문서엔 반영 안 됨.
+  전체 재정리는 이번 라운드의 범위 밖.
 
 ## 개발 모드 실행
 

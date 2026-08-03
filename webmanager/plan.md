@@ -25,11 +25,11 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 | Supervisor 프로세스 관리 | `.claude/archive/supervisor-plan-done.md` |
 | SSH authorized_keys 관리 | `.claude/qa-request/sshkeys-plan-done.md` |
 | Git 설정(user/email, 커밋 사이닝, SSH 호스트, HTTPS credential, git-lfs install, .gitconfig 원본 편집) | `.claude/qa-request/gitconfig-plan-done.md` |
-| Tailscale forwards/publish CRUD | `.claude/archive/tailscale-plan-done.md` |
+| Tailscale forwards/publish CRUD + 상태 조회(로그인 필요 시 배너, 내 정보/피어 목록, `GET /api/tailscale/status`) | `.claude/archive/tailscale-plan-done.md` |
 | vector 로그 파이프라인 + Logs 페이지 | `.claude/archive/vector-logs-plan-done.md` |
 | 작업 관리자(구 "Processes") — 성능/프로세스 서브탭 분리, 프로세스 트리+리스트, 필터/검색, 코어별 CPU 히트맵(호버 시 최근 히스토리 스파크라인 포함), 메모리 구성요소별 분해(호스트 물리 vs cgroup), 컨테이너 자체 루트 파일시스템의 최상위 디렉토리별 디스크 사용량 분석(Storage Sense류, `du` 기반, 캐시 + 수동 새로고침 전용) | `.claude/archive/processes-plan-done.md` |
 | Docker/dind 관리 M1(읽기 전용 — 컨테이너/이미지 목록, 로그 조회, `internal/dind` CLI 셸아웃)+M2(start/stop/remove, 확인 다이얼로그 필수, 비밀번호 게이트)+M3(docker inspect 상세 뷰, 비밀번호 게이트 — Config.Env 평문 노출 우려로 list/logs와 달리 게이트) | `.claude/qa-request/dind-plan-done.md` |
-| Claude Code 상태 탭 M1(퀵 오버뷰)+M2(히트맵/주간그래프/모델별 토큰)+M3(Skills/Plugins) | `.claude/claude-plan.md` (M4~M5는 미착수) |
+| Claude Code 상태 탭 M1(퀵 오버뷰)+M2(히트맵/주간그래프/모델별 토큰)+M3(Skills/Plugins) + 설치 버튼(mise 재사용)/mise 버전 확인·업데이트/버전 확인 무시 체크박스(백엔드 영속)/브라우저 내 로그인 자동화(`claude auth login` 서브프로세스 프록시, 파이프만으로 충분함을 실측 확인 — PTY 불필요) | `.claude/claude-plan.md` (M4~M5는 미착수, 로그인/설치/버전확인은 별도 트랙으로 이번에 구현 완료) |
 | code-server 익스텐션 추천/설치 (카테고리별 그룹핑, open-vsx "더 보기" 링크, 삭제(uninstall) 포함) | `.claude/archive/extensions-plan-done.md` |
 | 프로젝트 스캔/정리 1단계(용량/재생성 가능 폴더 탐지, 최근 편집 런처, 읽기 전용, mise 도구 표시 포함) | `.claude/qa-request/projects-plan-done.md` (2단계 삭제는 미착수) |
 | mise 관리(install/use/uninstall, 설치된 도구 목록, env 미리보기, 추천 목록) | `.claude/qa-request/mise-plan-done.md` |
@@ -42,6 +42,7 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 | Light/Dark 수동 토글(3-way: 자동/라이트/다크, `data-theme` 속성 + `localStorage`) + 사이드바 하단 잠금 상태 표시/미리 해제 + `index.css` 컬러 시스템 중앙화(기본 UI 다크 값 신규 설계 포함 — 원래 전혀 없었음, dataviz 스킬로 차트 팔레트 재검증) | `.claude/archive/theme-toggle-plan-done.md` |
 | `.env.webmanager` 마이그레이션 도구(`webmanager --env-migrate` — 키 추가/삭제 반영(삭제된 키는 `#~` 아카이브 섹션으로), 유저 코멘트 보존, `#!important`/`#!` 마커로 조직 강제값·권장값-변경-충돌 표시, 경로 기반 템플릿(조직 커스텀 마운트 가능) + 기동 로그/웹 UI 경고 배너(dismiss 영속화)) | `.claude/qa-request/env-migration-plan-done.md` |
 | code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일 origin 통합 — code-server/webmanager 내부 포트 이동, `code-config.yaml` 매 시작 재생성, 프론트엔드 서브패스(`apiUrl()`/`BASE_URL`) 대응까지 전부 구현 | `.claude/qa-request/expose-plan-done.md` |
+| mise 전역 설치/삭제 성공 후 code-server 재시작을 눌러서 바로 실행 가능(`POST /api/supervisor/processes/code-server/restart` 재사용, `frontend/src/utils/restartCodeServer.ts`) — 정적 안내문에서 버튼으로 승격, 잡 진행 패널(`Mise/JobPanel.tsx`)을 Mise 탭/Claude 탭이 공유하도록 추출 | 문서 없음(작은 갭 메우기, 별도 계획 문서 없이 진행) |
 
 전체 구현은 backend(Go)/frontend(React) subagent를 병렬로 여러 라운드 돌려서 진행,
 각 라운드 사이 API 계약 불일치를 직접 대조해서 잡는 패턴 반복 — 새 기능도 이 방식
@@ -75,33 +76,44 @@ program이라 `docker compose build && up` 후 7→8개 program 전부 RUNNING�
 아직 실컨테이너 통합 검증은 안 함 — M1/M2와 마찬가지로 `code-docker-dind`
 사이드카가 실제로 떠 있어야 의미 있게 확인 가능(`.claude/qa-request/dind-plan-done.md` 참고).
 
+같은 날(2026-08-03) 추가된 Tailscale 상태 조회, Claude Code 설치/mise 버전확인/
+브라우저 내 로그인 자동화, mise 재시작 다이얼로그도 전부 `go build`/`go vet`/
+`gofmt` + `npm run build`/`npm run lint`만 통과했고 아직 실컨테이너 검증 전 —
+특히 로그인 자동화는 `claude auth login`이 비-tty 파이프로 정상 동작함을 호스트에서
+격리된 임시 `$HOME`으로 직접 실행해 확인했지만(실제 코드 붙여넣기 전 kill, 실제
+인증은 안 함), 코드 붙여넣기까지 포함한 전체 플로우를 컨테이너 안에서 끝까지
+눌러본 적은 없음 — 사용자가 직접 한 번 로그인까지 완주해보는 걸 권장. Tailscale
+상태 탭도 실제 tailnet 연결 상태에서 피어/relay 표시가 맞는지 실기 확인 필요.
+
 ## 할 일 (우선순위 순, 문서 있으면 링크)
 
-1. **Claude Code 상태/관리 탭 M4~M5** — M1~M3는 구현 완료. 다음은 M4(익스텐션
-   설치 배너, 이미 구현된 익스텐션 API 재사용 가능). `.claude/claude-plan.md`
+1. **Claude Code 상태/관리 탭 M4~M5** — M1~M3는 구현 완료(설치/버전확인/로그인
+   자동화는 별도 트랙으로 이미 구현됨, 위 참고). 다음은 M4(익스텐션 설치 배너,
+   이미 구현된 익스텐션 API 재사용 가능). `.claude/claude-plan.md`
 2. **익스텐션 검색/URL 설치**(마켓플레이스 URL 붙여넣기 → open-vsx 교차 조회 →
    vsix 직접 설치 폴백) — 설계 완료, 미착수. `.claude/extension-search-plan.md`
 3. **Caddy 기반 dev 서버 expose** — mise보다도 후순위로 재조정됨. 설계는 대부분
    끝났지만(대부분의 결정 사항 확정) 남은 디테일(`preserve_host` 기본값 등)이 있어
    우선순위를 낮게 둠. `.claude/research/caddy-plan.md`
 4. code-server 설정(settings.json 등) 편집 UI — 후순위, 타당성 재검토 필요(`ideas.md`)
-5. tailscale 로그인 상태/URL을 webmanager UI에도 노출 — 아이디어 단계, 문서 없음
-6. 바인드 주소 전략 확정 — **최후순위**
-7. `/code/.vector/logs/*.jsonl` 보존기간(retention) 정책 없음 — 알려진 갭
+5. 바인드 주소 전략 확정 — **최후순위**
+6. `/code/.vector/logs/*.jsonl` 보존기간(retention) 정책 없음 — 알려진 갭
    (`.claude/archive/webmanager-review.md` (레포 루트) 참고), 문서 없음
-8. code-docker 도움말/가이드를 webmanager에 임베드 — 아이디어 단계, 착수 전
+7. code-docker 도움말/가이드를 webmanager에 임베드 — 아이디어 단계, 착수 전
    질문 정리 완료. `.claude/research/guide-plan.md`
-9. **code-server/mise 버전 관리 패널** — **최하 우선순위**(guide-plan과 동급),
+8. **code-server/mise 버전 관리 패널** — **최하 우선순위**(guide-plan과 동급),
     아이디어 단계, 착수 전 질문 다수 정리 완료(특히 "컨테이너 리빌드 필요성"
-    판단 기준이 근본적으로 불확실). `.claude/research/version-panel-plan.md`
-10. **활성 세션 목록 보기**(어디서 로그인/접속해있는지 보기) — **최하
+    판단 기준이 근본적으로 불확실). claude-code 하나만의 mise 버전확인은 이미
+    별도로 구현 완료됨(위 표) — 이 항목은 code-server/서브모듈/베이스 이미지까지
+    아우르는 더 큰 범위라 혼동하지 말 것. `.claude/research/version-panel-plan.md`
+9. **활성 세션 목록 보기**(어디서 로그인/접속해있는지 보기) — **최하
     우선순위**, 아이디어 단계. "세션"이 뭘 뜻하는지부터(webmanager 자체
     비밀번호 게이트 세션? code-server 자신의 연결? Authentik 세션?) 불명확해서
     착수 시 반드시 사용자와 인터랙티브하게 스코프 확인 필요 — 혼자 판단해서
     구현 진행하지 말 것. `.claude/research/session-viewer-plan.md`
-11. 다국어(i18n) 지원, 아마 LinguiJS — 모든 기능이 안정되고 문자열이 안 바뀌기
+10. 다국어(i18n) 지원, 아마 LinguiJS — 모든 기능이 안정되고 문자열이 안 바뀌기
     시작할 때 착수 예정, 아이디어 단계, 문서 없음.
-12. **파일 매니저 리워크**(드래그앤드롭 이동, 그리드/리스트/테이블 뷰,
+11. **파일 매니저 리워크**(드래그앤드롭 이동, 그리드/리스트/테이블 뷰,
     멀티탭) — **최하 우선순위**, Termix류 프로젝트를 벤치마킹하자는 아이디어
     단계. 복잡하고 필수 기능은 아니라서 낮은 우선순위 — 착수 전 스코프를
     사용자와 반드시 논의. `.claude/filemanager-rework-plan.md`

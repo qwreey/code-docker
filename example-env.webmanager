@@ -29,7 +29,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=2
+WEBMANAGER_ENV_VERSION=4
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -55,10 +55,17 @@ WEBMANAGER_ENV_VERSION=2
 #. PATH에 안 잡힐 수 있습니다).
 #WEBMANAGER_CLAUDE_BINPATH=
 #CLAUDE_CONFIG_DIR=/code/.claude
+#. claude-code 설치/버전 확인 탭 설정(업데이트 확인 숨김 등) 저장 경로.
+#WEBMANAGER_CLAUDE_PREFS_PATH=
 
 #. --- mise 탭 ---
 #. `mise` 바이너리 경로 오버라이드.
 #WEBMANAGER_MISE_BINPATH=
+
+#. --- Tailscale 탭 (상태 조회) ---
+#. `tailscale` 바이너리 경로 오버라이드. 이미지에 이미 PATH로 잡혀 있어야 하므로
+#. claudecode/mise와의 일관성을 위해 존재하는 옵션입니다.
+#WEBMANAGER_TAILSCALE_BINPATH=
 
 #. --- Projects 탭 ---
 #. 스캔할 최상위 디렉토리 목록 ($PATH처럼 콜론으로 구분).
