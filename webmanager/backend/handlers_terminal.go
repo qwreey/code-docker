@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/creack/pty"
+
+	"webmanager/internal/termsession"
 )
 
 // terminalReadBufferSize is the chunk size used when copying PTY output to
@@ -56,6 +59,23 @@ func (s *Server) handleTerminal(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		log.Printf("terminal: websocket accept failed: %v", err)
+		return
+	}
+
+	// M2: a named session (see internal/termsession) — created on first use,
+	// survives this connection closing, reattached to on a later connection
+	// with the same name. Omitting ?session= keeps the exact M1 behavior
+	// below (always a brand new PTY, killed the moment this connection
+	// closes) — the two paths are kept fully separate rather than routing
+	// M1 through the registry with a throwaway name, so M1's already-tested
+	// behavior can't regress from M2 changes.
+	if name := r.URL.Query().Get("session"); name != "" {
+		// context.Background(), not r.Context(): matches the ephemeral path
+		// below (which does the same for the same reason) — this connection
+		// can legitimately outlive whatever timeout semantics the request
+		// context might carry, since the handler blocks here for the
+		// connection's whole lifetime rather than returning immediately.
+		s.handleNamedTerminal(context.Background(), conn, name)
 		return
 	}
 
@@ -129,6 +149,87 @@ readLoop:
 			}
 			if serr := pty.Setsize(ptmx, &pty.Winsize{Rows: ctl.Rows, Cols: ctl.Cols}); serr != nil {
 				log.Printf("terminal: resize failed: %v", serr)
+			}
+		}
+	}
+
+	_ = conn.Close(websocket.StatusNormalClosure, "")
+}
+
+// handleNamedTerminal is the M2 path: reattach to (or create) a
+// termsession.Session by name, replay its scrollback, then relay this
+// connection's input/output exactly like handleTerminal's M1 loop — except
+// the PTY itself is owned by the Session, not this function, so it keeps
+// running after this connection ends.
+func (s *Server) handleNamedTerminal(ctx context.Context, conn *websocket.Conn, name string) {
+	sess, err := s.termSessions.GetOrCreate(name)
+	if err != nil {
+		log.Printf("terminal: session %q: %v", name, err)
+		status := websocket.StatusInternalError
+		if errors.Is(err, termsession.ErrInvalidName) {
+			status = websocket.StatusPolicyViolation
+		}
+		_ = conn.Close(status, err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	sink := func(p []byte) error {
+		return conn.Write(ctx, websocket.MessageBinary, p)
+	}
+	detach, scrollback, err := sess.Attach(sink)
+	if err != nil {
+		log.Printf("terminal: session %q: attach failed: %v", name, err)
+		_ = conn.Close(websocket.StatusInternalError, err.Error())
+		return
+	}
+	defer detach()
+
+	// If the session dies on its own (PTY EOF — e.g. the shell exited via
+	// Ctrl+D — or an explicit Remove/idle-GC elsewhere), cancel ctx so the
+	// conn.Read below unblocks and this connection actually closes instead
+	// of hanging open forever waiting for client input that will never
+	// come. The ctx.Done() branch lets this goroutine exit once the normal
+	// path's own `defer cancel()` fires, so it doesn't leak past this
+	// connection's lifetime.
+	go func() {
+		select {
+		case <-sess.Done():
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	if len(scrollback) > 0 {
+		if werr := conn.Write(ctx, websocket.MessageBinary, scrollback); werr != nil {
+			return
+		}
+	}
+
+readLoop:
+	for {
+		msgType, data, rerr := conn.Read(ctx)
+		if rerr != nil {
+			break readLoop
+		}
+		switch msgType {
+		case websocket.MessageBinary:
+			if _, werr := sess.Write(data); werr != nil {
+				break readLoop
+			}
+		case websocket.MessageText:
+			var ctl terminalControlMessage
+			if jerr := json.Unmarshal(data, &ctl); jerr != nil {
+				log.Printf("terminal: session %q: ignoring malformed control message: %v", name, jerr)
+				continue
+			}
+			if ctl.Type != "resize" || ctl.Cols == 0 || ctl.Rows == 0 {
+				continue
+			}
+			if serr := sess.Resize(ctl.Cols, ctl.Rows); serr != nil {
+				log.Printf("terminal: session %q: resize failed: %v", name, serr)
 			}
 		}
 	}

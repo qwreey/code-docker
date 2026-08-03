@@ -18,6 +18,7 @@ import (
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
 	"webmanager/internal/supervisor"
+	"webmanager/internal/termsession"
 )
 
 func main() {
@@ -48,6 +49,17 @@ func main() {
 		historyWindowMinutes = 10
 	}
 
+	termIdleTimeout, err := time.ParseDuration(cfg.TerminalSessionIdleTimeout)
+	if err != nil {
+		log.Printf("main: invalid terminal session idle timeout %q, using 30m: %v", cfg.TerminalSessionIdleTimeout, err)
+		termIdleTimeout = 30 * time.Minute
+	}
+	termScrollbackBytes, err := strconv.Atoi(cfg.TerminalSessionScrollbackBytes)
+	if err != nil {
+		log.Printf("main: invalid terminal session scrollback bytes %q, using 262144: %v", cfg.TerminalSessionScrollbackBytes, err)
+		termScrollbackBytes = 262144
+	}
+
 	s := &Server{
 		cfg:         cfg,
 		sup:         supervisor.NewClient(cfg.SupervisorSock),
@@ -70,9 +82,10 @@ func main() {
 			cfg.ProjectsOldDays,
 			cfg.CodeServerURL,
 		),
-		miseJobs:  mise.NewJobStore(),
-		diskUsage: diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
-		gate:      gate,
+		miseJobs:     mise.NewJobStore(),
+		diskUsage:    diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
+		termSessions: termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
+		gate:         gate,
 	}
 
 	mux := http.NewServeMux()
@@ -192,6 +205,14 @@ func main() {
 	mux.Handle("GET /api/terminal/settings", gate.RequirePassword(http.HandlerFunc(s.handleGetTerminalSettings)))
 	mux.Handle("PUT /api/terminal/settings", gate.RequirePassword(http.HandlerFunc(s.handlePutTerminalSettings)))
 
+	// M2 named sessions (internal/termsession) — same gate as the terminal
+	// itself above (listing session names/timestamps is far less sensitive
+	// than the terminal content, but there's no reason to give it a weaker
+	// bar than everything else terminal-related).
+	mux.Handle("GET /api/terminal/sessions", gate.RequirePassword(http.HandlerFunc(s.handleListTerminalSessions)))
+	mux.Handle("PATCH /api/terminal/sessions/{name}", gate.RequirePassword(http.HandlerFunc(s.handlePatchTerminalSession)))
+	mux.Handle("DELETE /api/terminal/sessions/{name}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteTerminalSession)))
+
 	// SECURITY: arbitrary filesystem read/write/delete under
 	// WEBMANAGER_FILES_ROOT (default /code) — webmanager's single largest
 	// risk surface alongside the terminal above and dind. Gated by the
@@ -216,9 +237,12 @@ func main() {
 		Handler: limitRequestBody(mux),
 	}
 
-	historyCtx, cancelHistory := context.WithCancel(context.Background())
-	defer cancelHistory()
-	go s.resourceHistory.Run(historyCtx)
+	// Shared cancel-on-shutdown context for every long-lived background
+	// loop (resource history sampling, terminal session idle GC).
+	bgCtx, cancelBg := context.WithCancel(context.Background())
+	defer cancelBg()
+	go s.resourceHistory.Run(bgCtx)
+	go s.termSessions.Run(bgCtx)
 
 	go func() {
 		log.Printf("webmanager listening on %s", cfg.Addr)
@@ -231,7 +255,7 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
 
-	cancelHistory()
+	cancelBg()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

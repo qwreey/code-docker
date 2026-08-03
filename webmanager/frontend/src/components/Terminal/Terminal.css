@@ -1,18 +1,151 @@
+/* --kb-inset is set by useKeyboardInset.ts (window.visualViewport-driven) —
+   neither iOS Safari nor Android Chrome 108+ resize the CSS layout viewport
+   for the on-screen keyboard by default (verified against current engine
+   behavior), so 100dvh alone does NOT shrink when the keyboard opens on
+   either. Subtracting the live-tracked inset here is what actually keeps
+   everything above the keyboard instead of leaving the bottom of the
+   terminal — and the control bar in particular — hidden behind it while the
+   page becomes silently scrollable underneath. Confirmed working live on a
+   real device (2026-08-03).
+
+   The section also cancels out .app-content's own padding via a negative
+   margin (App.css: 2rem 2.5rem desktop / 1.25rem tablet / 1rem 0.85rem
+   mobile) so the terminal gets the full viewport instead of losing space to
+   padding meant for the other, document-style tabs — width is compensated
+   to match. This is safe as a full-bleed escape hatch specifically here
+   because Terminal is always .app-content's only child while active (App.tsx
+   renders exactly one tab at a time), so there's no sibling layout to
+   disturb. */
 .terminal-section {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 4rem);
+  margin: -2rem -2.5rem;
+  width: calc(100% + 5rem);
+  height: calc(100dvh - var(--kb-inset, 0px));
 }
 
-.terminal-container {
-  flex: 1;
-  min-height: 300px;
-  min-width: 0;
-  padding: 0.5rem;
-  background: #000;
+/* Small horizontal inset kept on just these two rows (not on
+   .terminal-surface below) so the title/tab text isn't flush against the
+   true screen edge — only the black terminal+controls area goes fully
+   edge-to-edge. */
+.terminal-topbar,
+.terminal-tabbar {
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+}
+
+/* Compact single-row header instead of the other tabs' <h1> + separate
+   description paragraph — the terminal is a "look at a lot of text" screen,
+   so it deliberately spends less vertical budget on chrome than other tabs. */
+.terminal-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex: none;
+  padding-top: 0.6rem;
+}
+
+.terminal-topbar h1 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.terminal-inline-notice {
+  flex: none;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0.3rem 0.6rem 0;
+}
+
+/* Session tab bar (M2 named sessions), right below the topbar per the repo
+   owner's request. Real, functional tabs backed by internal/termsession —
+   see TerminalTabs.tsx's doc comment for the "always show the active tab
+   even before it's confirmed by the backend" behavior. */
+.terminal-tabbar {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: none;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.terminal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.4rem 0.25rem 0.7rem;
+  font-size: 0.85rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.terminal-tab-active {
+  color: var(--text-heading);
+  background: var(--surface);
+  font-weight: 600;
+}
+
+.terminal-tab-label {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.terminal-tab-pin,
+.terminal-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 0.15rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius);
+  opacity: 0.55;
+}
+
+.terminal-tab-pin:hover,
+.terminal-tab-close:hover {
+  opacity: 1;
+  background: var(--color-gray-bg);
+}
+
+.terminal-tab-pinned {
+  opacity: 1;
+}
+
+.terminal-tab-close {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.terminal-tab-add {
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.terminal-tab-add:hover {
+  color: var(--text);
+  background: var(--color-gray-bg);
 }
 
 .terminal-header-actions {
@@ -21,24 +154,90 @@
   gap: 0.6rem;
 }
 
+/* Terminal + control bar merged into one seamless surface (Termux-style —
+   no border/gap between the two so the controls read as part of the
+   terminal itself, not a separate toolbar floating above it) — fills all
+   remaining space below the tab bar. min-height: 0 lets it actually shrink
+   below content size instead of overflowing the column. Background follows
+   --term-bg (the active xterm theme's own background, set in Terminal.tsx)
+   rather than a hardcoded color — xterm paints its own canvas over
+   .terminal-container, so this mainly shows in the small padding gap
+   around it, and matching that gap to the real theme keeps it (and the
+   control bar) looking like part of the terminal regardless of which theme
+   is active, not just the default one. */
+.terminal-surface {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--term-bg, #000);
+}
+
+.terminal-container {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  padding: 0.4rem 0.5rem 0;
+  overflow: hidden;
+}
+
+/* Shown instead of .terminal-container when the last session was just
+   closed (Terminal.tsx) — text color follows --term-fg like everything
+   else in this surface, so it stays legible against whichever xterm theme
+   is active. */
+.terminal-empty-state {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--term-fg, #e6e6e6);
+  opacity: 0.85;
+}
+
+.terminal-empty-state p {
+  font-size: 0.9rem;
+}
+
+.terminal-container .xterm {
+  height: 100%;
+}
+
+.terminal-container .xterm-viewport {
+  overflow-y: auto;
+  /* xterm.js's own stylesheet hardcodes this to #000 — since the viewport's
+     pixel height gets rounded down to a whole number of cell-heights,
+     leftover space below the last row stays that hardcoded black instead of
+     the active theme's background on any non-black theme. Match --term-bg
+     (Terminal.tsx) so that gap is invisible instead of a stray black strip. */
+  background-color: var(--term-bg, #000) !important;
+}
+
 .terminal-controls {
   display: flex;
   flex-wrap: nowrap;
   gap: 0.4rem;
   overflow-x: auto;
-  padding: 0.4rem 0.1rem;
-  margin-bottom: 0.5rem;
+  padding: 0.4rem 0.5rem;
   flex: none;
 }
 
+/* Keys tinted from the active theme's own foreground/background (--term-fg/
+   --term-bg, set in Terminal.tsx) instead of the app's light/dark-mode
+   --surface/--border, or a hardcoded color that'd only look right against
+   one specific theme — a Termux accessory bar reads as part of the
+   terminal, not a themed UI panel sitting on it, for whichever theme is
+   active (dark or light preset alike). */
 .terminal-key-btn {
   flex: none;
   min-width: 2.6rem;
   padding: 0.5rem 0.7rem;
   border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--term-fg, #fff) 30%, transparent);
+  background: color-mix(in srgb, var(--term-fg, #fff) 10%, transparent);
+  color: var(--term-fg, #e6e6e6);
   font-size: 0.9rem;
   font-weight: 600;
   font-family: var(--mono);
@@ -48,7 +247,7 @@
 }
 
 .terminal-key-btn:hover:not(:disabled) {
-  background: var(--surface-hover);
+  background: color-mix(in srgb, var(--term-fg, #fff) 18%, transparent);
 }
 
 .terminal-key-btn:disabled {
@@ -62,22 +261,22 @@
   color: var(--accent-contrast);
 }
 
-.terminal-container .xterm {
-  height: 100%;
-}
-
-.terminal-container .xterm-viewport {
-  overflow-y: auto;
-}
-
 @media (max-width: 720px) {
   .terminal-section {
-    height: calc(100vh - 6.1rem);
+    margin: -1.25rem;
+    width: calc(100% + 2.5rem);
+    /* 3.6rem accounts for .mobile-topbar (App.css) — derived from the
+       original height rule here (calc(100vh - 6.1rem), where 6.1rem was
+       .app-content's old 2.5rem padding + this remainder) before the
+       padding-cancelling negative margin above made that part obsolete. */
+    height: calc(100dvh - 3.6rem - var(--kb-inset, 0px));
   }
 }
 
 @media (max-width: 480px) {
   .terminal-section {
-    height: calc(100vh - 5.6rem);
+    margin: -1rem -0.85rem;
+    width: calc(100% + 1.7rem);
+    height: calc(100dvh - 3.6rem - var(--kb-inset, 0px));
   }
 }

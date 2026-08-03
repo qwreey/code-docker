@@ -152,6 +152,11 @@ services:
       # Terminal tab: where user-customized on-screen keybindings/color
       # themes are saved.
       # WEBMANAGER_TERMINAL_SETTINGS_PATH: ""
+      # Terminal tab: M2 named persistent sessions - how long an unpinned,
+      # unattached session survives before being auto-cleaned up, and the
+      # scrollback ring buffer size per session (bytes).
+      # WEBMANAGER_TERMINAL_SESSION_IDLE_TIMEOUT: "" # default 30m
+      # WEBMANAGER_TERMINAL_SESSION_SCROLLBACK_BYTES: "" # default 262144
       # Sidebar: where your drag-and-drop tab order is saved.
       # WEBMANAGER_SIDEBAR_ORDER_PATH: ""
     networks:

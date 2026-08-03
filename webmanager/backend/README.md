@@ -273,5 +273,36 @@ fields, invalid host/keyId format, etc.) are unaffected.
     and `docker run`/`exec`/`cp` are out of scope indefinitely — see
     `webmanager/.claude/dind-plan.md`
 
+- `GET /api/terminal` — WebSocket upgrade, opens the container's login shell
+  in a PTY (binary frames = PTY input/output, text frames = `{"type":
+  "resize", cols, rows}`). Gated by the shared password gate like everything
+  else terminal-related. Two paths, kept fully separate in the handler:
+  - **without** `?session=<name>` — M1's original ephemeral behavior: a
+    brand new PTY every connection, killed (SIGHUP, then SIGKILL after a
+    grace period) the moment this connection closes. No persistence.
+  - **with** `?session=<name>` (M2) — reattaches to (or creates)
+    a named session via `internal/termsession`: the PTY survives this
+    connection closing, and a later connection with the same name replays
+    recent scrollback before switching to the live stream. A second
+    connection to the same name kicks the first (last-connection-wins, not
+    concurrent shared viewing). `400` for an invalid name (1-64 chars,
+    letters/digits/spaces/`_`/`-`/`.`)
+- `GET /api/terminal/settings` / `PUT /api/terminal/settings` — persisted
+  keybindings/theme (`internal/terminalsettings`), gated
+- `GET /api/terminal/sessions` — every known M2 session:
+  `{name, pinned, createdAt, lastAttachedAt, attached}[]`, sorted oldest
+  first. A session only appears here once it's actually been connected to at
+  least once (creation is lazy, triggered by the WS handshake above, not a
+  separate call)
+- `PATCH /api/terminal/sessions/{name}` — body `{"pinned": bool}`. Pinned
+  sessions are exempt from idle cleanup (`WEBMANAGER_TERMINAL_SESSION_
+  IDLE_TIMEOUT`, default 30m — unpinned sessions with no attached client
+  past this are reaped); this is the only difference pinning makes, session
+  creation itself never asks for it up front (see
+  `webmanager/.claude/archive/terminal-plan-done.md`'s "영속 세션 토글" for why). `404` if
+  unknown
+- `DELETE /api/terminal/sessions/{name}` — kills the session immediately
+  regardless of pinned state. `404` if unknown
+
 All error responses are `{"error": "message"}` with an appropriate 4xx/5xx
 status.

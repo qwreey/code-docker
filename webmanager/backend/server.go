@@ -11,6 +11,7 @@ import (
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
 	"webmanager/internal/supervisor"
+	"webmanager/internal/termsession"
 )
 
 type Server struct {
@@ -29,6 +30,7 @@ type Server struct {
 	projectScanner *projects.Scanner
 	miseJobs       *mise.JobStore
 	diskUsage      *diskusage.Analyzer
+	termSessions   *termsession.Registry
 	gate           *authgate.Gate
 }
 

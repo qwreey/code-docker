@@ -64,6 +64,13 @@ type Config struct {
 	// container's own root filesystem), not SystemDiskPath's default /code.
 	DiskBreakdownRoot      string
 	DiskBreakdownCachePath string
+
+	// TerminalSessionIdleTimeout/TerminalSessionScrollbackBytes back M2's
+	// named session registry (internal/termsession) — an idle, unpinned
+	// session is reaped after this long with no attached client; pinned
+	// sessions are exempt entirely (see terminal-plan.md's "영속 세션 토글").
+	TerminalSessionIdleTimeout     string
+	TerminalSessionScrollbackBytes string
 }
 
 func getenv(key, def string) string {
@@ -120,5 +127,8 @@ func loadConfig() Config {
 
 		DiskBreakdownRoot:      getenv("SYSTEM_DISK_BREAKDOWN_ROOT", "/"),
 		DiskBreakdownCachePath: getenv("WEBMANAGER_DISK_BREAKDOWN_CACHE_PATH", "/code/.webmanager/disk-breakdown-cache.json"),
+
+		TerminalSessionIdleTimeout:     getenv("WEBMANAGER_TERMINAL_SESSION_IDLE_TIMEOUT", "30m"),
+		TerminalSessionScrollbackBytes: getenv("WEBMANAGER_TERMINAL_SESSION_SCROLLBACK_BYTES", "262144"),
 	}
 }

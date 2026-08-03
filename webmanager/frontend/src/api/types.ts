@@ -487,6 +487,16 @@ export interface TerminalSettings {
   customThemes: TerminalTheme[]
 }
 
+// Mirrors internal/termsession.Info — M2 named sessions (see
+// webmanager/.claude/terminal-plan.md's "영속 세션 토글").
+export interface TerminalSessionInfo {
+  name: string
+  pinned: boolean
+  createdAt: string
+  lastAttachedAt: string
+  attached: boolean
+}
+
 export interface SidebarOrder {
   order: string[] // SectionId values, in user-chosen display order
 }

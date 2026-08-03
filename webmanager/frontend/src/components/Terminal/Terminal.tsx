@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
 import { api, errorMessage } from '../../api/client'
-import type { TerminalSettings } from '../../api/types'
+import type { TerminalSessionInfo, TerminalSettings } from '../../api/types'
 import { DEFAULT_KEYBINDINGS, type ModifierId } from './keybindings'
 import { DEFAULT_THEME_ID, findTheme, themeToXterm } from './themes'
 import { applyModifier } from './modifiers'
 import { TerminalControls } from './TerminalControls'
 import { TerminalSettingsPanel } from './TerminalSettingsPanel'
+import { TerminalTabs } from './TerminalTabs'
+import { useKeyboardInset } from './useKeyboardInset'
 import './Terminal.css'
 
 type ConnectionState = 'connecting' | 'connected' | 'disconnected'
@@ -32,9 +34,29 @@ const EMPTY_SETTINGS: TerminalSettings = {
   customThemes: [],
 }
 
+const DEFAULT_SESSION_NAME = '세션 1'
+
+// nextSessionName picks "세션 N" for the smallest N not already taken, so
+// repeated "+" clicks (or a name someone already renamed away from the
+// default pattern) never collide. alsoTaken covers the currently-active
+// session specifically — it's real and already occupying that name the
+// moment it's picked, but the backend may not have confirmed it in
+// `sessions` yet (GET /api/terminal/sessions hasn't been refetched since
+// connecting, or is still in flight) — without this, clicking "+" before
+// that refetch lands would silently "create" the exact name already active
+// (verified live: this was a real bug, not a hypothetical one).
+function nextSessionName(existing: TerminalSessionInfo[], alsoTaken: string): string {
+  const taken = new Set(existing.map((s) => s.name))
+  taken.add(alsoTaken)
+  let n = 1
+  while (taken.has(`세션 ${n}`)) n++
+  return `세션 ${n}`
+}
+
 export function Terminal() {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<XTerm | null>(null)
+  const fitAddonRef = useRef<FitAddon | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const armedModifierRef = useRef<ModifierId | null>(null)
 
@@ -45,6 +67,13 @@ export function Terminal() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [armedModifier, setArmedModifier] = useState<ModifierId | null>(null)
+  const [sessions, setSessions] = useState<TerminalSessionInfo[]>([])
+  // null means "no session selected" - only reachable by explicitly closing
+  // the last remaining tab (closeSession below), never the initial state,
+  // so a fresh page load still goes straight into a usable terminal.
+  const [activeSession, setActiveSession] = useState<string | null>(DEFAULT_SESSION_NAME)
+  const [sessionActionError, setSessionActionError] = useState<string | null>(null)
+  const keyboardInset = useKeyboardInset()
 
   // Effective settings: fall back to hardcoded defaults until the backend
   // responds (or if it returns an empty keybindings list).
@@ -79,6 +108,26 @@ export function Terminal() {
       cancelled = true
     }
   }, [])
+
+  // Session list for the tab bar — GET /api/terminal/sessions doesn't
+  // include the never-yet-connected default session (it's created lazily by
+  // the WS handshake itself, see the connection effect below), so this can
+  // legitimately come back not yet containing activeSession right after
+  // first mount; it'll show up once that first connection opens and this
+  // refetches.
+  const refreshSessions = useCallback(async () => {
+    try {
+      const data = await api.get<TerminalSessionInfo[]>('/terminal/sessions')
+      setSessions(data)
+    } catch {
+      // best-effort — the tab bar just falls back to only showing the
+      // active tab (TerminalTabs.tsx handles an empty list that way)
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshSessions()
+  }, [refreshSessions])
 
   // Apply the active theme live whenever it changes (initial load, or a
   // selection/edit made in the settings panel).
@@ -131,6 +180,9 @@ export function Terminal() {
     }
   }, [])
 
+  // xterm.js instance itself: created once and reused across session
+  // switches (only the WebSocket underneath it changes — see the next
+  // effect) so switching tabs doesn't tear down/rebuild the renderer.
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -142,35 +194,38 @@ export function Terminal() {
     })
     termRef.current = term
     const fitAddon = new FitAddon()
+    fitAddonRef.current = fitAddon
     term.loadAddon(fitAddon)
     term.open(container)
     fitAddon.fit()
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/terminal`)
-    ws.binaryType = 'arraybuffer'
-    wsRef.current = ws
-
-    ws.onopen = () => {
-      setState('connected')
-      fitAddon.fit()
-      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
-    }
-    ws.onclose = () => setState('disconnected')
-    ws.onerror = () => setState('disconnected')
-    ws.onmessage = (event) => {
-      if (event.data instanceof ArrayBuffer) {
-        term.write(new Uint8Array(event.data))
-      }
-    }
 
     // Routed through sendBytes so a sticky modifier armed via the on-screen
     // control bar also applies to the very next real keypress/paste.
     const dataDisposable = term.onData((data) => sendBytes(data))
 
+    // Stop Ctrl+W from closing the browser window instead of reaching the
+    // shell (a real terminal's "delete word backward") — preventDefault()
+    // and let xterm still process/send the key normally (return true).
+    // Confirmed (repo owner's own testing, matches VS Code/Termix): plain
+    // browser TABS reserve Ctrl+W at the OS/browser-chrome level and never
+    // dispatch the keydown to page JS at all — no page-level fix exists
+    // there (a dedicated Chrome extension is the only real workaround). A
+    // window opened as an installed PWA is different — it isn't a browser
+    // tab, so Ctrl+W isn't reserved the same way and this handler actually
+    // works. This is why installing webmanager as a PWA is tracked as a
+    // to-do for the repo owner (root TODO.md) rather than something to
+    // build here.
+    term.attachCustomKeyEventHandler((event) => {
+      if (event.type === 'keydown' && event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === 'w') {
+        event.preventDefault()
+      }
+      return true
+    })
+
     const resizeObserver = new ResizeObserver(() => {
       fitAddon.fit()
-      if (ws.readyState === WebSocket.OPEN) {
+      const ws = wsRef.current
+      if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
       }
     })
@@ -179,38 +234,176 @@ export function Terminal() {
     return () => {
       resizeObserver.disconnect()
       dataDisposable.dispose()
-      ws.close()
-      wsRef.current = null
       term.dispose()
       termRef.current = null
+      fitAddonRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // WebSocket connection: reopened against the active session's name
+  // whenever it changes (switching tabs), independent of the xterm
+  // instance above. The server replays that session's scrollback on
+  // attach (see internal/termsession), so clearing the display here before
+  // reconnecting is enough to avoid the previous session's content
+  // lingering while the new one's scrollback streams back in.
+  useEffect(() => {
+    const term = termRef.current
+    const fitAddon = fitAddonRef.current
+    if (!term || !fitAddon) return
+
+    if (!activeSession) {
+      // No session to connect to (the last tab was just closed) - the empty
+      // state below covers the UI; the previous effect run's cleanup
+      // already closed whatever WebSocket was open.
+      term.reset()
+      return
+    }
+
+    term.reset()
+    setState('connecting')
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const ws = new WebSocket(
+      `${protocol}//${window.location.host}/api/terminal?session=${encodeURIComponent(activeSession)}`,
+    )
+    ws.binaryType = 'arraybuffer'
+    wsRef.current = ws
+
+    ws.onopen = () => {
+      setState('connected')
+      fitAddon.fit()
+      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
+      refreshSessions()
+    }
+    // Also refetches the session list on close, not just on open — the
+    // backend now actively closes this connection when the underlying
+    // session dies on its own (e.g. Ctrl+D exits the shell), so the tab
+    // bar should promptly stop showing a session that no longer exists
+    // instead of only noticing on the next unrelated refresh.
+    ws.onclose = () => {
+      setState('disconnected')
+      refreshSessions()
+    }
+    ws.onerror = () => setState('disconnected')
+    ws.onmessage = (event) => {
+      if (event.data instanceof ArrayBuffer) {
+        term.write(new Uint8Array(event.data))
+      }
+    }
+
+    return () => {
+      ws.close()
+      if (wsRef.current === ws) wsRef.current = null
+    }
+  }, [activeSession, refreshSessions])
+
+  const selectSession = useCallback(
+    (name: string) => {
+      if (name !== activeSession) setActiveSession(name)
+    },
+    [activeSession],
+  )
+
+  const addSession = useCallback(() => {
+    setActiveSession(nextSessionName(sessions, activeSession ?? ''))
+  }, [sessions, activeSession])
+
+  const togglePin = useCallback(
+    async (name: string, pinned: boolean) => {
+      try {
+        await api.patch(`/terminal/sessions/${encodeURIComponent(name)}`, { pinned })
+        await refreshSessions()
+      } catch (e) {
+        setSessionActionError(errorMessage(e))
+      }
+    },
+    [refreshSessions],
+  )
+
+  const closeSession = useCallback(
+    async (name: string) => {
+      try {
+        await api.del(`/terminal/sessions/${encodeURIComponent(name)}`)
+      } catch (e) {
+        setSessionActionError(errorMessage(e))
+        return
+      }
+      if (name === activeSession) {
+        const remaining = sessions.filter((s) => s.name !== name)
+        // No new default session gets created here on purpose - closing
+        // the last tab should leave an explicit empty state (below) rather
+        // than silently spinning up a fresh "세션 1".
+        setActiveSession(remaining.length > 0 ? remaining[0].name : null)
+      }
+      await refreshSessions()
+    },
+    [activeSession, sessions, refreshSessions],
+  )
+
+  const surfaceStyle = {
+    '--kb-inset': `${keyboardInset}px`,
+    // Lets the control bar/surface chrome (Terminal.css) blend into whatever
+    // theme is active instead of a hardcoded color — xterm paints its own
+    // canvas over .terminal-container's own background per-cell, so that
+    // background only ever shows through in the small padding gap around it;
+    // matching it to the real theme colors keeps that gap (and the control
+    // bar below it) visually part of the terminal instead of a mismatched
+    // frame around it (verified live: a hardcoded black looked wrong against
+    // the default Dracula theme's #282a36).
+    '--term-bg': currentTheme.colors.background ?? '#000',
+    '--term-fg': currentTheme.colors.foreground ?? '#e6e6e6',
+  } as CSSProperties
+
   return (
-    <section className="terminal-section">
-      <div className="section-header">
+    <section className="terminal-section" style={surfaceStyle}>
+      <div className="terminal-topbar">
         <h1>Terminal</h1>
         <div className="terminal-header-actions">
-          <span className={`badge ${STATE_BADGE_CLASS[state]}`}>{STATE_LABEL[state]}</span>
+          {activeSession && <span className={`badge ${STATE_BADGE_CLASS[state]}`}>{STATE_LABEL[state]}</span>}
           <button type="button" className="btn btn-secondary btn-small" onClick={() => setSettingsOpen(true)}>
             설정
           </button>
         </div>
       </div>
-      <p className="section-description">
-        브라우저에서 바로 열리는 쉘 세션입니다. 탭을 닫거나 연결이 끊기면 세션이 즉시 종료됩니다.
-      </p>
-      {settingsError && (
-        <p className="section-description">터미널 설정을 불러오지 못했습니다 ({settingsError}) — 기본값을 사용합니다.</p>
-      )}
-      <TerminalControls
-        keybindings={effectiveSettings.keybindings}
-        armedModifier={armedModifier}
-        onArmModifier={armModifier}
-        onSendBytes={sendBytes}
+      <TerminalTabs
+        sessions={sessions}
+        activeSession={activeSession}
+        onSelect={selectSession}
+        onAdd={addSession}
+        onTogglePin={togglePin}
+        onClose={closeSession}
       />
-      <div ref={containerRef} className="terminal-container" />
+      {settingsError && (
+        <p className="terminal-inline-notice">터미널 설정을 불러오지 못했습니다 ({settingsError}) — 기본값을 사용합니다.</p>
+      )}
+      {sessionActionError && (
+        <p className="terminal-inline-notice">{sessionActionError}</p>
+      )}
+      <div className="terminal-surface">
+        {/* containerRef stays mounted even in the empty state - the xterm
+            instance is created once (see the effect above) and expects its
+            target element to always exist, so hiding it via CSS rather than
+            unmounting avoids having to recreate xterm when a session opens
+            again. */}
+        <div ref={containerRef} className="terminal-container" hidden={!activeSession} />
+        {!activeSession && (
+          <div className="terminal-empty-state">
+            <p>열린 세션이 없습니다.</p>
+            <button type="button" className="btn btn-primary" onClick={addSession}>
+              세션 열기
+            </button>
+          </div>
+        )}
+        {activeSession && (
+          <TerminalControls
+            keybindings={effectiveSettings.keybindings}
+            armedModifier={armedModifier}
+            onArmModifier={armModifier}
+            onSendBytes={sendBytes}
+          />
+        )}
+      </div>
       <TerminalSettingsPanel
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

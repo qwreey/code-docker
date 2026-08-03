@@ -83,6 +83,8 @@ export const api = {
     request<T>(path, { method: 'POST', ...withJsonBody(body) }),
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', ...withJsonBody(body) }),
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PATCH', ...withJsonBody(body) }),
   del: <T>(path: string, body?: unknown) => request<T>(path, { method: 'DELETE', ...withJsonBody(body) }),
 }
 

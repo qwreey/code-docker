@@ -3,7 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- interactive-widget=resizes-content: makes Chrome/Firefox-Android shrink
+         the layout viewport (and dvh) for the on-screen keyboard again, like
+         pre-Chrome-108 behavior (Chrome 108 changed the default to match
+         Safari, which never resized it and still doesn't support this meta
+         value at all - see Terminal/useKeyboardInset.ts for the
+         visualViewport-based fix that covers Safari too). Purely additive on
+         browsers that support it; ignored elsewhere. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <title>webmanager</title>
   </head>
   <body>
