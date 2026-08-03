@@ -172,7 +172,7 @@ export function ProcessTable() {
             </option>
           ))}
         </select>
-        <div className="processes-tabs">
+        <div className="processes-tabs processes-tabs-inline">
           <button
             type="button"
             className={`processes-tab${viewMode === 'list' ? ' processes-tab-active' : ''}`}

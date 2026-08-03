@@ -14,6 +14,15 @@
   flex: none;
 }
 
+/* used where the tab group sits inline with other filter controls
+   (search input/status select) inside a flex row with align-items: center -
+   without this, the group's own margin-bottom enlarges its flex margin-box,
+   which shifts its visible content upward relative to siblings that have no
+   such margin */
+.processes-tabs-inline {
+  margin-bottom: 0;
+}
+
 .processes-tab {
   display: inline-flex;
   align-items: center;
@@ -350,6 +359,26 @@
   pointer-events: none;
   z-index: 5;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.perf-cpu-sparkline {
+  display: block;
+  width: 6rem;
+  height: 1.7rem;
+  margin-top: 0.3rem;
+}
+
+.perf-cpu-sparkline path {
+  fill: none;
+  stroke: var(--surface);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.perf-cpu-sparkline-stats {
+  margin-top: 0.2rem;
+  font-size: 0.65rem;
+  opacity: 0.85;
 }
 
 .perf-cpu-cell {

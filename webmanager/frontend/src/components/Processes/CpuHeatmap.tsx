@@ -1,4 +1,6 @@
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { api } from '../../api/client'
+import type { ResourceHistoryResponse } from '../../api/types'
 import './Processes.css'
 
 interface CpuHeatmapProps {
@@ -12,6 +14,61 @@ interface HoverState {
   index: number
   x: number
   y: number
+}
+
+const DEFAULT_HISTORY_POLL_MS = 5000
+
+// Per-core sparkline in the tooltip reuses GET /api/system/resources/history
+// (already polled independently by ResourceHistory for the CPU/mem/disk/net
+// graphs below - this is a second, separate poll of the same cheap endpoint,
+// kept self-contained here rather than threading history state down from
+// Performance so this component doesn't need a parent-shaped API).
+function useCoreHistory() {
+  const [data, setData] = useState<ResourceHistoryResponse | null>(null)
+  const [pollMs, setPollMs] = useState(DEFAULT_HISTORY_POLL_MS)
+  const loadingRef = useRef(false)
+
+  const load = useCallback(async () => {
+    if (loadingRef.current) return
+    loadingRef.current = true
+    try {
+      const resp = await api.get<ResourceHistoryResponse>('/system/resources/history')
+      setData(resp)
+      if (resp.intervalSeconds > 0) {
+        const next = Math.max(2000, resp.intervalSeconds * 1000)
+        setPollMs((prev) => (prev === next ? prev : next))
+      }
+    } catch {
+      // silently keep last-known history - the heatmap itself still works from perCorePercent
+    } finally {
+      loadingRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+    const timer = setInterval(load, pollMs)
+    return () => clearInterval(timer)
+  }, [load, pollMs])
+
+  return data
+}
+
+function formatSpan(seconds: number): string {
+  if (seconds < 90) return `${Math.max(1, Math.round(seconds))}초`
+  return `${Math.round(seconds / 60)}분`
+}
+
+function sparklinePath(values: number[], width: number, height: number): string {
+  if (values.length < 2) return ''
+  const max = Math.max(100, ...values)
+  return values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * width
+      const y = height - (v / max) * height
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
 }
 
 // Fixed absolute bands (not per-dataset quartiles like ClaudeCode/Heatmap.tsx
@@ -29,6 +86,12 @@ function levelFor(percent: number): number {
 export function CpuHeatmap({ perCorePercent, available, clockMHz, numCpu }: CpuHeatmapProps) {
   const gridRef = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<HoverState | null>(null)
+  const history = useCoreHistory()
+
+  const hoverHistory =
+    hover && history
+      ? history.points.map((p) => p.hostPerCorePercent?.[hover.index]).filter((v): v is number => v != null)
+      : []
 
   function showHover(el: HTMLElement, index: number) {
     const grid = gridRef.current
@@ -61,8 +124,23 @@ export function CpuHeatmap({ perCorePercent, available, clockMHz, numCpu }: CpuH
             ))}
             {hover && (
               <div className="perf-cpu-tooltip" style={{ left: hover.x, top: hover.y }}>
-                코어 {hover.index} · {perCorePercent[hover.index].toFixed(1)}%
-                {clockMHz?.[hover.index] ? ` · ${(clockMHz[hover.index] / 1000).toFixed(2)} GHz` : ''}
+                <div>
+                  코어 {hover.index} · {perCorePercent[hover.index].toFixed(1)}%
+                  {clockMHz?.[hover.index] ? ` · ${(clockMHz[hover.index] / 1000).toFixed(2)} GHz` : ''}
+                </div>
+                {hoverHistory.length >= 2 && (
+                  <>
+                    <svg className="perf-cpu-sparkline" viewBox="0 0 100 28" preserveAspectRatio="none">
+                      <path d={sparklinePath(hoverHistory, 100, 28)} />
+                    </svg>
+                    <div className="perf-cpu-sparkline-stats">
+                      최근 {formatSpan(hoverHistory.length * (history?.intervalSeconds ?? 0))} · 최소{' '}
+                      {Math.min(...hoverHistory).toFixed(0)}% · 평균{' '}
+                      {(hoverHistory.reduce((a, b) => a + b, 0) / hoverHistory.length).toFixed(0)}% · 최대{' '}
+                      {Math.max(...hoverHistory).toFixed(0)}%
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
