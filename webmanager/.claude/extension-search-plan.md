@@ -1,28 +1,36 @@
-# 익스텐션 검색/URL 설치 + 정보 링크 (구현 전 설계, 미착수)
+# 익스텐션 검색/URL 설치 (구현 전 설계, 미착수)
 
-`.claude/extensions-plan-done.md`(구현 완료)의 후속 기능. 지금은 `recommendations.
-*.yaml`에 미리 등록된 목록만 설치 가능 — 여기서는 (1) 임의 익스텐션을 검색해서
-설치, 특히 마켓플레이스 URL을 붙여넣어서 설치하는 기능과 (2) 각 항목에 "더 보기"
-정보 링크를 추가하는 두 가지를 다룸. 후자는 훨씬 간단해서 먼저 해도 됨.
+`.claude/archive/extensions-plan-done.md`(구현 완료, 아카이브됨)의 후속 기능.
+지금은 `recommendations.*.yaml`에 미리 등록된 목록만 설치 가능함 — 여기서는
+임의 익스텐션을 검색해서 설치, 특히 마켓플레이스 URL을 붙여넣어서 설치하는
+기능을 다룸. ("더 보기" open-vsx 정보 링크는 이미 구현 완료 —
+`archive/extensions-plan-done.md` 참고. 삭제(uninstall)는 이미 구현 완료 —
+아래 "삭제/비활성화 리서치 결과" 참고. 둘 다 이 문서 범위에서는 뺌.)
 
-## 1. "더 보기" 정보 링크 — 쉬움, 먼저 해도 됨
+## 0. 삭제/비활성화 리서치 결과 (완료, 삭제는 구현도 완료)
 
-익스텐션: id가 항상 `publisher.name` 형식이라 open-vsx 링크를 기계적으로 구성
-가능 — `https://open-vsx.org/extension/<publisher>/<name>` (마이너스가 포함된
-publisher/name도 그대로 URL 세그먼트로 안전). GitHub 홈페이지 링크는 API
-응답(`recommendations.yaml`)에 없어서 못 만듦 — 필요하면 `recommendations.yaml`
-스키마에 `homepage`/`repository` 같은 선택 필드를 추가하고 수동으로 채워 넣는
-방식 정도가 현실적(open-vsx API가 자체적으로 repository URL을 내려주긴 하지만,
-그러려면 프론트가 open-vsx API를 직접 호출해야 함 — 아래 2번 기능과 겹치는
-인프라라 같이 하면 자연스러움).
+익스텐션 설치 후 **삭제**/**비활성화**가 가능한지 리서치한 결과:
 
-mise: `mise registry --json`이 각 도구의 백엔드 정보를 내려주는데, 홈페이지 URL이
-포함되는지는 **미확인** — 착수 시점에 `mise registry --json` 실제 출력을 다시
-확인 필요(mise-plan-done.md의 CLI 조사 당시엔 이 필드를 특별히 안 봤음). 없으면
-도구 백엔드(예: `core:node`, `aqua:owner/repo`)로부터 GitHub URL을 유추하는
-정도가 현실적(`aqua:` 백엔드는 `owner/repo` 형식이 곧 GitHub 경로).
+- **삭제(uninstall) — 구현 완료**: `code-server --uninstall-extension <id>`가
+  `--install-extension`과 완전히 같은 형태로 존재함(VS Code CLI 표준, code-server가
+  그대로 미러링 — `code.visualstudio.com/docs/configure/command-line` 문서로 확인).
+  안전하게 구현 가능하다고 판단해서 바로 구현함:
+  `internal/extensions.Uninstall()`(`Install()`과 거의 동일한 구조) +
+  `DELETE /api/code-extensions/{id}` 핸들러 + `Extensions.tsx`의 삭제 버튼
+  (`window.confirm` 확인 다이얼로그 포함, 파괴적 프론트엔드 액션 컨벤션 준수).
+  게이트는 install과 동일하게 안 걸음(`authgate-plan-done.md`의 "extensions
+  쓰기는 범위 밖" 기존 판단과 일관).
+- **비활성화(disable) — 구현 안 함, 의도적으로 보류**: `--disable-extensions`
+  (복수형) 플래그는 있지만 이건 실행 시점에 **전체** 익스텐션을 끄는 launch-time
+  플래그이지, 개별 익스텐션을 영속적으로 켜고 끄는 기능이 아님. 개별 활성/비활성
+  상태는 VS Code가 `<user-data-dir>/User/globalStorage/state.vscdb`라는
+  SQLite DB에 저장함(구버전은 `storage.json`) — 이 포맷은 공식 문서화가 안 돼
+  있고 VS Code 버전에 따라 이미 한 번 바뀐 이력이 있어서(storage.json →
+  state.vscdb), 여기에 직접 쓰는 코드를 만드는 건 다음 VS Code 업데이트에 깨질
+  위험을 안고 가는 것. 그만큼 이득이 크지 않다고 판단해 미구현으로 결정.
+  (출처: `coder/code-server` GitHub 이슈 #7601, code-server FAQ)
 
-## 2. 검색/URL 붙여넣기로 설치
+## 1. 검색/URL 붙여넣기로 설치
 
 ### 요구사항 (사용자 설명 그대로)
 
@@ -94,10 +102,11 @@ POST /api/code-extensions/install-vsix   body {id, version}
 - 검색(자유 텍스트로 open-vsx 전체 검색) UI를 URL 붙여넣기와 같은 화면에 둘지,
   별도 탭/모달로 분리할지.
 - vsix 직접 설치 폴백의 정확한 다운로드 URL 패턴 재확인(비공식 API라 변경 위험).
-- mise 쪽 "더 보기" 링크에 필요한 홈페이지 정보를 `mise registry --json`이
-  실제로 주는지 확인.
 
 ## 참고
 
-- `.claude/extensions-plan-done.md` — 기존 구현.
-- `.claude/mise-plan-done.md` — mise 쪽 "더 보기" 링크와 관련.
+- `.claude/archive/extensions-plan-done.md` — 기존 구현(설치, open-vsx "더 보기"
+  링크).
+- `.claude/qa-request/mise-plan-done.md` — mise 쪽에도 같은 "더 보기" 링크
+  아이디어가 계획만 되어 있음(`mise registry --json` 홈페이지 필드 지원 여부
+  미확인).

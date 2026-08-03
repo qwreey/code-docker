@@ -180,6 +180,7 @@ func main() {
 	mux.HandleFunc("GET /api/recommendations", s.handleGetRecommendations)
 	mux.HandleFunc("GET /api/code-extensions", s.handleListCodeExtensions)
 	mux.HandleFunc("POST /api/code-extensions", s.handleInstallCodeExtension)
+	mux.HandleFunc("DELETE /api/code-extensions/{id}", s.handleUninstallCodeExtension)
 
 	mux.HandleFunc("GET /api/mise/tools", s.handleListMiseTools)
 	mux.HandleFunc("POST /api/mise/tools", s.handleCreateMiseTool)

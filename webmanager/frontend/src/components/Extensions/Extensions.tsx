@@ -43,6 +43,7 @@ export function Extensions() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [installingId, setInstallingId] = useState<string | null>(null)
+  const [uninstallingId, setUninstallingId] = useState<string | null>(null)
   const [installedSectionOpen, setInstalledSectionOpen] = useState(false)
   const [categoryOpen, setCategoryOpen] = useState<Record<string, boolean>>({})
   const [showRecommendations, setShowRecommendations] = useState(loadShowRecommendations)
@@ -103,6 +104,25 @@ export function Extensions() {
       setError(errorMessage(e))
     } finally {
       setInstallingId(null)
+    }
+  }
+
+  async function handleUninstall(id: string) {
+    if (!window.confirm(`"${id}" 익스텐션을 삭제하시겠습니까?`)) return
+    setUninstallingId(id)
+    try {
+      await api.del<{ ok: true }>(`/code-extensions/${encodeURIComponent(id)}`)
+      setInstalled((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+      setInstalledList((prev) => prev.filter((x) => x !== id))
+      setError(null)
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setUninstallingId(null)
     }
   }
 
@@ -172,6 +192,14 @@ export function Extensions() {
                       )}
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-small"
+                    onClick={() => handleUninstall(id)}
+                    disabled={uninstallingId === id}
+                  >
+                    {uninstallingId === id ? '삭제 중...' : '삭제'}
+                  </button>
                 </li>
               ))}
             </ul>

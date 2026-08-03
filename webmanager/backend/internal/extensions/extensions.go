@@ -148,3 +148,28 @@ func Install(ctx context.Context, binPath, userDataDir, extensionsDir, id string
 	}
 	return nil
 }
+
+// Uninstall shells out to `code-server --uninstall-extension <id>` — same
+// flag shape and CLI as --install-extension (confirmed against the official
+// VS Code CLI docs, which code-server mirrors), so this is a near-exact copy
+// of Install rather than something new. Callers must call ValidateID first.
+// Per-extension *disable* (keep installed, just deactivate) deliberately
+// isn't implemented alongside this — see extension-search-plan.md for why
+// (no stable CLI flag or documented persisted-state format exists for it,
+// unlike install/uninstall).
+func Uninstall(ctx context.Context, binPath, userDataDir, extensionsDir, id string) error {
+	ctx, cancel := context.WithTimeout(ctx, installTimeout)
+	defer cancel()
+
+	args := append(commonArgs(userDataDir, extensionsDir), "--uninstall-extension", id)
+	cmd := exec.CommandContext(ctx, binPath, args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		msg := strings.TrimSpace(string(out))
+		if msg == "" {
+			msg = err.Error()
+		}
+		return errors.New(msg)
+	}
+	return nil
+}

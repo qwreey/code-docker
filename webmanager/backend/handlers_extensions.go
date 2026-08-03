@@ -93,3 +93,18 @@ func (s *Server) handleInstallCodeExtension(w http.ResponseWriter, r *http.Reque
 
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
+
+func (s *Server) handleUninstallCodeExtension(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := extensions.ValidateID(id); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if err := extensions.Uninstall(r.Context(), s.cfg.CodeServerBinPath, s.cfg.CodeServerUserDataDir, s.cfg.CodeServerExtensionsDir, id); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
