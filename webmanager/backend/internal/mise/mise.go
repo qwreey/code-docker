@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -177,6 +178,27 @@ func ListTools(ctx context.Context, binPath, path string) ([]Tool, error) {
 		}
 	}
 	return tools, nil
+}
+
+// GetLatestVersion runs `mise latest <toolID>`, which prints a single plain
+// version string to stdout (not JSON, unlike ls/env/registry). Bounded by
+// readTimeout — this is a quick lookup, not an install. toolID is validated
+// via ValidateToolID before it ever reaches exec.Command, same flag-
+// injection defense as everywhere else in this file.
+func GetLatestVersion(ctx context.Context, binPath, toolID string) (string, error) {
+	if err := ValidateToolID(toolID); err != nil {
+		return "", err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, binPath, "latest", toolID)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // GetEnv runs `mise env --json` targeting path (or defaultHomeDir when path

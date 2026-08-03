@@ -171,8 +171,22 @@
 }
 
 .mise-restart-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   font-size: 0.85rem;
   margin: 0 0 0.6rem;
+}
+
+.mise-restart-result {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.mise-restart-result-error {
+  font-size: 0.82rem;
+  color: var(--color-red-fg);
 }
 
 .mise-env-table-wrapper {

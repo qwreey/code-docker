@@ -48,6 +48,15 @@
   font-size: 0.8rem;
 }
 
+.claude-version-hide-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .claude-ghost-wrap {
   position: relative;
 }
@@ -110,6 +119,78 @@
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   font-size: 0.85rem;
+}
+
+/* ── in-browser login (LoginPanel) ───────────────────────────────────── */
+
+.claude-login-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+}
+
+.claude-login-message {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.claude-login-message.claude-login-success {
+  color: var(--color-green-fg);
+}
+
+.claude-login-message.claude-login-error {
+  color: var(--color-red-fg);
+}
+
+.claude-login-url-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.claude-login-url {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.claude-login-code-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.claude-login-code-input {
+  flex: 1;
+  min-width: 12rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+/* Same visual treatment as Mise/JobPanel's .mise-job-log log box. */
+.claude-login-log {
+  width: 100%;
+  max-height: 14rem;
+  overflow-y: auto;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.8rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
 }
 
 /* ── charts (M2) ──────────────────────────────────────────────────────── */

@@ -1,15 +1,82 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
-import type { ClaudePlugin, ClaudePluginsResponse, ClaudeStatus } from '../../api/types'
+import type {
+  ClaudeInstallJob,
+  ClaudePlugin,
+  ClaudePluginsResponse,
+  ClaudePrefs,
+  ClaudeStatus,
+  MiseJobStatus,
+} from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { formatDurationMs } from '../../utils/format'
 import { Heatmap } from './Heatmap'
 import { WeeklyChart } from './WeeklyChart'
 import { ModelUsageChart } from './ModelUsageChart'
+import { JobPanel } from '../Mise/JobPanel'
+import { LoginPanel } from './LoginPanel'
 import '../common/common.css'
 import './ClaudeCode.css'
 
-function NotInstalled() {
+const JOB_POLL_INTERVAL_MS = 800
+
+interface InstallJobState {
+  jobId: string
+  status: MiseJobStatus | null
+}
+
+// Shared by both the NotInstalled install button and the InstalledView
+// "지금 업데이트" button - POST /api/claude/install always resolves+installs
+// the latest version, so "install" and "update" are the same backend action.
+function useClaudeInstallJob(onDone: () => void) {
+  const [job, setJob] = useState<InstallJobState | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const busy = job !== null && (!job.status || job.status.running)
+
+  const start = useCallback(async () => {
+    if (busy) return
+    setError(null)
+    try {
+      const res = await api.post<ClaudeInstallJob>('/claude/install')
+      setJob({ jobId: res.jobId, status: null })
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }, [busy])
+
+  useEffect(() => {
+    if (!job || (job.status && !job.status.running)) return
+    let cancelled = false
+
+    const poll = async () => {
+      try {
+        const status = await api.get<MiseJobStatus>(`/mise/jobs/${encodeURIComponent(job.jobId)}`)
+        if (cancelled) return
+        setJob((prev) => (prev && prev.jobId === job.jobId ? { ...prev, status } : prev))
+        if (!status.running && status.exitCode === 0) {
+          onDone()
+        }
+      } catch (e) {
+        if (!cancelled) setError(errorMessage(e))
+      }
+    }
+
+    poll()
+    const timer = setInterval(poll, JOB_POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.jobId, job?.status?.running])
+
+  return { job, busy, error, start, close: () => setJob(null), clearError: () => setError(null) }
+}
+
+function NotInstalled({ onInstalled }: { onInstalled: () => void }) {
+  const { job, busy, error, start, close, clearError } = useClaudeInstallJob(onInstalled)
+
   return (
     <div className="claude-ghost-wrap">
       <div className="claude-skeleton-grid" aria-hidden="true">
@@ -23,8 +90,18 @@ function NotInstalled() {
       </div>
       <div className="claude-install-overlay">
         <div className="claude-install-message">
-          Claude Code가 설치되어 있지 않습니다 — <code>mise use -g claude-code</code>로 설치하거나, 이미 설치되어
-          있다면 <code>WEBMANAGER_CLAUDE_BINPATH</code>를 설정하세요.
+          <p>
+            Claude Code가 설치되어 있지 않습니다 — 아래 버튼으로 설치하거나, 이미 설치되어 있다면{' '}
+            <code>WEBMANAGER_CLAUDE_BINPATH</code>를 설정하세요.
+          </p>
+          {error && <ErrorBanner message={error} onDismiss={clearError} />}
+          {job ? (
+            <JobPanel kind="install" toolLabel="Claude Code" status={job.status} onClose={close} />
+          ) : (
+            <button type="button" className="btn btn-primary" onClick={start} disabled={busy}>
+              Claude Code 설치
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -95,12 +172,97 @@ function PluginsTable({ plugins }: { plugins: ClaudePlugin[] }) {
   )
 }
 
-function InstalledView({ status, plugins }: { status: ClaudeStatus; plugins: ClaudePlugin[] }) {
+function VersionCard({
+  miseVersion,
+  hideVersionCheck,
+  onToggleHide,
+  onUpdate,
+  updateJob,
+  updateBusy,
+  updateError,
+  onCloseUpdateJob,
+  onDismissUpdateError,
+}: {
+  miseVersion: NonNullable<ClaudeStatus['miseVersion']>
+  hideVersionCheck: boolean
+  onToggleHide: (checked: boolean) => void
+  onUpdate: () => void
+  updateJob: InstallJobState | null
+  updateBusy: boolean
+  updateError: string | null
+  onCloseUpdateJob: () => void
+  onDismissUpdateError: () => void
+}) {
+  return (
+    <div className="claude-card">
+      <div className="claude-card-label">버전</div>
+      {hideVersionCheck ? (
+        <div className="claude-card-sub">버전 확인이 꺼져 있습니다.</div>
+      ) : miseVersion.outdated ? (
+        <>
+          <div className="claude-card-value">
+            업데이트 가능: {miseVersion.current} → {miseVersion.latest}
+          </div>
+          {updateError && <ErrorBanner message={updateError} onDismiss={onDismissUpdateError} />}
+          {updateJob ? (
+            <JobPanel kind="install" toolLabel="Claude Code" status={updateJob.status} onClose={onCloseUpdateJob} />
+          ) : (
+            <button type="button" className="btn btn-primary btn-small" onClick={onUpdate} disabled={updateBusy}>
+              지금 업데이트
+            </button>
+          )}
+        </>
+      ) : (
+        <div className="claude-card-sub">
+          Claude Code {miseVersion.current} (최신)
+        </div>
+      )}
+      <label className="claude-card-note claude-version-hide-toggle">
+        <input type="checkbox" checked={hideVersionCheck} onChange={(e) => onToggleHide(e.target.checked)} />
+        버전 확인 끄기
+      </label>
+    </div>
+  )
+}
+
+function InstalledView({
+  status,
+  plugins,
+  prefs,
+  onTogglePrefs,
+  onUpdated,
+  onLoggedIn,
+}: {
+  status: ClaudeStatus
+  plugins: ClaudePlugin[]
+  prefs: ClaudePrefs | null
+  onTogglePrefs: (checked: boolean) => void
+  onUpdated: () => void
+  onLoggedIn: () => void
+}) {
   const auth = status.auth ?? null
   const stats = status.stats ?? null
+  const { job: updateJob, busy: updateBusy, error: updateError, start: startUpdate, close: closeUpdateJob, clearError: clearUpdateError } =
+    useClaudeInstallJob(onUpdated)
+  // The checkbox itself must stay visible even when hideVersionCheck is on,
+  // otherwise there'd be no way back to re-enable it short of a raw API call.
+  const showVersionCard = !!status.miseVersion && !!prefs
 
   return (
     <>
+      {showVersionCard && (
+        <VersionCard
+          miseVersion={status.miseVersion!}
+          hideVersionCheck={prefs!.hideVersionCheck}
+          onToggleHide={onTogglePrefs}
+          onUpdate={startUpdate}
+          updateJob={updateJob}
+          updateBusy={updateBusy}
+          updateError={updateError}
+          onCloseUpdateJob={closeUpdateJob}
+          onDismissUpdateError={clearUpdateError}
+        />
+      )}
       <div className="claude-cards">
       <div className="claude-card">
         <div className="claude-card-label">로그인 상태</div>
@@ -110,9 +272,7 @@ function InstalledView({ status, plugins }: { status: ClaudeStatus; plugins: Cla
             <div className="claude-card-sub">{auth.subscriptionType} 구독</div>
           </>
         ) : (
-          <div className="claude-card-note">
-            터미널에서 <code>claude</code> 명령을 실행해 로그인하세요.
-          </div>
+          <LoginPanel onLoggedIn={onLoggedIn} />
         )}
       </div>
 
@@ -173,6 +333,7 @@ function InstalledView({ status, plugins }: { status: ClaudeStatus; plugins: Cla
 export function ClaudeCode() {
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
   const [plugins, setPlugins] = useState<ClaudePlugin[]>([])
+  const [prefs, setPrefs] = useState<ClaudePrefs | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -183,12 +344,14 @@ export function ClaudeCode() {
     loadingRef.current = true
     setLoading(true)
     try {
-      const [statusData, pluginsData] = await Promise.all([
+      const [statusData, pluginsData, prefsData] = await Promise.all([
         api.get<ClaudeStatus>('/claude/status'),
         api.get<ClaudePluginsResponse>('/claude/plugins'),
+        api.get<ClaudePrefs>('/claude/prefs'),
       ])
       setStatus(statusData)
       setPlugins(pluginsData.plugins)
+      setPrefs(prefsData)
       setError(null)
     } catch (e) {
       setError(errorMessage(e))
@@ -201,6 +364,17 @@ export function ClaudeCode() {
   useEffect(() => {
     load()
   }, [load])
+
+  async function handleToggleHideVersionCheck(checked: boolean) {
+    const prev = prefs
+    setPrefs({ hideVersionCheck: checked })
+    try {
+      await api.put<{ ok: true }>('/claude/prefs', { hideVersionCheck: checked })
+    } catch (e) {
+      setPrefs(prev)
+      setError(errorMessage(e))
+    }
+  }
 
   return (
     <section>
@@ -215,7 +389,19 @@ export function ClaudeCode() {
       {loading && !status ? (
         <p className="empty-state">불러오는 중...</p>
       ) : (
-        status && (status.installed ? <InstalledView status={status} plugins={plugins} /> : <NotInstalled />)
+        status &&
+        (status.installed ? (
+          <InstalledView
+            status={status}
+            plugins={plugins}
+            prefs={prefs}
+            onTogglePrefs={handleToggleHideVersionCheck}
+            onUpdated={load}
+            onLoggedIn={load}
+          />
+        ) : (
+          <NotInstalled onInstalled={load} />
+        ))
       )}
     </section>
   )

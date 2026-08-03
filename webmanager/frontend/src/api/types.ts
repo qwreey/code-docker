@@ -222,10 +222,36 @@ export interface ClaudeStats {
   modelUsage: Record<string, ModelUsageSummary>
 }
 
+export interface ClaudeMiseVersionInfo {
+  current: string
+  latest: string
+  outdated: boolean
+}
+
 export interface ClaudeStatus {
   installed: boolean
   auth?: ClaudeAuthStatus | null
   stats?: ClaudeStats | null
+  miseVersion?: ClaudeMiseVersionInfo | null
+}
+
+export interface ClaudeInstallJob {
+  jobId: string
+}
+
+export interface ClaudeLoginStartResponse {
+  sessionId: string
+}
+
+export interface ClaudeLoginStatus {
+  running: boolean
+  lines: string[]
+  url: string
+  exitCode: number | null
+}
+
+export interface ClaudePrefs {
+  hideVersionCheck: boolean
 }
 
 export interface ClaudePlugin {

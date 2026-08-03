@@ -13,6 +13,7 @@ import (
 
 	"webmanager/internal/authgate"
 	"webmanager/internal/cgroup"
+	"webmanager/internal/claudecode"
 	"webmanager/internal/diskusage"
 	"webmanager/internal/envmigrate"
 	"webmanager/internal/mise"
@@ -111,6 +112,7 @@ func main() {
 			cfg.CodeServerURL,
 		),
 		miseJobs:           mise.NewJobStore(),
+		loginMgr:           claudecode.NewLoginManager(),
 		diskUsage:          diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
 		termSessions:       termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
 		gate:               gate,
@@ -205,6 +207,13 @@ func main() {
 
 	mux.HandleFunc("GET /api/claude/status", s.handleClaudeStatus)
 	mux.HandleFunc("GET /api/claude/plugins", s.handleClaudePlugins)
+	mux.Handle("POST /api/claude/install", gate.RequirePassword(http.HandlerFunc(s.handleClaudeInstall)))
+	mux.HandleFunc("GET /api/claude/prefs", s.handleClaudePrefsGet)
+	mux.Handle("PUT /api/claude/prefs", gate.RequirePassword(http.HandlerFunc(s.handleClaudePrefsPut)))
+	mux.Handle("POST /api/claude/login/start", gate.RequirePassword(http.HandlerFunc(s.handleClaudeLoginStart)))
+	mux.Handle("GET /api/claude/login/{id}", gate.RequirePassword(http.HandlerFunc(s.handleClaudeLoginStatus)))
+	mux.Handle("POST /api/claude/login/{id}/code", gate.RequirePassword(http.HandlerFunc(s.handleClaudeLoginCode)))
+	mux.Handle("POST /api/claude/login/{id}/cancel", gate.RequirePassword(http.HandlerFunc(s.handleClaudeLoginCancel)))
 
 	mux.HandleFunc("GET /api/projects", s.handleListProjects)
 	mux.HandleFunc("POST /api/projects/scan", s.handleScanProjects)

@@ -18,6 +18,7 @@ type Config struct {
 	SystemDiskPath       string
 	ClaudeBinPath        string
 	ClaudeConfigDir      string
+	ClaudePrefsPath      string
 	MiseBinPath          string
 	ProjectsPaths        string
 	ProjectsCachePath    string
@@ -124,6 +125,7 @@ func loadConfig() Config {
 		SystemDiskPath:       getenv("SYSTEM_DISK_PATH", "/code"),
 		ClaudeBinPath:        getenv("WEBMANAGER_CLAUDE_BINPATH", ""),
 		ClaudeConfigDir:      getenv("CLAUDE_CONFIG_DIR", "/code/.claude"),
+		ClaudePrefsPath:      getenv("WEBMANAGER_CLAUDE_PREFS_PATH", "/code/.webmanager/claude-prefs.json"),
 		MiseBinPath:          getenv("WEBMANAGER_MISE_BINPATH", ""),
 		ProjectsPaths:        getenv("WEBMANAGER_PROJECTS_PATH", "/code/Projects"),
 		ProjectsCachePath:    getenv("WEBMANAGER_PROJECTS_CACHE_PATH", "/code/.webmanager/projects-cache.json"),

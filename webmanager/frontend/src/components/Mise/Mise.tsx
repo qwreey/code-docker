@@ -12,6 +12,7 @@ import type {
 } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import '../common/common.css'
+import { JobPanel } from './JobPanel'
 import './Mise.css'
 
 const JOB_POLL_INTERVAL_MS = 800
@@ -180,9 +181,6 @@ export function Mise() {
     }
   }
 
-  const jobDone = job?.status && !job.status.running
-  const jobFailed = jobDone && job.status!.exitCode !== 0
-
   const toolEntries = Object.entries(tools)
   const envEntries = envData ? Object.entries(envData) : []
 
@@ -210,25 +208,7 @@ export function Mise() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {job && (
-        <div className={`mise-job-panel${jobDone ? (jobFailed ? ' mise-job-error' : ' mise-job-success') : ''}`}>
-          <div className="mise-job-header">
-            <strong>
-              {job.kind === 'install' ? '설치' : '삭제'}: {job.toolLabel}
-            </strong>
-            <span className="mise-job-status">
-              {!job.status ? '시작하는 중...' : job.status.running ? '진행 중...' : jobFailed ? `실패 (exit ${job.status.exitCode})` : '완료'}
-            </span>
-          </div>
-          <pre className="mise-job-log">{(job.status?.lines ?? []).join('\n') || '(출력 대기 중)'}</pre>
-          {jobDone && !jobFailed && (
-            <p className="mise-restart-note">
-              code-server에 반영하려면 터미널에서 <code>restart</code>를 입력하세요.
-            </p>
-          )}
-          <button type="button" className="btn btn-secondary btn-small" onClick={() => setJob(null)}>
-            닫기
-          </button>
-        </div>
+        <JobPanel kind={job.kind} toolLabel={job.toolLabel} status={job.status} onClose={() => setJob(null)} />
       )}
 
       {showRecommendations && (
