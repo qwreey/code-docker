@@ -22,6 +22,13 @@ import (
 )
 
 func main() {
+	// CLI helper mode: `webmanager --hash-password` computes an argon2id
+	// hash for WEBMANAGER_AUTH_PASSWORD_HASH and exits — never starts the
+	// server. See hashpassword.go's doc comment.
+	if len(os.Args) > 1 && os.Args[1] == "--hash-password" {
+		os.Exit(hashPasswordCmd())
+	}
+
 	cfg := loadConfig()
 
 	// Cross-check against /etc/environment: the whole point of storing

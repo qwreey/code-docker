@@ -16,7 +16,7 @@
   쓰기 힘드니 짧은 유예 윈도우가 낫다"는 사용자 판단). 인메모리 세션 저장소,
   컨테이너 재시작하면 전부 날아감(의도된 동작, redis 등 불필요 — 사실상 단일
   사용자 도구라 오버엔지니어링 방지).
-- 원래 설계는 `webmanager/.claude/terminal-plan.md`의 "인증" 절 — 거기서
+- 원래 설계는 `webmanager/.claude/archive/terminal-plan-done.md`의 "인증" 절 — 거기서
   터미널 전용으로 처음 설계됐다가, 파일 매니저가 두 번째로 같은 급의 게이트를
   요구하면서 재사용 가능한 미들웨어(`Gate.RequirePassword`)로 일반화됨.
 
@@ -58,10 +58,19 @@
 잠금 모달이 뜸). Logs/Terminal/파일 매니저처럼 통째로 게이트된 화면은 기존
 `src/components/common/RequiresUnlock.tsx`(탭 진입 시점에 바로 안내)를 사용.
 
+## 업데이트 (2026-08-03): 해시 계산 CLI 헬퍼 — 구현 완료
+
+`webmanager --hash-password`(`hashpassword.go`, 새 바이너리/빌드 타겟 아니라
+이미 이미지에 있는 webmanager 바이너리 재사용) —
+`docker compose exec code-docker /etc/code-docker/webmanager/webmanager
+--hash-password`로 실행, TTY면 두 번 입력받아 오타 확인(echo 없음), 파이프
+입력이면 한 줄만 읽음, `internal/authgate.HashPassword` 그대로 호출해서
+argon2id 해시 한 줄만 stdout에 출력(프롬프트/에러는 stderr). 루트
+`README.md`와 `docker-compose.yml` 양쪽에 인라인으로 문서화(다른 `.md` 참조
+없이 그 자리에서 따라할 수 있게 — 사용자가 명시적으로 요청한 방식).
+
 ## 아직 안 된 것
 
-- **해시 계산 CLI 헬퍼 없음** — 지금은 `internal/authgate.HashPassword`를
-  직접 호출하는 Go 스니펫으로 해시를 만들어야 함. `question.md` 참고.
 - **터미널 자체가 `RequiresUnlock`으로 안 감싸져 있음** — WebSocket 특성상
   REST와 다른 처리 필요, 지금은 설정 API(`/api/terminal/settings`)는 전역
   인터셉터 혜택을 받지만 WS 업그레이드 자체가 401이면 조용히 실패함(에러 UI

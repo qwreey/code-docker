@@ -252,7 +252,18 @@ git-lfs 는 `config/build.default.sh`에 포함되어 기본으로 설치됩니�
 > **주의: webmanager는 자체 비밀번호 게이트를 지원합니다(선택 사항, 기본은 꺼짐).**
 > `WEBMANAGER_AUTH_PASSWORD_HASH` 환경변수에 argon2id로 해시한 비밀번호를 설정하면
 > `/api/auth/unlock`으로 풀기 전까진 접근할 수 없는 라우트가 생깁니다(해제하면 10분간
-> 다시 안 물어봄). 원칙은 **조회(읽기)는 그대로 열어두고, 변경(쓰기)만 게이트** —
+> 다시 안 물어봄). **해시는 컨테이너가 이미 떠 있는 상태에서 아래 명령으로 직접
+> 생성합니다**(비밀번호를 두 번 입력받아 오타를 확인하고, 화면엔 안 보이며, 결과로
+> `$argon2id$...`로 시작하는 해시 한 줄만 출력됨 — 이 값을 그대로
+> `docker-compose.yml`의 `WEBMANAGER_AUTH_PASSWORD_HASH`나 옆의 `.env` 파일에 붙여넣고
+> `docker compose up -d`로 다시 올리면 적용됩니다, `restart`로는 새 환경변수가 안
+> 먹습니다):
+>
+> ```sh
+> docker compose exec code-docker /etc/code-docker/webmanager/webmanager --hash-password
+> ```
+>
+> 원칙은 **조회(읽기)는 그대로 열어두고, 변경(쓰기)만 게이트** —
 > Supervisor의 start/stop/restart, Git Config/Tailscale의 모든 추가·수정·삭제, SSH
 > Keys 추가·삭제 등이 여기 해당합니다. 예외로 **Terminal, 파일 탭, Logs, Supervisor의
 > 프로그램별 로그 조회는 조회까지 통째로 게이트**됩니다(각각 root 쉘/임의 파일

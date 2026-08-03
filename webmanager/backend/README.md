@@ -20,6 +20,25 @@ terminal are deliberately not implemented here yet.
 go build -o webmanager .
 ```
 
+## CLI
+
+The same binary doubles as a one-off CLI helper, checked before any server
+startup logic in `main()`:
+
+```sh
+webmanager --hash-password
+```
+
+Computes an argon2id hash for `WEBMANAGER_AUTH_PASSWORD_HASH`
+(`internal/authgate.HashPassword`) and exits — never starts the HTTP server.
+Prompts twice with echo disabled when stdin is a real terminal (typo check);
+reads a single line otherwise (piped/scripted input). Only the finished hash
+goes to stdout, everything else (prompts, errors) goes to stderr, so
+`HASH=$(webmanager --hash-password <<< "$pw")` works. See root
+`docker-compose.yml`'s `WEBMANAGER_AUTH_PASSWORD_HASH` comment for the exact
+`docker compose exec` invocation this is meant to be run with in the real
+container.
+
 ## Run locally
 
 None of the default paths (`/run/supervisor.sock`, `/code/.ssh/...`, etc.)
