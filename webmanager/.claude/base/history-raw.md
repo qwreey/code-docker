@@ -1,4 +1,4 @@
-# webmanager 설계 히스토리 (아카이브)
+# webmanager 설계 히스토리
 
 `webmanager/plan.md`에서 분리한 전체 의사결정 로그. 각 라운드에서 "왜 이렇게 정했는지"의
 전체 논증 과정이 궁금할 때만 열어보면 되는 문서 — 현재 상태/남은 TODO는
@@ -191,12 +191,12 @@ webmanager/
   ```
   `[api]`는 vector top/tap이 쓰는 GraphQL API로 상상했으나, **실제로는 이미 vector
   0.55.0(2026-04)에서 GraphQL이 제거되고 gRPC로 교체된 뒤였음** — 이 사실은 다른 에이전트가
-  `vector-logs-plan-done.md`에서 재조사해서 바로잡음. 최종 구현은 gRPC API를
+  `archive/vector-logs-plan-done.md`에서 재조사해서 바로잡음. 최종 구현은 gRPC API를
   아예 켜지 않고, 대신 vector의 file sink로 JSONL을 직접 써서 webmanager가 읽는 방식으로
   단순화됨.
 - **설치(오판)**: "vector는 pacman 공식 저장소엔 없어서 AUR(yay) 경유 설치 필요"라고 적었으나,
   실제로는 Arch `extra` 공식 저장소에 있어서 AUR이 전혀 필요 없었음 (마찬가지로
-  `vector-logs-plan-done.md`에서 재확인).
+  `archive/vector-logs-plan-done.md`에서 재확인).
 - **webmanager API 초안**: `GET /api/logs/apps`, `GET /api/logs/:app/stream` (vector API를
   통한 tail/follow) — 이 형태 대신 최종적으로는 `GET /api/logs/apps`/`GET /api/logs/entries`
   (JSONL 폴링 방식)로 구현됨, `webmanager/backend/README.md` 참고.
@@ -272,7 +272,7 @@ git 커밋 사이닝(SSH/GPG) + 최소 GPG 키 관리, 로그 뷰어(처음엔 m
   프로그램은 실제 파일에만 쓰는 구조가 "vector-viewer 하나만 fd1으로 나가는 패턴"이라
   원하는 방향과 일치함
 
-최종 설계와 구현 검증 결과는 `vector-logs-plan-done.md` 참고 (실제
+최종 설계와 구현 검증 결과는 `archive/vector-logs-plan-done.md` 참고 (실제
 vector 0.57.0 바이너리로 validate + 실행까지 검증됨).
 
 ## 프로세스/포트 뷰어 타당성 조사 (6차 결정)

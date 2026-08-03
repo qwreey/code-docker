@@ -8,7 +8,7 @@
 폴백) + `handlers_files.go`(문서의 API 설계 절 그대로: list/stat/download/
 content(GET·PUT)/upload/mkdir/rename/move/copy/delete). `internal/authgate`
 (argon2id + ENV 전용 저장 + `/etc/environment` 교차검증, 세션 쿠키) 신규 —
-`terminal-plan.md`가 설계해둔 메커니즘을 일반화, 터미널과 파일 매니저가
+`terminal-plan-done.md`가 설계해둔 메커니즘을 일반화, 터미널과 파일 매니저가
 공유(`WEBMANAGER_AUTH_PASSWORD_HASH` 하나). `server.go`의 `limitRequestBody`가
 업로드 라우트만 예외 처리하도록 수정. 프론트: `src/components/FileManager/`
 (브레드크럼, 멀티선택, 정보 패널, `LazyCodeEditor` 재사용 편집), `common/
@@ -19,9 +19,13 @@ RequiresUnlock.tsx`(범용 잠금 래퍼, 나중에 터미널 탭에도 씌울 �
 zip 디렉토리 다운로드는 이번 라운드에 미포함(파일 단위만), 비밀번호는 터미널과
 공유.
 
-실컨테이너(`docker compose build && up`) 검증은 아직 안 했으나, 로컬 스모크
-테스트(경로 탈출 차단/게이트 on-off/CRUD 전부)는 실제 서버 프로세스로 완료.
-`go build`/`go vet`/`gofmt`, `npm run build`/`npm run lint` 전부 클린.
+로컬 스모크 테스트(경로 탈출 차단/게이트 on-off/CRUD 전부)는 실제 서버
+프로세스로 완료. `go build`/`go vet`/`gofmt`, `npm run build`/`npm run lint`
+전부 클린.
+
+**v1에서 미뤄둔 항목(업로드 진행률/chmod/zip 다운로드/실컨테이너 검증)은
+`.claude/filemanager-rework-plan.md`의 "v1에서 미뤄둔 것" 절로 옮김** — 이
+문서는 실제로 구현 완료된 부분만 남김.
 
 ---
 
@@ -48,7 +52,7 @@ build-custom을 택했을 때의 구체안이 있음.
 ## 알려진 것 (전제)
 
 - 이미 있는 관련 인프라:
-  - `webmanager/.claude/terminal-plan.md`의 **argon2id + ENV 전용 저장 +
+  - `terminal-plan-done.md`의 **argon2id + ENV 전용 저장 +
     `/etc/environment` 교차검증** 비밀번호 게이트 — 방향은 확정, 아직 구현 전.
     이 문서가 쓰인 시점에 "이걸 재사용 가능한 `RequirePassword` 미들웨어로
     일반화하는" 병행 작업이 별도로 진행 중이라고 전달받음 — 파일 매니저는 그
@@ -148,7 +152,7 @@ Projects 탭 등에서 쓰는 일반 테이블/리스트 패턴으로 충분히 
 스타일로 직접 구현.** 나중에 드래그앤드롭/그리드 뷰 같은 UX가 아쉬워지면 그때
 재검토.
 
-## API 설계 (구현 전 상상, `dind-plan.md`/`mise-plan-done.md` 형식 참고, 재검토 필요)
+## API 설계 (구현 전 상상, `dind-plan.md`/`qa-request/mise-plan-done.md` 형식 참고, 재검토 필요)
 
 루트 설정: `WEBMANAGER_FILES_ROOT`(기본값은 "사용자 확인 필요" 참고 — 컨테이너
 전체(`/`) vs `/code`로 좁히는 선택 자체가 스코프 판단). 아래 모든 `path`는 이
@@ -202,7 +206,7 @@ POST /api/files/delete   body {items: [path...]}
   동일한 부분 실패 허용 패턴.
 ```
 
-인증: 위 전 라우트는 `RequirePassword` 미들웨어(terminal-plan.md에서 나올 예정)로
+인증: 위 전 라우트는 `RequirePassword` 미들웨어(terminal-plan-done.md에서 나올 예정)로
 감싼다 — 이 문서에서 새로 설계하지 않음, 그게 나오는 시점에 그대로 wrap.
 
 ## 경로 검증 (가장 보안이 중요한 부분)
@@ -332,7 +336,7 @@ stdlib만으로 충분.
 
 ## 비밀번호 게이트 의존성 (필수 — 이 게이트 없이는 출시하지 않음)
 
-이 기능은 **`terminal-plan.md`가 설계해둔 argon2id + ENV 전용 저장 +
+이 기능은 **`terminal-plan-done.md`가 설계해둔 argon2id + ENV 전용 저장 +
 `/etc/environment` 교차검증 메커니즘을 일반화한 `RequirePassword`(가칭) 미들웨어가
 먼저 존재해야 착수 가능**함을 이 문서에서 다시 한번 명시함. 파일 매니저 전용으로
 새 인증 메커니즘을 따로 설계하지 않음 — 그 미들웨어가 나오는 시점에 위 API 설계
@@ -348,18 +352,17 @@ README/`webmanager/CLAUDE.md`의 보안 각주(dind/터미널을 "webmanager에�
 강력한 권한"으로 명시한 부분)에 파일 매니저도 동급으로 추가해야 함 — 구현
 착수 시 반영.
 
-## 구현 시 확인할 것 (착수 시점에 정하면 됨, 지금 안 막힘)
+## 구현 시 확인했던 것 (착수 전 기록, 이후 전부 정리됨)
 
 - 정확한 `internal/files` 패키지 분할(list/stat/upload/download/mutate를 파일
   몇 개로 나눌지) — 다른 `internal/*` 패키지들과 비슷한 크기가 될 걸로 예상.
 - `mode`를 `os.FileMode.String()` 그대로 노출할지, chmod 변경 기능까지 v1에
-  넣을지(요구사항에 명시적으로 없었음 — 이 문서 스코프 밖으로 가정, 필요하면
-  별도 라운드).
-- 업로드 중 진행률 표시 여부(현재 다른 기능들의 폴링 패턴처럼 "잡 상태 조회"로
-  갈지, 아니면 단순 스피너로 v1을 끝낼지) — mise 잡 스트리밍과 달리 업로드는
-  브라우저가 이미 진행률 이벤트(`XMLHttpRequest.upload.onprogress`)를 표준으로
-  주므로 백엔드에 별도 잡 스토어가 필요 없을 가능성이 높음, 착수 시 확인.
-- 디렉토리 목록에 숨김 파일(`.`으로 시작) 기본 표시 여부/토글 UI.
+  넣을지 — **v1 스코프 밖으로 결론, 아직 미착수(`filemanager-rework-plan.md`
+  참고)**.
+- 업로드 중 진행률 표시 여부 — **미착수로 남음(`filemanager-rework-plan.md`
+  참고)**.
+- 디렉토리 목록에 숨김 파일(`.`으로 시작) 기본 표시 여부/토글 UI — **구현
+  완료**(토글 UI 있음).
 
 ## 사용자 확인 필요
 
@@ -375,10 +378,10 @@ README/`webmanager/CLAUDE.md`의 보안 각주(dind/터미널을 "webmanager에�
   기술적 제약은 아님 — 몇 GB로 잡을지는 취향.
 - **디렉토리 다운로드(zip) 지원을 v1에 포함할지**: `archive/zip`(stdlib, 새
   의존성 없음)으로 구현 가능하지만, 스트리밍 중 압축이라 진행률 표시가 파일
-  단일 다운로드보다 복잡해짐 — v1에서 뺴고 파일 단위 다운로드만 먼저 낼지 판단
-  필요.
+  단일 다운로드보다 복잡해짐 — **결론: v1에서 뺴고 파일 단위 다운로드만
+  구현, zip은 미착수로 `filemanager-rework-plan.md`에 기록됨**.
 - **비밀번호 게이트를 터미널과 공유할지, 파일 매니저 전용 별도 해시로 할지**:
-  terminal-plan.md가 이미 열어둔 질문("터미널 전용 vs webmanager 전체")이 이
+  terminal-plan-done.md가 이미 열어둔 질문("터미널 전용 vs webmanager 전체")이 이
   문서로 두 번째 후보가 생기면서 더 구체화됨 — 공유하면 env var 하나로 두 기능
   다 게이트되고(운영 단순), 분리하면 각 기능을 독립적으로 열고 닫을 수 있음
   (예: 터미널은 신뢰하지만 파일 매니저는 당분간 꺼두고 싶은 경우).

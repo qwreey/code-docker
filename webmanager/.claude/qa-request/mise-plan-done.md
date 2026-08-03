@@ -30,8 +30,9 @@ download` 등)는 stdout이 아니라 **stderr**로 나옴 — 구현은 이미 
 - **"추천 표시" 토글**(새로고침 버튼 옆), `localStorage`에 유지
   (`webmanager.mise.showRecommendations`) — 익스텐션 탭과 동일 패턴.
 - **아직 안 함**(계획만): 각 도구에 "더 보기"(홈페이지/레지스트리) 링크 —
-  `.claude/extension-search-plan.md`의 "1. 더 보기 정보 링크" 절 참고, mise
-  쪽은 `mise registry --json`이 홈페이지 필드를 주는지부터 재확인 필요.
+  익스텐션 탭의 open-vsx 링크(구현 완료, `archive/extensions-plan-done.md`
+  참고)와 같은 패턴이지만, mise 쪽은 착수 전에 `mise registry --json`이
+  홈페이지 필드를 실제로 주는지부터 재확인 필요(미확인).
 
 ## Go/No-Go: GO — 최후순위 프레이밍 철회
 
@@ -47,7 +48,7 @@ download` 등)는 stdout이 아니라 **stderr**로 나옴 — 구현은 이미 
   내놓음 — `claude mcp list`(`claude-plan.md` M5가 뒤로 미뤄진 이유)처럼 텍스트
   파싱이 필요한 경우가 하나도 없음.
 - 설치 진행 로그는 라인 버퍼링된 평범한 텍스트 스트림(`[1/3] download`, `[2/3]
-  verify` 등)이라 실제 PTY가 필요 없음 — `terminal-plan.md`의 PTY/WebSocket
+  verify` 등)이라 실제 PTY가 필요 없음 — `archive/terminal-plan-done.md`의 PTY/WebSocket
   인프라를 기다릴 이유가 없어짐(아래 "스트리밍 방식" 절 참고).
 - 프롬프트/인터랙티브 셀렉터 위험도 낮음 — `mise`는 stdin이 닫혀있고 tty가 없는
   환경을 스스로 감지해서 (인자 없는 `mise use`처럼 원래 인터랙티브해야 하는
@@ -59,7 +60,7 @@ download` 등)는 stdout이 아니라 **stderr**로 나옴 — 구현은 이미 
 가능" 티어로 승격 권장** — dind/웹쉘 완료를 기다릴 이유 없음, 특히 스트리밍
 설계를 터미널 기능의 (아직 진행 중인) 설계에 종속시키지 말 것.
 
-익스텐션(code-server) 추천/설치는 별도 문서(`extensions-plan-done.md`, 구현
+익스텐션(code-server) 추천/설치는 별도 문서(`archive/extensions-plan-done.md`, 구현
 완료)로 분리됨 — mise를 안 기다리고 더 일찍 만들어도 되는 독립적인 기능이라
 우선순위도 다름.
 
@@ -117,7 +118,7 @@ uninstall CLI 래핑, 터미널 스트리밍 뷰, global+per-project 목록, 설
 자체는 필요 없고 webmanager 백엔드가 override 유무만 확인하고 읽으면 됨
 (`code-config.*.yaml`이 이미 "디스패처 없는 데이터형 override"의 선례). 이
 파일/`GET /api/recommendations`는 익스텐션 기능 구현 시 이미 실제로 만들어짐
-(`extensions-plan-done.md` 참고) — mise 쪽 `mise:` 최상위 키만 아직 안 쓰임.
+(`archive/extensions-plan-done.md` 참고) — mise 쪽 `mise:` 최상위 키만 아직 안 쓰임.
 
 ```yaml
 mise:
@@ -314,7 +315,7 @@ GET  /api/mise/jobs/:id
   모드/ANSI 커서 제어/양방향 키 입력이 필요한 상황을 위한 것이고, 이 중 아무것도
   mise install 진행 표시에는 해당하지 않음 — PTY로 감싸는 건 평문 로그를
   터미널 시맨틱으로 한 번 왕복시키는 불필요한 레이어만 추가함.
-- **결합 비용이 실재함**: `terminal-plan.md`는 지금 이 세션에서 M1이 막 착수된
+- **결합 비용이 실재함**: `archive/terminal-plan-done.md`는 지금 이 세션에서 M1이 막 착수된
   상태고, WebSocket 라이브러리 선택도 아직 안 끝남, M2(named 영속 세션)의 세션
   생명주기/재연결 설계도 미확정. mise의 설치 뷰가 같은 세션/메시지 프레이밍을
   타면, 터미널 기능이 나중에 M2에서 세션 목록/재연결/유휴 타임아웃을 설계할 때마다
@@ -388,9 +389,9 @@ GET  /api/mise/jobs/:id
 - 전체 우선순위/현재 상태는 `webmanager/plan.md`, `webmanager/CLAUDE.md` 참고 —
   이 문서의 go 권고에 맞춰 `webmanager/CLAUDE.md`의 큐 순서도 갱신 필요(이 문서
   범위 밖, 별도 반영).
-- 익스텐션 추천/설치는 `extensions-plan-done.md`(구현 완료, 동일 shell-out 패턴의
+- 익스텐션 추천/설치는 `archive/extensions-plan-done.md`(구현 완료, 동일 shell-out 패턴의
   선례).
-- 웹쉘(터미널) 설계는 `terminal-plan.md` — 이 문서가 스트리밍 재사용을
+- 웹쉘(터미널) 설계는 `archive/terminal-plan-done.md` — 이 문서가 스트리밍 재사용을
   비권장했으므로 mise 쪽 구현은 이 문서의 M1/M2 진행 상황과 무관하게 진행 가능.
 - Projects 탭은 `projects-plan-done.md`.
 - `claude mcp list`의 텍스트 파싱 문제(비교 대상)는 `claude-plan.md`의 M5 절.

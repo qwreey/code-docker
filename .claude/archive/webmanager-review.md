@@ -2,7 +2,7 @@
 
 > **아카이브됨 (2026-08-03)**: 이 문서가 다루던 라운드는 오래전에 끝났고, 여기서
 > 나온 이슈들은 전부 고쳐졌거나 각 기능의 `webmanager/.claude/*-plan-done.md`
-> 문서에 흡수됨(예: 프로그램별 메타데이터 아이디어 → `supervisor-plan-done.md`로
+> 문서에 흡수됨(예: 프로그램별 메타데이터 아이디어 → `webmanager/.claude/archive/supervisor-plan-done.md`로
 > 실제 구현). 더 이상 "살아있는" 진행 중 문서가 아니라 그 근거/이력 기록이라
 > `webmanager/`가 아니라 레포 루트 `.claude/archive/`로 옮김(`tailscale-design.md`와
 > 같은 성격). 새 작업 시 재발 방지용 참고 자료로만 쓸 것 — 실제 현재 상태는 항상
@@ -152,7 +152,7 @@ cgroup/statfs 읽기가 실패하면 해당 섹션이 그냥 0으로 채워져�
 `LoadMetadata`가 `GET /api/supervisor/processes` 응답에 프로그램별
 `label`/`note`/`disableStart`/`disableStop`/`disableRestart`/`disableLogs`를
 병합 — vector는 `disableLogs: true`로 기본 설정됨(자세히는
-`.claude/supervisor-plan-done.md`). 아래는 원 조사 기록(여전히 정확함, 왜 이
+`webmanager/.claude/archive/supervisor-plan-done.md`). 아래는 원 조사 기록(여전히 정확함, 왜 이
 방식을 택했는지의 근거로 남겨둠).
 
 **결론: 안 됨 — supervisord 자체에는 자유 형식 메타데이터/라벨 필드가 없음.**

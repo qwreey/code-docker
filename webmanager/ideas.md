@@ -31,7 +31,7 @@ Claude Code 탭, Caddy dev-proxy는 전부 `webmanager/.claude/`로 이동함). 
 
 ## code-server 설정(settings.json 등) 편집 UI — 후순위로 내림
 
-익스텐션 추천/설치 부분은 `.claude/extensions-plan-done.md`로 승격/구현 완료돼서
+익스텐션 추천/설치 부분은 `.claude/archive/extensions-plan-done.md`로 승격/구현 완료돼서
 빠짐 — 여기 남은 건 "settings.json/keybindings.json 자체를 편집하는 UI" 얘기만:
 
 - JSON 파일 하나 텍스트 편집이야 `<textarea>`로도 되지만, 그럴 거면 이미 code-server가
@@ -57,5 +57,5 @@ Claude Code 탭, Caddy dev-proxy는 전부 `webmanager/.claude/`로 이동함). 
 
 ## 사용자 세션 뷰어 — 추후 구현, 실현 가능성부터 확인 필요
 
-`webmanager/.claude/session-viewer-plan.md` 참고 — 착수 전 리서치/실현 가능성
+`webmanager/.claude/research/session-viewer-plan.md` 참고 — 착수 전 리서치/실현 가능성
 확인이 필요해서 별도 계획 문서로 분리함(여기 브레인스토밍 목록에는 포인터만).

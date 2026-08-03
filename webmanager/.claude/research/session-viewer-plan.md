@@ -66,5 +66,5 @@
 ## 참고
 
 - `.claude/authgate-plan-done.md` — 지금 있는 세션 스토어 구현.
-- `.claude/terminal-plan.md`의 M2(named 영속 세션)도 "세션"이라는 단어를
+- `.claude/archive/terminal-plan-done.md`의 M2(named 영속 세션)도 "세션"이라는 단어를
   쓰지만 완전히 다른 개념(PTY 프로세스 생명주기) — 혼동하지 말 것.

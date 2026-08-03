@@ -19,11 +19,25 @@ override 안내 추가). `go build`/`go vet`/`gofmt`, `npm run build`/`npm run l
 - **"추천 표시" 토글**(새로고침 버튼 옆) — 끄면 추천 섹션 전체 숨김, 켜짐/꺼짐
   `localStorage`에 저장돼 새로고침해도 유지(`webmanager.extensions.
   showRecommendations`).
+- **"더 보기"(open-vsx) 링크 — 구현 완료**: `Extensions.tsx`의 `openVsxUrl(id)`가
+  `id`(항상 `publisher.name` 형식)만으로 `https://open-vsx.org/extension/
+  <publisher>/<name>`를 기계적으로 구성 — 설치된 목록/추천 목록 항목 모두
+  "open-vsx ↗" 링크로 새 탭에 열림(원래 `.claude/extension-search-plan.md`
+  "1. 더 보기 정보 링크" 절에서 설계했던 것, 저 절은 구현 완료 후 이 문서로
+  옮기고 그쪽에선 삭제함). GitHub 홈페이지 링크는 여전히 안 만듦(레지스트리
+  응답에 필드가 없어서, 아래 참고).
+- **삭제(uninstall) — 구현 완료**: `DELETE /api/code-extensions/{id}` →
+  `internal/extensions.Uninstall()`(`--uninstall-extension <id>`,
+  `Install()`과 거의 동일한 구조), 프론트에 `window.confirm` 확인 다이얼로그
+  포함 삭제 버튼. 게이트는 install과 동일하게 안 걸음.
+- **비활성화(disable) — 조사 후 구현 안 하기로 결정**: 개별 익스텐션의 영속적
+  on/off는 VS Code가 문서화 안 된 SQLite(`state.vscdb`, 예전엔 `storage.json`)
+  에 저장 — 버전마다 포맷이 바뀐 이력이 있어 직접 건드리기엔 부서지기 쉬움.
+  자세한 근거는 `.claude/extension-search-plan.md`의 "0. 삭제/비활성화 리서치
+  결과" 참고.
 - **아직 안 함**(계획만, `question.md` 참고): 검색해서 설치, 특히 마켓플레이스
-  URL 붙여넣기로 설치(마소 공식 → open-vsx 교차 조회 → vsix 직접 폴백) — 복잡도
-  높아서 `.claude/extension-search-plan.md`로 별도 설계만 해두고 미착수.
-  GitHub/레지스트리 홈페이지로 가는 "더 보기" 링크도 아직 안 함(open-vsx 링크는
-  `id`로 기계적 구성 가능하다고 확인은 됐음, `question.md` 참고).
+  URL 붙여넣기로 설치(마소 공식 → open-vsx 교차 조회 → vsix 직접 폴백) —
+  `.claude/extension-search-plan.md`로 별도 설계만 해두고 미착수.
 
 ---
 

@@ -1,7 +1,8 @@
-# webmanager 전체 아키텍처 — 완료
+# webmanager 전체 아키텍처
 
 컴포넌트별이 아니라 webmanager 전체에 걸치는 결정들. 최종 상태 요약이고, 각
-결정에 도달한 전체 논쟁 과정은 `history-raw-done.md`에 있음(필요할 때만 참고).
+결정에 도달한 전체 논쟁 과정은 `.claude/base/history-raw.md`에 있음(필요할
+때만 참고).
 
 ## 결정
 
@@ -37,7 +38,7 @@
 
 - 사용자 입력이 파일 경로(`filepath.Join`)나 다른 설정 파일 포맷(SSH config, YAML)에
   원문 그대로 들어가면 path traversal/injection 위험 — 항상 안전한 charset으로
-  검증할 것 (실제로 SSH 호스트 이름에서 이 문제가 있었고 고침, `gitconfig-plan-done.md`
+  검증할 것 (실제로 SSH 호스트 이름에서 이 문제가 있었고 고침, `qa-request/gitconfig-plan-done.md`
   참고).
 - `exec.Command`에 넘기는 사용자 입력이 `-`로 시작하면 플래그로 오인될 수 있음 —
   포맷이 고정된 값(fingerprint 등)은 정규식으로 정확히 검증하고 나서 넘길 것.

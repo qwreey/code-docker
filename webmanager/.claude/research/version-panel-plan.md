@@ -52,7 +52,7 @@ webmanager가 실행 중인 컨테이너 안에서 자기 자신을 담은 이�
 실행하는 `qwreey-fish`의 `qs_setup` fish 함수가 설치하는 것으로 추정됨(그
 저장소는 이 레포 범위 밖이라 직접 확인 안 함). mise 자신의 최신 버전 확인/자체
 업데이트는 `mise self-update`(mise 공식 서브커맨드로 알려져 있음 — 정확한 플래그/
-동작은 구현 시점에 재확인 필요, `mise-plan-done.md`가 이미 확립한 "CLI 서브커맨드
+동작은 구현 시점에 재확인 필요, `qa-request/mise-plan-done.md`가 이미 확립한 "CLI 서브커맨드
 실행 + 결과 파싱" 패턴을 그대로 재사용하면 될 것으로 보임, `internal/mise`
 패키지에 자연스럽게 추가 가능).
 
@@ -104,7 +104,7 @@ webmanager가 다루는 어떤 것과도 다른 권한 레벨(`dind-plan.md`가 
 ## 참고
 
 - `code-server-autoinstall/install.sh` — code-server 자동 업데이트 로직 원본.
-- `.claude/mise-plan-done.md` — `mise self-update` 추가 시 재사용할 CLI
+- `.claude/qa-request/mise-plan-done.md` — `mise self-update` 추가 시 재사용할 CLI
   shell-out 패턴.
 - 우선순위는 `guide-plan.md`와 동일하게 최하 — `webmanager/plan.md`/`CLAUDE.md`
   반영 완료.
