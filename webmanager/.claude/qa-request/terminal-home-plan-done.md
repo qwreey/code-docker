@@ -1,5 +1,34 @@
 # 터미널 홈 탭 — 구현 완료
 
+## UI 개선 라운드 (2026-08-04, 저장소 소유자 실사용 피드백 반영)
+
+1차 구현을 실제로 눌러본 뒤 받은 피드백 5가지 전부 반영:
+
+- **데스크탑 가로 분할**: `.terminal-home`이 720px 이하(모바일, 기존 앱
+  전역 브레이크포인트와 동일)에서는 기존처럼 세로로 쌓이고, 721px 이상에서는
+  "열린 세션"/"프로파일" 두 판(`.terminal-home-pane`)이 좌우로 나란히 배치.
+- **각 판 독립 스크롤**: 데스크탑 미디어쿼리에서만 `.terminal-home`이
+  `overflow: hidden`이 되고 각 `.terminal-home-pane`이 자기 `overflow-y: auto`를
+  가짐 — 한쪽이 길어도 다른 쪽 스크롤 위치에 영향 없음.
+- **편집을 다이얼로그로**: 목록 맨 아래에 붙던 인라인 폼을 없애고, 기존
+  공용 `Sheet`(모바일에서는 바텀시트로 자동 전환되는 컴포넌트,
+  `FileEditorSheet.tsx`/`TerminalSettingsPanel.tsx`가 이미 쓰던 것과 동일)로
+  교체 — 저장 버튼은 그 두 파일과 동일하게 `headerActions`에 배치.
+- **카드형 프로파일 목록**: `.terminal-home-profile-list`를
+  `grid-template-columns: repeat(auto-fill, minmax(200px, 1fr))`로 바꿔서
+  판 너비에 따라 자동으로 여러 열 카드 그리드가 됨.
+- **프로파일 드래그앤드롭 정렬**: `Layout/Sidebar.tsx`의 사이드바 탭 순서
+  변경과 완전히 동일한 패턴(순수 HTML5 drag 이벤트, `dragIdRef`/`dragOverId`)을
+  그대로 재사용 — 순서가 곧 `profiles` 배열 순서이고 `PUT
+  /api/terminal/profiles`가 전체 배열을 그대로 replace하므로 백엔드 변경 없이
+  프론트 재정렬 후 `onSaveProfiles(next)` 호출만으로 영속화됨.
+
+`npm run build`/`npm run lint` 클린. 데스크탑 가로 분할은 헤드리스 브라우저로
+`getBoundingClientRect` 직접 측정해서 두 판이 정확히 절반씩 나뉘고 각자 너비대로
+렌더링되는 것까지 확인(스크린샷 캡처가 이 환경의 타일링 WM 때문에 실제 좁은
+뷰포트로는 안 줄어들어서 모바일 폭 시각 확인은 못 함 — 모바일 스택 자체는
+기존 로직 그대로라 별도 변경 없음). 다이얼로그/카드/드래그 정렬은 코드 검증까지만.
+
 ## 구현 완료 (2026-08-03)
 
 아래 설계 그대로 전부 구현. 탭바 맨 앞에 항상 존재하는(닫기/이름변경/고정 불가)

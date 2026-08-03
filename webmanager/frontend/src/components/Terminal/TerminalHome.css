@@ -2,17 +2,46 @@
    (Terminal.css) when the Home tab is active - given its own opaque
    background rather than following --term-bg (the active xterm theme's
    color), since this is a regular dashboard-style panel, not terminal
-   output. */
+   output. Mobile (default): the two panes stack and scroll together as one
+   column. Desktop (>720px, see below): side-by-side, each scrolling
+   independently. */
 .terminal-home {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   background: var(--surface);
   color: var(--text);
-  padding: 1rem 1.2rem 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  padding: 1rem 1.2rem 1.5rem;
+}
+
+.terminal-home-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+@media (min-width: 721px) {
+  .terminal-home {
+    flex-direction: row;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .terminal-home-pane {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1rem 1.2rem 1.5rem;
+  }
+
+  .terminal-home-pane + .terminal-home-pane {
+    border-left: 1px solid var(--border);
+  }
 }
 
 .terminal-home-section-header {
@@ -40,8 +69,7 @@
   margin: 0;
 }
 
-.terminal-home-session-list,
-.terminal-home-profile-list {
+.terminal-home-session-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -94,28 +122,60 @@
   background: var(--color-gray-bg);
 }
 
+/* Profile cards - a responsive grid (rather than a single-column list) so
+   the pane's own width (roughly half the terminal on desktop, full width on
+   mobile) decides how many columns fit. */
+.terminal-home-profile-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.6rem;
+}
+
 .terminal-home-profile-card {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.8rem;
-  padding: 0.6rem 0.8rem;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.7rem 0.8rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
-  flex-wrap: wrap;
+  cursor: grab;
+}
+
+.terminal-home-profile-card.terminal-home-drag-over {
+  outline: 2px dashed var(--accent-border, var(--accent));
+  outline-offset: -2px;
 }
 
 .terminal-home-profile-info {
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  align-items: center;
+  gap: 0.35rem;
   min-width: 0;
+}
+
+.terminal-home-drag-handle {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  line-height: 1;
+  /* only shown on hover, same convention as the sidebar's own drag handle
+     (Layout/Layout.css's .sidebar-drag-handle) - reserved width so the
+     label doesn't shift when it fades in. */
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.terminal-home-profile-card:hover .terminal-home-drag-handle {
+  opacity: 1;
 }
 
 .terminal-home-profile-label {
   font-weight: 600;
   color: var(--text-heading);
+  overflow-wrap: anywhere;
 }
 
 .terminal-home-profile-detail {
@@ -127,15 +187,5 @@
 .terminal-home-profile-actions {
   display: flex;
   gap: 0.4rem;
-  flex: none;
-}
-
-.terminal-home-profile-form {
-  margin-top: 0.6rem;
-}
-
-.terminal-home-profile-form-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.8rem;
+  margin-top: 0.3rem;
 }

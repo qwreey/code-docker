@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Pin, PinOff, Plus, X } from 'lucide-react'
 import type { TerminalProfile, TerminalSessionInfo } from '../../api/types'
+import { Sheet } from '../common/Sheet'
 import './TerminalHome.css'
 
 function genId(): string {
@@ -22,7 +23,11 @@ const EMPTY_DRAFT: ProfileDraft = { editingId: null, label: '', cwd: '', command
 // active. Two independent things live here: a switcher for whatever
 // sessions are already open, and a small CRUD list of launch profiles (a
 // label plus optional starting directory/command) so opening a terminal at
-// a frequently-used location doesn't mean retyping `cd` every time.
+// a frequently-used location doesn't mean retyping `cd` every time. Laid
+// out as two independently-scrolling side-by-side panes on desktop
+// (.terminal-home-pane, see TerminalHome.css's >720px media query) and
+// stacked on mobile, matching the app's existing 720px breakpoint
+// (App.css/Terminal.css).
 export function TerminalHome({
   sessions,
   onSelectSession,
@@ -45,6 +50,11 @@ export function TerminalHome({
   onNewSession: () => void
 }) {
   const [draft, setDraft] = useState<ProfileDraft | null>(null)
+  // Drag-to-reorder, same plain HTML5 drag-event pattern as the sidebar's
+  // tab reordering (Layout/Sidebar.tsx) — a ref for the dragged id (doesn't
+  // need to trigger a render) plus state just for the drop-target highlight.
+  const dragIdRef = useRef<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   function startCreate() {
     setDraft(EMPTY_DRAFT)
@@ -62,9 +72,7 @@ export function TerminalHome({
     const command = draft.command.trim() || undefined
 
     if (draft.editingId) {
-      onSaveProfiles(
-        profiles.map((p) => (p.id === draft.editingId ? { ...p, label, cwd, command } : p)),
-      )
+      onSaveProfiles(profiles.map((p) => (p.id === draft.editingId ? { ...p, label, cwd, command } : p)))
     } else {
       onSaveProfiles([...profiles, { id: genId(), label, cwd, command }])
     }
@@ -77,9 +85,24 @@ export function TerminalHome({
     if (draft?.editingId === profile.id) setDraft(null)
   }
 
+  function handleProfileDrop(targetId: string) {
+    const draggedId = dragIdRef.current
+    dragIdRef.current = null
+    setDragOverId(null)
+    if (!draggedId || draggedId === targetId) return
+
+    const next = [...profiles]
+    const fromIndex = next.findIndex((p) => p.id === draggedId)
+    const toIndex = next.findIndex((p) => p.id === targetId)
+    if (fromIndex === -1 || toIndex === -1) return
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    onSaveProfiles(next)
+  }
+
   return (
     <div className="terminal-home">
-      <section className="terminal-home-section">
+      <section className="terminal-home-pane">
         <div className="terminal-home-section-header">
           <h2>열린 세션</h2>
           <button type="button" className="btn btn-secondary btn-small" onClick={onNewSession}>
@@ -122,32 +145,53 @@ export function TerminalHome({
         )}
       </section>
 
-      <section className="terminal-home-section">
+      <section className="terminal-home-pane">
         <div className="terminal-home-section-header">
           <h2>프로파일</h2>
-          {!draft && (
-            <button type="button" className="btn btn-secondary btn-small" onClick={startCreate}>
-              <Plus size={14} /> 새 프로파일
-            </button>
-          )}
+          <button type="button" className="btn btn-secondary btn-small" onClick={startCreate}>
+            <Plus size={14} /> 새 프로파일
+          </button>
         </div>
         {profilesError && <p className="terminal-inline-notice">프로파일을 불러오지 못했습니다 ({profilesError}).</p>}
 
-        {profiles.length === 0 && !draft && (
+        {profiles.length === 0 ? (
           <p className="terminal-home-empty">
             자주 여는 위치나 실행할 명령을 프로파일로 저장해두면 한 번에 새 세션을 열 수 있습니다.
           </p>
-        )}
-
-        {profiles.length > 0 && (
+        ) : (
           <ul className="terminal-home-profile-list">
             {profiles.map((p) => (
-              <li key={p.id} className="terminal-home-profile-card">
+              <li
+                key={p.id}
+                className={
+                  'terminal-home-profile-card' + (dragOverId === p.id ? ' terminal-home-drag-over' : '')
+                }
+                draggable
+                onDragStart={() => {
+                  dragIdRef.current = p.id
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  if (dragOverId !== p.id) setDragOverId(p.id)
+                }}
+                onDragLeave={() => setDragOverId((prev) => (prev === p.id ? null : prev))}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  handleProfileDrop(p.id)
+                }}
+                onDragEnd={() => {
+                  dragIdRef.current = null
+                  setDragOverId(null)
+                }}
+              >
                 <div className="terminal-home-profile-info">
+                  <span className="terminal-home-drag-handle" aria-hidden="true">
+                    ⠿
+                  </span>
                   <span className="terminal-home-profile-label">{p.label}</span>
-                  {p.cwd && <span className="terminal-home-profile-detail mono-cell">{p.cwd}</span>}
-                  {p.command && <span className="terminal-home-profile-detail mono-cell">{p.command}</span>}
                 </div>
+                {p.cwd && <span className="terminal-home-profile-detail mono-cell">{p.cwd}</span>}
+                {p.command && <span className="terminal-home-profile-detail mono-cell">{p.command}</span>}
                 <div className="terminal-home-profile-actions">
                   <button type="button" className="btn btn-primary btn-small" onClick={() => onOpenProfile(p)}>
                     실행
@@ -163,53 +207,59 @@ export function TerminalHome({
             ))}
           </ul>
         )}
+      </section>
 
+      <Sheet
+        open={draft !== null}
+        onClose={() => setDraft(null)}
+        title={draft?.editingId ? '프로파일 편집' : '새 프로파일'}
+        headerActions={
+          <button
+            type="button"
+            className="btn btn-primary btn-small"
+            onClick={commitDraft}
+            disabled={!draft?.label.trim()}
+          >
+            저장
+          </button>
+        }
+      >
         {draft && (
-          <div className="card terminal-home-profile-form">
-            <div className="form-grid">
-              <div className="form-field">
-                <label htmlFor="th-profile-label">이름</label>
-                <input
-                  id="th-profile-label"
-                  type="text"
-                  value={draft.label}
-                  autoFocus
-                  onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-                  placeholder="예: 블로그 서버"
-                />
-              </div>
-              <div className="form-field">
-                <label htmlFor="th-profile-cwd">시작 위치 (선택)</label>
-                <input
-                  id="th-profile-cwd"
-                  type="text"
-                  value={draft.cwd}
-                  onChange={(e) => setDraft({ ...draft, cwd: e.target.value })}
-                  placeholder="/code/Projects/blog"
-                />
-              </div>
-              <div className="form-field">
-                <label htmlFor="th-profile-command">실행할 명령 (선택)</label>
-                <input
-                  id="th-profile-command"
-                  type="text"
-                  value={draft.command}
-                  onChange={(e) => setDraft({ ...draft, command: e.target.value })}
-                  placeholder="npm run dev"
-                />
-              </div>
+          <div className="form-grid">
+            <div className="form-field">
+              <label htmlFor="th-profile-label">이름</label>
+              <input
+                id="th-profile-label"
+                type="text"
+                value={draft.label}
+                autoFocus
+                onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+                placeholder="예: 블로그 서버"
+              />
             </div>
-            <div className="terminal-home-profile-form-actions">
-              <button type="button" className="btn btn-primary btn-small" onClick={commitDraft} disabled={!draft.label.trim()}>
-                저장
-              </button>
-              <button type="button" className="btn btn-secondary btn-small" onClick={() => setDraft(null)}>
-                취소
-              </button>
+            <div className="form-field">
+              <label htmlFor="th-profile-cwd">시작 위치 (선택)</label>
+              <input
+                id="th-profile-cwd"
+                type="text"
+                value={draft.cwd}
+                onChange={(e) => setDraft({ ...draft, cwd: e.target.value })}
+                placeholder="/code/Projects/blog"
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="th-profile-command">실행할 명령 (선택)</label>
+              <input
+                id="th-profile-command"
+                type="text"
+                value={draft.command}
+                onChange={(e) => setDraft({ ...draft, command: e.target.value })}
+                placeholder="npm run dev"
+              />
             </div>
           </div>
         )}
-      </section>
+      </Sheet>
     </div>
   )
 }
