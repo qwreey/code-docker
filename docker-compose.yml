@@ -53,6 +53,11 @@ services:
       # --login-server=`. Leave unset/empty to use the official
       # tailscale.com control server instead.
       TAILSCALE_LOGIN_SERVER: "" # https://tail.qwreey.moe
+      # In-container nginx (config/nginx.default.conf) access_log verbosity:
+      #   errors - only log non-2xx/3xx responses (via an nginx map/if on
+      #     $status), so routine traffic doesn't flood `docker compose logs`.
+      #   all - log every request, combined format (the old behavior).
+      NGINX_LOG_LEVEL: "errors"
       # Path `webmanager --env-migrate`/the startup version-mismatch check
       # read the current example-env.webmanager template from. Left unset to
       # use the image's own copy. Deliberately not settable via

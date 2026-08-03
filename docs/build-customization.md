@@ -208,3 +208,15 @@ code-server(`/`, 내부 전용 `127.0.0.1:8080`)와 webmanager(`/manager`, 내�
 webmanager는 지금처럼 `/api/...`를 그대로 받습니다. access/error 로그는 nginx
 자신의 stdout/stderr로 나가서 다른 프로그램들과 동일하게 supervisord가 파일로
 캡처합니다(`vector`가 그 파일을 다시 tail).
+
+access_log 상세도는 `docker-compose.yml`의 `NGINX_LOG_LEVEL`로 조절합니다.
+기본값 `errors`는 응답 상태코드가 4xx/5xx인 요청만 기록합니다(nginx의 표준
+`map $status $loggable` + `access_log ... if=$loggable` 기법) — 매 요청이 다
+찍히던 예전 동작(`all`로 설정하면 복원됩니다)이 정상적인 200 OK 트래픽까지
+`docker compose logs`에 전부 쏟아내서 다른 프로그램 로그를 묻어버렸기 때문입니다.
+이 conf 파일은 nginx가 자체적으로 셸 환경변수를 치환하지 못하므로, 정적 파일이
+아니라 템플릿입니다 — `nginx-service.default.sh`가 시작 시 `envsubst`로
+`${NGINX_ACCESS_LOG_IF}` 자리를 채운 렌더링 결과(`/run/nginx.generated.conf`)를
+만들어 그걸로 nginx를 실행합니다. override 작성 시 이 자리표시자를 그대로 두면
+`NGINX_LOG_LEVEL` 토글이 계속 동작하고, 지우면 그냥 고정된 access_log 동작이
+됩니다.
