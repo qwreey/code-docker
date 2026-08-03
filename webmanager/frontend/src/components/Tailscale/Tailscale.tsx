@@ -1,3 +1,4 @@
+import { Status } from './Status'
 import { GlobalSettings } from './GlobalSettings'
 import { Forwards } from './Forwards'
 import { Publish } from './Publish'
@@ -11,8 +12,7 @@ export function Tailscale() {
         <h1>Tailscale</h1>
       </div>
       <p className="section-description">
-        tailscale 로그인 상태/URL은 code-server 화면 배너에서 확인하세요 — 여기서는 forwards/publish 설정만
-        관리합니다.
+        아래 상태 카드는 조회 전용입니다 — forwards/publish 설정을 관리하려면 이어지는 섹션을 사용하세요.
       </p>
       <div className="warning-note">
         <span aria-hidden="true">⚠</span>
@@ -25,6 +25,7 @@ export function Tailscale() {
           반드시 제한하세요</strong> — 선택 사항이 아닙니다.
         </span>
       </div>
+      <Status />
       <GlobalSettings />
       <Forwards />
       <Publish />

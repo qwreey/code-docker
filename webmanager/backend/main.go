@@ -165,6 +165,7 @@ func main() {
 	mux.HandleFunc("GET /api/tailscale/publish", s.handleListTailscalePublish)
 	mux.Handle("POST /api/tailscale/publish", gate.RequirePassword(http.HandlerFunc(s.handleAddTailscalePublish)))
 	mux.Handle("DELETE /api/tailscale/publish/{name}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteTailscalePublish)))
+	mux.HandleFunc("GET /api/tailscale/status", s.handleTailscaleStatus)
 
 	// Gated entirely (reads included, unlike the rest of webmanager): log
 	// content can leak secrets, so even listing/viewing requires unlock.

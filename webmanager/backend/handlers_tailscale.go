@@ -133,6 +133,35 @@ func (s *Server) handleAddTailscalePublish(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusCreated, publish)
 }
 
+// tailscaleStatusResponse is GET /api/tailscale/status's body. Status is a
+// plain pointer with no `omitempty` so it serializes as an explicit JSON
+// `null` when Available is false, matching the read-only status contract
+// agreed with the frontend.
+type tailscaleStatusResponse struct {
+	Available bool              `json:"available"`
+	Status    *tailscale.Status `json:"status,omitempty"`
+}
+
+// handleTailscaleStatus reports live tailnet status via `tailscale status
+// --json`, mirroring handleClaudeStatus's degrade-to-unavailable pattern:
+// `tailscale` missing from PATH, a stopped daemon, or a parse failure are
+// all normal states here, not errors — never a non-200 for any of them.
+func (s *Server) handleTailscaleStatus(w http.ResponseWriter, r *http.Request) {
+	binPath, ok := tailscale.FindBinary(s.cfg.TailscaleBinPath)
+	if !ok {
+		writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: false})
+		return
+	}
+
+	status, err := tailscale.GetStatus(r.Context(), binPath)
+	if err != nil {
+		writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: false})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: true, Status: &status})
+}
+
 func (s *Server) handleDeleteTailscalePublish(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if err := tailscale.DeletePublish(s.cfg.TailscaleConfigPath, name); err != nil {

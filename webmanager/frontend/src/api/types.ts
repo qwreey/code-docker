@@ -95,6 +95,29 @@ export interface TailscaleForward {
   retryInterval: number
 }
 
+export interface TailscalePeerInfo {
+  hostName: string
+  dnsName: string
+  tailscaleIPs: string[]
+  relay: string
+  online: boolean
+  tags: string[]
+  os: string
+}
+
+export interface TailscaleStatus {
+  backendState: string
+  authUrl: string
+  tailnetName: string
+  self: TailscalePeerInfo | null
+  peers: TailscalePeerInfo[]
+}
+
+export interface TailscaleStatusResponse {
+  available: boolean
+  status?: TailscaleStatus
+}
+
 export type TailscalePublishMode = 'tcp' | 'tls-terminated-tcp'
 
 export interface TailscalePublish {

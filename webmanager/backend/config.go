@@ -13,6 +13,7 @@ type Config struct {
 	GitCredentialsPath   string
 	StaticDir            string
 	TailscaleConfigPath  string
+	TailscaleBinPath     string
 	SSHSigningKeyPath    string
 	VectorLogDir         string
 	SystemDiskPath       string
@@ -120,6 +121,7 @@ func loadConfig() Config {
 		GitCredentialsPath:   getenv("GIT_CREDENTIALS_PATH", "/code/.git-credentials"),
 		StaticDir:            getenv("WEBMANAGER_STATIC_DIR", "./static"),
 		TailscaleConfigPath:  getenv("TAILSCALE_CONFIG_PATH", "/code/.tailscale/config.yaml"),
+		TailscaleBinPath:     getenv("WEBMANAGER_TAILSCALE_BINPATH", ""),
 		SSHSigningKeyPath:    getenv("SSH_SIGNING_KEY_PATH", "/code/.ssh/signing_key"),
 		VectorLogDir:         getenv("VECTOR_LOG_DIR", "/code/.vector/logs"),
 		SystemDiskPath:       getenv("SYSTEM_DISK_PATH", "/code"),

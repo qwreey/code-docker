@@ -20,3 +20,54 @@
   border-top: 1px solid var(--border);
   padding-top: 1rem;
 }
+
+.tailscale-status-note {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.tailscale-login-link {
+  margin-top: 0.5rem;
+  text-decoration: none;
+}
+
+.tailscale-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.tailscale-status-grid .card {
+  margin-top: 0;
+}
+
+.tailscale-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.tailscale-info-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.tailscale-info-list dt {
+  color: var(--text-muted);
+}
+
+.tailscale-info-list dd {
+  margin: 0;
+  font-family: var(--mono);
+  text-align: right;
+  word-break: break-word;
+}
+
+.tailscale-status-disclaimer {
+  margin: 1rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
