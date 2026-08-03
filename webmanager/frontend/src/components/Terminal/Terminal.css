@@ -91,6 +91,13 @@
   font-weight: 600;
 }
 
+/* Home tab (TerminalTabs.tsx) is a plain button, not a .terminal-tab-label
+   + separate action buttons like the real session tabs below it - nothing
+   to rename/pin/close. */
+.terminal-tab-home {
+  cursor: pointer;
+}
+
 .terminal-tab-label {
   border: none;
   background: none;
@@ -191,26 +198,6 @@
   min-width: 0;
   padding: 0.4rem 0.5rem 0;
   overflow: hidden;
-}
-
-/* Shown instead of .terminal-container when the last session was just
-   closed (Terminal.tsx) — text color follows --term-fg like everything
-   else in this surface, so it stays legible against whichever xterm theme
-   is active. */
-.terminal-empty-state {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  color: var(--term-fg, #e6e6e6);
-  opacity: 0.85;
-}
-
-.terminal-empty-state p {
-  font-size: 0.9rem;
 }
 
 .terminal-container .xterm {

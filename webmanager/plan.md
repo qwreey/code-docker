@@ -34,6 +34,7 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 | 프로젝트 스캔/정리 1단계(용량/재생성 가능 폴더 탐지, 최근 편집 런처, 읽기 전용, mise 도구 표시 포함) | `.claude/qa-request/projects-plan-done.md` (2단계 삭제는 미착수) |
 | mise 관리(install/use/uninstall, 설치된 도구 목록, env 미리보기, 추천 목록) | `.claude/qa-request/mise-plan-done.md` |
 | 웹쉘(터미널) M1(임시 세션, xterm.js+PTY/WebSocket, 비밀번호 게이트 소급 적용됨) + M2(named 영속 세션, `internal/termsession`, 탭 UI/유지 토글/유휴 자동정리) + 모바일 레이아웃 재설계(키보드 추적, 엣지투엣지, 테마 동화 색상) | `.claude/archive/terminal-plan-done.md` |
+| 터미널 홈 탭(항상 열려있는 첫 탭 — 세션 목록 전환 + 시작 위치/실행 명령을 저장하는 프로파일 CRUD, 세션 생성 시 cwd/초기 명령 지원하도록 `internal/termsession` 확장) | `.claude/qa-request/terminal-home-plan-done.md` |
 | 공용 비밀번호 게이트(`internal/authgate`, argon2id + ENV 전용 저장, 읽기 열림/쓰기 게이트 원칙으로 Git/SSH/Tailscale/Supervisor/Logs까지 확장) | `.claude/authgate-plan-done.md` (터미널 탭이 아직 `RequiresUnlock`으로 안 감싸진 실제 갭 있음 — 문서 참고, 그래서 archive 안 됨) |
 | 파일 매니저(업로드/다운로드/이동/복사/이름변경/폴더생성/멀티선택/정보패널/텍스트편집, 자체 비밀번호 게이트) | `.claude/archive/filemanager-plan-done.md` (업로드 진행률/chmod/zip 다운로드 등 v1 잔여 항목은 `.claude/filemanager-rework-plan.md`) |
 | 공용 코드 에디터(CodeMirror 6, 지연 로딩) — git raw 설정 편집/파일 매니저가 재사용 | 별도 문서 없음(공용 컴포넌트, `src/components/common/CodeEditor.tsx`) |
@@ -84,6 +85,11 @@ program이라 `docker compose build && up` 후 7→8개 program 전부 RUNNING�
 인증은 안 함), 코드 붙여넣기까지 포함한 전체 플로우를 컨테이너 안에서 끝까지
 눌러본 적은 없음 — 사용자가 직접 한 번 로그인까지 완주해보는 걸 권장. Tailscale
 상태 탭도 실제 tailnet 연결 상태에서 피어/relay 표시가 맞는지 실기 확인 필요.
+
+같은 날 이어서 추가된 터미널 홈 탭도 `go build`/`go vet`/`gofmt`/`go test ./...`
++ `npm run build`/`npm run lint`만 통과했고 아직 실컨테이너 검증 전 — 프로파일의
+cwd/초기 명령이 실제 셸에서 기대대로 동작하는지, 홈 탭 진입/전환/탭 닫기 후 복귀가
+매끄러운지 직접 확인 필요(`.claude/qa-request/terminal-home-plan-done.md` 참고).
 
 ## 할 일 (우선순위 순, 문서 있으면 링크)
 

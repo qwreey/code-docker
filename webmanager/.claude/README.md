@@ -55,6 +55,7 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 | `qa-request/env-migration-plan-done.md` | `.env.webmanager` 마이그레이션 도구(`webmanager --env-migrate`) — 키 추가/삭제 반영(삭제된 키는 `#~` 아카이브), 유저 코멘트 보존, `#!important`/`#!` 마커, 경로 기반 템플릿(조직 커스텀 마운트 가능), 웹 UI 경고 배너(dismiss 영속화) |
 | `qa-request/expose-plan-done.md` | code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일 origin 통합(레포 루트 `expose.md` 리서치를 대체) — M1(nginx)~M3(프론트엔드 서브패스 대응) 코드/빌드 검증까지 완료. code-server 쪽에서 매니저를 여는 위젯/PWA 바로가기는 별도 마일스톤으로 남아있음(질문만 정리, 착수 안 함) |
 | `qa-request/dind-plan-done.md` | Docker/dind 관리 — M1(목록/로그, 읽기 전용)+M2(start/stop/remove, 비밀번호 게이트)+M3(docker inspect 상세 뷰, 비밀번호 게이트) 전부 코드/빌드 검증까지 완료 |
+| `qa-request/terminal-home-plan-done.md` | 터미널 홈 탭 — 항상 열려있는 첫 탭에 세션 목록 전환 + 시작 위치/실행 명령 프로파일 CRUD, 세션 생성 시 cwd/초기 명령 지원하도록 `internal/termsession` 확장, 코드/빌드 검증까지 완료 |
 
 ## 완료, 사용자 실사용 검증까지 끝나서 아카이브됨 (`archive/*-plan-done.md`)
 

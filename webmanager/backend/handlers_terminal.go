@@ -70,12 +70,20 @@ func (s *Server) handleTerminal(w http.ResponseWriter, r *http.Request) {
 	// M1 through the registry with a throwaway name, so M1's already-tested
 	// behavior can't regress from M2 changes.
 	if name := r.URL.Query().Get("session"); name != "" {
+		// cwd/cmd are only meaningful the moment this name is first created
+		// (see termsession.Registry.GetOrCreate) — a plain tab-switch
+		// reconnect to an already-running session just omits them and they
+		// no-op here too, since GetOrCreate ignores opts on that path.
+		opts := termsession.CreateOptions{
+			Cwd:            r.URL.Query().Get("cwd"),
+			InitialCommand: r.URL.Query().Get("cmd"),
+		}
 		// context.Background(), not r.Context(): matches the ephemeral path
 		// below (which does the same for the same reason) — this connection
 		// can legitimately outlive whatever timeout semantics the request
 		// context might carry, since the handler blocks here for the
 		// connection's whole lifetime rather than returning immediately.
-		s.handleNamedTerminal(context.Background(), conn, name)
+		s.handleNamedTerminal(context.Background(), conn, name, opts)
 		return
 	}
 
@@ -161,8 +169,8 @@ readLoop:
 // connection's input/output exactly like handleTerminal's M1 loop — except
 // the PTY itself is owned by the Session, not this function, so it keeps
 // running after this connection ends.
-func (s *Server) handleNamedTerminal(ctx context.Context, conn *websocket.Conn, name string) {
-	sess, err := s.termSessions.GetOrCreate(name)
+func (s *Server) handleNamedTerminal(ctx context.Context, conn *websocket.Conn, name string, opts termsession.CreateOptions) {
+	sess, err := s.termSessions.GetOrCreate(name, opts)
 	if err != nil {
 		log.Printf("terminal: session %q: %v", name, err)
 		status := websocket.StatusInternalError

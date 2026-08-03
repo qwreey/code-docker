@@ -270,6 +270,11 @@ func main() {
 	mux.Handle("PATCH /api/terminal/sessions/{name}", gate.RequirePassword(http.HandlerFunc(s.handlePatchTerminalSession)))
 	mux.Handle("DELETE /api/terminal/sessions/{name}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteTerminalSession)))
 
+	// Home tab launch profiles (internal/terminalprofiles) — same gate as
+	// the rest of the terminal feature.
+	mux.Handle("GET /api/terminal/profiles", gate.RequirePassword(http.HandlerFunc(s.handleGetTerminalProfiles)))
+	mux.Handle("PUT /api/terminal/profiles", gate.RequirePassword(http.HandlerFunc(s.handlePutTerminalProfiles)))
+
 	// SECURITY: arbitrary filesystem read/write/delete under
 	// WEBMANAGER_FILES_ROOT (default /code) — webmanager's single largest
 	// risk surface alongside the terminal above and dind. Gated by the

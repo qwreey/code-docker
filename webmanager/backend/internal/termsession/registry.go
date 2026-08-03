@@ -35,8 +35,9 @@ func NewRegistry(shellFunc func() string, scrollbackBytes int, idleTimeout time.
 }
 
 // GetOrCreate returns the named session, creating (and starting) a new PTY
-// for it if this name hasn't been seen before.
-func (r *Registry) GetOrCreate(name string) (*Session, error) {
+// for it if this name hasn't been seen before. opts is only consulted on
+// that creation path — reattaching to an existing session ignores it.
+func (r *Registry) GetOrCreate(name string, opts CreateOptions) (*Session, error) {
 	if err := ValidateName(name); err != nil {
 		return nil, err
 	}
@@ -48,7 +49,7 @@ func (r *Registry) GetOrCreate(name string) (*Session, error) {
 	}
 	r.mu.Unlock()
 
-	s, err := newSession(name, r.shellFunc(), r.scrollbackBytes)
+	s, err := newSession(name, r.shellFunc(), r.scrollbackBytes, opts)
 	if err != nil {
 		return nil, err
 	}

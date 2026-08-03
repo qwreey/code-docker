@@ -55,6 +55,11 @@ type Config struct {
 	// keybindings/color themes are persisted (see internal/terminalsettings).
 	TerminalSettingsPath string
 
+	// TerminalProfilesPath is where the terminal Home tab's user-defined
+	// launch profiles (label + optional cwd/initial command) are persisted
+	// (see internal/terminalprofiles).
+	TerminalProfilesPath string
+
 	// SidebarOrderPath is where the user's drag-and-drop sidebar tab order
 	// is persisted (see internal/uiprefs). Not gated — purely cosmetic.
 	SidebarOrderPath string
@@ -154,6 +159,7 @@ func loadConfig() Config {
 		FilesMaxUploadBytes: getenv("WEBMANAGER_FILES_MAX_UPLOAD_BYTES", "2147483648"),
 
 		TerminalSettingsPath: getenv("WEBMANAGER_TERMINAL_SETTINGS_PATH", "/code/.webmanager/terminal-settings.json"),
+		TerminalProfilesPath: getenv("WEBMANAGER_TERMINAL_PROFILES_PATH", "/code/.webmanager/terminal-profiles.json"),
 		SidebarOrderPath:     getenv("WEBMANAGER_SIDEBAR_ORDER_PATH", "/code/.webmanager/sidebar-order.json"),
 
 		DiskBreakdownRoot:      getenv("SYSTEM_DISK_BREAKDOWN_ROOT", "/"),

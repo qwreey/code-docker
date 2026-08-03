@@ -4,15 +4,22 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
 import { api, apiUrl, errorMessage } from '../../api/client'
-import type { TerminalSessionInfo, TerminalSettings } from '../../api/types'
+import type { TerminalProfile, TerminalProfilesDoc, TerminalSessionInfo, TerminalSettings } from '../../api/types'
 import { DEFAULT_KEYBINDINGS, type ModifierId } from './keybindings'
 import { DEFAULT_THEME_ID, findTheme, themeToXterm } from './themes'
 import { applyModifier } from './modifiers'
 import { TerminalControls } from './TerminalControls'
 import { TerminalSettingsPanel } from './TerminalSettingsPanel'
-import { TerminalTabs } from './TerminalTabs'
+import { TerminalTabs, HOME_TAB_ID } from './TerminalTabs'
+import { TerminalHome } from './TerminalHome'
 import { useKeyboardInset } from './useKeyboardInset'
 import './Terminal.css'
+
+// Options a new session can be created with — only meaningful the moment a
+// never-before-seen name is first connected (see the WS-connect effect and
+// internal/termsession.Registry.GetOrCreate); reused for both the plain "+"
+// tab (no options) and the Home tab's profile launcher (label/cwd/command).
+type SessionCreateOptions = { label?: string; cwd?: string; command?: string }
 
 type ConnectionState = 'connecting' | 'connected' | 'disconnected'
 
@@ -34,21 +41,30 @@ const EMPTY_SETTINGS: TerminalSettings = {
   customThemes: [],
 }
 
-// nextSessionName picks "세션 N" for the smallest N not already taken, so
-// repeated "+" clicks (or a name someone already renamed away from the
-// default pattern) never collide. alsoTaken covers the currently-active
-// session specifically — it's real and already occupying that name the
-// moment it's picked, but the backend may not have confirmed it in
-// `sessions` yet (GET /api/terminal/sessions hasn't been refetched since
-// connecting, or is still in flight) — without this, clicking "+" before
-// that refetch lands would silently "create" the exact name already active
-// (verified live: this was a real bug, not a hypothetical one).
-function nextSessionName(existing: TerminalSessionInfo[], alsoTaken: string): string {
+// nextSessionName picks "세션 N" for the smallest N not already taken (or,
+// when a profile supplies a label, that label itself — only falling back to
+// "label 2", "label 3", ... if it's already in use), so repeated "+" clicks
+// (or a name someone already renamed away from the default pattern) never
+// collide. alsoTaken covers the currently-active session specifically —
+// it's real and already occupying that name the moment it's picked, but the
+// backend may not have confirmed it in `sessions` yet (GET
+// /api/terminal/sessions hasn't been refetched since connecting, or is
+// still in flight) — without this, clicking "+" before that refetch lands
+// would silently "create" the exact name already active (verified live:
+// this was a real bug, not a hypothetical one).
+function nextSessionName(existing: TerminalSessionInfo[], alsoTaken: string, label?: string): string {
   const taken = new Set(existing.map((s) => s.name))
   taken.add(alsoTaken)
-  let n = 1
-  while (taken.has(`세션 ${n}`)) n++
-  return `세션 ${n}`
+  const base = label?.trim() || '세션'
+  if (base === '세션') {
+    let n = 1
+    while (taken.has(`세션 ${n}`)) n++
+    return `세션 ${n}`
+  }
+  if (!taken.has(base)) return base
+  let n = 2
+  while (taken.has(`${base} ${n}`)) n++
+  return `${base} ${n}`
 }
 
 export function Terminal() {
@@ -66,15 +82,25 @@ export function Terminal() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [armedModifier, setArmedModifier] = useState<ModifierId | null>(null)
   const [sessions, setSessions] = useState<TerminalSessionInfo[]>([])
-  // null means "no session selected" - this is also the initial state now:
-  // opening the Terminal tab must not silently spawn a shell before the user
-  // asks for one, so the empty state (.terminal-empty-state, "세션 열기"
-  // button) is what a fresh mount shows, same as after explicitly closing the
-  // last tab. Pre-existing sessions from a previous browser session (e.g.
-  // pinned ones) still show up normally via refreshSessions() below — this
-  // only affects whether a brand new session gets created on mount.
-  const [activeSession, setActiveSession] = useState<string | null>(null)
+  // HOME_TAB_ID is a virtual tab (never a real termsession.Session), and is
+  // also the initial state now: opening the Terminal tab must not silently
+  // spawn a shell before the user asks for one, so the Home tab (session
+  // list + launch profiles, see TerminalHome.tsx) is what a fresh mount
+  // shows, same as after explicitly closing the last real tab. Pre-existing
+  // sessions from a previous browser session (e.g. pinned ones) still show
+  // up normally via refreshSessions() below — this only affects whether a
+  // brand new session gets created/attached on mount.
+  const [activeSession, setActiveSession] = useState<string>(HOME_TAB_ID)
   const [sessionActionError, setSessionActionError] = useState<string | null>(null)
+  const [profiles, setProfiles] = useState<TerminalProfile[]>([])
+  const [profilesError, setProfilesError] = useState<string | null>(null)
+  // Carries cwd/command from addSession(opts) through to the WS-connect
+  // effect below, keyed by the session name they belong to — a ref (not
+  // state) since it's write-then-read-once bookkeeping, not something a
+  // render should react to. Cleared once consumed; harmless if it weren't
+  // (GetOrCreate ignores opts on reattach) but keeping it tidy avoids
+  // resending stale values on an unrelated later reconnect.
+  const pendingCreateOptionsRef = useRef<Map<string, { cwd?: string; command?: string }>>(new Map())
   const keyboardInset = useKeyboardInset()
 
   // Effective settings: fall back to hardcoded defaults until the backend
@@ -130,6 +156,32 @@ export function Terminal() {
   useEffect(() => {
     refreshSessions()
   }, [refreshSessions])
+
+  // Home tab launch profiles — best-effort like refreshSessions above; the
+  // Home tab just shows profilesError and an empty list if this fails.
+  const refreshProfiles = useCallback(async () => {
+    try {
+      const data = await api.get<TerminalProfilesDoc>('/terminal/profiles')
+      setProfiles(data.profiles)
+      setProfilesError(null)
+    } catch (e) {
+      setProfilesError(errorMessage(e))
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshProfiles()
+  }, [refreshProfiles])
+
+  const saveProfiles = useCallback(async (next: TerminalProfile[]) => {
+    try {
+      await api.put('/terminal/profiles', { profiles: next })
+      setProfiles(next)
+      setProfilesError(null)
+    } catch (e) {
+      setProfilesError(errorMessage(e))
+    }
+  }, [])
 
   // Apply the active theme live whenever it changes (initial load, or a
   // selection/edit made in the settings panel).
@@ -254,10 +306,10 @@ export function Terminal() {
     const fitAddon = fitAddonRef.current
     if (!term || !fitAddon) return
 
-    if (!activeSession) {
-      // No session to connect to (the last tab was just closed) - the empty
-      // state below covers the UI; the previous effect run's cleanup
-      // already closed whatever WebSocket was open.
+    if (activeSession === HOME_TAB_ID) {
+      // Home tab is active, not a real session (the last real tab may have
+      // just been closed) - TerminalHome covers the UI; the previous effect
+      // run's cleanup already closed whatever WebSocket was open.
       term.reset()
       return
     }
@@ -265,10 +317,18 @@ export function Terminal() {
     term.reset()
     setState('connecting')
 
+    // Only ever non-empty right after addSession(opts) picked this exact
+    // name (see there) - consumed once so an unrelated later reconnect to
+    // the same still-open tab doesn't keep resending them (harmless either
+    // way, since the backend only honors them on actual creation).
+    const pending = pendingCreateOptionsRef.current.get(activeSession)
+    pendingCreateOptionsRef.current.delete(activeSession)
+    const params = new URLSearchParams({ session: activeSession })
+    if (pending?.cwd) params.set('cwd', pending.cwd)
+    if (pending?.command) params.set('cmd', pending.command)
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const ws = new WebSocket(
-      `${protocol}//${window.location.host}${apiUrl(`/terminal?session=${encodeURIComponent(activeSession)}`)}`,
-    )
+    const ws = new WebSocket(`${protocol}//${window.location.host}${apiUrl(`/terminal?${params.toString()}`)}`)
     ws.binaryType = 'arraybuffer'
     wsRef.current = ws
 
@@ -307,9 +367,24 @@ export function Terminal() {
     [activeSession],
   )
 
-  const addSession = useCallback(() => {
-    setActiveSession(nextSessionName(sessions, activeSession ?? ''))
-  }, [sessions, activeSession])
+  const addSession = useCallback(
+    (opts?: SessionCreateOptions) => {
+      const alsoTaken = activeSession === HOME_TAB_ID ? '' : activeSession
+      const name = nextSessionName(sessions, alsoTaken, opts?.label)
+      if (opts && (opts.cwd || opts.command)) {
+        pendingCreateOptionsRef.current.set(name, { cwd: opts.cwd, command: opts.command })
+      }
+      setActiveSession(name)
+    },
+    [sessions, activeSession],
+  )
+
+  const openProfile = useCallback(
+    (profile: TerminalProfile) => {
+      addSession({ label: profile.label, cwd: profile.cwd, command: profile.command })
+    },
+    [addSession],
+  )
 
   const togglePin = useCallback(
     async (name: string, pinned: boolean) => {
@@ -360,9 +435,9 @@ export function Terminal() {
       if (name === activeSession) {
         const remaining = sessions.filter((s) => s.name !== name)
         // No new default session gets created here on purpose - closing
-        // the last tab should leave an explicit empty state (below) rather
-        // than silently spinning up a fresh "세션 1".
-        setActiveSession(remaining.length > 0 ? remaining[0].name : null)
+        // the last tab should fall back to the Home tab rather than
+        // silently spinning up a fresh "세션 1".
+        setActiveSession(remaining.length > 0 ? remaining[0].name : HOME_TAB_ID)
       }
       await refreshSessions()
     },
@@ -388,7 +463,9 @@ export function Terminal() {
       <div className="terminal-topbar">
         <h1>Terminal</h1>
         <div className="terminal-header-actions">
-          {activeSession && <span className={`badge ${STATE_BADGE_CLASS[state]}`}>{STATE_LABEL[state]}</span>}
+          {activeSession !== HOME_TAB_ID && (
+            <span className={`badge ${STATE_BADGE_CLASS[state]}`}>{STATE_LABEL[state]}</span>
+          )}
           <button type="button" className="btn btn-secondary btn-small" onClick={() => setSettingsOpen(true)}>
             설정
           </button>
@@ -415,16 +492,21 @@ export function Terminal() {
             target element to always exist, so hiding it via CSS rather than
             unmounting avoids having to recreate xterm when a session opens
             again. */}
-        <div ref={containerRef} className="terminal-container" hidden={!activeSession} />
-        {!activeSession && (
-          <div className="terminal-empty-state">
-            <p>열린 세션이 없습니다.</p>
-            <button type="button" className="btn btn-primary" onClick={addSession}>
-              세션 열기
-            </button>
-          </div>
+        <div ref={containerRef} className="terminal-container" hidden={activeSession === HOME_TAB_ID} />
+        {activeSession === HOME_TAB_ID && (
+          <TerminalHome
+            sessions={sessions}
+            onSelectSession={selectSession}
+            onTogglePin={togglePin}
+            onCloseSession={closeSession}
+            profiles={profiles}
+            profilesError={profilesError}
+            onSaveProfiles={saveProfiles}
+            onOpenProfile={openProfile}
+            onNewSession={() => addSession()}
+          />
         )}
-        {activeSession && (
+        {activeSession !== HOME_TAB_ID && (
           <TerminalControls
             keybindings={effectiveSettings.keybindings}
             armedModifier={armedModifier}

@@ -550,3 +550,16 @@ export interface TerminalSessionInfo {
 export interface SidebarOrder {
   order: string[] // SectionId values, in user-chosen display order
 }
+
+// Mirrors internal/terminalprofiles.Profile — Home tab launch presets. Cwd
+// and Command are both optional/independent.
+export interface TerminalProfile {
+  id: string
+  label: string
+  cwd?: string
+  command?: string
+}
+
+export interface TerminalProfilesDoc {
+  profiles: TerminalProfile[]
+}

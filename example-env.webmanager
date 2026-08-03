@@ -29,7 +29,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=4
+WEBMANAGER_ENV_VERSION=5
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -112,6 +112,8 @@ WEBMANAGER_ENV_VERSION=4
 #. 유휴 시간, 세션당 스크롤백 링버퍼 크기(바이트).
 #WEBMANAGER_TERMINAL_SESSION_IDLE_TIMEOUT=30m
 #WEBMANAGER_TERMINAL_SESSION_SCROLLBACK_BYTES=262144
+#. 홈 탭에 저장하는 세션 실행 프로파일(이름 + 시작 위치/명령) 저장 경로.
+#WEBMANAGER_TERMINAL_PROFILES_PATH=
 
 #. --- 사이드바 ---
 #. 드래그앤드롭으로 정렬한 탭 순서 저장 경로.

@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -98,9 +99,34 @@ type Session struct {
 
 type writerFunc func(p []byte) error
 
-func newSession(name, shell string, scrollbackBytes int) (*Session, error) {
+// CreateOptions customizes a brand-new session at creation time only — see
+// Registry.GetOrCreate, which ignores these when reattaching to a session
+// that already exists (an already-running PTY's cwd/initial command can't
+// be changed after the fact).
+type CreateOptions struct {
+	// Cwd, if set and it names an existing directory, is used as the
+	// shell's starting directory instead of the "/code" default. An
+	// invalid/nonexistent value falls back to the default rather than
+	// failing the whole session — this is a convenience starting point, not
+	// a security boundary (the shell it starts is already full
+	// root-equivalent access).
+	Cwd string
+	// InitialCommand, if set, is written to the PTY right after the shell
+	// starts, exactly as if the user had typed it themselves and pressed
+	// Enter. No shell-escaping is needed since it's literal keystrokes into
+	// an interactive shell, not a value substituted into another
+	// exec.Command.
+	InitialCommand string
+}
+
+func newSession(name, shell string, scrollbackBytes int, opts CreateOptions) (*Session, error) {
 	cmd := exec.Command(shell)
 	cmd.Dir = "/code"
+	if opts.Cwd != "" {
+		if info, err := os.Stat(opts.Cwd); err == nil && info.IsDir() {
+			cmd.Dir = opts.Cwd
+		}
+	}
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
 
 	ptmx, err := pty.Start(cmd)
@@ -117,6 +143,9 @@ func newSession(name, shell string, scrollbackBytes int) (*Session, error) {
 		ring:           newRingBuffer(scrollbackBytes),
 		lastAttachedAt: now,
 		done:           make(chan struct{}),
+	}
+	if opts.InitialCommand != "" {
+		_, _ = ptmx.Write([]byte(strings.TrimRight(opts.InitialCommand, "\r\n") + "\n"))
 	}
 	go s.pump()
 	return s, nil
