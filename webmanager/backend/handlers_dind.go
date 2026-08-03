@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -62,4 +63,42 @@ func (s *Server) handleDindContainerLogs(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"text": text})
+}
+
+// M2: start/stop/remove, mutating so gated by RequirePassword in main.go
+// (unlike the read-only handlers above). Audit trail is just a log.Printf —
+// webmanager's own stdout is already collected by the vector pipeline and
+// surfaced in the Logs tab, so no new storage is needed for this (see
+// webmanager/.claude/dind-plan.md's "위험 완화" section).
+func (s *Server) handleStartDindContainer(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := dind.StartContainer(r.Context(), id); err != nil {
+		writeDindErr(w, err)
+		return
+	}
+	log.Printf("dind: started container %s", id)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (s *Server) handleStopDindContainer(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := dind.StopContainer(r.Context(), id); err != nil {
+		writeDindErr(w, err)
+		return
+	}
+	log.Printf("dind: stopped container %s", id)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (s *Server) handleRemoveDindContainer(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	// force must be an explicit opt-in query param — never implicit/default
+	// force-removal of a running container (plan doc requirement).
+	force := r.URL.Query().Get("force") == "true"
+	if err := dind.RemoveContainer(r.Context(), id, force); err != nil {
+		writeDindErr(w, err)
+		return
+	}
+	log.Printf("dind: removed container %s (force=%v)", id, force)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

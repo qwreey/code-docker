@@ -25,8 +25,9 @@ from "Processes" — split into 성능/프로세스 sub-tabs (host-wide per-core
 heatmap, host-physical memory breakdown alongside cgroup used/limit,
 best-effort clock/temperature; process list+tree dual view, status filter,
 fuzzy search with match highlighting, client-side DOM pagination), Claude Code
-status tab M1+M2+M3, Docker/dind management M1 (read-only: container/image
-list + log tail, `internal/dind` CLI shell-out, ungated), a per-top-level-
+status tab M1+M2+M3, Docker/dind management M1+M2 (container/image
+list + log tail, `internal/dind` CLI shell-out; start/stop/remove with
+mandatory confirm dialogs, password-gated), a per-top-level-
 directory container disk breakdown in Task Manager (`internal/diskusage`,
 `du`-based, cached + explicit-trigger-only like the Projects scan), code-server extension recommend/install (categorized,
 collapsible, installed-list section, an open-vsx "더 보기" link, a
@@ -76,9 +77,6 @@ dependencies on each other or on anything still queued):
 3. `.claude/extension-search-plan.md` — extension search + marketplace-URL
    paste-to-install (with an open-vsx cross-lookup + vsix-direct-download
    fallback). Design done, not started.
-4. `.claude/dind-plan.md` — Docker/dind management **M2** (start/stop/remove
-   with mandatory confirm dialogs, password-gate the writes). M1
-   (container/image list + log tail, read-only) is done.
 
 **Lower-priority / no dedicated plan doc yet** — tracked only in `plan.md`'s
 TODO table: code-server settings.json editor (revisit once caddy-plan's

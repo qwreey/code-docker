@@ -1,4 +1,4 @@
-# Docker/dind 관리 (M1 구현 완료, M2는 아직)
+# Docker/dind 관리 (M1+M2 구현 완료)
 
 ## 구현 완료 (2026-08-03): M1 (읽기 전용)
 
@@ -25,10 +25,30 @@ ContainerTable/ImageTable/DindLogPanel) — Task Manager의 서브탭 CSS
 뺐음**(list/logs만으로 M1 완결, inspect는 별도 라운드로 미룸 — 질문 자체는 아직
 유효).
 
-## 다음: M2 (start/stop/remove)
+## 구현 완료 (2026-08-03): M2 (start/stop/remove)
 
-아래 "위험 완화" 절 그대로: 시작/정지/삭제는 확인 다이얼로그 필수(예외 없음),
-`docker rm`이 실행 중 컨테이너엔 `-f`가 필요하다는 점 UI 문구에 반영. 미착수.
+아래 "위험 완화" 절 그대로: `internal/dind`에 `StartContainer`/`StopContainer`/
+`RemoveContainer`(plain 함수, M1과 동일 패턴)를 추가해 각각 `docker
+start|stop|rm [-f]`로 셸아웃, 컨테이너 ID는 M1과 같은
+`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$` 정규식(`ValidateID`)을 그대로 재사용.
+`POST /api/dind/containers/{id}/start|stop|remove` 3개 핸들러
+(`handlers_dind.go`)는 `main.go`에서 `gate.RequirePassword`로 감싸 비밀번호
+게이트 적용 — Supervisor의 start/stop/restart와 동일한 배선. 삭제 강제 여부는
+`?force=true` 쿼리 파라미터로만 명시적으로 켤 수 있고, 기본값(force 없음)은 항상
+`docker rm`(정지된 컨테이너만 성공) — 실행 중 컨테이너의 암묵적 강제 삭제는 없음.
+액션마다 `log.Printf` 한 줄로 감사 로그(선택 사항이었지만 거의 공짜라 추가함).
+
+프론트(`src/components/Dind/ContainerTable.tsx`)는 각 행에 시작/정지/삭제 버튼을
+추가 — 셋 다 `window.confirm` 확인 다이얼로그 필수(예외 없음, Supervisor
+`ProcessTable.tsx`의 `confirmAction` 패턴과 동일하게 재사용, 별도 다이얼로그
+컴포넌트는 이 저장소에 애초에 없음). 삭제 확인 문구는 M1이 이미 받아온 목록 데이터의
+`state` 필드로 실행 중 여부를 판단(새 fetch 없음): 실행 중이면 "강제 삭제하면
+즉시 종료(kill)됩니다, 먼저 정지 버튼으로 정지 후 삭제하세요"를 명시하고 확인 시
+`force=true`로 호출, 정지/생성 상태면 일반 삭제 문구로 `force` 없이 호출. 액션
+성공 시 `Dind.tsx`가 즉시 `load()`를 재호출해 5초 폴링을 기다리지 않고 목록을
+새로고침. `go build`/`go vet`/`gofmt`, `npm run build`/`npm run lint` 전부
+클린 — 실컨테이너(`docker compose up`) 통합 확인은 M1과 마찬가지로 아직 안 함,
+출시 전 권장.
 
 ---
 

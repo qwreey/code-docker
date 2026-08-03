@@ -7,9 +7,9 @@
 // stderr into plain text on its own, unlike the raw Engine API), so a new
 // dependency buys nothing.
 //
-// v1 scope is strictly read-only (list containers/images, tail logs) per the
-// plan doc — start/stop/remove and anything resembling `docker run`/`exec`/
-// `cp` are deliberately out of scope here.
+// M1 (list containers/images, tail logs) and M2 (start/stop/remove) are both
+// implemented here per the plan doc; anything resembling `docker run`/`exec`/
+// `cp` stays deliberately out of scope indefinitely.
 package dind
 
 import (
@@ -176,6 +176,44 @@ func ListImages(ctx context.Context) ([]Image, error) {
 		})
 	}
 	return images, nil
+}
+
+// StartContainer runs `docker start` on id (validated via ValidateID before
+// ever reaching exec.Command, same as every other function in this package).
+func StartContainer(ctx context.Context, id string) error {
+	if err := ValidateID(id); err != nil {
+		return err
+	}
+	_, err := runDocker(ctx, "start", id)
+	return err
+}
+
+// StopContainer runs `docker stop` on id. This is a graceful stop (SIGTERM
+// then SIGKILL after docker's default timeout) — never forced.
+func StopContainer(ctx context.Context, id string) error {
+	if err := ValidateID(id); err != nil {
+		return err
+	}
+	_, err := runDocker(ctx, "stop", id)
+	return err
+}
+
+// RemoveContainer runs `docker rm` on id, or `docker rm -f` when force is
+// true. force must be an explicit, caller-driven opt-in (see handlers_dind.go
+// — it only comes from an explicit query param, never a default) since `-f`
+// on a running container kills it without the graceful stop StopContainer
+// gives; the frontend confirm dialog is responsible for saying so.
+func RemoveContainer(ctx context.Context, id string, force bool) error {
+	if err := ValidateID(id); err != nil {
+		return err
+	}
+	args := []string{"rm"}
+	if force {
+		args = append(args, "-f")
+	}
+	args = append(args, id)
+	_, err := runDocker(ctx, args...)
+	return err
 }
 
 // ContainerLogs returns up to tail lines of combined stdout+stderr for the

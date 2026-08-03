@@ -11,9 +11,10 @@ const POLL_INTERVAL_MS = 5000
 
 type Tab = 'containers' | 'images'
 
-// M1 (read-only): list containers/images + tail logs. Start/stop/remove is
-// queued next (M2, with mandatory confirm dialogs); docker run/exec/cp stay
-// out of scope indefinitely — see webmanager/.claude/dind-plan.md.
+// M1 (read-only: list containers/images + tail logs) and M2 (start/stop/
+// remove, password-gated on the backend, mandatory confirm dialogs here) are
+// both implemented. docker run/exec/cp stay out of scope indefinitely — see
+// webmanager/.claude/dind-plan.md.
 export function Dind() {
   const [tab, setTab] = useState<Tab>('containers')
   const [containers, setContainers] = useState<DindContainer[]>([])
@@ -21,6 +22,7 @@ export function Dind() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [logTarget, setLogTarget] = useState<DindContainer | null>(null)
+  const [busy, setBusy] = useState<Record<string, boolean>>({})
 
   const loadingRef = useRef(false)
 
@@ -48,6 +50,23 @@ export function Dind() {
     const timer = setInterval(load, POLL_INTERVAL_MS)
     return () => clearInterval(timer)
   }, [load])
+
+  // Confirm dialogs happen in ContainerTable (it has the per-row state/name
+  // needed to word them correctly); this just performs the already-confirmed
+  // action and refetches immediately afterward so the poll interval isn't
+  // the only thing keeping the table fresh (per the plan doc).
+  async function handleAction(id: string, action: 'start' | 'stop' | 'remove', force = false) {
+    setBusy((prev) => ({ ...prev, [id]: true }))
+    try {
+      const suffix = action === 'remove' && force ? '?force=true' : ''
+      await api.post(`/dind/containers/${encodeURIComponent(id)}/${action}${suffix}`)
+      await load()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy((prev) => ({ ...prev, [id]: false }))
+    }
+  }
 
   return (
     <section>
@@ -81,7 +100,7 @@ export function Dind() {
       {loading ? (
         <p className="empty-state">불러오는 중...</p>
       ) : tab === 'containers' ? (
-        <ContainerTable containers={containers} onShowLogs={setLogTarget} />
+        <ContainerTable containers={containers} busy={busy} onShowLogs={setLogTarget} onAction={handleAction} />
       ) : (
         <ImageTable images={images} />
       )}

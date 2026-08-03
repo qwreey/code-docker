@@ -28,7 +28,7 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 | Tailscale forwards/publish CRUD | `.claude/archive/tailscale-plan-done.md` |
 | vector 로그 파이프라인 + Logs 페이지 | `.claude/archive/vector-logs-plan-done.md` |
 | 작업 관리자(구 "Processes") — 성능/프로세스 서브탭 분리, 프로세스 트리+리스트, 필터/검색, 코어별 CPU 히트맵(호버 시 최근 히스토리 스파크라인 포함), 메모리 구성요소별 분해(호스트 물리 vs cgroup), 컨테이너 자체 루트 파일시스템의 최상위 디렉토리별 디스크 사용량 분석(Storage Sense류, `du` 기반, 캐시 + 수동 새로고침 전용) | `.claude/archive/processes-plan-done.md` |
-| Docker/dind 관리 M1(읽기 전용) — 컨테이너/이미지 목록, 로그 조회, `internal/dind` CLI 셸아웃 | `.claude/dind-plan.md` (M2 start/stop/remove는 미착수) |
+| Docker/dind 관리 M1(읽기 전용 — 컨테이너/이미지 목록, 로그 조회, `internal/dind` CLI 셸아웃)+M2(start/stop/remove, 확인 다이얼로그 필수, 비밀번호 게이트) | `.claude/dind-plan.md` |
 | Claude Code 상태 탭 M1(퀵 오버뷰)+M2(히트맵/주간그래프/모델별 토큰)+M3(Skills/Plugins) | `.claude/claude-plan.md` (M4~M5는 미착수) |
 | code-server 익스텐션 추천/설치 (카테고리별 그룹핑, open-vsx "더 보기" 링크, 삭제(uninstall) 포함) | `.claude/archive/extensions-plan-done.md` |
 | 프로젝트 스캔/정리 1단계(용량/재생성 가능 폴더 탐지, 최근 편집 런처, 읽기 전용, mise 도구 표시 포함) | `.claude/qa-request/projects-plan-done.md` (2단계 삭제는 미착수) |
@@ -50,7 +50,7 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 `/api/*` 전 엔드포인트 실응답 확인). 이후 `.claude/archive/webmanager-review.md` (레포 루트) 리뷰 라운드에서
 나온 버그(critical 2건 포함)도 전부 수정 후 재검증 완료.
 
-2026-08-03에 추가된 CPU 코어 히트맵 히스토리 스파크라인, dind M1은 `go build`/
+2026-08-03에 추가된 CPU 코어 히트맵 히스토리 스파크라인, dind M1+M2는 `go build`/
 `go vet`/`gofmt` + `npm run build`/`npm run lint`만 통과했고 아직 실컨테이너
 통합 검증(`docker compose build && up`)은 안 함 — dind는 특히 `code-docker-dind`
 사이드카가 실제로 떠 있어야 의미 있게 확인 가능.
@@ -64,34 +64,31 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 
 ## 할 일 (우선순위 순, 문서 있으면 링크)
 
-1. **Docker/dind 관리 M2** — M1(목록/로그, 읽기 전용)은 구현 완료(위 "구현 완료"
-   표 참고). M2는 start/stop/remove(확인 다이얼로그 필수, 비밀번호 게이트 검토).
-   `.claude/dind-plan.md`
-2. **Claude Code 상태/관리 탭 M4~M5** — M1~M3는 구현 완료. 다음은 M4(익스텐션
+1. **Claude Code 상태/관리 탭 M4~M5** — M1~M3는 구현 완료. 다음은 M4(익스텐션
    설치 배너, 이미 구현된 익스텐션 API 재사용 가능). `.claude/claude-plan.md`
-3. **익스텐션 검색/URL 설치**(마켓플레이스 URL 붙여넣기 → open-vsx 교차 조회 →
+2. **익스텐션 검색/URL 설치**(마켓플레이스 URL 붙여넣기 → open-vsx 교차 조회 →
    vsix 직접 설치 폴백) — 설계 완료, 미착수. `.claude/extension-search-plan.md`
-4. **Caddy 기반 dev 서버 expose** — mise보다도 후순위로 재조정됨. 설계는 대부분
+3. **Caddy 기반 dev 서버 expose** — mise보다도 후순위로 재조정됨. 설계는 대부분
    끝났지만(대부분의 결정 사항 확정) 남은 디테일(`preserve_host` 기본값 등)이 있어
    우선순위를 낮게 둠. `.claude/research/caddy-plan.md`
-5. code-server 설정(settings.json 등) 편집 UI — 후순위, 타당성 재검토 필요(`ideas.md`)
-6. tailscale 로그인 상태/URL을 webmanager UI에도 노출 — 아이디어 단계, 문서 없음
-7. 바인드 주소 전략 확정 — **최후순위**
-8. `/code/.vector/logs/*.jsonl` 보존기간(retention) 정책 없음 — 알려진 갭
+4. code-server 설정(settings.json 등) 편집 UI — 후순위, 타당성 재검토 필요(`ideas.md`)
+5. tailscale 로그인 상태/URL을 webmanager UI에도 노출 — 아이디어 단계, 문서 없음
+6. 바인드 주소 전략 확정 — **최후순위**
+7. `/code/.vector/logs/*.jsonl` 보존기간(retention) 정책 없음 — 알려진 갭
    (`.claude/archive/webmanager-review.md` (레포 루트) 참고), 문서 없음
-9. code-docker 도움말/가이드를 webmanager에 임베드 — 아이디어 단계, 착수 전
+8. code-docker 도움말/가이드를 webmanager에 임베드 — 아이디어 단계, 착수 전
    질문 정리 완료. `.claude/research/guide-plan.md`
-10. **code-server/mise 버전 관리 패널** — **최하 우선순위**(guide-plan과 동급),
+9. **code-server/mise 버전 관리 패널** — **최하 우선순위**(guide-plan과 동급),
     아이디어 단계, 착수 전 질문 다수 정리 완료(특히 "컨테이너 리빌드 필요성"
     판단 기준이 근본적으로 불확실). `.claude/research/version-panel-plan.md`
-11. **활성 세션 목록 보기**(어디서 로그인/접속해있는지 보기) — **최하
+10. **활성 세션 목록 보기**(어디서 로그인/접속해있는지 보기) — **최하
     우선순위**, 아이디어 단계. "세션"이 뭘 뜻하는지부터(webmanager 자체
     비밀번호 게이트 세션? code-server 자신의 연결? Authentik 세션?) 불명확해서
     착수 시 반드시 사용자와 인터랙티브하게 스코프 확인 필요 — 혼자 판단해서
     구현 진행하지 말 것. `.claude/research/session-viewer-plan.md`
-12. 다국어(i18n) 지원, 아마 LinguiJS — 모든 기능이 안정되고 문자열이 안 바뀌기
+11. 다국어(i18n) 지원, 아마 LinguiJS — 모든 기능이 안정되고 문자열이 안 바뀌기
     시작할 때 착수 예정, 아이디어 단계, 문서 없음.
-13. **파일 매니저 리워크**(드래그앤드롭 이동, 그리드/리스트/테이블 뷰,
+12. **파일 매니저 리워크**(드래그앤드롭 이동, 그리드/리스트/테이블 뷰,
     멀티탭) — **최하 우선순위**, Termix류 프로젝트를 벤치마킹하자는 아이디어
     단계. 복잡하고 필수 기능은 아니라서 낮은 우선순위 — 착수 전 스코프를
     사용자와 반드시 논의. `.claude/filemanager-rework-plan.md`

@@ -163,12 +163,16 @@ func main() {
 
 	// dind is DOCKER_HOST=tcp://dind:2375 (plaintext, no auth) — same trust
 	// boundary as the rest of code-docker-internal, not a new one (see
-	// webmanager/.claude/dind-plan.md). v1 is read-only (list/logs), so left
-	// ungated like the other read endpoints above; start/stop/remove will
-	// need the password gate + confirm dialogs when M2 lands.
+	// webmanager/.claude/dind-plan.md). Reads (list/logs) stay ungated like
+	// the other read endpoints above; start/stop/remove mutate state so
+	// they're wrapped in gate.RequirePassword, same as Supervisor's
+	// start/stop/restart and every other write route below.
 	mux.HandleFunc("GET /api/dind/containers", s.handleListDindContainers)
 	mux.HandleFunc("GET /api/dind/images", s.handleListDindImages)
 	mux.HandleFunc("GET /api/dind/containers/{id}/logs", s.handleDindContainerLogs)
+	mux.Handle("POST /api/dind/containers/{id}/start", gate.RequirePassword(http.HandlerFunc(s.handleStartDindContainer)))
+	mux.Handle("POST /api/dind/containers/{id}/stop", gate.RequirePassword(http.HandlerFunc(s.handleStopDindContainer)))
+	mux.Handle("POST /api/dind/containers/{id}/remove", gate.RequirePassword(http.HandlerFunc(s.handleRemoveDindContainer)))
 
 	mux.HandleFunc("GET /api/claude/status", s.handleClaudeStatus)
 	mux.HandleFunc("GET /api/claude/plugins", s.handleClaudePlugins)
