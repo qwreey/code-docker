@@ -33,6 +33,7 @@ import (
 var (
 	ErrInvalidName = errors.New("session name must be 1-64 chars of letters, digits, spaces, _, -, .")
 	ErrSessionGone = errors.New("session no longer exists")
+	ErrNameTaken   = errors.New("a session with that name already exists")
 )
 
 // nameRe is deliberately permissive (spaces allowed, this is a display
@@ -65,6 +66,12 @@ type Info struct {
 }
 
 type Session struct {
+	// Name is set at construction and read directly (no lock) by callers
+	// that only ever see it once, e.g. Registry.GetOrCreate's caller. Once a
+	// session can be renamed (see Registry.Rename), any read/write after
+	// construction must go through currentName/rename below, which take mu -
+	// info() already did, being the one place besides construction that
+	// reads it.
 	Name      string
 	CreatedAt time.Time
 
@@ -201,6 +208,24 @@ func (s *Session) SetPinned(pinned bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.pinned = pinned
+}
+
+// currentName returns the session's live display name, safe to call
+// concurrently with rename (unlike reading the Name field directly).
+func (s *Session) currentName() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.Name
+}
+
+// rename updates the session's display name in place - same *Session, same
+// PTY/goroutines/attached sink, just a new label. Only called by
+// Registry.Rename, which holds its own lock across the map re-key and this
+// call so the two never observe an inconsistent state.
+func (s *Session) rename(name string) {
+	s.mu.Lock()
+	s.Name = name
+	s.mu.Unlock()
 }
 
 // reapCheck reports everything Registry.reapIdle needs about this session in

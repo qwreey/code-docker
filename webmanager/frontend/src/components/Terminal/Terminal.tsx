@@ -34,8 +34,6 @@ const EMPTY_SETTINGS: TerminalSettings = {
   customThemes: [],
 }
 
-const DEFAULT_SESSION_NAME = '세션 1'
-
 // nextSessionName picks "세션 N" for the smallest N not already taken, so
 // repeated "+" clicks (or a name someone already renamed away from the
 // default pattern) never collide. alsoTaken covers the currently-active
@@ -68,10 +66,14 @@ export function Terminal() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [armedModifier, setArmedModifier] = useState<ModifierId | null>(null)
   const [sessions, setSessions] = useState<TerminalSessionInfo[]>([])
-  // null means "no session selected" - only reachable by explicitly closing
-  // the last remaining tab (closeSession below), never the initial state,
-  // so a fresh page load still goes straight into a usable terminal.
-  const [activeSession, setActiveSession] = useState<string | null>(DEFAULT_SESSION_NAME)
+  // null means "no session selected" - this is also the initial state now:
+  // opening the Terminal tab must not silently spawn a shell before the user
+  // asks for one, so the empty state (.terminal-empty-state, "세션 열기"
+  // button) is what a fresh mount shows, same as after explicitly closing the
+  // last tab. Pre-existing sessions from a previous browser session (e.g.
+  // pinned ones) still show up normally via refreshSessions() below — this
+  // only affects whether a brand new session gets created on mount.
+  const [activeSession, setActiveSession] = useState<string | null>(null)
   const [sessionActionError, setSessionActionError] = useState<string | null>(null)
   const keyboardInset = useKeyboardInset()
 
@@ -110,10 +112,10 @@ export function Terminal() {
   }, [])
 
   // Session list for the tab bar — GET /api/terminal/sessions doesn't
-  // include the never-yet-connected default session (it's created lazily by
-  // the WS handshake itself, see the connection effect below), so this can
-  // legitimately come back not yet containing activeSession right after
-  // first mount; it'll show up once that first connection opens and this
+  // include a never-yet-connected new session (it's created lazily by the WS
+  // handshake itself, see the connection effect below), so this can
+  // legitimately come back not yet containing activeSession right after the
+  // user opens one; it'll show up once that first connection opens and this
   // refetches.
   const refreshSessions = useCallback(async () => {
     try {
@@ -321,6 +323,32 @@ export function Terminal() {
     [refreshSessions],
   )
 
+  const renameSession = useCallback(
+    async (oldName: string, newName: string) => {
+      const trimmed = newName.trim()
+      if (!trimmed || trimmed === oldName) return
+      try {
+        await api.patch(`/terminal/sessions/${encodeURIComponent(oldName)}`, { name: trimmed })
+      } catch (e) {
+        setSessionActionError(errorMessage(e))
+        return
+      }
+      // If the renamed tab is the one currently connected, its WebSocket
+      // needs to move to the new name too (the connection effect below is
+      // keyed by activeSession) so pin/close afterward target the session's
+      // actual current key on the backend rather than a name that no longer
+      // exists there. This does mean the effect tears down and reopens the
+      // WebSocket under the new name - deliberately not special-cased to
+      // avoid it, since the reconnect is effectively free here: the PTY
+      // itself never restarts (internal/termsession.Registry.Rename re-keys
+      // the same *Session in place), and the reattach replays scrollback
+      // immediately, same as any other tab switch.
+      if (oldName === activeSession) setActiveSession(trimmed)
+      await refreshSessions()
+    },
+    [activeSession, refreshSessions],
+  )
+
   const closeSession = useCallback(
     async (name: string) => {
       try {
@@ -373,6 +401,7 @@ export function Terminal() {
         onAdd={addSession}
         onTogglePin={togglePin}
         onClose={closeSession}
+        onRename={renameSession}
       />
       {settingsError && (
         <p className="terminal-inline-notice">터미널 설정을 불러오지 못했습니다 ({settingsError}) — 기본값을 사용합니다.</p>

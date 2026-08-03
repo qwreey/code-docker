@@ -64,24 +64,60 @@ func (r *Registry) GetOrCreate(name string) (*Session, error) {
 	}
 	r.sessions[name] = s
 	r.mu.Unlock()
-	go r.forgetWhenDone(name, s)
+	go r.forgetWhenDone(s)
 	return s, nil
 }
 
-// forgetWhenDone removes name from the registry once s finishes on its own
+// forgetWhenDone removes s from the registry once it finishes on its own
 // (pump() noticing PTY EOF — e.g. Ctrl+D exiting the shell — is the case
 // Remove/reapIdle don't already handle themselves, since those two delete
-// from the map before calling Close()). The pointer-equality check guards
-// against a race where name was already removed and a new session with the
-// same name created in the meantime — this goroutine must never delete that
-// newer session's map entry out from under it.
-func (r *Registry) forgetWhenDone(name string, s *Session) {
+// from the map before calling Close()). It reads s.currentName() rather than
+// closing over the name s was created with, since Rename can re-key it in
+// the meantime - using a stale captured name here would look up the wrong
+// (already-deleted) map entry and leak the session's current entry forever.
+// The pointer-equality check guards against a race where that current name
+// was already removed and a new session with the same name created in the
+// meantime — this goroutine must never delete that newer session's map entry
+// out from under it.
+func (r *Registry) forgetWhenDone(s *Session) {
 	<-s.Done()
 	r.mu.Lock()
+	name := s.currentName()
 	if r.sessions[name] == s {
 		delete(r.sessions, name)
 	}
 	r.mu.Unlock()
+}
+
+// Rename atomically re-keys a session from oldName to newName in place - the
+// same *Session (live PTY, goroutines, attached WebSocket sink if any) just
+// addressable under a new name afterward, never destroyed/recreated.
+// Renaming to the name it already has is a no-op success. Returns
+// ErrSessionGone if oldName doesn't exist, ErrNameTaken if newName already
+// names a different live session.
+func (r *Registry) Rename(oldName, newName string) error {
+	if err := ValidateName(newName); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	s, ok := r.sessions[oldName]
+	if !ok {
+		return ErrSessionGone
+	}
+	if newName == oldName {
+		return nil
+	}
+	if _, taken := r.sessions[newName]; taken {
+		return ErrNameTaken
+	}
+
+	delete(r.sessions, oldName)
+	r.sessions[newName] = s
+	s.rename(newName)
+	return nil
 }
 
 func (r *Registry) List() []Info {
@@ -161,7 +197,7 @@ func (r *Registry) reapIdle() {
 	r.mu.Unlock()
 
 	for _, s := range toReap {
-		log.Printf("termsession: reaping idle session %q (idle >= %s)", s.Name, r.idleTimeout)
+		log.Printf("termsession: reaping idle session %q (idle >= %s)", s.currentName(), r.idleTimeout)
 		s.Close()
 	}
 }

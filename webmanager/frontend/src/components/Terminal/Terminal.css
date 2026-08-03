@@ -100,6 +100,17 @@
   cursor: pointer;
 }
 
+.terminal-tab-rename-input {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  padding: 0 0.2rem;
+  border-radius: var(--radius);
+  width: 8em;
+}
+
+.terminal-tab-rename,
 .terminal-tab-pin,
 .terminal-tab-close {
   display: inline-flex;
@@ -116,6 +127,7 @@
   opacity: 0.55;
 }
 
+.terminal-tab-rename:hover,
 .terminal-tab-pin:hover,
 .terminal-tab-close:hover {
   opacity: 1;

@@ -1,5 +1,57 @@
 # 웹쉘(터미널) — 구현 완료 (M1+M2, 모바일 레이아웃, 인증 전부 끝)
 
+## 업데이트 (2026-08-03, 일곱 번째 라운드): 초기 마운트 자동 세션 생성 제거 + 이름 변경 기능 추가
+
+- **초기 마운트 시 "세션 1" 자동 생성 — 제거**: 저번 라운드까지는 "마지막
+  탭을 닫았을 때만 빈 상태"였고 첫 마운트는 예외로 `activeSession`을
+  `DEFAULT_SESSION_NAME`("세션 1")으로 초기화해서 곧바로 WebSocket을
+  열었음 — 사용자가 터미널 탭을 켜기만 해도 아무 상호작용 없이 셸 프로세스가
+  하나 뜨는 게 문제로 지적됨. 근본 원인은 `Terminal.tsx`의 딱 한 줄,
+  `useState<string | null>(activeSession 초기값)`이 `DEFAULT_SESSION_NAME`
+  이었던 것 — `null`로 바꿔서 첫 마운트도 마지막 탭 닫힘과 완전히 같은 경로를
+  타게 함(`.terminal-empty-state` + "세션 열기" 버튼, 사용자가 클릭해야
+  `addSession`/`selectSession`이 실제로 이름을 정하고 WS를 엶). 이제 안 쓰는
+  `DEFAULT_SESSION_NAME` 상수는 제거. 백엔드가 이미 갖고 있던 기존 세션(예:
+  이전 브라우저 세션에서 pin해둔 것)은 이 변경과 무관하게 그대로
+  `refreshSessions()`로 탭 목록에 보임 — 이번 변경은 "새 세션을 자동으로
+  만드는가"에만 영향, 기존 세션 노출과는 무관.
+- **탭 이름 변경(rename) — 신규 구현**: 코드 전체를 확인한 결과 이름 변경
+  기능은 프론트/백엔드 어디에도 없었음(자동 넘버링 `nextSessionName`만
+  있었음, 문서에도 명시적으로 안 다뤄짐) — 그래서 처음부터 끝까지 새로
+  만듦.
+  - 백엔드: `internal/termsession.Registry.Rename(oldName, newName)` 추가 —
+    `r.mu` 하나로 통째로 감싸서 "존재 확인 → 새 이름 충돌 확인 → 맵에서
+    삭제/재삽입 → `Session.rename()`으로 라벨 갱신"을 원자적으로 처리, 같은
+    `*Session` 포인터를 그대로 재사용(PTY/고루틴/붙어있는 WebSocket sink
+    전부 안 건드림). 빈 이름/충돌하는 이름은 각각 `ErrInvalidName`(400)/
+    `ErrNameTaken`(409, 신규)으로 거부, 같은 이름으로의 "변경"은 무해한
+    no-op. 부수 효과로 버그 하나 발견/수정: `forgetWhenDone`이 세션 생성
+    시점에 캡처한 이름으로만 맵을 지웠는데, 그 세션이 rename된 뒤 스스로
+    끝나면(PTY EOF 등) 옛 이름은 이미 지워졌고 새 이름 키가 영원히 안
+    지워지는 좀비가 남을 뻔함 — `Session.currentName()`(락 보호)을 추가해서
+    종료 시점의 "현재" 이름으로 지우게 고침. `PATCH /api/terminal/sessions/
+    {name}`을 확장(별도 엔드포인트 대신 기존 핸들러 재사용) — `pinned`/`name`
+    둘 다 `*bool`/`*string` 포인터라 한쪽만 보내도 다른 쪽 값을 실수로
+    안 건드림, 둘 다 보내면 rename 먼저 적용 후 그 결과 이름으로 pinned 적용.
+  - 프론트: `TerminalTabs.tsx`에 탭 라벨 더블클릭 또는 새 연필
+    아이콘(`lucide-react`의 `Pencil`, 기존 `Pin`/`X`/`Plus`와 톤 맞춤)
+    클릭으로 인라인 입력창으로 전환, Enter 확정/Escape 취소/포커스 아웃 시
+    확정. 커밋 함수는 `setEditing`의 함수형 업데이터로 작성해서 Enter →
+    (input 언마운트로 인한) blur가 연달아 같은 커밋을 두 번 트리거해도
+    안전(두 번째 호출은 이미 `null`인 상태를 보고 그냥 무시). 현재 활성
+    탭을 rename하면 `activeSession` state도 새 이름으로 갱신 — 이는
+    WebSocket을 여는 effect의 의존값이라 재연결이 일어나지만, 백엔드가
+    `Rename`으로 같은 `*Session`을 그대로 재사용하기 때문에 PTY는 안
+    재시작되고 재접속 시 스크롤백이 그대로 재생되어 사실상 무손실(이미
+    탭 전환 때 쓰던 것과 완전히 같은 경로) — 연결을 안 끊는 특수 경로를
+    따로 만드는 복잡도보다 이 재사용이 더 낫다고 판단, 코드에 근거 남김.
+
+`go build`/`go vet`/`gofmt`(backend), `npm run build`/`npm run lint`(frontend)
+전부 클린. 실컨테이너 실행 검증은 이전 라운드와 동일한 이유로 이 개발
+호스트에서 불가(`cmd.Dir = "/code"`) — rename 시 PTY 안 재시작되는지,
+좀비 맵 엔트리 안 남는지는 코드 리뷰로 확인, **실컨테이너에서 한 번 확인
+권장**.
+
 ## 업데이트 (2026-08-03, 여섯 번째 라운드): 실사용 버그 2건 + 아이콘 + 빈 상태
 
 - **Ctrl+D로 셸이 끝나도 세션이 안 닫히던 버그 — 수정**: `Session.pump()`가
@@ -61,10 +113,14 @@ components/Terminal/`)로 추적 가능 — 이 문서엔 더 이상 안 남김.
   재접속 시 스크롤백부터 재생 후 실시간 전환. 동시 접속은 last-wins(새 연결이
   이전 걸 자동으로 끊음, `sinkGen` 세대 카운터로 레이스 방지).
 - `GET /api/terminal/sessions`(목록) / `PATCH .../sessions/{name}`
-  (`{pinned}` 토글) / `DELETE .../sessions/{name}`(즉시 종료) — "임시"와
+  (`{pinned}`, `{name}` 각각 선택적 — `pinned` 토글과 이름 변경(rename)
+  둘 다 이 한 엔드포인트로 처리, 필드는 포인터 타입이라 한쪽만 보내도 다른
+  쪽을 실수로 안 건드림) / `DELETE .../sessions/{name}`(즉시 종료) — "임시"와
   "영속"은 같은 PTY 관리 코드 경로이고 차이는 `pinned` 플래그 하나뿐(이름은
-  세션 자체가 항상 갖고 있음) — 그래서 세션 생성 시점에 영속 여부를 정할
-  필요가 없고, 아무 때나 토글 가능. 유휴 GC(`Registry.Run`, 1분 주기)는
+  세션 자체가 항상 갖고 있고 언제든 바꿀 수 있음, `Registry.Rename` — 같은
+  `*Session`을 그대로 두고 맵 키만 원자적으로 재배치) — 그래서 세션 생성
+  시점에 영속 여부를 정할 필요가 없고, 아무 때나 토글 가능. 유휴 GC
+  (`Registry.Run`, 1분 주기)는
   `pinned`이거나 현재 붙은 클라이언트가 있으면 절대 안 건드리고, 그 외엔
   `WEBMANAGER_TERMINAL_SESSION_IDLE_TIMEOUT`(기본 30분) 지나면 정리.
   컨테이너 재시작하면 pinned 여부와 무관하게 전부 사라짐(의도된 제약 —
@@ -91,12 +147,22 @@ components/Terminal/`)로 추적 가능 — 이 문서엔 더 이상 안 남김.
   `activeSession`이 바뀔 때마다 새로 열림(`?session=` 쿼리), 전환 시
   `term.reset()`으로 화면 비우고 서버가 재생하는 스크롤백으로 다시 채움.
 - `TerminalTabs.tsx` — VSCode 스타일 세션 탭(`GET /api/terminal/sessions`
-  기반, 목업 아님): 탭 클릭(전환), 📌(유지 토글), ×(종료), +(새 세션 —
-  "세션 N" 자동 넘버링, `nextSessionName`이 현재 활성 세션 이름도 제외 대상에
-  포함하도록 수정됨 — 안 그러면 목록이 아직 최신이 아닐 때 "+"를 눌러도 같은
-  이름이 다시 골라져서 아무 일도 안 일어나는 것처럼 보이는 버그가 있었음,
-  실브라우저 테스트로 발견/수정). 세션 생성은 별도 API 호출 없이 그냥 새
-  이름으로 WebSocket을 여는 것 자체가 트리거(`GetOrCreate`가 처리).
+  기반, 목업 아님): 탭 클릭(전환), 연필 아이콘 또는 라벨 더블클릭(이름 변경 —
+  인라인 입력, Enter 확정/Escape 취소, `PATCH .../sessions/{name}`의 `name`
+  필드로 전송), 📌(유지 토글), ×(종료), +(새 세션 — "세션 N" 자동 넘버링,
+  `nextSessionName`이 현재 활성 세션 이름도 제외 대상에 포함하도록 수정됨 —
+  안 그러면 목록이 아직 최신이 아닐 때 "+"를 눌러도 같은 이름이 다시 골라져서
+  아무 일도 안 일어나는 것처럼 보이는 버그가 있었음, 실브라우저 테스트로
+  발견/수정). 세션 생성은 별도 API 호출 없이 그냥 새 이름으로 WebSocket을
+  여는 것 자체가 트리거(`GetOrCreate`가 처리). 활성 탭 자체를 rename하면
+  `activeSession`이 새 이름으로 갱신되어 WS가 재연결되지만 PTY는 그대로(같은
+  `*Session`) — 스크롤백 재생으로 사실상 무손실.
+- 첫 마운트 시 세션을 자동으로 만들지 않음 — `activeSession` 초기값이
+  `null`이라 `.terminal-empty-state`("열린 세션이 없습니다." + "세션 열기"
+  버튼)부터 보이고, 사용자가 명시적으로 클릭해야 세션이 생성/연결됨(마지막
+  탭을 닫았을 때와 완전히 같은 경로). 컨테이너가 이미 갖고 있던 기존 세션은
+  이 초기 상태와 무관하게 탭 목록에는 정상적으로 나타남 — `refreshSessions`가
+  그 목록을 채우는 거지 `activeSession`의 초기값과는 별개.
 - 키바인딩/색상 테마 — `GET/PUT /api/terminal/settings`
   (`internal/terminalsettings`, 원자적 저장, 비밀번호 게이트). 모바일 온스크린
   컨트롤 바(Esc/Ctrl/Alt/Shift/Tab/방향키, Ctrl/Alt/Shift는 sticky modifier).
