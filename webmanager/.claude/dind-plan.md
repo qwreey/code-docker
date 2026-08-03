@@ -1,6 +1,41 @@
-# Docker/dind 관리 (구현 전, 미착수 — 리서치 완료, 방향 확정)
+# Docker/dind 관리 (M1 구현 완료, M2는 아직)
 
-`caddy-plan.md`에서 확정된 우선순위: **웹쉘보다 먼저** 진행 (`terminal-plan.md` 다음
+## 구현 완료 (2026-08-03): M1 (읽기 전용)
+
+아래 "구현 방향" 절의 리서치 결론 그대로: `internal/dind`(plain 함수, `Client`
+구조체 없음)가 `os/exec`로 `docker` CLI를 셸아웃 — 새 의존성 없음. `docker ps -a
+--no-trunc --format json`/`docker images --no-trunc --format json`을 한 줄당 JSON
+객체로 파싱, `docker logs --timestamps --tail N [--since <unix초>]`는 컨테이너
+자신의 stdout/stderr를 한 버퍼에 합쳐서 반환(`docker`가 낸 진짜 에러 메시지와
+섞이지 않도록 list류와는 별도 exec 경로 사용 — 코드 주석 참고).
+
+`GET /api/dind/containers`, `GET /api/dind/images`,
+`GET /api/dind/containers/{id}/logs?tail=&since=` 3개 전부 읽기 전용이라 비밀번호
+게이트 없음(계획대로). 컨테이너/이미지 ID는 `gitconfig/gpg.go`의 fingerprint
+정규식과 같은 패턴으로 `^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$` 검증 후에만
+`exec.Command`에 전달, `since`는 순수 자릿수(unix초)만 허용 — 둘 다 플래그 주입
+방지. 프론트는 `src/components/Dind/`(Dind.tsx가 컨테이너/이미지 서브탭 전환,
+ContainerTable/ImageTable/DindLogPanel) — Task Manager의 서브탭 CSS
+(`processes-tab`)와 Supervisor의 LogPanel 패턴(Sheet 재사용, 폴링 없이 수동
+새로고침)을 그대로 재사용. 5초 폴링으로 목록 갱신. `go build`/`go vet`/`gofmt`,
+`npm run build`/`npm run lint` 전부 클린 — 실컨테이너(`docker compose up`) 통합
+확인은 아직 안 함.
+
+**아래 "사용자 확인 필요" 절의 `docker inspect` 상세 뷰 질문은 M1 스코프에서
+뺐음**(list/logs만으로 M1 완결, inspect는 별도 라운드로 미룸 — 질문 자체는 아직
+유효).
+
+## 다음: M2 (start/stop/remove)
+
+아래 "위험 완화" 절 그대로: 시작/정지/삭제는 확인 다이얼로그 필수(예외 없음),
+`docker rm`이 실행 중 컨테이너엔 `-f`가 필요하다는 점 UI 문구에 반영. 미착수.
+
+---
+
+## 원본 계획 (리서치 라운드, 2026-08-02 — 위 M1 구현으로 대체된 부분 제외하고는
+여전히 유효)
+
+`research/caddy-plan.md`에서 확정된 우선순위: **웹쉘보다 먼저** 진행 (`archive/terminal-plan-done.md` 다음
 이 아니라 그 앞 — 전체 순서는 `webmanager/CLAUDE.md` 참고). 이번 라운드는 사용자
 요청으로 **리서치만** 진행(라이브러리 선택, 위험 완화, 로그 스트리밍) — 구현은
 여전히 시작 안 함.
@@ -12,7 +47,7 @@
   하면 됨, 새 인증 계층 불필요(기존 신뢰 경계 재사용).
 - **주의**: 이 API는 사실상 호스트 루트 권한과 동급 — webmanager 자체의 (없는) 인증이
   곧 이 API의 유일한 문지기가 됨(README의 기존 dind 보안 각주와 동일 성격). 아래
-  "위험 완화" 절에서 `terminal-plan.md`의 인증 절과 같은 급으로 다룸.
+  "위험 완화" 절에서 `archive/terminal-plan-done.md`의 인증 절과 같은 급으로 다룸.
 - `docker` CLI가 이미 이미지에 설치돼 있고(루트 Dockerfile, `docker-bin` 스테이지)
   `DOCKER_HOST`만 가리키면 그대로 dind 데몬에 붙는다 — 로컬 확인 결과 이 이미지의
   docker CLI(29.6.2)는 `docker ps/images/inspect` 모두 `--format json`(순수 JSON,
@@ -28,7 +63,7 @@
 범위다. `docker run`(임의 이미지+마운트+privileged), `docker exec`(실행 중인
 컨테이너에 셸 진입), `docker cp`, 네트워크/볼륨 조작, "풀 후 바로 실행" 플로우는
 API 초안에 아예 포함하지 않는다 — 나중에 필요해지면 별도 라운드에서 그 자체를
-`terminal-plan.md`의 인증 절과 동급의 보안 각주와 함께 재검토.
+`archive/terminal-plan-done.md`의 인증 절과 동급의 보안 각주와 함께 재검토.
 
 ## 구현 방향 (리서치 결과, 확정)
 
@@ -79,7 +114,7 @@ API 초안에 아예 포함하지 않는다 — 나중에 필요해지면 별도
 
 **근거**:
 
-- `terminal-plan.md`의 인증 절은 웹쉘을 "webmanager 전체에서 가장 강력한 단일
+- `archive/terminal-plan-done.md`의 인증 절은 웹쉘을 "webmanager 전체에서 가장 강력한 단일
   권한"이라고 명시하고, 그래서 M1은 임시 세션으로 범위를 좁히고 별도 비밀번호
   게이트를 나중에 얹는 방향까지 이미 구체적으로 설계해뒀다. `docker exec`(실행 중인
   임의 컨테이너에 셸 진입)와 `docker run --privileged -v ...`(임의 마운트/특권
@@ -107,7 +142,7 @@ API 초안에 아예 포함하지 않는다 — 나중에 필요해지면 별도
   반영할 것(실행 중 컨테이너 삭제 시도는 "먼저 정지하시겠습니까" 안내 또는 강제
   삭제임을 명확히 알리는 별도 문구).
 - 읽기 전용 우선 출시: 권장. 이 저장소에 이미 Projects 탭이 "1단계 읽기 전용(용량/
-  재생성 가능 폴더 탐지) → 2단계 삭제 UI"로 나눈 전례가 있다(`projects-plan-done.md`
+  재생성 가능 폴더 탐지) → 2단계 삭제 UI"로 나눈 전례가 있다(`qa-request/projects-plan-done.md`
   / `CLAUDE.md` 큐 항목 2번). dind도 동일하게 자연스러운 M1/M2로 나뉜다: **M1 =
   목록(containers/images) + inspect 상세 + 로그 조회(follow 없이도 우선 가치 있음)**,
   **M2 = start/stop/remove(확인 다이얼로그 포함)**. M1은 뮤테이션이 전혀 없어

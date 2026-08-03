@@ -11,7 +11,7 @@ import { Projects } from './components/Projects/Projects'
 import { ClaudeCode } from './components/ClaudeCode/ClaudeCode'
 import { Extensions } from './components/Extensions/Extensions'
 import { Mise } from './components/Mise/Mise'
-import { Placeholder } from './components/Placeholder/Placeholder'
+import { Dind } from './components/Dind/Dind'
 import { Terminal } from './components/Terminal/Terminal'
 import { RequiresUnlock } from './components/common/RequiresUnlock'
 import { UnlockModalHost } from './components/common/UnlockModal'
@@ -22,13 +22,6 @@ import './App.css'
 const FileManager = lazy(() =>
   import('./components/FileManager/FileManager').then((module) => ({ default: module.FileManager })),
 )
-
-const PLACEHOLDER_INFO: Record<string, { title: string; note: string }> = {
-  dind: {
-    title: 'Docker (dind)',
-    note: 'dind 컨테이너/이미지 목록 조회 및 시작/정지/삭제 관리 예정.',
-  },
-}
 
 function App() {
   const [active, setActive] = useState<SectionId>('supervisor')
@@ -67,6 +60,7 @@ function App() {
         {active === 'processes' && <Processes />}
         {active === 'projects' && <Projects />}
         {active === 'mise' && <Mise />}
+        {active === 'dind' && <Dind />}
         {active === 'claude' && <ClaudeCode />}
         {active === 'extensions' && <Extensions />}
         {active === 'terminal' && <Terminal />}
@@ -76,9 +70,6 @@ function App() {
               <FileManager />
             </RequiresUnlock>
           </Suspense>
-        )}
-        {active in PLACEHOLDER_INFO && (
-          <Placeholder title={PLACEHOLDER_INFO[active].title} note={PLACEHOLDER_INFO[active].note} />
         )}
       </main>
       <UnlockModalHost />

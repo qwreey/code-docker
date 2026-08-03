@@ -133,6 +133,15 @@ func main() {
 	mux.HandleFunc("GET /api/system/resources", s.handleSystemResources)
 	mux.HandleFunc("GET /api/system/resources/history", s.handleSystemResourcesHistory)
 
+	// dind is DOCKER_HOST=tcp://dind:2375 (plaintext, no auth) — same trust
+	// boundary as the rest of code-docker-internal, not a new one (see
+	// webmanager/.claude/dind-plan.md). v1 is read-only (list/logs), so left
+	// ungated like the other read endpoints above; start/stop/remove will
+	// need the password gate + confirm dialogs when M2 lands.
+	mux.HandleFunc("GET /api/dind/containers", s.handleListDindContainers)
+	mux.HandleFunc("GET /api/dind/images", s.handleListDindImages)
+	mux.HandleFunc("GET /api/dind/containers/{id}/logs", s.handleDindContainerLogs)
+
 	mux.HandleFunc("GET /api/claude/status", s.handleClaudeStatus)
 	mux.HandleFunc("GET /api/claude/plugins", s.handleClaudePlugins)
 

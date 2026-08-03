@@ -28,7 +28,7 @@ export const SECTIONS: SectionMeta[] = [
   { id: 'processes', label: 'Task Manager', implemented: true },
   { id: 'projects', label: 'Projects', implemented: true },
   { id: 'mise', label: 'mise', implemented: true },
-  { id: 'dind', label: 'Docker (dind)', implemented: false },
+  { id: 'dind', label: 'Docker (dind)', implemented: true },
   { id: 'terminal', label: 'Terminal', implemented: true },
   { id: 'claude', label: 'Claude Code', implemented: true },
   { id: 'extensions', label: 'Code Extensions', implemented: true },

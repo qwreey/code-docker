@@ -30,6 +30,25 @@ export interface LogResponse {
   text: string
 }
 
+export interface DindContainer {
+  id: string
+  names: string
+  image: string
+  command: string
+  state: string
+  status: string
+  ports: string
+  created: string
+}
+
+export interface DindImage {
+  id: string
+  repository: string
+  tag: string
+  size: string
+  created: string
+}
+
 export interface SshKey {
   id: string
   type: string

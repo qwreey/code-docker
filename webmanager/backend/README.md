@@ -231,5 +231,26 @@ fields, invalid host/keyId format, etc.) are unaffected.
     `subscriptionType` stay correct — a pre-existing CLI quirk, not
     something this endpoint's wrapper introduces or can paper over
 
+- `GET /api/dind/containers` — every container in the `code-docker-dind`
+  sidecar (running and stopped, `docker ps -a` equivalent):
+  id/names/image/command/state/status/ports/created, all straight from
+  `docker ps --format json` (one JSON object per line, native — not a Go
+  template). Ungated (read-only) — see `internal/dind` for why shelling out
+  to the `docker` CLI (already on `PATH`, `DOCKER_HOST` already points at the
+  dind sidecar) was chosen over the official SDK
+- `GET /api/dind/images` — every image in the dind sidecar:
+  id/repository/tag/size/created, from `docker images --format json`
+- `GET /api/dind/containers/{id}/logs?tail=N&since=<unix-seconds>` — combined
+  stdout+stderr, timestamped, via `docker logs`. `tail` defaults to 1000
+  lines. `since` (optional) is a bare unix-seconds timestamp — passing the
+  last-seen line's time lets the frontend poll for only what's new instead
+  of re-fetching a growing tail; no persistent `--follow` subprocess is kept
+  running (a fresh short-lived `docker logs` process per poll instead, for a
+  simpler cancellation/lifecycle story). `404` if no such container, `400`
+  if `id`/`tail`/`since` fails validation
+  - v1 is deliberately read-only: no start/stop/remove yet (queued next),
+    and `docker run`/`exec`/`cp` are out of scope indefinitely — see
+    `webmanager/.claude/dind-plan.md`
+
 All error responses are `{"error": "message"}` with an appropriate 4xx/5xx
 status.
