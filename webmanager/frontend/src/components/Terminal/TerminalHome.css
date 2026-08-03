@@ -184,8 +184,14 @@
   overflow-wrap: anywhere;
 }
 
+/* margin-top: auto (not just a fixed gap) - grid rows stretch every card in
+   the row to the tallest one's height (default grid align-items: stretch),
+   so a card with less content (e.g. no cwd/command line) would otherwise
+   leave its action buttons floating in the middle of the leftover space
+   instead of pinned to the bottom like its taller neighbors. */
 .terminal-home-profile-actions {
   display: flex;
   gap: 0.4rem;
-  margin-top: 0.3rem;
+  margin-top: auto;
+  padding-top: 0.3rem;
 }
