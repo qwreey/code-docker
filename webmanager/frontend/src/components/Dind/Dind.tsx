@@ -5,16 +5,18 @@ import { ErrorBanner } from '../common/ErrorBanner'
 import { ContainerTable } from './ContainerTable'
 import { ImageTable } from './ImageTable'
 import { DindLogPanel } from './DindLogPanel'
+import { DindInspectPanel } from './DindInspectPanel'
 import '../Processes/Processes.css'
 
 const POLL_INTERVAL_MS = 5000
 
 type Tab = 'containers' | 'images'
 
-// M1 (read-only: list containers/images + tail logs) and M2 (start/stop/
-// remove, password-gated on the backend, mandatory confirm dialogs here) are
-// both implemented. docker run/exec/cp stay out of scope indefinitely — see
-// webmanager/.claude/dind-plan.md.
+// M1 (read-only: list containers/images + tail logs), M2 (start/stop/
+// remove, password-gated on the backend, mandatory confirm dialogs here),
+// and M3 (docker inspect detail view, also password-gated — Config.Env can
+// contain secrets) are all implemented. docker run/exec/cp stay out of scope
+// indefinitely — see webmanager/.claude/dind-plan.md.
 export function Dind() {
   const [tab, setTab] = useState<Tab>('containers')
   const [containers, setContainers] = useState<DindContainer[]>([])
@@ -22,6 +24,7 @@ export function Dind() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [logTarget, setLogTarget] = useState<DindContainer | null>(null)
+  const [inspectTarget, setInspectTarget] = useState<DindContainer | null>(null)
   const [busy, setBusy] = useState<Record<string, boolean>>({})
 
   const loadingRef = useRef(false)
@@ -100,13 +103,22 @@ export function Dind() {
       {loading ? (
         <p className="empty-state">불러오는 중...</p>
       ) : tab === 'containers' ? (
-        <ContainerTable containers={containers} busy={busy} onShowLogs={setLogTarget} onAction={handleAction} />
+        <ContainerTable
+          containers={containers}
+          busy={busy}
+          onShowLogs={setLogTarget}
+          onInspect={setInspectTarget}
+          onAction={handleAction}
+        />
       ) : (
         <ImageTable images={images} />
       )}
 
       {logTarget && (
         <DindLogPanel containerId={logTarget.id} containerName={logTarget.names} onClose={() => setLogTarget(null)} />
+      )}
+      {inspectTarget && (
+        <DindInspectPanel containerId={inspectTarget.id} containerName={inspectTarget.names} onClose={() => setInspectTarget(null)} />
       )}
     </section>
   )

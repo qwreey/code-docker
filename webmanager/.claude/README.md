@@ -36,7 +36,6 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 
 | 문서 | 기능 | 우선순위 |
 |---|---|---|
-| `dind-plan.md` | Docker/dind 관리 — **M1(목록/로그, 읽기 전용) 구현 완료**, M2(start/stop/remove)부터 미착수 | 다음 착수 예정(사용자 작업 중) |
 | `claude-plan.md` | Claude Code 상태/관리 탭 — **M1~M3 구현 완료**, M4(익스텐션 배너)부터 미착수 | M4는 바로 가능 |
 | `extension-search-plan.md` | 익스텐션 검색/마켓플레이스 URL 붙여넣기 설치 — "더 보기" 링크와 삭제(uninstall)는 이미 구현 완료돼서 이 문서에서 빠짐(각각 `archive/extensions-plan-done.md` 참고), 비활성화(disable)는 조사 후 미구현 결정 | M4 언저리, 급하지 않음 |
 | `authgate-plan-done.md` | 공용 비밀번호 게이트(`internal/authgate`) — 대부분 완료지만 **터미널 탭이 아직 `RequiresUnlock`으로 안 감싸져 있어서 WS 업그레이드가 401일 때 조용히 실패하는 실제 미해결 갭이 있음**(문서 자체의 "아직 안 된 것" 절 참고) — 그래서 archive로 안 옮김 | 작음, 남는 대로 처리 가능 |
@@ -55,6 +54,7 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 | `qa-request/mise-plan-done.md` | mise 관리(install/use/uninstall, 설치된 도구 목록, env 미리보기) + 설치 추천 목록(접기, 표시 토글) |
 | `qa-request/env-migration-plan-done.md` | `.env.webmanager` 마이그레이션 도구(`webmanager --env-migrate`) — 키 추가/삭제 반영(삭제된 키는 `#~` 아카이브), 유저 코멘트 보존, `#!important`/`#!` 마커, 경로 기반 템플릿(조직 커스텀 마운트 가능), 웹 UI 경고 배너(dismiss 영속화) |
 | `qa-request/expose-plan-done.md` | code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일 origin 통합(레포 루트 `expose.md` 리서치를 대체) — M1(nginx)~M3(프론트엔드 서브패스 대응) 코드/빌드 검증까지 완료. code-server 쪽에서 매니저를 여는 위젯/PWA 바로가기는 별도 마일스톤으로 남아있음(질문만 정리, 착수 안 함) |
+| `qa-request/dind-plan-done.md` | Docker/dind 관리 — M1(목록/로그, 읽기 전용)+M2(start/stop/remove, 비밀번호 게이트)+M3(docker inspect 상세 뷰, 비밀번호 게이트) 전부 코드/빌드 검증까지 완료 |
 
 ## 완료, 사용자 실사용 검증까지 끝나서 아카이브됨 (`archive/*-plan-done.md`)
 

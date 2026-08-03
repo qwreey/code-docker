@@ -25,9 +25,11 @@ from "Processes" — split into 성능/프로세스 sub-tabs (host-wide per-core
 heatmap, host-physical memory breakdown alongside cgroup used/limit,
 best-effort clock/temperature; process list+tree dual view, status filter,
 fuzzy search with match highlighting, client-side DOM pagination), Claude Code
-status tab M1+M2+M3, Docker/dind management M1+M2 (container/image
+status tab M1+M2+M3, Docker/dind management M1+M2+M3 (container/image
 list + log tail, `internal/dind` CLI shell-out; start/stop/remove with
-mandatory confirm dialogs, password-gated), a per-top-level-
+mandatory confirm dialogs, password-gated; a password-gated `docker inspect`
+detail view — the only gated read among list/logs/inspect, since
+`Config.Env` can expose plaintext secrets), a per-top-level-
 directory container disk breakdown in Task Manager (`internal/diskusage`,
 `du`-based, cached + explicit-trigger-only like the Projects scan), code-server extension recommend/install (categorized,
 collapsible, installed-list section, an open-vsx "더 보기" link, a

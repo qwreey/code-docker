@@ -1,4 +1,4 @@
-# Docker/dind 관리 (M1+M2 구현 완료)
+# Docker/dind 관리 (M1+M2+M3 구현 완료) — 실컨테이너 QA 대기
 
 ## 구현 완료 (2026-08-03): M1 (읽기 전용)
 
@@ -211,11 +211,43 @@ API 초안에 아예 포함하지 않는다 — 나중에 필요해지면 별도
 
 ## 사용자 확인 필요
 
-- **`docker inspect` 상세 뷰를 v1에 포함할지**: `docker inspect`는 컨테이너 생성 시
-  넘긴 환경변수(`Config.Env`)를 평문으로 그대로 보여준다 — `docker run -e
-  POSTGRES_PASSWORD=...`처럼 개인이 dind 안에 띄운 컨테이너의 비밀번호/토큰이 여기
-  포함될 수 있다. Engine API 자체가 이미 그 값을 다 볼 수 있는 권한이라 새로운
-  노출은 아니지만(README에 이미 host-root급으로 문서화), "목록/로그"보다 "환경변수
-  통째로 웹 UI에 표시"는 체감 민감도가 다르다고 판단될 수 있어 이 스코프 판단만
-  저장소 소유자에게 남김 — 나머지(라이브러리 선택/exec·run 제외/폴링 방식)는
-  이번 리서치로 결론이 났다고 판단.
+- ~~**`docker inspect` 상세 뷰를 v1에 포함할지**~~ — **해결됨(2026-08-03)**:
+  저장소 소유자가 "구현하되 비밀번호 게이트로 감싼다"로 결정. `Config.Env`
+  평문 노출 우려는 그대로 유효하지만, list/logs와 달리 inspect 하나만
+  password-gated 읽기로 두는 것으로 완화 — 아래 "구현 완료: M3" 절 참고.
+
+## 구현 완료 (2026-08-03): M3 (docker inspect 상세 뷰)
+
+바로 위 "사용자 확인 필요" 절의 결정 그대로: `docker inspect` 상세 뷰를
+구현하되, `Config.Env` 평문 노출 우려 때문에 list/logs(비밀번호 게이트 없음)와
+달리 이것만 기존 공용 비밀번호 게이트(`internal/authgate`)로 감쌌다.
+
+백엔드: `internal/dind/dind.go`에 `Inspect(ctx, id) (json.RawMessage, error)`
+추가 — M1/M2와 동일하게 `ValidateID`로 먼저 검증한 뒤, 새 exec 배관을 짜지
+않고 기존 `runDocker` 헬퍼(stdout/stderr 분리 + "No such container" →
+`ErrNotFound` 변환)를 그대로 재사용(`runDocker(ctx, "inspect", id)`).
+`docker inspect <id>`는 단일 ID에도 항상 JSON 배열(원소 1개)을 반환하므로
+`[]json.RawMessage`로 언마샬 후 `[0]`만 반환해 HTTP API는 배열이 아니라 단일
+객체를 내려준다(빈 슬라이스면 방어적으로 `ErrNotFound` 처리 — `runDocker`가
+이미 "No such container"를 잡아내서 평소엔 발생 안 함). `handlers_dind.go`의
+`handleInspectDindContainer`는 `handleDindContainerLogs`와 같은 모양(경로
+`id` 검증 → `dind.Inspect` 호출 → `writeDindErr`/`writeJSON`). `main.go`에
+`GET /api/dind/containers/{id}/inspect`를 `gate.RequirePassword`로 감싸
+등록 — list/logs/inspect 중 inspect만 게이트된 이유와, "탭 전체를
+`<RequiresUnlock>`으로 감싸지 않고 개별 읽기 라우트 하나만 게이트"하는 전례가
+`GET /api/supervisor/processes/{name}/log`(`handleProcessLog`, Supervisor
+탭 자체는 `RequiresUnlock` 없음)와 동일 패턴임을 라우트 등록부 주석에 남김.
+
+프론트엔드: 새 `DindInspectPanel.tsx`가 `DindLogPanel.tsx`/`Sheet` 패턴을
+거의 그대로 복사 — 마운트 시 `api.get`으로 조회, 헤더에 새로고침 버튼, 에러
+배너, JSON 문법 하이라이팅 없이 `<pre>{JSON.stringify(data, null, 2)}</pre>`로
+표시(레포 관례, 새 라이브러리 안 들임). `Dind.tsx`에 `logTarget`과 병렬로
+`inspectTarget` 상태 + `onInspect` 콜백 추가, `ContainerTable.tsx`의 기존
+"로그" 버튼 바로 옆에 "Inspect" 버튼 추가(동일한 `btn btn-secondary
+btn-small` 스타일 재사용, 파괴적 동작이 아니라 `window.confirm` 없음).
+`App.tsx`는 건드리지 않음(Dind 탭에 `<RequiresUnlock>` 래핑 안 함 — 위
+main.go 주석의 전례와 동일하게 라우트 단위 게이트로 충분).
+
+`go build`/`go vet`/`gofmt -l .`, `npm run build`/`npm run lint` 전부
+클린 — 실컨테이너(`docker compose up`) 통합 확인은 M1/M2와 마찬가지로 아직
+안 함(이 문서가 `qa-request/dind-plan-done.md`로 옮겨진 이유).

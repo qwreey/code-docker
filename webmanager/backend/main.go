@@ -185,13 +185,20 @@ func main() {
 
 	// dind is DOCKER_HOST=tcp://dind:2375 (plaintext, no auth) — same trust
 	// boundary as the rest of code-docker-internal, not a new one (see
-	// webmanager/.claude/dind-plan.md). Reads (list/logs) stay ungated like
-	// the other read endpoints above; start/stop/remove mutate state so
-	// they're wrapped in gate.RequirePassword, same as Supervisor's
-	// start/stop/restart and every other write route below.
+	// webmanager/.claude/dind-plan.md). Reads (list/logs/inspect) stay
+	// ungated like the other read endpoints above, except inspect: it's the
+	// one gated read among list/logs/inspect, because `docker inspect`
+	// exposes a container's full config including plaintext env vars
+	// (Config.Env, which may contain secrets from `docker run -e ...`) —
+	// same shape as GET /api/supervisor/processes/{name}/log (handleProcessLog,
+	// also gated below without wrapping its whole tab in <RequiresUnlock>).
+	// start/stop/remove mutate state so they're wrapped in
+	// gate.RequirePassword too, same as Supervisor's start/stop/restart and
+	// every other write route below.
 	mux.HandleFunc("GET /api/dind/containers", s.handleListDindContainers)
 	mux.HandleFunc("GET /api/dind/images", s.handleListDindImages)
 	mux.HandleFunc("GET /api/dind/containers/{id}/logs", s.handleDindContainerLogs)
+	mux.Handle("GET /api/dind/containers/{id}/inspect", gate.RequirePassword(http.HandlerFunc(s.handleInspectDindContainer)))
 	mux.Handle("POST /api/dind/containers/{id}/start", gate.RequirePassword(http.HandlerFunc(s.handleStartDindContainer)))
 	mux.Handle("POST /api/dind/containers/{id}/stop", gate.RequirePassword(http.HandlerFunc(s.handleStopDindContainer)))
 	mux.Handle("POST /api/dind/containers/{id}/remove", gate.RequirePassword(http.HandlerFunc(s.handleRemoveDindContainer)))

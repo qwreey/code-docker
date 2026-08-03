@@ -35,11 +35,13 @@ export function ContainerTable({
   containers,
   busy,
   onShowLogs,
+  onInspect,
   onAction,
 }: {
   containers: DindContainer[]
   busy: Record<string, boolean>
   onShowLogs: (container: DindContainer) => void
+  onInspect: (container: DindContainer) => void
   onAction: (id: string, action: Action, force?: boolean) => void
 }) {
   if (containers.length === 0) {
@@ -124,6 +126,13 @@ export function ContainerTable({
                       onClick={() => onShowLogs(c)}
                     >
                       로그
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-small"
+                      onClick={() => onInspect(c)}
+                    >
+                      Inspect
                     </button>
                   </div>
                 </td>

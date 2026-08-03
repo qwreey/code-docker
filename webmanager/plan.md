@@ -28,7 +28,7 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 | Tailscale forwards/publish CRUD | `.claude/archive/tailscale-plan-done.md` |
 | vector 로그 파이프라인 + Logs 페이지 | `.claude/archive/vector-logs-plan-done.md` |
 | 작업 관리자(구 "Processes") — 성능/프로세스 서브탭 분리, 프로세스 트리+리스트, 필터/검색, 코어별 CPU 히트맵(호버 시 최근 히스토리 스파크라인 포함), 메모리 구성요소별 분해(호스트 물리 vs cgroup), 컨테이너 자체 루트 파일시스템의 최상위 디렉토리별 디스크 사용량 분석(Storage Sense류, `du` 기반, 캐시 + 수동 새로고침 전용) | `.claude/archive/processes-plan-done.md` |
-| Docker/dind 관리 M1(읽기 전용 — 컨테이너/이미지 목록, 로그 조회, `internal/dind` CLI 셸아웃)+M2(start/stop/remove, 확인 다이얼로그 필수, 비밀번호 게이트) | `.claude/dind-plan.md` |
+| Docker/dind 관리 M1(읽기 전용 — 컨테이너/이미지 목록, 로그 조회, `internal/dind` CLI 셸아웃)+M2(start/stop/remove, 확인 다이얼로그 필수, 비밀번호 게이트)+M3(docker inspect 상세 뷰, 비밀번호 게이트 — Config.Env 평문 노출 우려로 list/logs와 달리 게이트) | `.claude/qa-request/dind-plan-done.md` |
 | Claude Code 상태 탭 M1(퀵 오버뷰)+M2(히트맵/주간그래프/모델별 토큰)+M3(Skills/Plugins) | `.claude/claude-plan.md` (M4~M5는 미착수) |
 | code-server 익스텐션 추천/설치 (카테고리별 그룹핑, open-vsx "더 보기" 링크, 삭제(uninstall) 포함) | `.claude/archive/extensions-plan-done.md` |
 | 프로젝트 스캔/정리 1단계(용량/재생성 가능 폴더 탐지, 최근 편집 런처, 읽기 전용, mise 도구 표시 포함) | `.claude/qa-request/projects-plan-done.md` (2단계 삭제는 미착수) |
@@ -69,6 +69,11 @@ lint`까지만 통과했고 실컨테이너 검증은 아직 — nginx가 새로
 program이라 `docker compose build && up` 후 7→8개 program 전부 RUNNING인지,
 `/manager` 경로/웹쉘 WebSocket/파일 업로드가 실제로 통과하는지 직접 확인
 필요(`.claude/qa-request/expose-plan-done.md` 참고).
+
+같은 날 이어서 추가된 dind M3(docker inspect 상세 뷰, 비밀번호 게이트)도
+`go build`/`go vet`/`gofmt` + `npm run build`/`npm run lint`만 통과했고
+아직 실컨테이너 통합 검증은 안 함 — M1/M2와 마찬가지로 `code-docker-dind`
+사이드카가 실제로 떠 있어야 의미 있게 확인 가능(`.claude/qa-request/dind-plan-done.md` 참고).
 
 ## 할 일 (우선순위 순, 문서 있으면 링크)
 

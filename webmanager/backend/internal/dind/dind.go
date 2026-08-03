@@ -7,9 +7,10 @@
 // stderr into plain text on its own, unlike the raw Engine API), so a new
 // dependency buys nothing.
 //
-// M1 (list containers/images, tail logs) and M2 (start/stop/remove) are both
-// implemented here per the plan doc; anything resembling `docker run`/`exec`/
-// `cp` stays deliberately out of scope indefinitely.
+// M1 (list containers/images, tail logs), M2 (start/stop/remove), and M3
+// (docker inspect detail view) are all implemented here per the plan doc;
+// anything resembling `docker run`/`exec`/`cp` stays deliberately out of
+// scope indefinitely.
 package dind
 
 import (
@@ -214,6 +215,30 @@ func RemoveContainer(ctx context.Context, id string, force bool) error {
 	args = append(args, id)
 	_, err := runDocker(ctx, args...)
 	return err
+}
+
+// Inspect returns the raw `docker inspect` object for id. `docker inspect
+// <id>` (a single ID) always returns a JSON array with exactly one element,
+// so this unwraps it to a single object — callers (the HTTP handler) get a
+// plain object back, not a one-element array.
+func Inspect(ctx context.Context, id string) (json.RawMessage, error) {
+	if err := ValidateID(id); err != nil {
+		return nil, err
+	}
+	out, err := runDocker(ctx, "inspect", id)
+	if err != nil {
+		return nil, err
+	}
+	var arr []json.RawMessage
+	if err := json.Unmarshal(out, &arr); err != nil {
+		return nil, fmt.Errorf("docker inspect %s: parsing output: %w", id, err)
+	}
+	if len(arr) == 0 {
+		// Shouldn't normally happen — runDocker already translates "No such
+		// container" into ErrNotFound above — but be defensive.
+		return nil, ErrNotFound
+	}
+	return arr[0], nil
 }
 
 // ContainerLogs returns up to tail lines of combined stdout+stderr for the

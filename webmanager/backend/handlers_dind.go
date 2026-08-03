@@ -65,6 +65,24 @@ func (s *Server) handleDindContainerLogs(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]string{"text": text})
 }
 
+// M3: docker inspect detail view. Unlike list/logs above, this is gated
+// (see main.go) — `docker inspect` includes Config.Env in plaintext, which
+// can contain secrets the user passed via `docker run -e ...` inside dind
+// (see webmanager/.claude/dind-plan.md's "사용자 확인 필요" section).
+func (s *Server) handleInspectDindContainer(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := dind.ValidateID(id); err != nil {
+		writeDindErr(w, err)
+		return
+	}
+	raw, err := dind.Inspect(r.Context(), id)
+	if err != nil {
+		writeDindErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, raw)
+}
+
 // M2: start/stop/remove, mutating so gated by RequirePassword in main.go
 // (unlike the read-only handlers above). Audit trail is just a log.Printf —
 // webmanager's own stdout is already collected by the vector pipeline and
