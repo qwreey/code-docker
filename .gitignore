@@ -2,6 +2,7 @@ code/
 sshd/
 /dind/
 .env
+.env.webmanager
 config/*-override*
 config/*.override*
 config/code-patch/*.override.*
