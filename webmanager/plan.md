@@ -41,6 +41,7 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 | `docker-compose.yml`에 모든 `WEBMANAGER_*` env var를 주석 처리된 상태로 문서화(값 예시는 안 채움, 필요할 때 주석 해제), locale(`LANG`)도 TZ 옆에 주석으로 추가 | 문서 없음(레포 루트 `docker-compose.yml` 자체가 최신 소스) |
 | Light/Dark 수동 토글(3-way: 자동/라이트/다크, `data-theme` 속성 + `localStorage`) + 사이드바 하단 잠금 상태 표시/미리 해제 + `index.css` 컬러 시스템 중앙화(기본 UI 다크 값 신규 설계 포함 — 원래 전혀 없었음, dataviz 스킬로 차트 팔레트 재검증) | `.claude/archive/theme-toggle-plan-done.md` |
 | `.env.webmanager` 마이그레이션 도구(`webmanager --env-migrate` — 키 추가/삭제 반영(삭제된 키는 `#~` 아카이브 섹션으로), 유저 코멘트 보존, `#!important`/`#!` 마커로 조직 강제값·권장값-변경-충돌 표시, 경로 기반 템플릿(조직 커스텀 마운트 가능) + 기동 로그/웹 UI 경고 배너(dismiss 영속화)) | `.claude/qa-request/env-migration-plan-done.md` |
+| code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일 origin 통합 — code-server/webmanager 내부 포트 이동, `code-config.yaml` 매 시작 재생성, 프론트엔드 서브패스(`apiUrl()`/`BASE_URL`) 대응까지 전부 구현 | `.claude/qa-request/expose-plan-done.md` |
 
 전체 구현은 backend(Go)/frontend(React) subagent를 병렬로 여러 라운드 돌려서 진행,
 각 라운드 사이 API 계약 불일치를 직접 대조해서 잡는 패턴 반복 — 새 기능도 이 방식
@@ -62,6 +63,12 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 셀, 뱃지 등)의 실제 색상은 백엔드 없이 확인 못 했음(자세히는
 `.claude/archive/theme-toggle-plan-done.md`) — 도커에서 라이트/다크 둘 다 훑어봐 주는 걸
 권장.
+
+`expose-plan.md`(단일 origin 통합)도 `go build`/`go vet`/`npm run build`/`npm run
+lint`까지만 통과했고 실컨테이너 검증은 아직 — nginx가 새로 추가된 supervisord
+program이라 `docker compose build && up` 후 7→8개 program 전부 RUNNING인지,
+`/manager` 경로/웹쉘 WebSocket/파일 업로드가 실제로 통과하는지 직접 확인
+필요(`.claude/qa-request/expose-plan-done.md` 참고).
 
 ## 할 일 (우선순위 순, 문서 있으면 링크)
 
@@ -93,10 +100,6 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
     멀티탭) — **최하 우선순위**, Termix류 프로젝트를 벤치마킹하자는 아이디어
     단계. 복잡하고 필수 기능은 아니라서 낮은 우선순위 — 착수 전 스코프를
     사용자와 반드시 논의. `.claude/filemanager-rework-plan.md`
-13. code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일
-    origin 통합 — 아키텍처/포트 재배치(code-server 내부 포트 이동,
-    `code-config.yaml` 매 시작 재생성으로 변경)/프론트엔드 변경까지 전부
-    확정, 미착수. `.claude/expose-plan.md`
 
 ## 참고 문서
 

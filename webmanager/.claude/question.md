@@ -72,6 +72,14 @@ mise의 설치·삭제(쓰기)는 이번 라운드에 게이트 **안 함**(사�
 - **caddy** (`.claude/research/caddy-plan.md`, 우선순위 낮음) — 유일하게 남은 디테일
   (`preserve_host` 기본값)은 급하지 않다고 이미 정리됨. Monaco 도입 고민은
   이제 공용 `CodeEditor`(CodeMirror 6)로 해소돼서 더 이상 열린 질문 아님.
+- **code-server 안에서 매니저 여는 방법** (`.claude/qa-request/expose-plan-done.md`의
+  "나중 마일스톤" 절 — `/manager` 경로 통합 자체는 구현 완료, 실컨테이너 QA만
+  남음) — 4개 질문:
+  트리거(커맨드 팔레트/사이드바 아이콘/키바인딩?), 표시 형태(작은
+  위젯(iframe) vs 전체 화면 네비게이션 vs 둘 다?), PWA `shortcuts`
+  필드(code-server manifest를 새로 패치해야 함, 홈 화면 꾹 눌러서 뭘
+  보여줄지?). 긴 세션을 폰으로 여는 건 이 마일스톤과 무관하게 `/manager`
+  경로만 생기면 이미 해결됨(오해 방지 기록).
 
 ## 탭 이름 영어 통일 (2026-08-02 QoL 패치)
 

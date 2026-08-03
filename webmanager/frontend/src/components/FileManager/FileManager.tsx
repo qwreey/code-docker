@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, errorMessage } from '../../api/client'
+import { api, apiUrl, errorMessage } from '../../api/client'
 import type { FileEntry, FileOpResult, FileUploadResult } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { FileTable } from './FileTable'
@@ -103,7 +103,7 @@ export function FileManager() {
   }
 
   function handleDownload(entry: FileEntry) {
-    window.location.href = `/api/files/download?path=${encodeURIComponent(entry.path)}`
+    window.location.href = apiUrl(`/files/download?path=${encodeURIComponent(entry.path)}`)
   }
 
   async function submitRename(entry: FileEntry, newName: string) {
@@ -165,7 +165,7 @@ export function FileManager() {
       const fd = new FormData()
       fd.append('dir', currentDirPath)
       for (const f of Array.from(files)) fd.append('files', f)
-      const res = await fetch('/api/files/upload', { method: 'POST', body: fd })
+      const res = await fetch(apiUrl('/files/upload'), { method: 'POST', body: fd })
       if (!res.ok) {
         throw new Error(`업로드 요청이 실패했습니다 (${res.status})`)
       }

@@ -50,7 +50,7 @@ code.yaeji.moe {
     copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version
     trusted_proxies private_ranges
   }
-  reverse_proxy http://containerip:port
+  reverse_proxy http://containerip:80   # code-server(/) + webmanager(/manager) 전부 이 한 줄로 커버됩니다 - 컨테이너 안 nginx가 라우팅합니다
 }
 ```
 
@@ -130,7 +130,7 @@ code-docker 가 고유한 tailscale IP를 가지도록 하여, ssh/adb 를 위�
 
 ## webmanager (관리자 패널)
 
-80번 포트의 code-server 와 별개로, `81`번 포트에 브라우저 관리자 패널이 함께 떠 있습니다 (Go 백엔드 + React 프론트엔드, `webmanager/` 폴더에서 개발됩니다).
+80번 포트의 code-server 와 같은 origin, `/manager` 경로에 브라우저 관리자 패널이 함께 떠 있습니다 (Go 백엔드 + React 프론트엔드, `webmanager/` 폴더에서 개발됩니다) — 컨테이너 안 nginx가 `/manager`를 webmanager로, 나머지를 code-server로 라우팅해줍니다. 별도 포트로 직접 열고 싶다면(예: nginx를 거치지 않고 붙고 싶은 경우) `.env.webmanager`의 `WEBMANAGER_ADDR`를 `:81`로 바꾸고 `docker-compose.yml`의 주석 처리된 `81:81` 매핑을 되살리세요.
 
 자세한 내용(각 탭 설명, 비밀번호 게이트, 보안 주의사항)은 [docs/webmanager.md](docs/webmanager.md)를 확인하세요.
 
@@ -159,7 +159,7 @@ code-docker 가 고유한 tailscale IP를 가지도록 하여, ssh/adb 를 위�
 - **code-server**: `code-service.*.sh`, `code-config.*.yaml`, `code-env.*.sh`, `code-runner.*.sh`, `recommendations.*.yaml`, `shell.*`
 - **tailscale**: `tailscale-service.*.sh`, `tailscale-forward.*.sh`, `tailscale-status.*.sh`, `tailscale-config.*.yaml`
 - **webmanager**: `webmanager.*.sh`, `supervisor-metadata.*.yaml`, `example-env.webmanager`(런타임 환경변수 템플릿, 저장소 루트)
-- **기타**: `supervisord.*.conf`, `supervisord/*.conf`, `user-init.*.sh`, `sshd-service.*.sh`, `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`, `vector.*.toml`
+- **기타**: `supervisord.*.conf`, `supervisord/*.conf`, `user-init.*.sh`, `sshd-service.*.sh`, `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`, `vector.*.toml`, `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅)
 
 # 코드 서버 패치
 

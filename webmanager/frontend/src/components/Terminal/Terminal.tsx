@@ -3,7 +3,7 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
-import { api, errorMessage } from '../../api/client'
+import { api, apiUrl, errorMessage } from '../../api/client'
 import type { TerminalSessionInfo, TerminalSettings } from '../../api/types'
 import { DEFAULT_KEYBINDINGS, type ModifierId } from './keybindings'
 import { DEFAULT_THEME_ID, findTheme, themeToXterm } from './themes'
@@ -267,7 +267,7 @@ export function Terminal() {
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const ws = new WebSocket(
-      `${protocol}//${window.location.host}/api/terminal?session=${encodeURIComponent(activeSession)}`,
+      `${protocol}//${window.location.host}${apiUrl(`/terminal?session=${encodeURIComponent(activeSession)}`)}`,
     )
     ws.binaryType = 'arraybuffer'
     wsRef.current = ws

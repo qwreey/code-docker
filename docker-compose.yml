@@ -94,13 +94,16 @@ services:
       # It's recommended to use a reverse proxy with forward proxy auth
       # where possible, e.g. a web server like Caddy combined with an
       # authentication tool like Authentik.
+      # An in-container nginx (see config/nginx.default.conf) now splits this
+      # single port between code-server (/) and webmanager (/manager) - no
+      # separate port needed for webmanager anymore.
       - 80:80
       # - 22:22
-      # webmanager admin panel. No auth of its own - relies entirely on a
-      # reverse proxy in front of it. Bind-address strategy (host publish vs
-      # internal-only alias) is still undecided, so this is just open on
-      # 0.0.0.0 for now while it's under development.
-      - 81:81
+      # webmanager no longer needs its own published port - it's reachable at
+      # /manager on port 80 above (nginx strips the prefix internally).
+      # Uncomment this (and set WEBMANAGER_ADDR=:81 in .env.webmanager) only
+      # if you want to bypass nginx and reach it directly on its own port.
+      # - 81:81
     volumes:
       - ./code:/code
       - ./sshd:/etc/ssh

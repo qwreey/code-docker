@@ -1,7 +1,10 @@
 # webmanager (관리자 패널)
 
-80번 포트의 code-server 와 별개로, `81`번 포트에 브라우저 관리자 패널이 함께 떠 있습니다 (Go
-백엔드 + React 프론트엔드, `webmanager/` 폴더에서 개발됩니다). 구현된 기능:
+80번 포트의 code-server 와 같은 origin, `/manager` 경로에 브라우저 관리자 패널이 함께 떠
+있습니다 (Go 백엔드 + React 프론트엔드, `webmanager/` 폴더에서 개발됩니다) — 컨테이너 안
+nginx가 `/manager`를 webmanager로 라우팅해줍니다(자세한 라우팅 규칙은
+[build-customization.md](build-customization.md#nginxconf-단일-origin-라우팅-설정) 참고).
+구현된 기능:
 
 ### Supervisor
 
@@ -133,9 +136,10 @@ git-lfs 는 `config/build.default.sh`에 포함되어 기본으로 설치됩니�
 
 ## 보안: 자체 로그인 없음
 
-> **주의: webmanager 는 자체 로그인 화면이 없습니다.** code-server 와 마찬가지로 앞단
-> 리버스 프록시의 forward-auth 에만 의존하므로, 프록시 설정 없이 81번 포트를 그대로
-> 인터넷에 노출하면 안 됩니다 (README의 [보안 (로그인)](../README.md#보안-로그인) 절과 동일한 방식으로 프록시를
+> **주의: webmanager 는 자체 로그인 화면이 없습니다.** code-server 와 같은 80번 포트,
+> `/manager` 경로를 공유하므로 앞단 리버스 프록시의 forward-auth 하나가 둘 다 보호합니다
+> — 프록시 설정 없이 80번 포트를 그대로 인터넷에 노출하면 안 됩니다 (README의
+> [보안 (로그인)](../README.md#보안-로그인) 절과 동일한 방식으로 프록시를
 > 구성하세요). SSH 키/git credential 파일을 직접 다루는 기능이라 code-server 의
 > `auth: none` 보다 더 신중한 접근 통제가 필요합니다. **특히 Terminal(브라우저에서
 > 곧바로 root 쉘)과 파일(임의 파일시스템 read/write/delete) 탭은 webmanager 안에서

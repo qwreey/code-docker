@@ -29,7 +29,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=1
+WEBMANAGER_ENV_VERSION=2
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -126,5 +126,7 @@ WEBMANAGER_ENV_VERSION=1
 #SSH_SIGNING_KEY_PATH=
 #VECTOR_LOG_DIR=
 #SYSTEM_DISK_PATH=
-#. 바꾸면 docker-compose.yml의 81:81 포트 매핑도 같이 바꿔야 합니다.
-#WEBMANAGER_ADDR=:81
+#. webmanager는 이제 nginx가 컨테이너 안에서 /manager 경로로 라우팅해주므로
+#. 기본값이 내부 전용 바인드입니다. docker-compose.yml의 81:81 포트 매핑을
+#. 되살려 직접 노출하고 싶을 때만 :81(0.0.0.0)로 바꾸세요.
+#WEBMANAGER_ADDR=127.0.0.1:81

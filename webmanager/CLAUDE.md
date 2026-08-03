@@ -66,7 +66,19 @@ the user's choice (`WEBMANAGER_ENV_VERSION` is just the first real use of
 (`WEBMANAGER_ENV_TEMPLATE_PATH`, not `go:embed`) so orgs running multiple
 instances can bind-mount their own; plus a startup log warning and a web UI
 banner (dismiss state persisted backend-side via `internal/envversionprefs`)
-when the running file is stale. Keep extending as
+when the running file is stale. A single-origin merge of code-server (`/`)
+and webmanager (`/manager`) via an in-container nginx supervisord program
+(`config/nginx.default.conf`, `[program:nginx]` — see
+`.claude/qa-request/expose-plan-done.md`): code-server's `bind-addr` and
+webmanager's `WEBMANAGER_ADDR` both moved to internal-only ports,
+`code-config.default.yaml` is now regenerated on every start (no more
+once-only guard) same as every other override-pattern file, and the 4
+frontend call-sites that hardcoded `/api/...` outside `src/api/client.ts` now
+go through `apiUrl()`/`import.meta.env.BASE_URL`. Code/build-verified only —
+real-container QA by the repo owner is still pending. A follow-on milestone
+(opening `/manager` as a widget/iframe from inside the code-server PWA, or a
+PWA `shortcuts` entry) is deliberately left as open questions only in
+`.claude/question.md`, not designed yet. Keep extending as
 needed; see `plan.md`'s "구현 완료" table before assuming something isn't
 done yet. **Open questions the repo owner still needs to weigh in on are
 consolidated in `.claude/question.md`** — none of them block further work,
@@ -89,21 +101,6 @@ dependencies on each other or on anything still queued):
 3. `.claude/extension-search-plan.md` — extension search + marketplace-URL
    paste-to-install (with an open-vsx cross-lookup + vsix-direct-download
    fallback). Design done, not started.
-4. `.claude/expose-plan.md` — merge code-server (`/`) and webmanager
-   (`/manager`) onto one origin via an in-container nginx supervisord
-   program (not the user's external Caddy — a broken external-proxy reload
-   must never be able to take down access to everything at once). Requires
-   moving code-server's `bind-addr` off `0.0.0.0:80` to an internal-only
-   port and removing `code-service.default.sh`'s once-only
-   `config.yaml`-copy guard (so it's always regenerated from
-   `code-config.default.yaml`/`.override.yaml` — that file becomes
-   fully derived, never hand-edited, same as every other override-pattern
-   file), plus 4 frontend call-sites that hardcode `/api/...` outside
-   `src/api/client.ts` (found via grep, listed in the doc) needing an
-   `import.meta.env.BASE_URL` prefix. Architecture and required changes are
-   fully decided; a follow-on milestone (opening `/manager` as a
-   widget/iframe from inside the code-server PWA, or a PWA `shortcuts`
-   entry) is deliberately left as open questions only, not designed yet.
 
 **Lower-priority / no dedicated plan doc yet** — tracked only in `plan.md`'s
 TODO table: code-server settings.json editor (revisit once caddy-plan's

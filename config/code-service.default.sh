@@ -10,12 +10,15 @@ fi
 # Update code server
 mkdir -p /code/.server
 TARGET="/code/.server" /etc/code-docker/code-server-autoinstall/install.sh
-if [ ! -e "/code/.server/config.yaml" ]; then
-    if [ -e /etc/code-docker/code-config.override.yaml ]; then
-        cp /etc/code-docker/code-config.override.yaml /code/.server/config.yaml
-    else
-        cp /etc/code-docker/code-config.default.yaml  /code/.server/config.yaml
-    fi
+
+# Regenerated every start (not just once) - this file is fully derived, same
+# as every other override-pattern file. Customize via
+# code-config.override.yaml + rebuild, never by hand-editing the copy under
+# /code/.server directly (it would just get overwritten on next start).
+if [ -e /etc/code-docker/code-config.override.yaml ]; then
+    cp /etc/code-docker/code-config.override.yaml /code/.server/config.yaml
+else
+    cp /etc/code-docker/code-config.default.yaml  /code/.server/config.yaml
 fi
 
 # Seed code-docker's own default browser patches. Runs every start, like

@@ -16,8 +16,12 @@
 - **인증**: 리버스 프록시의 forward-auth에만 의존, 자체 로그인 없음(code-server와
   동일 신뢰 모델). dind/git-credential/ssh-key 등 민감한 조작을 다루므로 프록시
   앞단 인증이 필수 — README의 "webmanager" 절 경고 문구 참고.
-- **바인드 주소**: 미정, 지금은 `0.0.0.0:81`. 최후순위 TODO — `webmanager/plan.md`
-  참고.
+- **바인드 주소**: `expose-plan.md` 구현으로 기본값이 `127.0.0.1:81`(내부 전용)로
+  바뀜 — 컨테이너 안 nginx가 `/manager`로 라우팅해주므로 기본 배포에서는 80번
+  포트 하나만 외부에 노출되면 됨. `0.0.0.0:81`로 직접 노출하고 싶은 사용자는
+  `WEBMANAGER_ADDR`를 바꾸고 `docker-compose.yml`의 주석 처리된 `81:81` 매핑을
+  되살리면 됨(README "webmanager" 절 참고). "바인드 주소 전략" 자체를 더 정교하게
+  다듬을지는 여전히 최후순위 TODO — `webmanager/plan.md` 참고.
 - **프론트 구조**: 사이드바 + 섹션별 컴포넌트(`src/components/<Feature>/`), 각
   섹션은 `sections.ts`의 `SECTIONS` 배열에 `implemented: true/false`로 등록.
   구현 안 된 섹션은 `Placeholder` 컴포넌트로 "구현 예정" 표시.

@@ -37,6 +37,8 @@
 - [`code-patch/`](#code-patch-기본-제공-브라우저-패치-모음)
 - [`vector-service.*.sh`](#vector-servicesh-vector-실행)
 - [`vector.*.toml`](#vectortoml-vector-로그-파이프라인-설정)
+- [`nginx-service.*.sh`](#nginx-servicesh-nginx-실행)
+- [`nginx.*.conf`](#nginxconf-단일-origin-라우팅-설정)
 
 ### `build.*.sh` (빌드 스크립트)
 
@@ -48,7 +50,9 @@ code-server 서비스 엔트리포인트입니다. code-server 의 업데이트/
 
 ### `code-config.*.yaml` (code-server 기본 설정)
 
-유저가 적절한 설정을 가지고 있지 않을 때(일반적으로 초기 설치에) 복사되는 기본 code-server 설정파일입니다. 이미 설정된 경우 /code/.server/config.yaml 를 수정해야합니다.
+code-server 설정 파일입니다. **매 시작마다 `/code/.server/config.yaml`로 무조건 덮어써집니다** — 다른 override 패턴 파일들과 마찬가지로 완전히 파생된(derived) 파일이라, `/code/.server/config.yaml`을 직접 편집해도 다음 재시작에 사라집니다. 커스터마이징하려면 `code-config.override.yaml`을 만들고 재빌드하세요.
+
+`bind-addr`는 `127.0.0.1:8080`(내부 전용)으로 고정되어 있습니다 — 80번 포트는 이제 컨테이너 안 nginx가 code-server(`/`)와 webmanager(`/manager`)를 함께 라우팅하는 데 쓰이므로(`nginx.*.conf` 참고), override에서 `bind-addr`를 바꾸면 라우팅이 깨집니다.
 
 여기의 각 요소는 /code/.server/code-server/bin/code-server --help 를 통해 확인해볼 수 있습니다. 각각의 인자 `--some=value` 는 `some: value` 로 작성할 수 있습니다.
 
@@ -186,3 +190,21 @@ sink, `docker compose logs` 에서 프로그램 구분이 되도록 함)하고, 
 뷰어가 여기서 직접 읽습니다). 로그 레벨은 메시지에 `error`/`warn` 등의 문자열이 포함되는지
 보는 대략적인 추정치일 뿐이라 정확한 파싱은 아닙니다. `/code/.vector/logs` 는 별도 보존 기간
 정책 없이 계속 쌓이므로 필요하면 직접 정리하세요.
+
+### `nginx-service.*.sh` (nginx 실행)
+
+컨테이너 안에서 `nginx -g "daemon off;"`를 실행하는 진입점입니다(`daemon off`는
+필수 — 아니면 nginx가 스스로 마스터+워커로 fork해서 supervisord가 워커 프로세스를
+직접 관리하지 못하게 됩니다). 어떤 conf 파일을 쓸지는 이 스크립트가 고르므로
+(`nginx.override.conf` 있으면 그쪽, 없으면 `nginx.default.conf`), 실행 방식 자체를
+바꾸고 싶을 때만 이 파일을 override하세요 — 라우팅 규칙만 바꾸려면 `nginx.*.conf`를
+override하는 걸로 충분합니다.
+
+### `nginx.*.conf` (단일 origin 라우팅 설정)
+
+code-server(`/`, 내부 전용 `127.0.0.1:8080`)와 webmanager(`/manager`, 내부 전용
+`WEBMANAGER_ADDR`)를 하나의 80번 포트로 합쳐주는 nginx 설정입니다 — 80번 포트에
+직접 바인딩하는 유일한 프로그램입니다. `/manager` prefix는 여기서 벗겨져서
+webmanager는 지금처럼 `/api/...`를 그대로 받습니다. access/error 로그는 nginx
+자신의 stdout/stderr로 나가서 다른 프로그램들과 동일하게 supervisord가 파일로
+캡처합니다(`vector`가 그 파일을 다시 tail).

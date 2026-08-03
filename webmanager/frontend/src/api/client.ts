@@ -35,8 +35,16 @@ export function requestUnlock(): Promise<void> {
 // of re-triggering the prompter (which could otherwise recurse).
 const UNLOCK_PATH = '/auth/unlock'
 
+// import.meta.env.BASE_URL is '/' in dev and '/manager/' in a production
+// build (see vite.config.ts) - prefixing every API URL with it is what lets
+// the same build work whether nginx strips a /manager prefix in front of it
+// or not.
+export function apiUrl(path: string): string {
+  return `${import.meta.env.BASE_URL}api${path}`
+}
+
 async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
-  const res = await fetch(`/api${path}`, init)
+  const res = await fetch(apiUrl(path), init)
 
   if (res.status === 204) {
     return undefined as T

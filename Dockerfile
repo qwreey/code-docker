@@ -41,7 +41,8 @@ COPY example-env.webmanager /etc/code-docker/webmanager/example-env.webmanager
 
 # Log directories for per-program rotated log files (read by vector)
 RUN mkdir -p /var/log/code-server /var/log/sshd /var/log/tailscaled \
-    /var/log/tailscale-forward /var/log/tailscale-status /var/log/webmanager
+    /var/log/tailscale-forward /var/log/tailscale-status /var/log/webmanager \
+    /var/log/nginx
 
 # Copy config & static files
 COPY --chown=root:root \
@@ -49,7 +50,7 @@ COPY --chown=root:root \
     script/get-user-shell.sh script/sshd-service.sh \
     script/tailscale-service.sh script/tailscale-forward.sh \
     script/tailscale-status.sh script/webmanager.sh \
-    script/vector-service.sh /etc/code-docker/
+    script/vector-service.sh script/nginx-service.sh /etc/code-docker/
 COPY --chown=root:root code-server-autoinstall/*.sh \
     /etc/code-docker/code-server-autoinstall/
 COPY --chown=root:root bin /usr/local/bin/
