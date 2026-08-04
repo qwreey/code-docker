@@ -42,9 +42,17 @@ type PeerInfo struct {
 	DNSName      string   `json:"dnsName"`
 	TailscaleIPs []string `json:"tailscaleIPs"`
 	Relay        string   `json:"relay"`
-	Online       bool     `json:"online"`
-	Tags         []string `json:"tags"`
-	OS           string   `json:"os"`
+	// Direct reports whether the active connection to this peer is a
+	// direct/P2P link rather than relayed through a DERP server - derived
+	// from CurAddr (ipnstate.PeerStatus), which the CLI only populates once
+	// a direct path is actually established, not merely attempted. Relay
+	// above still shows the home DERP region even when Direct is true (it's
+	// the fallback path, not necessarily the one in use), so the two fields
+	// answer different questions and both are exposed.
+	Direct bool     `json:"direct"`
+	Online bool     `json:"online"`
+	Tags   []string `json:"tags"`
+	OS     string   `json:"os"`
 }
 
 // Status is the subset of `tailscale status --json`'s output this package
@@ -63,9 +71,13 @@ type peerInfoRaw struct {
 	DNSName      string   `json:"DNSName"`
 	TailscaleIPs []string `json:"TailscaleIPs"`
 	Relay        string   `json:"Relay"`
-	Online       bool     `json:"Online"`
-	Tags         []string `json:"Tags"`
-	OS           string   `json:"OS"`
+	// CurAddr is only non-empty once a direct/P2P path to this peer is
+	// actually established - empty means traffic is currently relayed
+	// through DERP, regardless of what Relay (the home region) says.
+	CurAddr string   `json:"CurAddr"`
+	Online  bool     `json:"Online"`
+	Tags    []string `json:"Tags"`
+	OS      string   `json:"OS"`
 }
 
 func (r peerInfoRaw) toPeerInfo() PeerInfo {
@@ -74,6 +86,7 @@ func (r peerInfoRaw) toPeerInfo() PeerInfo {
 		DNSName:      r.DNSName,
 		TailscaleIPs: r.TailscaleIPs,
 		Relay:        r.Relay,
+		Direct:       r.CurAddr != "",
 		Online:       r.Online,
 		Tags:         r.Tags,
 		OS:           r.OS,

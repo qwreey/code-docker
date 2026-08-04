@@ -100,6 +100,7 @@ export interface TailscalePeerInfo {
   dnsName: string
   tailscaleIPs: string[]
   relay: string
+  direct: boolean
   online: boolean
   tags: string[]
   os: string

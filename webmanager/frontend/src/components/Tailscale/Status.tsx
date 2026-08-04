@@ -18,6 +18,15 @@ function peerTags(peer: TailscalePeerInfo): string {
   return peer.tags.join(', ') || '-'
 }
 
+// direct/relay is only meaningful for an active connection to a peer - an
+// offline peer has neither a live P2P path nor a live DERP relay, so both
+// fields go stale/empty rather than reflecting the last-known state.
+function peerConnection(peer: TailscalePeerInfo): { label: string; variant: 'green' | 'gray' } {
+  if (!peer.online) return { label: '-', variant: 'gray' }
+  if (peer.direct) return { label: '직접 연결', variant: 'green' }
+  return { label: peer.relay ? `릴레이 경유 (${peer.relay})` : '릴레이 경유', variant: 'gray' }
+}
+
 export function Status() {
   const [data, setData] = useState<TailscaleStatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -158,25 +167,30 @@ export function Status() {
                       <tr>
                         <th>호스트명</th>
                         <th>IP</th>
-                        <th>릴레이</th>
+                        <th>연결</th>
                         <th>상태</th>
                         <th>태그</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {status.peers.map((peer) => (
-                        <tr key={peer.dnsName || peer.hostName}>
-                          <td>{peer.hostName}</td>
-                          <td className="mono-cell">{peerIPs(peer)}</td>
-                          <td>{peer.relay || '-'}</td>
-                          <td>
-                            <span className={`badge ${peer.online ? 'badge-green' : 'badge-gray'}`}>
-                              {peer.online ? '온라인' : '오프라인'}
-                            </span>
-                          </td>
-                          <td>{peerTags(peer)}</td>
-                        </tr>
-                      ))}
+                      {status.peers.map((peer) => {
+                        const connection = peerConnection(peer)
+                        return (
+                          <tr key={peer.dnsName || peer.hostName}>
+                            <td>{peer.hostName}</td>
+                            <td className="mono-cell">{peerIPs(peer)}</td>
+                            <td>
+                              <span className={`badge badge-${connection.variant}`}>{connection.label}</span>
+                            </td>
+                            <td>
+                              <span className={`badge ${peer.online ? 'badge-green' : 'badge-gray'}`}>
+                                {peer.online ? '온라인' : '오프라인'}
+                              </span>
+                            </td>
+                            <td>{peerTags(peer)}</td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
