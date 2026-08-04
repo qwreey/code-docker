@@ -454,9 +454,6 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
-/* Width is intentionally unset so the SVG stretches to whatever width the
-   tooltip's own content (the nowrap min/avg/max stats line) ends up at,
-   instead of sitting at a fixed size inside a wider box. */
 .perf-cpu-sparkline {
   display: block;
   width: 100%;
@@ -616,5 +613,19 @@
   color: var(--text-heading);
   font-weight: 600;
   margin-left: auto;
+}
+
+/* Secondary caption below DiskBreakdownSection - host mount capacity, kept
+   as plain text (no bar) since the free-space framing it used to carry
+   (a used/free progress bar) isn't the useful view here; the breakdown
+   above is. */
+.perf-disk-host-note {
+  margin-top: 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.perf-disk-host-note-danger {
+  color: var(--color-red-fg);
 }
 

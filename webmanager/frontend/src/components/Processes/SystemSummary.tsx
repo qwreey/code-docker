@@ -160,35 +160,32 @@ function DiskBreakdownSection() {
 // DiskUsageCard is what's left of the old SystemSummary once the redundant
 // CPU/memory "current value" cards were removed (see Performance.tsx and
 // CpuHeatmap/MemoryBreakdown below) — those duplicated numbers the
-// redesigned graphs already show in their own header/legend. The top section
-// (host/mount usage for `disk.path`) is pure/presentational, fed by
-// Performance.tsx's single shared /system/resources poll; DiskBreakdownSection
-// below it is a second, independent scope (this container's own root
-// filesystem by top-level directory) with its own fetch lifecycle — see its
-// doc comment.
+// redesigned graphs already show in their own header/legend.
+//
+// The free-vs-used framing (a progress bar toward `disk.totalBytes`) that
+// used to lead this card was dropped — "how much room is left" isn't the
+// useful question here, "what's actually using the space" is, which is
+// exactly what DiskBreakdownSection's folder-percentage view already
+// answers. DiskBreakdownSection is now the primary content; the host/mount
+// numbers for `disk.path` (fed by Performance.tsx's shared /system/resources
+// poll, a different scope than DiskBreakdownSection's own container-root du
+// — see its doc comment) are kept only as a compact secondary caption below
+// it, since the underlying host mount's total capacity isn't otherwise
+// visible from the du-based breakdown alone.
 export function DiskUsageCard({ disk }: { disk: DiskInfo }) {
   const diskPercent = disk.totalBytes > 0 ? (disk.usedBytes / disk.totalBytes) * 100 : 0
+  const danger = disk.available && diskPercent >= DANGER_THRESHOLD
 
   return (
     <div className="card perf-card perf-card-disk">
-      <div className="perf-mem-scope">
-        <div className="system-summary-label">
-          디스크 (<span className="system-summary-label-path">{disk.path}</span>)
-        </div>
-        {disk.available ? (
-          <>
-            <div className="system-summary-value">
-              {formatBytes(disk.usedBytes)} / {formatBytes(disk.totalBytes)}
-            </div>
-            <ProgressBar percent={diskPercent} />
-            <div className="system-summary-sub">{formatPercent(diskPercent)} 사용</div>
-          </>
-        ) : (
-          <div className="system-summary-unavailable">확인 불가</div>
-        )}
-      </div>
-
       <DiskBreakdownSection />
+
+      <div className={`perf-disk-host-note${danger ? ' perf-disk-host-note-danger' : ''}`}>
+        호스트 마운트 <span className="system-summary-label-path">{disk.path}</span>:{' '}
+        {disk.available
+          ? `${formatBytes(disk.usedBytes)} / ${formatBytes(disk.totalBytes)} (${formatPercent(diskPercent)} 사용)`
+          : '확인 불가'}
+      </div>
     </div>
   )
 }

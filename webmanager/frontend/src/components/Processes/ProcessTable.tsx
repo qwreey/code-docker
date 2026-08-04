@@ -240,7 +240,9 @@ export function ProcessTable() {
                     ),
                   )}
                   <th className="pf-col-cmd">커맨드</th>
-                  <th className="pf-col-actions" aria-label="동작" />
+                  <th className="pf-col-actions" aria-label="동작">
+                    &nbsp;
+                  </th>
                 </tr>
               </thead>
               {viewMode === 'list' ? (

@@ -102,7 +102,7 @@ export function CpuHeatmap({ perCorePercent, available, clockMHz, numCpu }: CpuH
   }
 
   return (
-    <div className="card perf-card">
+    <div className="card perf-card perf-card-cpu">
       <h2>CPU 코어 (호스트 전체기준, {numCpu}개)</h2>
       {!available || perCorePercent.length === 0 ? (
         <p className="empty-state">코어별 CPU 정보를 사용할 수 없습니다.</p>
