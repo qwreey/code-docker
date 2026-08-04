@@ -207,6 +207,7 @@ func main() {
 	mux.Handle("POST /api/dind/containers/{id}/remove", gate.RequirePassword(http.HandlerFunc(s.handleRemoveDindContainer)))
 
 	mux.HandleFunc("GET /api/claude/status", s.handleClaudeStatus)
+	mux.HandleFunc("GET /api/claude/mise-version", s.handleClaudeMiseVersion)
 	mux.HandleFunc("GET /api/claude/plugins", s.handleClaudePlugins)
 	mux.Handle("POST /api/claude/install", gate.RequirePassword(http.HandlerFunc(s.handleClaudeInstall)))
 	mux.HandleFunc("GET /api/claude/prefs", s.handleClaudePrefsGet)

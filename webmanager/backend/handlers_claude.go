@@ -14,13 +14,11 @@ import (
 // explicit JSON `null` (not merely omitted) when installed is true but that
 // sub-fetch degraded — matching claude-plan.md's M1 API contract, which the
 // frontend is being built against concurrently. When Installed is false,
-// both stay nil/null too, which the contract also allows. MiseVersion
-// follows the same "explicit null over absent" convention (no `omitempty`).
+// both stay nil/null too, which the contract also allows.
 type claudeStatusResponse struct {
-	Installed   bool                   `json:"installed"`
-	Auth        *claudecode.Auth       `json:"auth"`
-	Stats       *claudecode.Stats      `json:"stats"`
-	MiseVersion *claudeMiseVersionInfo `json:"miseVersion"`
+	Installed bool              `json:"installed"`
+	Auth      *claudecode.Auth  `json:"auth"`
+	Stats     *claudecode.Stats `json:"stats"`
 }
 
 // claudeMiseVersionInfo reports whether the `claude-code` mise tool (global
@@ -60,11 +58,28 @@ func (s *Server) handleClaudeStatus(w http.ResponseWriter, r *http.Request) {
 		resp.Stats = &stats
 	}
 
-	// MiseVersion detects "is claude-code managed by mise's global config"
-	// via presence in `mise ls -g --json`'s output — not a `which claude`
-	// heuristic, since a mise shim and a manually-installed binary can both
-	// resolve on PATH. Any failure along the way (mise not found, tool not
-	// in the global list, latest-lookup fails) just leaves MiseVersion nil.
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// claudeMiseVersionResponse is GET /api/claude/mise-version's body.
+// MiseVersion has no `omitempty`, so "not present" serializes as an explicit
+// JSON `null` rather than a bare absence.
+type claudeMiseVersionResponse struct {
+	MiseVersion *claudeMiseVersionInfo `json:"miseVersion"`
+}
+
+// handleClaudeMiseVersion reports whether the `claude-code` mise tool
+// (global scope) is up to date, for the update banner. Split out of
+// handleClaudeStatus: `mise latest` can involve a real registry round-trip,
+// so bundling it into the main status fetch made every Claude tab open wait
+// on it even when the frontend has version checks turned off — this endpoint
+// is only called when the frontend actually wants the answer. Same
+// degrade-to-null-on-any-failure contract as the rest of this package: mise
+// not found, tool not in the global list, or the latest-lookup failing are
+// all normal states here, not errors.
+func (s *Server) handleClaudeMiseVersion(w http.ResponseWriter, r *http.Request) {
+	resp := claudeMiseVersionResponse{}
+
 	if miseBin, ok := mise.FindBinary(s.cfg.MiseBinPath); ok {
 		if tools, err := mise.ListTools(r.Context(), miseBin, ""); err == nil {
 			for _, t := range tools {

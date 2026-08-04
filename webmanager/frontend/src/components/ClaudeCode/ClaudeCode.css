@@ -48,13 +48,50 @@
   font-size: 0.8rem;
 }
 
-.claude-version-hide-toggle {
+.claude-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.claude-version-tag {
+  margin-left: 0.55rem;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  vertical-align: middle;
+}
+
+.claude-update-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.claude-update-banner-text {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-heading);
+}
+
+.claude-settings-toggle {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  margin-top: 0.6rem;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.claude-settings-note {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0.5rem 0 0;
 }
 
 .claude-ghost-wrap {

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type {
   ClaudeInstallJob,
+  ClaudeMiseVersionInfo,
+  ClaudeMiseVersionResponse,
   ClaudePlugin,
   ClaudePluginsResponse,
   ClaudePrefs,
@@ -9,6 +11,7 @@ import type {
   MiseJobStatus,
 } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Sheet } from '../common/Sheet'
 import { formatDurationMs } from '../../utils/format'
 import { Heatmap } from './Heatmap'
 import { WeeklyChart } from './WeeklyChart'
@@ -173,10 +176,12 @@ function PluginsTable({ plugins }: { plugins: ClaudePlugin[] }) {
   )
 }
 
-function VersionCard({
+// UpdateBanner only renders when a mise-managed claude-code install is
+// outdated - the up-to-date/hidden states show nothing here at all, per the
+// "banner only when there's actually an update" redesign (the up-to-date
+// case is instead a small tag next to the page title, see ClaudeVersionTag).
+function UpdateBanner({
   miseVersion,
-  hideVersionCheck,
-  onToggleHide,
   onUpdate,
   updateJob,
   updateBusy,
@@ -184,9 +189,7 @@ function VersionCard({
   onCloseUpdateJob,
   onDismissUpdateError,
 }: {
-  miseVersion: NonNullable<ClaudeStatus['miseVersion']>
-  hideVersionCheck: boolean
-  onToggleHide: (checked: boolean) => void
+  miseVersion: ClaudeMiseVersionInfo
   onUpdate: () => void
   updateJob: InstallJobState | null
   updateBusy: boolean
@@ -195,49 +198,40 @@ function VersionCard({
   onDismissUpdateError: () => void
 }) {
   return (
-    <div className="claude-card">
-      <div className="claude-card-label">버전</div>
-      {hideVersionCheck ? (
-        <div className="claude-card-sub">버전 확인이 꺼져 있습니다.</div>
-      ) : miseVersion.outdated ? (
-        <>
-          <div className="claude-card-value">
-            업데이트 가능: {miseVersion.current} → {miseVersion.latest}
-          </div>
-          {updateError && <ErrorBanner message={updateError} onDismiss={onDismissUpdateError} />}
-          {updateJob ? (
-            <JobPanel kind="install" toolLabel="Claude Code" status={updateJob.status} onClose={onCloseUpdateJob} />
-          ) : (
-            <button type="button" className="btn btn-primary btn-small" onClick={onUpdate} disabled={updateBusy}>
-              지금 업데이트
-            </button>
-          )}
-        </>
+    <div className="claude-update-banner">
+      <div className="claude-update-banner-text">
+        Claude Code 업데이트 가능: {miseVersion.current} → {miseVersion.latest}
+      </div>
+      {updateError && <ErrorBanner message={updateError} onDismiss={onDismissUpdateError} />}
+      {updateJob ? (
+        <JobPanel kind="install" toolLabel="Claude Code" status={updateJob.status} onClose={onCloseUpdateJob} />
       ) : (
-        <div className="claude-card-sub">
-          Claude Code {miseVersion.current} (최신)
-        </div>
+        <button type="button" className="btn btn-primary btn-small" onClick={onUpdate} disabled={updateBusy}>
+          지금 업데이트
+        </button>
       )}
-      <label className="claude-card-note claude-version-hide-toggle">
-        <input type="checkbox" checked={hideVersionCheck} onChange={(e) => onToggleHide(e.target.checked)} />
-        버전 확인 끄기
-      </label>
     </div>
   )
+}
+
+// Small muted tag next to the "Claude Code" page title - shown whenever the
+// current mise-managed version is known, regardless of outdated/up-to-date
+// (the update-available case additionally gets the louder UpdateBanner
+// above).
+function ClaudeVersionTag({ version }: { version: string }) {
+  return <span className="claude-version-tag">v{version}</span>
 }
 
 function InstalledView({
   status,
   plugins,
-  prefs,
-  onTogglePrefs,
+  miseVersion,
   onUpdated,
   onLoggedIn,
 }: {
   status: ClaudeStatus
   plugins: ClaudePlugin[]
-  prefs: ClaudePrefs | null
-  onTogglePrefs: (checked: boolean) => void
+  miseVersion: ClaudeMiseVersionInfo | null
   onUpdated: () => void
   onLoggedIn: () => void
 }) {
@@ -245,17 +239,12 @@ function InstalledView({
   const stats = status.stats ?? null
   const { job: updateJob, busy: updateBusy, error: updateError, start: startUpdate, close: closeUpdateJob, clearError: clearUpdateError } =
     useClaudeInstallJob(onUpdated)
-  // The checkbox itself must stay visible even when hideVersionCheck is on,
-  // otherwise there'd be no way back to re-enable it short of a raw API call.
-  const showVersionCard = !!status.miseVersion && !!prefs
 
   return (
     <>
-      {showVersionCard && (
-        <VersionCard
-          miseVersion={status.miseVersion!}
-          hideVersionCheck={prefs!.hideVersionCheck}
-          onToggleHide={onTogglePrefs}
+      {miseVersion?.outdated && (
+        <UpdateBanner
+          miseVersion={miseVersion}
           onUpdate={startUpdate}
           updateJob={updateJob}
           updateBusy={updateBusy}
@@ -342,11 +331,17 @@ export function ClaudeCode() {
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
   const [plugins, setPlugins] = useState<ClaudePlugin[]>([])
   const [prefs, setPrefs] = useState<ClaudePrefs | null>(null)
+  const [miseVersion, setMiseVersion] = useState<ClaudeMiseVersionInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const loadingRef = useRef(false)
 
+  // Deliberately excludes the mise version check - that's a separate,
+  // possibly-slow `mise latest` network round-trip (see
+  // handleClaudeMiseVersion's doc comment on the backend), so it must never
+  // block the page's main content from showing up.
   const load = useCallback(async () => {
     if (loadingRef.current) return
     loadingRef.current = true
@@ -373,6 +368,39 @@ export function ClaudeCode() {
     load()
   }, [load])
 
+  const loadMiseVersion = useCallback(async () => {
+    try {
+      const res = await api.get<ClaudeMiseVersionResponse>('/claude/mise-version')
+      setMiseVersion(res.miseVersion)
+    } catch {
+      // Best-effort, same degrade-to-null contract as the backend - the
+      // version tag/banner just don't show rather than surfacing an error
+      // banner for what's a non-essential check.
+      setMiseVersion(null)
+    }
+  }, [])
+
+  // Only fires the (possibly slow) version check once the fast path above
+  // has confirmed Claude is installed, and skips it entirely when the user
+  // turned it off - matching the "hideVersionCheck" pref's whole point.
+  useEffect(() => {
+    if (!status?.installed || !prefs || prefs.hideVersionCheck) {
+      setMiseVersion(null)
+      return
+    }
+    loadMiseVersion()
+  }, [status?.installed, prefs, loadMiseVersion])
+
+  const handleRefresh = useCallback(() => {
+    load()
+    if (prefs && !prefs.hideVersionCheck) loadMiseVersion()
+  }, [load, loadMiseVersion, prefs])
+
+  const handleUpdated = useCallback(() => {
+    load()
+    loadMiseVersion()
+  }, [load, loadMiseVersion])
+
   async function handleToggleHideVersionCheck(checked: boolean) {
     const prev = prefs
     setPrefs({ hideVersionCheck: checked })
@@ -387,10 +415,20 @@ export function ClaudeCode() {
   return (
     <section>
       <div className="section-header">
-        <h1>Claude Code</h1>
-        <button type="button" className="btn btn-secondary btn-small" onClick={load} disabled={loading}>
-          {loading ? '불러오는 중...' : '새로고침'}
-        </button>
+        <h1>
+          Claude Code
+          {miseVersion && <ClaudeVersionTag version={miseVersion.current} />}
+        </h1>
+        <div className="claude-header-actions">
+          {status?.installed && (
+            <button type="button" className="btn btn-secondary btn-small" onClick={() => setSettingsOpen(true)}>
+              설정
+            </button>
+          )}
+          <button type="button" className="btn btn-secondary btn-small" onClick={handleRefresh} disabled={loading}>
+            {loading ? '불러오는 중...' : '새로고침'}
+          </button>
+        </div>
       </div>
       <p className="section-description">Claude Code CLI의 로그인 상태와 사용 통계를 보여줍니다.</p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
@@ -402,15 +440,29 @@ export function ClaudeCode() {
           <InstalledView
             status={status}
             plugins={plugins}
-            prefs={prefs}
-            onTogglePrefs={handleToggleHideVersionCheck}
-            onUpdated={load}
+            miseVersion={miseVersion}
+            onUpdated={handleUpdated}
             onLoggedIn={load}
           />
         ) : (
           <NotInstalled onInstalled={load} />
         ))
       )}
+
+      <Sheet open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Claude Code 설정">
+        <label className="claude-settings-toggle">
+          <input
+            type="checkbox"
+            checked={prefs?.hideVersionCheck ?? false}
+            onChange={(e) => handleToggleHideVersionCheck(e.target.checked)}
+          />
+          버전 확인 끄기
+        </label>
+        <p className="claude-settings-note">
+          mise로 관리되는 Claude Code 버전이 최신인지 확인하지 않습니다. 켜져 있으면 페이지 제목 옆의 버전
+          표시와 업데이트 안내 배너가 모두 사라집니다.
+        </p>
+      </Sheet>
     </section>
   )
 }

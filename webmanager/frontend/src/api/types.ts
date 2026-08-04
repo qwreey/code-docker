@@ -255,7 +255,10 @@ export interface ClaudeStatus {
   installed: boolean
   auth?: ClaudeAuthStatus | null
   stats?: ClaudeStats | null
-  miseVersion?: ClaudeMiseVersionInfo | null
+}
+
+export interface ClaudeMiseVersionResponse {
+  miseVersion: ClaudeMiseVersionInfo | null
 }
 
 export interface ClaudeInstallJob {

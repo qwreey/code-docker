@@ -54,7 +54,13 @@ when the tool is present in the mise *global* tool list — i.e. actually
 managed by mise — with an "지금 업데이트" button reusing the same install
 endpoint, and a backend-persisted "버전 확인 끄기" checkbox,
 `internal/claudecode/prefs.go`, since this should follow the user across
-browsers/devices unlike the mise tab's `localStorage`-only toggles), and an
+browsers/devices unlike the mise tab's `localStorage`-only toggles; the check
+itself lives on its own `GET /api/claude/mise-version` endpoint, not bundled
+into `/api/claude/status` — `mise latest` can be a real registry round-trip,
+so folding it into the main status fetch made every tab open wait on it even
+with the check turned off; the frontend renders a small version tag next to
+the page title and only shows a banner when an update is actually available,
+skipping the fetch entirely when the pref is on), and an
 in-browser Claude Code login flow (`internal/claudecode/login.go`'s
 `LoginManager` runs `claude auth login` as a managed background subprocess —
 plain `os/exec` pipes are sufficient, empirically confirmed no PTY is needed
