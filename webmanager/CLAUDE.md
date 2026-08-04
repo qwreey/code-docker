@@ -105,7 +105,15 @@ per-device `localStorage`, `src/theme.ts`/`src/useTheme.ts`) and a sidebar
 footer lock-status indicator on the left (shows a live "N분 남음" countdown
 from `GET /api/auth/status`'s `unlockedUntil`, click to pre-unlock via the
 shared `UnlockModalHost` queue). `lucide-react` is also used for the
-terminal's tab pin/close/add icons. A `.env.webmanager` migration tool
+terminal's tab pin/close/add icons. Sidebar tab switches and the theme
+toggle both animate via the View Transition API (`src/utils/
+viewTransition.ts`'s `withViewTransition`, a thin `document.
+startViewTransition` wrapper with a synchronous browsers-without-support
+fallback), and every tab's first-load state now shows a shared generic
+shimmer placeholder (`components/common/Skeleton.tsx`) that cross-fades
+into the real content via the same utility instead of snapping — see
+"First-load skeleton" under Ground rules below for the pattern to follow
+when adding a new tab. A `.env.webmanager` migration tool
 (`webmanager --env-migrate`, `internal/envmigrate` — see
 `.claude/qa-request/env-migration-plan-done.md`): reconciles a user's file
 against the image's current `example-env.webmanager`, archiving removed keys
@@ -217,6 +225,23 @@ queue.
   backend-persisted JSON file under `/code/.webmanager/` instead (see
   `internal/terminalsettings` for the pattern: whole-document GET/PUT,
   atomic write via temp-file+rename).
+- **First-load skeleton**: any tab/panel's "no data yet" state should render
+  `components/common/Skeleton.tsx`'s `<Skeleton />` instead of a bare
+  `<p className="empty-state">불러오는 중...</p>`. It's deliberately generic
+  (a handful of shimmering bars, not shaped to that component's real
+  layout — tabs vary too much for a per-component skeleton to be worth
+  maintaining, and matching the final layout isn't necessary for it to read
+  as "loading"). Pair it with `utils/viewTransition.ts`'s
+  `withViewTransition` around the loading-flag setter's `finally`-block call
+  (`withViewTransition(() => setLoading(false))` instead of a bare
+  `setLoading(false)`) so the swap to real content cross-fades instead of
+  snapping instantly — same utility the sidebar tab switch and theme toggle
+  already use for the same reason. Only convert a component's own top-level
+  "nothing loaded yet" placeholder this way; leave button-label loading text
+  (`{loading ? '불러오는 중...' : '새로고침'}`) and small nested per-item
+  loading states (e.g. Supervisor's per-program process-tree expand) as
+  plain text — those aren't full-section states and a big skeleton block
+  would look oversized there.
 - **Process tree**: `src/utils/processTree.ts`'s `buildProcessTree(processes,
   rootPid?)` is a reusable, backend-free utility (built from the existing
   `ppid` field already returned by `GET /api/processes`) — reuse it rather
