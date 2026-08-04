@@ -1,10 +1,39 @@
-# Caddy 기반 dev 서버 expose 어댑터 조사 (설계 조사, 미구현 — 우선순위 낮음)
+# Caddy 기반 dev 서버 expose 어댑터 조사 (구현 완료 — 2026-08-04)
 
-> **이 문서는 구현 전 설계 조사 문서임.** `../../.claude/archive/tailscale-design.md` 와
-> 동일한 성격(구현 전 조사 기록) — 구현 착수 시 이 파일을 참고해서 실제 구현 계획으로
-> 전환하면 됨. 대부분의 설계 결정은 이 문서 안에서 이미 확정됐지만(아래 "남은 질문"
-> 참고), 남은 소소한 결정(`preserve_host` 기본값 등)이 있는 데다 다른 큐(dind/웹쉘)
-> 대비 우선순위가 낮게 재조정됨 — `webmanager/plan.md`/`CLAUDE.md` 우선순위 목록 참고.
+> **2026-08-04: 구현 완료.** 아래는 구현 전 설계 조사 기록으로 남겨두되(대부분의
+> 설계 결정은 실제 구현과 그대로 일치), 실제 구현 과정에서 뒤집히거나 확정된 부분은
+> 이 콜아웃에 정리:
+>
+> - **"왜 커스텀 플러그인이 아닌가"/"라우팅 설계" 등 구조 설계는 그대로 구현됨** —
+>   `config/caddy-adapter.default.sh`(override 패턴, `caddy-adapter` supervisord
+>   program), `/code/.caddy-adapter/{Caddyfile,managed/,custom/}` 레이아웃,
+>   expose 하나 = `managed/*.caddy` 파일 하나, 구조화 폼 + `ExpandableEditor`
+>   raw 편집 fallback(별도 Monaco 도입 없이 기존 CodeMirror 6 컴포넌트 재사용).
+> - **"인증은 바깥 리버스 프록시에 전적으로 위임" 결정(아래 "결정된 방향" 4번)이
+>   뒤집힘.** 대신 이미 있는 `internal/authgate`(웹매니저 비밀번호 게이트)를
+>   Caddy의 `forward_auth`에 그대로 연결 — expose마다 "인증 요구" 체크박스 하나로
+>   켤 수 있음(`GET /api/auth/verify`, 401 시 독립 로그인 페이지
+>   `/manager/dev-auth`로 302 리다이렉트). 근거: expose를 등록할 때마다 바깥
+>   프록시에도 auth를 따로 등록해야 하면 깜빡 누락하기 쉽다는 문제의식 — Caddy
+>   라우터 등록 시점에 인증까지 한 번에 켤 수 있는 쪽이 실수를 구조적으로 막음.
+>   이 변경에 맞춰 `internal/authgate`의 토큰도 HMAC 서명 자기서술형으로
+>   재설계됨(세션 저장소 삭제, 같은 토큰을 웹매니저 쓰기 게이트=10분 /
+>   Dev Proxy 열람=24시간으로 다른 TTL 적용) — 자세한 내용은
+>   `.claude/authgate-plan-done.md`. `WEBMANAGER_AUTH_COOKIE_DOMAIN`(신규)을
+>   설정해야 웹매니저 잠금 해제가 dev-proxy 서브도메인에도 적용됨.
+> - **`preserve_host`(`header_up Host {host}`) 기본값 — "없음"으로 확정, 폼에
+>   옵션 자체를 두지 않음.** 사용자 판단: "이미 밖에서 그거 안 쓰고 대부분 앱이
+>   잘 돌아가고 있음" — 필요해지면 그때 앱별로 `allowedHosts` 등을 조정하는
+>   쪽으로 대응(아래 "preserve_host 상세 설명" 참고, 문서는 남겨두되 기본값은
+>   확정).
+> - **CLI(`bin/dev-expose`)는 이번 구현 범위에서 제외.** UI(webmanager Dev Proxy
+>   탭)로 충분하다는 판단 — 필요해지면 나중에 이 문서의 "CLI 설계 초안"을 그대로
+>   구현하면 됨.
+> - 사용자 문서는 `docs/dev-proxy.md`(신규) + `docs/webmanager.md`의 "Dev Proxy"
+>   절 + README의 "dev 서버 노출" tips 절.
+>
+> 아래 본문은 구현 전 조사 당시 기록 그대로 보존(`../../.claude/archive/tailscale-design.md`와
+> 동일한 성격) — 위 콜아웃과 배치되는 서술(특히 "인증" 관련)은 위 콜아웃이 우선함.
 
 > 이 저장소의 일반적인 구조/컨벤션(override 패턴, supervisord 프로세스 모델, docker-compose 토폴로지 등)은 저장소 루트의 `CLAUDE.md` 를 참고. `webmanager/` 관련 컨벤션은 `webmanager/CLAUDE.md`, `webmanager/plan.md` 참고.
 

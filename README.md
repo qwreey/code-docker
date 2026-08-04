@@ -170,6 +170,17 @@ code-docker 가 고유한 tailscale IP를 가지도록 하여, ssh/adb 를 위�
 - [포트 내보내기 (publish)](docs/tailscale.md#포트-내보내기-publish)
 - [보안: tailnet ACL 설정](docs/tailscale.md#보안-tailnet-acl-설정) — 놓치기 쉬운 필수 설정입니다
 
+## dev 서버 노출 (Dev Proxy)
+
+컨테이너 안에서 뜬 dev 서버(`npm run dev` 등)를 와일드카드 서브도메인으로 바깥에 노출하는 기능입니다. 내부 Caddy 인스턴스가 서브도메인별로 로컬 포트로 프록시하고, [webmanager의 Dev Proxy 탭](docs/webmanager.md)에서 항목을 관리합니다.
+
+자세한 내용은 [docs/dev-proxy.md](docs/dev-proxy.md)를 확인하세요.
+
+- [켜고 끄기 / 기본 설정](docs/dev-proxy.md#켜고-끄기--기본-설정)
+- [expose 추가하기](docs/dev-proxy.md#expose-추가하기)
+- [바깥 리버스 프록시 연결하기](docs/dev-proxy.md#바깥-리버스-프록시-연결하기)
+- [인증](docs/dev-proxy.md#인증) — 켜려면 `WEBMANAGER_CODE_SERVER_URL`/`WEBMANAGER_AUTH_COOKIE_DOMAIN` 둘 다 필요합니다, 놓치기 쉬운 필수 설정입니다
+
 ## webmanager (관리자 패널)
 
 80번 포트의 code-server 와 같은 origin, `/manager` 경로에 브라우저 관리자 패널이 함께 떠 있습니다 (Go 백엔드 + React 프론트엔드, `webmanager/` 폴더에서 개발됩니다) — 컨테이너 안 nginx가 `/manager`를 webmanager로, 나머지를 code-server로 라우팅해줍니다. 별도 포트로 직접 열고 싶다면(예: nginx를 거치지 않고 붙고 싶은 경우) `.env.webmanager`의 `WEBMANAGER_ADDR`를 `:81`로 바꾸고 `docker-compose.yml`의 주석 처리된 `81:81` 매핑을 되살리세요.

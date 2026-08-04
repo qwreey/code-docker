@@ -16,6 +16,19 @@
   쓰기 힘드니 짧은 유예 윈도우가 낫다"는 사용자 판단). 인메모리 세션 저장소,
   컨테이너 재시작하면 전부 날아감(의도된 동작, redis 등 불필요 — 사실상 단일
   사용자 도구라 오버엔지니어링 방지).
+- **2026-08-04 갱신 — Dev Proxy(`.claude/research/caddy-plan.md`) 추가에 맞춰
+  토큰을 HMAC 서명 자기서술형으로 재설계**(`internal/authgate/gate.go`):
+  세션 맵/뮤텍스는 삭제, 토큰이 발급 시각(unix epoch)을 담고 랜덤 HMAC
+  시크릿(프로세스 시작 시 생성, 영속화 안 함 — 재시작하면 시크릿도 새로
+  생겨서 "재시작하면 전부 로그아웃" 동작은 그대로 유지)으로 서명됨. **같은
+  토큰을 컨텍스트별로 다른 TTL로 검사** — 웹매니저 쓰기 게이트는 여전히
+  10분(`Gate.Unlocked`), Dev Proxy의 Caddy `forward_auth` 열람은 24시간
+  (`Gate.UnlockedForForwardAuth`, `GET /api/auth/verify`가 사용). 쿠키
+  `Domain` 속성도 신규 지원(`WEBMANAGER_AUTH_COOKIE_DOMAIN`, 기본 비어있어
+  기존 호스트 전용 동작 그대로) — Dev Proxy 와일드카드 서브도메인과 상위
+  도메인을 공유하도록 설정하면 웹매니저에서 한 번 푼 잠금이 dev-proxy
+  서브도메인에도 그대로 적용됨. 자세한 배경은 `.claude/research/caddy-plan.md`
+  참고.
 - 원래 설계는 `webmanager/.claude/archive/terminal-plan-done.md`의 "인증" 절 — 거기서
   터미널 전용으로 처음 설계됐다가, 파일 매니저가 두 번째로 같은 급의 게이트를
   요구하면서 재사용 가능한 미들웨어(`Gate.RequirePassword`)로 일반화됨.
@@ -38,6 +51,7 @@
   `POST /api/git/signing/ssh-key`, gpg-keys의 POST·DELETE, known-hosts의
   POST·DELETE
 - Tailscale: config의 PUT, forwards/publish의 POST·DELETE
+- Dev Proxy: exposes의 POST·PUT·DELETE, reload의 POST
 - Logs: 전체(읽기 포함)
 - Terminal: 전체(`GET /api/terminal`, `GET/PUT /api/terminal/settings`)
 - 파일 매니저: 전체
