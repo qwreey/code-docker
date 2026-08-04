@@ -2,11 +2,13 @@ networks:
   code-docker-internal:
     name: "${PREFIX:-}code-docker-internal"
     internal: true
-    # enable_ipv6: true # If you enabled ipv6 docker engine support, enable this
+    # Requires ipv6 support enabled in the docker engine daemon.json - see
+    # example-env before enabling.
+    enable_ipv6: ${ENABLE_IPV6:-false}
   code-docker-external:
     name: "${PREFIX:-}code-docker-external"
     internal: false
-    # enable_ipv6: true # If you enabled ipv6 docker engine support, enable this
+    enable_ipv6: ${ENABLE_IPV6:-false}
   code-docker-forwards:
     # Dedicated network for the tailscale `forwards:` feature (config.yaml's
     # socat listeners that pull a remote tailnet peer's port in). Kept
@@ -14,6 +16,7 @@ networks:
     # port namespace.
     name: "${PREFIX:-}code-docker-forwards"
     internal: true
+    enable_ipv6: ${ENABLE_IPV6:-false}
 
 services:
   code-docker:

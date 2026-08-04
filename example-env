@@ -27,6 +27,13 @@
 # BUILD_CONTEXT="builds/code-docker" 로 지정하세요.
 #BUILD_CONTEXT="."
 
+# code-docker-internal/external/forwards 세 네트워크의 enable_ipv6를 한 번에
+# 켭니다. PREFIX/BUILD_CONTEXT와 마찬가지로 컨테이너 안 환경변수가 아니라
+# docker-compose.yml의 네트워크 정의에만 쓰입니다. 도커 엔진 자체의 ipv6
+# 지원(daemon.json의 ipv6/fixed-cidr-v6 등)이 먼저 켜져 있어야 의미가
+# 있습니다 - 엔진 지원 없이 이 값만 켜면 네트워크 생성이 실패합니다.
+#ENABLE_IPV6="false"
+
 # Web app name
 #PWA_NAME="code-docker"
 #PWA_SHORT_NAME="code-docker"
