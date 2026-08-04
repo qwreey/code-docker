@@ -291,6 +291,25 @@ export interface ClaudePluginsResponse {
   plugins: ClaudePlugin[]
 }
 
+export interface ClaudeSessionInfo {
+  project: string
+  sessionId: string
+  cwd: string
+  modifiedAt: string
+  sizeBytes: number
+  preview: string
+}
+
+export interface ClaudeSessionsResponse {
+  sessions: ClaudeSessionInfo[]
+}
+
+export interface ClaudeSessionLinesResponse {
+  lines: string[]
+  cursor: number
+  hasMore: boolean
+}
+
 export interface ReclaimableEntry {
   pattern: string
   path: string

@@ -65,10 +65,28 @@ a passive read). This reverses `claude-plan.md`'s earlier explicit decision
 to leave login to the user's own terminal — that assumed SSH/code-server
 access was always available, which stopped being true once webmanager needed
 to support org/company deployments where webmanager itself is the only
-surface ever opened. A shared
+surface ever opened. A Claude Code conversation-log viewer inside the same
+tab (`.claude/session-log-plan.md`, `internal/claudecode/sessions.go`) lists
+and renders every session transcript found under
+`CLAUDE_CONFIG_DIR/projects/*/*.jsonl` as a condensed chat view — the
+backend stays schema-agnostic (cheap listing + raw cursor-paginated line
+reads only, same pattern as `internal/logstore`) while all parsing happens
+frontend-side against a vendored copy of `d-kimuson/claude-code-viewer`'s
+Zod schema module (`frontend/src/vendor/claude-conversation-schema/`, MIT,
+not an installable package so it's a manual periodic re-sync rather than a
+real dependency) — this deliberately reverses `claude-plan.md`'s original
+"stats-cache.json only, raw transcripts too version-fragile" decision, but
+only on the frontend side, so the backend's format-agnostic contract still
+holds if the JSONL shape drifts. Gated entirely like Terminal/Files/Logs
+(session content, not a passive read) despite living inside the otherwise
+open Claude tab — `RequiresUnlock` wraps just that sub-section, not the
+whole tab, which the component doc comment notes is a supported pattern
+(not only from `App.tsx`). Sub-agent/sidechain transcripts and
+externally-spilled tool-result files are out of scope for v1. A shared
 password gate (`internal/authgate` — see `.claude/authgate-plan-done.md` for
 the full list of what it gates; principle is reads-stay-open/writes-gated,
-with Terminal/File Manager/Logs/Supervisor-log-view gated entirely), a file
+with Terminal/File Manager/Logs/Supervisor-log-view/Claude-session-log gated
+entirely), a file
 manager, a shared lazy-loaded CodeMirror 6 editor component, a responsive
 layout with a mobile hamburger/drawer sidebar (now also independently
 scrollable so short viewports can reach every item), a centralized

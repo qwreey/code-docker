@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"webmanager/internal/claudecode"
 	"webmanager/internal/mise"
@@ -264,4 +265,60 @@ func (s *Server) handleClaudeLoginCancel(w http.ResponseWriter, r *http.Request)
 	id := r.PathValue("id")
 	_ = s.loginMgr.Cancel(id)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// claudeSessionsResponse is GET /api/claude/sessions's body. Sessions is
+// never nil (see handleClaudeSessions).
+type claudeSessionsResponse struct {
+	Sessions []claudecode.SessionInfo `json:"sessions"`
+}
+
+// handleClaudeSessions lists every Claude Code conversation transcript
+// found under CLAUDE_CONFIG_DIR/projects (see
+// webmanager/.claude/session-log-plan.md) — gated like Terminal/File
+// Manager/Logs since this is conversation content, not passive read like
+// most of the app. A scan failure degrades to an empty list rather than a
+// 5xx: a missing/unreadable projects directory just means "no sessions
+// yet," not an error.
+func (s *Server) handleClaudeSessions(w http.ResponseWriter, r *http.Request) {
+	sessions, err := claudecode.ListSessions(s.cfg.ClaudeConfigDir)
+	if err != nil {
+		sessions = []claudecode.SessionInfo{}
+	}
+	writeJSON(w, http.StatusOK, claudeSessionsResponse{Sessions: sessions})
+}
+
+// claudeSessionLinesResponse is GET
+// /api/claude/sessions/{project}/{sessionId}'s body — raw, unparsed JSONL
+// lines. Parsing/rendering happens entirely on the frontend (vendored
+// conversation-schema module), see session-log-plan.md.
+type claudeSessionLinesResponse struct {
+	Lines   []string `json:"lines"`
+	Cursor  int      `json:"cursor"`
+	HasMore bool     `json:"hasMore"`
+}
+
+// handleClaudeSessionLines reads a page of raw lines from one session's
+// transcript. Gated like handleClaudeSessions. An unknown project/sessionId
+// (fails path validation, or just doesn't exist) is a 404, not a 500 —
+// resolveSessionPath's error covers both cases identically on purpose (no
+// distinction that would help an attacker enumerate valid ids).
+func (s *Server) handleClaudeSessionLines(w http.ResponseWriter, r *http.Request) {
+	project := r.PathValue("project")
+	sessionID := r.PathValue("sessionId")
+
+	cursor, _ := strconv.Atoi(r.URL.Query().Get("cursor"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+
+	lines, hasMore, err := claudecode.ReadSessionLines(s.cfg.ClaudeConfigDir, project, sessionID, cursor, limit)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, claudeSessionLinesResponse{
+		Lines:   lines,
+		Cursor:  cursor + len(lines),
+		HasMore: hasMore,
+	})
 }

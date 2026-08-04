@@ -15,6 +15,7 @@ import { WeeklyChart } from './WeeklyChart'
 import { ModelUsageChart } from './ModelUsageChart'
 import { JobPanel } from '../Mise/JobPanel'
 import { LoginPanel } from './LoginPanel'
+import { SessionLog } from './SessionLog/SessionLog'
 import '../common/common.css'
 import './ClaudeCode.css'
 
@@ -325,6 +326,13 @@ function InstalledView({
       <div className="card">
         <h2>Skills / Plugins</h2>
         <PluginsTable plugins={plugins} />
+      </div>
+      <div className="card">
+        <h2>대화 로그</h2>
+        <p className="section-description">
+          이 인스턴스에서 진행된 Claude Code 대화 기록입니다. 비밀번호로 보호됩니다.
+        </p>
+        <SessionLog />
       </div>
     </>
   )

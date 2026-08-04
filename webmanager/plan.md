@@ -44,6 +44,7 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 | `.env.webmanager` 마이그레이션 도구(`webmanager --env-migrate` — 키 추가/삭제 반영(삭제된 키는 `#~` 아카이브 섹션으로), 유저 코멘트 보존, `#!important`/`#!` 마커로 조직 강제값·권장값-변경-충돌 표시, 경로 기반 템플릿(조직 커스텀 마운트 가능) + 기동 로그/웹 UI 경고 배너(dismiss 영속화)) | `.claude/qa-request/env-migration-plan-done.md` |
 | code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일 origin 통합 — code-server/webmanager 내부 포트 이동, `code-config.yaml` 매 시작 재생성, 프론트엔드 서브패스(`apiUrl()`/`BASE_URL`) 대응까지 전부 구현 | `.claude/qa-request/expose-plan-done.md` |
 | mise 전역 설치/삭제 성공 후 code-server 재시작을 눌러서 바로 실행 가능(`POST /api/supervisor/processes/code-server/restart` 재사용, `frontend/src/utils/restartCodeServer.ts`) — 정적 안내문에서 버튼으로 승격, 잡 진행 패널(`Mise/JobPanel.tsx`)을 Mise 탭/Claude 탭이 공유하도록 추출 | 문서 없음(작은 갭 메우기, 별도 계획 문서 없이 진행) |
+| Claude 탭 안 대화 로그 뷰어 v1 — 프로젝트 전체의 세션 트랜스크립트 목록/축약 채팅뷰(`CLAUDE_CONFIG_DIR/projects/*/*.jsonl`), 백엔드는 목록+원본 라인 페이지네이션만 제공하고 파싱은 프론트가 벤더링한 Zod 스키마(`d-kimuson/claude-code-viewer` MIT)로 처리, Terminal/Files/Logs와 동급으로 비밀번호 게이트 | `.claude/session-log-plan.md` |
 
 전체 구현은 backend(Go)/frontend(React) subagent를 병렬로 여러 라운드 돌려서 진행,
 각 라운드 사이 API 계약 불일치를 직접 대조해서 잡는 패턴 반복 — 새 기능도 이 방식
