@@ -91,8 +91,10 @@
 }
 
 .claude-install-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: 1000;
+  background: rgba(15, 18, 26, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -100,6 +102,7 @@
 }
 
 .claude-install-message {
+  width: 100%;
   max-width: 26rem;
   text-align: center;
   background: var(--surface);

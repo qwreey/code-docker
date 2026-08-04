@@ -27,11 +27,30 @@ const authTimeout = 5 * time.Second
 // (CLAUDE_CONFIG_DIR, default /code/.claude) that this package reads.
 const statsCacheFileName = "stats-cache.json"
 
-// FindBinary resolves the `claude` binary path. override (WEBMANAGER_CLAUDE_BINPATH)
-// takes priority when non-empty; otherwise it falls back to a PATH lookup.
-// Either failing (override doesn't exist, or no `claude` on PATH) means "not
-// installed" — ok is false, not an error, since that's a perfectly normal
-// state for an instance that doesn't use Claude Code.
+// miseShimPath is mise's shim for the `claude` binary — checked as a last
+// resort after override/PATH. webmanager's own supervisord program
+// (config/webmanager.default.sh) never runs `mise env`, so mise-installed
+// tools never land on its process PATH the way they do for code-server (see
+// config/code-runner.default.sh) — a bare PATH lookup can never see a
+// mise-managed claude-code no matter how many times webmanager or
+// code-server gets restarted. The shim sidesteps that entirely: it's a
+// small mise-dispatch binary that resolves and execs whatever version is
+// currently configured (global or project) at invocation time, so it works
+// immediately after `mise use -g claude-code@x` with no restart of
+// anything. Fixed path rather than derived from WEBMANAGER_MISE_BINPATH,
+// same convention as mise.go's own defaultHomeDir: HOME is always /code in
+// this image.
+const miseShimPath = "/code/.local/share/mise/shims/claude"
+
+// FindBinary resolves the `claude` binary path: override
+// (WEBMANAGER_CLAUDE_BINPATH) takes priority when non-empty; otherwise a
+// PATH lookup, then miseShimPath above. All three failing (override doesn't
+// exist, no `claude` on PATH, no mise shim either) means "not installed" —
+// ok is false, not an error, since that's a perfectly normal state for an
+// instance that doesn't use Claude Code. Checked fresh on every call (no
+// caching), so a `claude-code` installed via mise — from webmanager's own
+// install button or from a plain shell — is picked up the moment the
+// frontend next asks, not just after some restart.
 func FindBinary(override string) (path string, ok bool) {
 	if override != "" {
 		info, err := os.Stat(override)
@@ -40,11 +59,13 @@ func FindBinary(override string) (path string, ok bool) {
 		}
 		return override, true
 	}
-	p, err := exec.LookPath("claude")
-	if err != nil {
-		return "", false
+	if p, err := exec.LookPath("claude"); err == nil {
+		return p, true
 	}
-	return p, true
+	if info, err := os.Stat(miseShimPath); err == nil && !info.IsDir() {
+		return miseShimPath, true
+	}
+	return "", false
 }
 
 // Auth is the subset of `claude auth status --json`'s output this package
