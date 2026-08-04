@@ -58,6 +58,82 @@
   border-bottom: none;
 }
 
+/* ── process-flex-table: CSS-order-based row reordering ─────────────────
+   `.process-flex-table` (ProcessTable's <table>, shared by both the list
+   and tree tbody) turns tbody into a flex column container so each <tr>'s
+   `order` (set inline per row from the current sort rank, see
+   ProcessTable.tsx) repositions it visually without React ever moving the
+   underlying DOM node - rows are always inserted in a stable pid order and
+   only *look* resorted. `order` only has an effect on flex/grid children,
+   so both header and body rows are made flex rows here (not just tbody)
+   with an identical `.pf-col-*` width recipe on th/td - once a row is
+   pulled out of the table's own column/row model this way, header and body
+   columns would silently drift apart unless both sides size their cells
+   from the exact same explicit rule instead of relying on <table>'s normal
+   auto column-width algorithm. */
+
+.process-flex-table thead tr,
+.process-flex-table tbody tr {
+  display: flex;
+  align-items: center;
+}
+
+.process-flex-table tbody {
+  display: flex;
+  flex-direction: column;
+}
+
+/* `order` reshuffles visual position, so the DOM-last row is no longer
+   reliably the visually-last one - show the border on every body row
+   instead of only suppressing it on `:last-child`. */
+.process-flex-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--border);
+}
+
+.process-flex-table th,
+.process-flex-table td {
+  box-sizing: border-box;
+}
+
+.process-flex-table .pf-col-pid {
+  flex: 0 0 3.5rem;
+}
+
+.process-flex-table .pf-col-name {
+  flex: 1 1 11rem;
+  min-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.process-flex-table .pf-col-user {
+  flex: 0 0 6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.process-flex-table .pf-col-status {
+  flex: 0 0 6rem;
+}
+
+.process-flex-table .pf-col-cpu,
+.process-flex-table .pf-col-mem {
+  flex: 0 0 4rem;
+}
+
+.process-flex-table .pf-col-rss {
+  flex: 0 0 5.5rem;
+}
+
+.process-flex-table .pf-col-cmd {
+  flex: 2 1 12rem;
+  min-width: 0;
+}
+
+.process-flex-table .pf-col-actions {
+  flex: 0 0 10.5rem;
+}
+
 .sortable-header {
   display: inline-flex;
   align-items: center;

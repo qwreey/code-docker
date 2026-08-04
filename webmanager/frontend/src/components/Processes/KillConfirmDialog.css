@@ -1,0 +1,23 @@
+.kill-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 1.5rem;
+}
+
+.kill-confirm-card {
+  width: 100%;
+  max-width: 380px;
+  margin-top: 0;
+}
+
+.kill-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}

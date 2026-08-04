@@ -15,14 +15,14 @@ type SortKey = 'pid' | 'name' | 'username' | 'status' | 'cpuPercent' | 'memPerce
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'tree'
 
-const COLUMNS: { key: SortKey; label: string }[] = [
-  { key: 'pid', label: 'PID' },
-  { key: 'name', label: '이름' },
-  { key: 'username', label: '사용자' },
-  { key: 'status', label: '상태' },
-  { key: 'cpuPercent', label: 'CPU' },
-  { key: 'memPercent', label: 'MEM' },
-  { key: 'rssBytes', label: 'RSS' },
+const COLUMNS: { key: SortKey; label: string; className: string }[] = [
+  { key: 'pid', label: 'PID', className: 'pf-col-pid' },
+  { key: 'name', label: '이름', className: 'pf-col-name' },
+  { key: 'username', label: '사용자', className: 'pf-col-user' },
+  { key: 'status', label: '상태', className: 'pf-col-status' },
+  { key: 'cpuPercent', label: 'CPU', className: 'pf-col-cpu' },
+  { key: 'memPercent', label: 'MEM', className: 'pf-col-mem' },
+  { key: 'rssBytes', label: 'RSS', className: 'pf-col-rss' },
 ]
 
 const DESC_DEFAULT_KEYS: SortKey[] = ['cpuPercent', 'memPercent', 'rssBytes']
@@ -148,6 +148,25 @@ export function ProcessTable() {
   const paginated =
     pageSize === ALL_PAGE_SIZE ? sorted : sorted.slice((clampedPage - 1) * pageSizeNum, clampedPage * pageSizeNum)
 
+  // DOM order for the visible rows is kept stable (pid ascending) across
+  // polls, independent of the active sort — only the CSS `order` below
+  // (rankByPid, driven by `sorted`'s position) moves rows visually. Sorting
+  // by a value that fluctuates every poll (CPU/mem%) used to reshuffle
+  // `paginated`'s own array order, which React reconciles by physically
+  // moving <tr> DOM nodes even though their `key` (pid) didn't change - that
+  // DOM movement is what was causing the reported scroll jump/reset, not an
+  // explicit scroll reset anywhere. Rendering a pid-sorted copy instead means
+  // React never needs to reorder nodes for the same set of rows; `order`
+  // (see `.pf-col-*`/`process-flex-table` in Processes.css, which turns
+  // tbody into a flex column container so `order` on each row takes effect)
+  // repositions them visually with a pure CSS/compositor operation.
+  const domOrdered = useMemo(() => [...paginated].sort((a, b) => a.pid - b.pid), [paginated])
+  const rankByPid = useMemo(() => {
+    const m = new Map<number, number>()
+    paginated.forEach((p, i) => m.set(p.pid, i))
+    return m
+  }, [paginated])
+
   return (
     <div>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
@@ -201,12 +220,12 @@ export function ProcessTable() {
       ) : (
         <>
           <div className="table-wrapper">
-            <table className="process-info-table">
+            <table className="process-info-table process-flex-table">
               <thead>
                 <tr>
                   {COLUMNS.map((col) =>
                     viewMode === 'list' ? (
-                      <th key={col.key}>
+                      <th key={col.key} className={col.className}>
                         <button type="button" className="sortable-header" onClick={() => toggleSort(col.key)}>
                           {col.label}
                           {sortKey === col.key && (
@@ -215,17 +234,19 @@ export function ProcessTable() {
                         </button>
                       </th>
                     ) : (
-                      <th key={col.key}>{col.label}</th>
+                      <th key={col.key} className={col.className}>
+                        {col.label}
+                      </th>
                     ),
                   )}
-                  <th>커맨드</th>
-                  <th aria-label="동작" />
+                  <th className="pf-col-cmd">커맨드</th>
+                  <th className="pf-col-actions" aria-label="동작" />
                 </tr>
               </thead>
               {viewMode === 'list' ? (
                 <tbody>
-                  {paginated.map((proc) => (
-                    <tr key={proc.pid}>
+                  {domOrdered.map((proc) => (
+                    <tr key={proc.pid} style={{ order: rankByPid.get(proc.pid) }}>
                       <ProcessRowCells
                         proc={proc}
                         nameMatch={matches?.get(proc.pid)?.nameMatch}

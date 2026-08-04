@@ -55,8 +55,8 @@ export function ProcessRowCells({
 }: ProcessRowCellsProps) {
   return (
     <>
-      <td>{proc.pid}</td>
-      <td>
+      <td className="pf-col-pid">{proc.pid}</td>
+      <td className="pf-col-name" title={proc.name}>
         <span className="process-name-cell" style={indent ? { paddingLeft: `${indent * 1.25}rem` } : undefined}>
           {expandable && (
             <button
@@ -71,17 +71,17 @@ export function ProcessRowCells({
           <HighlightedText text={proc.name} match={nameMatch} />
         </span>
       </td>
-      <td>{proc.username || '-'}</td>
-      <td>
+      <td className="pf-col-user">{proc.username || '-'}</td>
+      <td className="pf-col-status">
         <span className="badge badge-gray">{proc.status}</span>
       </td>
-      <td>{formatPercent(proc.cpuPercent)}</td>
-      <td>{formatPercent(proc.memPercent)}</td>
-      <td>{formatBytes(proc.rssBytes)}</td>
-      <td className="process-cmdline" title={proc.cmdline}>
+      <td className="pf-col-cpu">{formatPercent(proc.cpuPercent)}</td>
+      <td className="pf-col-mem">{formatPercent(proc.memPercent)}</td>
+      <td className="pf-col-rss">{formatBytes(proc.rssBytes)}</td>
+      <td className="pf-col-cmd process-cmdline" title={proc.cmdline}>
         <HighlightedText text={proc.cmdline || '-'} match={cmdMatch} />
       </td>
-      <td>
+      <td className="pf-col-actions">
         <KillButtons pid={proc.pid} label={proc.name} onKilled={onKilled} onError={onError} />
       </td>
     </>

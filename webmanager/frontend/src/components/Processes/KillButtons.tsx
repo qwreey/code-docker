@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { ProcessSignal } from '../../api/types'
+import { KillConfirmDialog } from './KillConfirmDialog'
 
 interface KillButtonsProps {
   pid: number
@@ -10,20 +11,17 @@ interface KillButtonsProps {
   onError: (message: string) => void
 }
 
-const SIGNAL_LABEL: Record<ProcessSignal, string> = {
-  TERM: '종료',
-  KILL: '강제 종료',
-}
-
 export function KillButtons({ pid, label, disabled, onKilled, onError }: KillButtonsProps) {
   const [busy, setBusy] = useState(false)
+  const [pendingSignal, setPendingSignal] = useState<ProcessSignal | null>(null)
 
   if (disabled) {
     return <span className="process-kill-none">—</span>
   }
 
-  async function send(signal: ProcessSignal) {
-    if (!window.confirm(`${label} (PID ${pid}) 프로세스를 ${SIGNAL_LABEL[signal]}하시겠습니까?`)) return
+  async function confirmSend() {
+    const signal = pendingSignal
+    if (!signal) return
     setBusy(true)
     try {
       await api.post(`/processes/${pid}/signal`, { signal })
@@ -32,17 +30,33 @@ export function KillButtons({ pid, label, disabled, onKilled, onError }: KillBut
       onError(errorMessage(e))
     } finally {
       setBusy(false)
+      setPendingSignal(null)
     }
   }
 
   return (
     <div className="process-kill-actions">
-      <button type="button" className="btn btn-small" disabled={busy} onClick={() => send('TERM')}>
+      <button type="button" className="btn btn-small" disabled={busy} onClick={() => setPendingSignal('TERM')}>
         종료
       </button>
-      <button type="button" className="btn btn-danger btn-small" disabled={busy} onClick={() => send('KILL')}>
+      <button
+        type="button"
+        className="btn btn-danger btn-small"
+        disabled={busy}
+        onClick={() => setPendingSignal('KILL')}
+      >
         강제 종료
       </button>
+      {pendingSignal && (
+        <KillConfirmDialog
+          pid={pid}
+          label={label}
+          signal={pendingSignal}
+          busy={busy}
+          onCancel={() => setPendingSignal(null)}
+          onConfirm={confirmSend}
+        />
+      )}
     </div>
   )
 }
