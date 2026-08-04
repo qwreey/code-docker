@@ -53,7 +53,7 @@ code-server 서비스 엔트리포인트입니다. code-server 의 업데이트/
 
 code-server 설정 파일입니다. **매 시작마다 `/code/.server/config.yaml`로 무조건 덮어써집니다** — 다른 override 패턴 파일들과 마찬가지로 완전히 파생된(derived) 파일이라, `/code/.server/config.yaml`을 직접 편집해도 다음 재시작에 사라집니다. 커스터마이징하려면 `code-config.override.yaml`을 만들고 재빌드하세요.
 
-`bind-addr`는 `127.0.0.1:8080`(내부 전용)으로 고정되어 있습니다 — 80번 포트는 이제 컨테이너 안 nginx가 code-server(`/`)와 webmanager(`/manager`)를 함께 라우팅하는 데 쓰이므로(`nginx.*.conf` 참고), override에서 `bind-addr`를 바꾸면 라우팅이 깨집니다.
+**`bind-addr`는 여기 넣지 마세요 — 넣어도 무시됩니다.** `code-runner.default.sh`가 항상 `--bind-addr` CLI 인자를 붙여서 실행하는데, code-server는 CLI 인자를 config.yaml 값보다 우선하므로 여기(default든 override든)에 뭘 적어도 그 값이 이깁니다. 실제 바인드 주소를 바꾸고 싶으면 `docker-compose.yml`의 `CODE_SERVER_BIND_ADDR`(기본값 `private:8080`, 전용 tailscale IP)을 바꾸세요 — nginx의 upstream 대상도 같은 값을 따라가므로(`nginx-service.default.sh`) 라우팅이 어긋날 걱정 없이 이거 하나만 바꾸면 됩니다. `127.0.0.1`/`0.0.0.0` 대신 `private`가 기본인 이유는 [tailscale 문서의 보안 절](tailscale.md#보안-tailnet-acl-설정) 참고 — loopback에 바인드하면 tailscaled가 같은 포트로 tailnet 전체에 자동 노출해버립니다.
 
 여기의 각 요소는 /code/.server/code-server/bin/code-server --help 를 통해 확인해볼 수 있습니다. 각각의 인자 `--some=value` 는 `some: value` 로 작성할 수 있습니다.
 
@@ -231,12 +231,18 @@ override하는 걸로 충분합니다.
 
 ### `nginx.*.conf` (단일 origin 라우팅 설정)
 
-code-server(`/`, 내부 전용 `127.0.0.1:8080`)와 webmanager(`/manager`, 내부 전용
+code-server(`/`, 내부 전용 `private:8080`)와 webmanager(`/manager`, 내부 전용
 `WEBMANAGER_ADDR`)를 하나의 80번 포트로 합쳐주는 nginx 설정입니다 — 80번 포트에
 직접 바인딩하는 유일한 프로그램입니다. `/manager` prefix는 여기서 벗겨져서
 webmanager는 지금처럼 `/api/...`를 그대로 받습니다. access/error 로그는 nginx
 자신의 stdout/stderr로 나가서 다른 프로그램들과 동일하게 supervisord가 파일로
-캡처합니다(`vector`가 그 파일을 다시 tail).
+캡처합니다(`vector`가 그 파일을 다시 tail). tailscale의 자동 loopback 포워딩
+경로(`127.0.0.1`로 들어온 요청)만 따로 거부하는 조건(`NGINX_BLOCK_LOOPBACK`,
+기본 켜짐)과, `ALLOWED_HOSTS`로 조절하는 Host 헤더 화이트리스트도 이 파일에
+있습니다 — 둘 다 [tailscale 문서의 보안 절](tailscale.md#보안-tailnet-acl-설정)
+참고. `TRUSTED_PROXIES`(외부 리버스 프록시의 IP/CIDR를 알려주면 `$remote_addr`가
+그 프록시의 X-Forwarded-For를 신뢰해서 실제 클라이언트 IP로 채워짐, 기본 빈 값)도
+같이 있습니다.
 
 access_log 상세도는 `docker-compose.yml`의 `NGINX_LOG_LEVEL`로 조절합니다.
 기본값 `errors`는 응답 상태코드가 4xx/5xx인 요청만 기록합니다(nginx의 표준
@@ -252,7 +258,7 @@ access_log 상세도는 `docker-compose.yml`의 `NGINX_LOG_LEVEL`로 조절합�
 
 ### `nginx-error.*.html` (code-server 준비 중 페이지)
 
-`location /`(code-server 프록시)에서 upstream(`127.0.0.1:8080`)에 연결할 수
+`location /`(code-server 프록시)에서 upstream(`private:8080`)에 연결할 수
 없어 502/503/504가 나면, nginx의 기본 에러 페이지 대신 이 파일을 대신
 보여줍니다 — 컨테이너가 막 시작했거나 code-server가 재시작 중이라 아직
 포트가 열리지 않은, 실제로는 에러가 아닌 흔한 상황을 사용자에게 "곧

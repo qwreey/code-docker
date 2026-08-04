@@ -90,6 +90,50 @@
 #   all - log every request, combined format (the old behavior).
 #NGINX_LOG_LEVEL="errors"
 
+# code-server's actual bind address, default "private:8080" (a dedicated
+# non-loopback IP - see docs/tailscale.md for why not 127.0.0.1/0.0.0.0).
+# code-runner.default.sh passes this as a --bind-addr CLI arg, which
+# code-server treats as overriding whatever's in config.yaml (default or
+# your own code-config.override.yaml) - so this env var, not that file, is
+# the supported way to change it. The in-container nginx's upstream target
+# follows this value automatically (see nginx-service.default.sh), so you
+# don't need to touch nginx.*.conf too. Only change this if you have a
+# specific reason to (e.g. code-server --bind-addr 192.168.1.50:8080 to
+# bind somewhere else entirely) - note that anything other than `private:*`
+# loses the tailnet-exposure protection this default provides.
+#CODE_SERVER_BIND_ADDR="private:8080"
+
+# Comma-separated allowlist of Host header values the in-container nginx
+# will accept on port 80 (e.g. "code.yaeji.moe" or "code.yaeji.moe,
+# 192.168.1.50"), no scheme/port. Empty (default) disables the check
+# entirely - current behavior, any Host is accepted.
+#
+# This is a best-effort backstop against incidentally reaching this
+# container's directly-published port 80 without going through your
+# intended reverse proxy (e.g. an internet scanner hitting the host IP
+# directly) - it is NOT spoof-proof, since Host is a client-controlled
+# header a deliberate attacker who already knows your domain can just set
+# themselves. See docs/tailscale.md for the actual unspoofable defense
+# against tailscale's automatic same-port forwarding.
+#ALLOWED_HOSTS=""
+
+# The in-container nginx blocks any request accepted on 127.0.0.1 (i.e.
+# tailscaled's automatic same-port forwarding into this container - see
+# docs/tailscale.md), true by default. Set to "false" if you deliberately
+# proxy into this container via loopback yourself (e.g. your own local
+# stunnel/socat in front of nginx) and need that path to keep working -
+# doing so re-opens the tailnet auto-exposure gap docs/tailscale.md
+# describes, so only disable this if you understand that trade-off.
+#NGINX_BLOCK_LOOPBACK="true"
+
+# Comma-separated IP/CIDR list of upstream reverse proxies (e.g. your
+# external Caddy's container/host IP) whose X-Forwarded-For header nginx
+# should trust to determine the real client IP - otherwise $remote_addr
+# (used in access logs and anything downstream that reads it) is just the
+# proxy's own IP. Empty (default) disables this - current behavior
+# unchanged.
+#TRUSTED_PROXIES=""
+
 # vector's own internal diagnostic log level (its startup/healthcheck/
 # file-watch chatter - "Loading configs", "Vector has started",
 # "Starting file server", "Loaded checkpoint data", etc). Doesn't

@@ -1,4 +1,9 @@
-bind-addr: 127.0.0.1:8080
+# bind-addr is deliberately NOT set here - code-runner.default.sh always
+# appends --bind-addr as a CLI arg (which wins over whatever's in this
+# file, default or override), so an unrelated code-config.override.yaml
+# can't silently defeat the tailnet-exposure fix. Change CODE_SERVER_BIND_ADDR
+# (docker-compose.yml) instead of adding bind-addr back here - see
+# docs/build-customization.md.
 auth: none
 cert: false
 disable-telemetry: true

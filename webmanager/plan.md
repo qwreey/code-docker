@@ -16,7 +16,8 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 
 스택/배포/인증 등 전체에 걸치는 결정은 `webmanager/.claude/base/architecture.md`.
 요약: Go(stdlib) + Vite/React(TS, CSR), 기존 이미지에 supervisord program으로 추가,
-인증은 forward-auth 전적 위임(자체 로그인 없음), 바인드 주소는 아직 미정(`0.0.0.0:81`).
+인증은 forward-auth 전적 위임(자체 로그인 없음), 바인드 주소는 `private:81`(전용
+tailscale IP, 레포 루트 `docs/tailscale.md` 참고 - tailnet 자동노출 방지).
 
 ## 구현 완료
 
@@ -43,6 +44,7 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 | Light/Dark 수동 토글(3-way: 자동/라이트/다크, `data-theme` 속성 + `localStorage`) + 사이드바 하단 잠금 상태 표시/미리 해제 + `index.css` 컬러 시스템 중앙화(기본 UI 다크 값 신규 설계 포함 — 원래 전혀 없었음, dataviz 스킬로 차트 팔레트 재검증) | `.claude/archive/theme-toggle-plan-done.md` |
 | `.env.webmanager` 마이그레이션 도구(`webmanager --env-migrate` — 키 추가/삭제 반영(삭제된 키는 `#~` 아카이브 섹션으로), 유저 코멘트 보존, `#!important`/`#!` 마커로 조직 강제값·권장값-변경-충돌 표시, 경로 기반 템플릿(조직 커스텀 마운트 가능) + 기동 로그/웹 UI 경고 배너(dismiss 영속화)) | `.claude/qa-request/env-migration-plan-done.md` |
 | code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일 origin 통합 — code-server/webmanager 내부 포트 이동, `code-config.yaml` 매 시작 재생성, 프론트엔드 서브패스(`apiUrl()`/`BASE_URL`) 대응까지 전부 구현 | `.claude/qa-request/expose-plan-done.md` |
+| 바인드 주소 전략 확정(구 TODO 5번) — code-server/webmanager를 loopback(`127.0.0.1`) 대신 전용 tailscale IP(`private` 호스트네임)에 바인드, nginx `listen 127.0.0.1:80`으로 tailscale 자동 loopback 포워딩 경로 차단, `ALLOWED_HOSTS`(nginx Host 헤더 화이트리스트) 추가 | 레포 루트 `docs/tailscale.md`의 "보안: tailnet ACL 설정" 절 (전용 webmanager 문서 없음 - nginx/code-server/docker-compose.yml 전체에 걸친 변경이라 레포 루트 문서가 소관) |
 | mise 전역 설치/삭제 성공 후 code-server 재시작을 눌러서 바로 실행 가능(`POST /api/supervisor/processes/code-server/restart` 재사용, `frontend/src/utils/restartCodeServer.ts`) — 정적 안내문에서 버튼으로 승격, 잡 진행 패널(`Mise/JobPanel.tsx`)을 Mise 탭/Claude 탭이 공유하도록 추출 | 문서 없음(작은 갭 메우기, 별도 계획 문서 없이 진행) |
 | Claude 탭 안 대화 로그 뷰어 v1 — 프로젝트 전체의 세션 트랜스크립트 목록/축약 채팅뷰(`CLAUDE_CONFIG_DIR/projects/*/*.jsonl`), 백엔드는 목록+원본 라인 페이지네이션만 제공하고 파싱은 프론트가 벤더링한 Zod 스키마(`d-kimuson/claude-code-viewer` MIT)로 처리, Terminal/Files/Logs와 동급으로 비밀번호 게이트 | `.claude/session-log-plan.md` |
 
@@ -103,12 +105,11 @@ cwd/초기 명령이 실제 셸에서 기대대로 동작하는지, 홈 탭 진�
    끝났지만(대부분의 결정 사항 확정) 남은 디테일(`preserve_host` 기본값 등)이 있어
    우선순위를 낮게 둠. `.claude/research/caddy-plan.md`
 4. code-server 설정(settings.json 등) 편집 UI — 후순위, 타당성 재검토 필요(`ideas.md`)
-5. 바인드 주소 전략 확정 — **최후순위**
-6. `/code/.vector/logs/*.jsonl` 보존기간(retention) 정책 없음 — 알려진 갭
+5. `/code/.vector/logs/*.jsonl` 보존기간(retention) 정책 없음 — 알려진 갭
    (`.claude/archive/webmanager-review.md` (레포 루트) 참고), 문서 없음
-7. code-docker 도움말/가이드를 webmanager에 임베드 — 아이디어 단계, 착수 전
+6. code-docker 도움말/가이드를 webmanager에 임베드 — 아이디어 단계, 착수 전
    질문 정리 완료. `.claude/research/guide-plan.md`
-8. **code-server/mise 버전 관리 패널** — **최하 우선순위**(guide-plan과 동급),
+7. **code-server/mise 버전 관리 패널** — **최하 우선순위**(guide-plan과 동급),
     아이디어 단계, 착수 전 질문 다수 정리 완료(특히 "컨테이너 리빌드 필요성"
     판단 기준이 근본적으로 불확실). claude-code 하나만의 mise 버전확인은 이미
     별도로 구현 완료됨(위 표) — 이 항목은 code-server/서브모듈/베이스 이미지까지

@@ -54,21 +54,23 @@ publish:
 
 ## 포트 내보내기 (publish)
 
-code-docker 의 로컬 포트를 tailscale IP에 명시적으로 게시합니다 (포트 리매핑, 또는 `mode: tls-terminated-tcp` 로 무료 HTTPS 종단). 게시하려는 서비스는 `0.0.0.0`/`localhost` 가 아니라 `private` hostname(자기 자신의 tailscale용 전용 IP)에 bind 되어 있어야 합니다. 편집 후에는 `forwards` 와 마찬가지로 `forward-reload` 로 반영합니다.
+code-docker 의 로컬 포트를 tailscale IP에 명시적으로 게시합니다 (포트 리매핑, 또는 `mode: tls-terminated-tcp` 로 무료 HTTPS 종단). 게시하려는 서비스는 `0.0.0.0`/`localhost` 가 아니라 `private` hostname(자기 자신의 tailscale용 전용 IP)에 bind 되어 있어야 합니다 — `0.0.0.0`/`localhost` 에 바인드된 서비스는 `tailscale serve` 규칙이 없어도 같은 포트 번호로 tailnet 전체에 자동 노출되기 때문에([아래](#보안-tailnet-acl-설정) 참고), 여기서 명시적으로 게시하기 전까지는 노출되지 않게 하려면 `private` 에 바인드해야 합니다. 편집 후에는 `forwards` 와 마찬가지로 `forward-reload` 로 반영합니다.
 
 ## 보안: tailnet ACL 설정
 
-> **주의: sshd(22), code-server(80), webmanager(81)는 `config.yaml`에 없어도 항상 tailnet 에 자동 노출됩니다.** tailscaled 는 `tailscale serve` 규칙이 없는 포트도 같은 번호로 `127.0.0.1`/`0.0.0.0` 에 떠있는 서비스에 자동으로 연결해주기 때문입니다 — 이 세 서비스는 전부 `0.0.0.0` 에 바인드되어 있어서(sshd/code-server는 호스트 포트 퍼블리시 때문에, webmanager는 바인드 주소 전략이 아직 미정이라) 이 자동 노출을 피할 방법이 없습니다. `code-config.default.yaml` 은 `auth: none` 이고 webmanager는 아예 자체 로그인이 없으므로(SSH 키/git credential 을 다루는 만큼 code-server 보다 더 민감), code-docker 가 tailnet 에 들어가는 순간 인증 없이 두 서비스에 접근 가능한 사람이 tailnet 전체로 넓어집니다.
+> tailscaled 는 `tailscale serve` 규칙이 없는 포트도 같은 번호로 `127.0.0.1`/`0.0.0.0` 에 떠있는 서비스에 자동으로 연결해주기 때문에, 이 자동 노출 대상이 되는 포트가 아예 없어야 ACL 없이도 안전합니다. **sshd(22)만은 여기서 피할 방법이 없습니다** — 호스트 포트 퍼블리시 때문에 `0.0.0.0` 에 바인드되어야 하기 때문인데, 키 인증만 통과하면 접근 가능해서(비밀번호 로그인 없음) 위험도는 낮게 보고 있습니다.
 >
-> **그래서 tailnet 관리 콘솔(ACL)에서 code-docker 태그로 접근 가능한 포트를 반드시 제한하세요.** 예:
+> code-server(내부 포트 8080)/webmanager(내부 포트 81)는 이제 `0.0.0.0`/`127.0.0.1` 대신 `private` hostname(전용 tailscale IP, [위 "포트 내보내기" 절](#포트-내보내기-publish) 참고)에 바인드되어 있어서 이 자동 노출 대상이 아닙니다. 이 둘을 대신 물려주는 in-container nginx(포트 80, 컨테이너 밖 리버스 프록시에 물리는 지점)는 host 포트 퍼블리시 때문에 여전히 `0.0.0.0` 에 있어야 하지만, `127.0.0.1` 으로 들어오는 연결(정확히 tailscaled 의 자동 포워딩 경로)만 403 으로 거부하는 조건이 있어서(`config/nginx.default.conf`, [`NGINX_BLOCK_LOOPBACK`](../example-env)으로 켜고 끔 - 기본 켜짐), tailnet 을 통한 접근은 여기서도 막힙니다. 로컬에서 직접 loopback 으로 nginx 앞단에 프록시(stunnel/socat 등)를 두는 특수한 구성이 있다면 `NGINX_BLOCK_LOOPBACK=false`로 꺼야 하는데, 그러면 이 문단이 설명하는 자동노출 문제가 다시 열리니 신중하게 판단하세요. 추가로 [`ALLOWED_HOSTS`](../example-env)(nginx Host 헤더 화이트리스트)를 설정하면 리버스 프록시를 거치지 않고 퍼블리시된 포트 80에 직접 접근하는 경우도 걸러낼 수 있습니다 — 다만 Host 헤더는 클라이언트가 마음대로 정할 수 있으므로 스푸핑 방지는 아니고, 우발적 접근(스캐너 등)을 줄이는 보조 수단입니다.
+>
+> **그래도 sshd(22)에 대한 백스톱으로 tailnet 관리 콘솔(ACL)에서 code-docker 태그로 접근 가능한 포트를 제한하는 걸 권장합니다.** 예:
 > ```json
 > {
 >   "tagOwners": { "tag:code-docker": ["autogroup:admin"] },
 >   "grants": [
->     { "src": ["autogroup:member"], "dst": ["tag:code-docker"], "ip": ["tcp:22", "tcp:80", "tcp:81"] }
+>     { "src": ["autogroup:member"], "dst": ["tag:code-docker"], "ip": ["tcp:22", "tcp:80"] }
 >   ]
 > }
 > ```
-> 이게 없으면 sshd/code-server/webmanager 는 항상 tailnet 전체에 열려있는 상태입니다.
+> 이게 없으면 sshd 는 항상 tailnet 전체에 열려있는 상태입니다 (포트 80도 위 방어 계층을 신뢰하지 못하겠다면 같이 막아도 무방).
 >
-> 반대로 `forwards`/`publish` 는 이런 자동 노출에 걸리지 않도록 이미 전용 네트워크의 자기 자신 IP에만 바인드되어 있어서 안전합니다 — private 하게 유지하고 싶은, 직접 띄운 서비스(dev 서버 등)는 `0.0.0.0`/`localhost` 대신 `private` 에 bind 하고 필요할 때만 `publish:` 에 추가하세요. `forwards:` 로 가져온 것들은 `forward` hostname 으로만 접근 가능하니 혼동하지 마세요.
+> `forwards`/`publish` 도 같은 이유로 안전합니다 — 이미 전용 네트워크의 자기 자신 IP(`private`/`forward`)에만 바인드되므로, 자동 노출에 걸리지 않습니다. private 하게 유지하고 싶은, 직접 띄운 서비스(dev 서버 등)는 `0.0.0.0`/`localhost` 대신 `private` 에 bind 하고 필요할 때만 `publish:` 에 추가하세요. `forwards:` 로 가져온 것들은 `forward` hostname 으로만 접근 가능하니 혼동하지 마세요.

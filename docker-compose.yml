@@ -51,6 +51,10 @@ services:
       # MagicDNS name unless set explicitly per instance. See example-env.
       TAILSCALE_HOSTNAME: "${TAILSCALE_HOSTNAME:-}"
       NGINX_LOG_LEVEL: "${NGINX_LOG_LEVEL:-errors}"
+      CODE_SERVER_BIND_ADDR: "${CODE_SERVER_BIND_ADDR:-private:8080}"
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-}"
+      NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
+      TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
       TAILSCALE_LOG_LEVEL: "${TAILSCALE_LOG_LEVEL:-errors}"
       WEBMANAGER_ENV_TEMPLATE_PATH: "${WEBMANAGER_ENV_TEMPLATE_PATH:-/etc/code-docker/webmanager/example-env.webmanager}"

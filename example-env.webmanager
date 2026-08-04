@@ -29,7 +29,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=6
+WEBMANAGER_ENV_VERSION=7
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -87,8 +87,10 @@ WEBMANAGER_ENV_VERSION=6
 #. manifest에 "Open manager" 점프리스트 항목만 추가한 뒤 돌려줍니다(실패 시
 #. code-server 원본으로 자동 폴백). webmanager가 code-server의 실제 manifest를
 #. fetch할 내부 URL - nginx를 다시 거치지 않고 code-server 내부 포트로 직접
-#. 접근합니다.
-#WEBMANAGER_CODE_SERVER_MANIFEST_URL=http://127.0.0.1:8080/manifest.json
+#. 접근합니다. 기본값은 레포 루트 docker-compose.yml의 CODE_SERVER_BIND_ADDR을
+#. 그대로 따라가므로(코드 자체 기본값), 그쪽만 바꿨다면 이건 안 건드려도 됩니다 -
+#. 이 값을 직접 지정하면 그 자동 추적을 끊고 여기 적은 값으로 고정됩니다.
+#WEBMANAGER_CODE_SERVER_MANIFEST_URL=http://private:8080/manifest.json
 
 #. --- Task Manager 탭 ---
 #. 리소스 히스토리 그래프 샘플링 주기(초)와 보관 기간(분).
@@ -146,6 +148,8 @@ WEBMANAGER_ENV_VERSION=6
 #VECTOR_LOG_DIR=
 #SYSTEM_DISK_PATH=
 #. webmanager는 이제 nginx가 컨테이너 안에서 /manager 경로로 라우팅해주므로
-#. 기본값이 내부 전용 바인드입니다. docker-compose.yml의 81:81 포트 매핑을
-#. 되살려 직접 노출하고 싶을 때만 :81(0.0.0.0)로 바꾸세요.
-#WEBMANAGER_ADDR=127.0.0.1:81
+#. 기본값이 전용 tailscale IP(`private` 호스트네임)로의 내부 전용 바인드입니다
+#. - loopback(127.0.0.1)이 아닌 이유는 tailscale 문서의 보안 절 참고(loopback은
+#. tailscaled가 같은 포트로 tailnet 전체에 자동 노출해버립니다). docker-compose.yml의
+#. 81:81 포트 매핑을 되살려 직접 노출하고 싶을 때만 :81(0.0.0.0)로 바꾸세요.
+#WEBMANAGER_ADDR=private:81

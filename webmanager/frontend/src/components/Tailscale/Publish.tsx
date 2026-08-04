@@ -87,7 +87,10 @@ export function Publish() {
         <span aria-hidden="true">ℹ</span>
         <span>
           게시하려는 서비스는 <code>0.0.0.0</code>/<code>localhost</code>가 아니라 <code>private</code>{' '}
-          호스트네임(전용 tailscale IP)에 바인드되어 있어야 합니다.
+          호스트네임(전용 tailscale IP)에 바인드되어 있어야 합니다. <code>0.0.0.0</code>/
+          <code>localhost</code>에 바인드된 서비스는 <code>tailscale serve</code> 규칙이 없어도
+          같은 포트 번호로 tailnet 전체에 자동으로 노출되기 때문에, 여기서 명시적으로 게시하기
+          전까지는 노출되지 않게 하려면 <code>private</code>에 바인드해야 합니다.
         </span>
       </div>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
