@@ -413,6 +413,10 @@
   flex-direction: column;
   align-items: center;
   flex: 1;
+  min-width: 0; /* flex items default to min-width:auto (content-based),
+    which stops a `flex:1` group from ever shrinking past its nowrap text's
+    intrinsic width - this is what let bar/axis labels push past the card
+    edge on narrow screens instead of actually shrinking with the group. */
   height: 100%;
 }
 
@@ -555,4 +559,58 @@
   font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: 0.1rem;
+}
+
+/* ── responsive (720px/480px breakpoints, same convention as App.css/
+   Layout.css/Terminal.css) ──────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .claude-viz {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+
+  .claude-weekly-bar-track {
+    width: 10px;
+  }
+
+  .claude-weekly-bar-label {
+    font-size: 0.56rem;
+  }
+
+  .claude-weekly-axis-label {
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .claude-viz {
+    grid-template-columns: 1fr;
+  }
+
+  .claude-weekly-bars {
+    gap: 0.15rem;
+  }
+
+  .claude-weekly-bar-track {
+    width: 8px;
+  }
+
+  /* Numeric labels above each bar no longer fit at this width even at the
+     smaller 720px font-size - truncate instead of letting them overflow the
+     14px-wide track (this was the actual overflow reported: nowrap text
+     spilling past its bar). */
+  .claude-weekly-bar-label {
+    font-size: 0.52rem;
+    max-width: 1.6rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .claude-weekly-axis-label {
+    font-size: 0.55rem;
+    max-width: 1.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }

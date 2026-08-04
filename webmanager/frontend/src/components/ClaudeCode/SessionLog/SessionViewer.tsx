@@ -11,7 +11,11 @@ const PAGE_SIZE = 500
 // tab's memory unbounded (mirrors Logs.tsx's MAX_ENTRIES cap).
 const MAX_LINES = 10000
 
-export function SessionViewer({ session, onBack }: { session: ClaudeSessionInfo; onBack: () => void }) {
+// Rendered inside SessionLog's Sheet overlay - the Sheet's own header already
+// shows the project/cwd as its title and provides a "닫기" button that stays
+// visible regardless of scroll position, so this only needs the sessionId
+// for extra context, no separate close/back affordance of its own.
+export function SessionViewer({ session }: { session: ClaudeSessionInfo }) {
   const [rawLines, setRawLines] = useState<string[]>([])
   const [cursor, setCursor] = useState(0)
   const [hasMore, setHasMore] = useState(false)
@@ -58,13 +62,7 @@ export function SessionViewer({ session, onBack }: { session: ClaudeSessionInfo;
   return (
     <div className="session-log-viewer">
       <div className="session-log-viewer-header">
-        <button type="button" className="btn btn-secondary btn-small" onClick={onBack}>
-          ← 목록으로
-        </button>
-        <div className="session-log-viewer-title">
-          <div>{session.cwd || session.project}</div>
-          <div className="session-log-viewer-subtitle">{session.sessionId}</div>
-        </div>
+        <div className="session-log-viewer-subtitle">{session.sessionId}</div>
       </div>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}

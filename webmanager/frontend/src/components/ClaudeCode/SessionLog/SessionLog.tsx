@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ClaudeSessionInfo } from '../../../api/types'
 import { RequiresUnlock } from '../../common/RequiresUnlock'
+import { Sheet } from '../../common/Sheet'
 import { SessionList } from './SessionList'
 import { SessionViewer } from './SessionViewer'
 import './SessionLog.css'
@@ -9,16 +10,24 @@ import './SessionLog.css'
 // ground rule): this is conversation content, the same trust tier as
 // Terminal/File Manager/Logs, per the user's explicit request when this
 // feature was scoped (session-log-plan.md).
+//
+// SessionList stays mounted at all times and the transcript opens in a Sheet
+// overlay on top of it instead of replacing it inline - this is what keeps
+// the list's scroll position intact across open/close (it used to reset
+// because selecting a session unmounted SessionList entirely).
 export function SessionLog() {
   const [selected, setSelected] = useState<ClaudeSessionInfo | null>(null)
 
   return (
     <RequiresUnlock>
-      {selected ? (
-        <SessionViewer session={selected} onBack={() => setSelected(null)} />
-      ) : (
-        <SessionList onSelect={setSelected} />
-      )}
+      <SessionList onSelect={setSelected} />
+      <Sheet
+        open={selected !== null}
+        onClose={() => setSelected(null)}
+        title={selected ? selected.cwd || selected.project : '대화 로그'}
+      >
+        {selected && <SessionViewer session={selected} />}
+      </Sheet>
     </RequiresUnlock>
   )
 }

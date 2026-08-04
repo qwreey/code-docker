@@ -7,15 +7,63 @@
 .session-log-project-group {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+}
+
+.session-log-project-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0 0 0.5rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.session-log-chevron {
+  display: inline-flex;
+  flex: none;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: transform 0.12s ease;
+}
+
+.session-log-chevron-open {
+  transform: rotate(90deg);
 }
 
 .session-log-project-name {
+  flex: 1;
+  min-width: 0;
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-muted);
   font-family: var(--mono);
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-log-project-count {
+  flex: none;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: var(--color-gray-bg);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+}
+
+.session-log-project-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.session-log-more-btn {
+  align-self: flex-start;
 }
 
 .session-log-session-card {
@@ -59,16 +107,6 @@
   display: flex;
   align-items: center;
   gap: 0.9rem;
-}
-
-.session-log-viewer-title {
-  min-width: 0;
-}
-
-.session-log-viewer-title > div:first-child {
-  font-size: 0.9rem;
-  color: var(--text-heading);
-  word-break: break-all;
 }
 
 .session-log-viewer-subtitle {

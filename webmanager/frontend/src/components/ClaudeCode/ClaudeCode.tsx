@@ -22,7 +22,13 @@ import { JobPanel } from '../Mise/JobPanel'
 import { LoginPanel } from './LoginPanel'
 import { SessionLog } from './SessionLog/SessionLog'
 import '../common/common.css'
+import '../Processes/Processes.css'
 import './ClaudeCode.css'
+
+// Mirrors Task Manager's 성능/프로세스 sub-tab pattern (Processes.tsx) - the
+// same .processes-tabs/.processes-tab classes are reused rather than
+// inventing a new tab bar, same convention Dind.tsx already follows.
+type ClaudeSubTab = 'status' | 'analytics' | 'sessions' | 'management'
 
 const JOB_POLL_INTERVAL_MS = 800
 
@@ -226,13 +232,11 @@ function ClaudeVersionTag({ version }: { version: string }) {
 
 function InstalledView({
   status,
-  plugins,
   miseVersion,
   onUpdated,
   onLoggedIn,
 }: {
   status: ClaudeStatus
-  plugins: ClaudePlugin[]
   miseVersion: ClaudeMiseVersionInfo | null
   onUpdated: () => void
   onLoggedIn: () => void
@@ -313,18 +317,6 @@ function InstalledView({
         )}
       </div>
       </div>
-      {stats && <InstalledCharts stats={stats} />}
-      <div className="card">
-        <h2>Skills / Plugins</h2>
-        <PluginsTable plugins={plugins} />
-      </div>
-      <div className="card">
-        <h2>대화 로그</h2>
-        <p className="section-description">
-          이 인스턴스에서 진행된 Claude Code 대화 기록입니다. 비밀번호로 보호됩니다.
-        </p>
-        <SessionLog />
-      </div>
     </>
   )
 }
@@ -337,6 +329,7 @@ export function ClaudeCode() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [subTab, setSubTab] = useState<ClaudeSubTab>('status')
 
   const loadingRef = useRef(false)
 
@@ -439,13 +432,66 @@ export function ClaudeCode() {
       ) : (
         status &&
         (status.installed ? (
-          <InstalledView
-            status={status}
-            plugins={plugins}
-            miseVersion={miseVersion}
-            onUpdated={handleUpdated}
-            onLoggedIn={load}
-          />
+          <>
+            <div className="processes-tabs processes-maintabs">
+              <button
+                type="button"
+                className={`processes-tab${subTab === 'status' ? ' processes-tab-active' : ''}`}
+                onClick={() => setSubTab('status')}
+              >
+                상태
+              </button>
+              <button
+                type="button"
+                className={`processes-tab${subTab === 'analytics' ? ' processes-tab-active' : ''}`}
+                onClick={() => setSubTab('analytics')}
+              >
+                세부 분석
+              </button>
+              <button
+                type="button"
+                className={`processes-tab${subTab === 'sessions' ? ' processes-tab-active' : ''}`}
+                onClick={() => setSubTab('sessions')}
+              >
+                대화 로그
+              </button>
+              <button
+                type="button"
+                className={`processes-tab${subTab === 'management' ? ' processes-tab-active' : ''}`}
+                onClick={() => setSubTab('management')}
+              >
+                관리
+              </button>
+            </div>
+
+            {subTab === 'status' && (
+              <InstalledView status={status} miseVersion={miseVersion} onUpdated={handleUpdated} onLoggedIn={load} />
+            )}
+
+            {subTab === 'analytics' &&
+              (status.stats ? (
+                <InstalledCharts stats={status.stats} />
+              ) : (
+                <p className="empty-state">통계를 확인할 수 없습니다.</p>
+              ))}
+
+            {subTab === 'sessions' && (
+              <div className="card">
+                <h2>대화 로그</h2>
+                <p className="section-description">
+                  이 인스턴스에서 진행된 Claude Code 대화 기록입니다. 비밀번호로 보호됩니다.
+                </p>
+                <SessionLog />
+              </div>
+            )}
+
+            {subTab === 'management' && (
+              <div className="card">
+                <h2>Skills / Plugins</h2>
+                <PluginsTable plugins={plugins} />
+              </div>
+            )}
+          </>
         ) : (
           <NotInstalled onInstalled={load} />
         ))
