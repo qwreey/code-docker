@@ -66,6 +66,21 @@ if contains(msg_lower, "error") || contains(msg_lower, "fatal") || contains(msg_
 }
 '''
 
+# Some programs (code-server chief among them) intermittently write a
+# completely empty stdout line - once format_console below prepends
+# "[app_name] ", these turn into a bare "[app_name] " with nothing after it:
+# pure noise in `docker compose logs`/the webmanager Logs page, carrying no
+# information. Filtered generically (blank/whitespace-only message) rather
+# than program-specific like filter_tailscaled below, since this isn't a
+# code-server quirk specifically - any program's stdout can end up with a
+# stray blank line.
+[transforms.filter_blank_lines]
+type = "filter"
+inputs = ["tag_level"]
+condition = '''
+strip_whitespace(to_string!(.message)) != ""
+'''
+
 # tailscaled is uniquely chatty compared to every other program here - a
 # single restart alone logs dozens of internal-plumbing lines (DNS mode
 # selection, WireGuard device setup, control-plane routine tracing, etc.),
@@ -96,7 +111,7 @@ if contains(msg_lower, "error") || contains(msg_lower, "fatal") || contains(msg_
 #     other program (previous behavior).
 [transforms.filter_tailscaled]
 type = "filter"
-inputs = ["tag_level"]
+inputs = ["filter_blank_lines"]
 condition = '''
 msg = to_string!(.message)
 .app_name != "tailscaled" ||
