@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { SshEntry } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Sheet } from '../common/Sheet'
 import { Skeleton } from '../common/Skeleton'
 import '../common/common.css'
 import './SshKeys.css'
@@ -24,10 +25,12 @@ export function SshKeys() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [addKeyOpen, setAddKeyOpen] = useState(false)
   const [newKey, setNewKey] = useState('')
   const [submittingKey, setSubmittingKey] = useState(false)
   const [keyFormError, setKeyFormError] = useState<string | null>(null)
 
+  const [addCommentOpen, setAddCommentOpen] = useState(false)
   const [newComment, setNewComment] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
   const [commentFormError, setCommentFormError] = useState<string | null>(null)
@@ -66,6 +69,7 @@ export function SshKeys() {
     try {
       await api.post<SshEntry>('/ssh/keys', { key: newKey.trim() })
       setNewKey('')
+      setAddKeyOpen(false)
       await load()
     } catch (e) {
       setKeyFormError(errorMessage(e))
@@ -82,6 +86,7 @@ export function SshKeys() {
     try {
       await api.post<SshEntry>('/ssh/keys/comments', { text: newComment.trim() })
       setNewComment('')
+      setAddCommentOpen(false)
       await load()
     } catch (e) {
       setCommentFormError(errorMessage(e))
@@ -174,6 +179,15 @@ export function SshKeys() {
         주석 줄로 섹션을 구분할 수 있습니다. 드래그하여 순서를 바꿀 수 있습니다.
       </p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+
+      <div className="ssh-keys-toolbar">
+        <button type="button" className="btn btn-secondary btn-small" onClick={() => setAddCommentOpen(true)}>
+          + 주석 추가
+        </button>
+        <button type="button" className="btn btn-primary btn-small" onClick={() => setAddKeyOpen(true)}>
+          + 키 추가
+        </button>
+      </div>
 
       {loading ? (
         <Skeleton />
@@ -287,8 +301,14 @@ export function SshKeys() {
         </div>
       )}
 
-      <div className="card add-key-card">
-        <h2>새 공개키 추가</h2>
+      <Sheet
+        open={addKeyOpen}
+        onClose={() => {
+          setAddKeyOpen(false)
+          setKeyFormError(null)
+        }}
+        title="새 공개키 추가"
+      >
         <form onSubmit={handleAddKey} className="add-key-form">
           <textarea
             className="add-key-textarea"
@@ -296,6 +316,7 @@ export function SshKeys() {
             value={newKey}
             onChange={(e) => setNewKey(e.target.value)}
             rows={3}
+            autoFocus
           />
           {keyFormError && <ErrorBanner message={keyFormError} onDismiss={() => setKeyFormError(null)} />}
           <div>
@@ -304,10 +325,16 @@ export function SshKeys() {
             </button>
           </div>
         </form>
-      </div>
+      </Sheet>
 
-      <div className="card add-key-card">
-        <h2>새 주석 추가</h2>
+      <Sheet
+        open={addCommentOpen}
+        onClose={() => {
+          setAddCommentOpen(false)
+          setCommentFormError(null)
+        }}
+        title="새 주석 추가"
+      >
         <p className="section-description">섹션 구분/메모용 줄입니다. 목록 어디로든 드래그해서 옮길 수 있습니다.</p>
         <form onSubmit={handleAddComment} className="add-key-form">
           <textarea
@@ -316,6 +343,7 @@ export function SshKeys() {
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             rows={1}
+            autoFocus
           />
           {commentFormError && (
             <ErrorBanner message={commentFormError} onDismiss={() => setCommentFormError(null)} />
@@ -326,7 +354,7 @@ export function SshKeys() {
             </button>
           </div>
         </form>
-      </div>
+      </Sheet>
     </section>
   )
 }
