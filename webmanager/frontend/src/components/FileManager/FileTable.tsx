@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Download, Info, Pencil, Trash2, TextCursorInput } from 'lucide-react'
 import type { FileEntry } from '../../api/types'
 import { formatBytes } from '../../utils/format'
 import './FileManager.css'
@@ -134,57 +135,67 @@ export function FileTable({
                 <div className="file-manager-actions">
                   <button
                     type="button"
-                    className="btn btn-secondary btn-small"
+                    className="btn btn-secondary btn-small btn-icon"
+                    title="정보"
+                    aria-label="정보"
                     onClick={(e) => {
                       e.stopPropagation()
                       onInfo(entry)
                     }}
                   >
-                    정보
+                    <Info size={14} />
                   </button>
                   {!entry.isDir && (
                     <button
                       type="button"
-                      className="btn btn-secondary btn-small"
+                      className="btn btn-secondary btn-small btn-icon"
+                      title="다운로드"
+                      aria-label="다운로드"
                       onClick={(e) => {
                         e.stopPropagation()
                         onDownload(entry)
                       }}
                     >
-                      다운로드
+                      <Download size={14} />
                     </button>
                   )}
                   {!entry.isDir && (
                     <button
                       type="button"
-                      className="btn btn-secondary btn-small"
+                      className="btn btn-secondary btn-small btn-icon"
+                      title="편집"
+                      aria-label="편집"
                       onClick={(e) => {
                         e.stopPropagation()
                         onEdit(entry)
                       }}
                     >
-                      편집
+                      <Pencil size={14} />
                     </button>
                   )}
                   <button
                     type="button"
-                    className="btn btn-secondary btn-small"
+                    className="btn btn-secondary btn-small btn-icon"
+                    title="이름변경"
+                    aria-label="이름변경"
                     onClick={(e) => {
                       e.stopPropagation()
                       onStartRename(entry)
                     }}
                   >
-                    이름변경
+                    <TextCursorInput size={14} />
                   </button>
                   <button
                     type="button"
-                    className="btn btn-danger btn-small"
+                    className="btn btn-danger btn-small btn-icon"
+                    title="삭제"
+                    aria-label="삭제"
                     onClick={(e) => {
                       e.stopPropagation()
                       onDelete(entry)
                     }}
                   >
-                    삭제
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </td>

@@ -115,7 +115,13 @@
 .file-manager-actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.3rem;
+}
+
+.file-manager-actions .btn-icon {
+  padding: 0.35rem;
+  line-height: 0;
 }
 
 .file-manager-rename-form {
