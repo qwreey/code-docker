@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../../api/client'
 import type { ClaudeSessionInfo, ClaudeSessionsResponse } from '../../../api/types'
 import { ErrorBanner } from '../../common/ErrorBanner'
+import { Skeleton } from '../../common/Skeleton'
 import { formatBytes } from '../../../utils/format'
+import { withViewTransition } from '../../../utils/viewTransition'
 
 function formatModifiedAt(iso: string): string {
   const d = new Date(iso)
@@ -18,7 +20,7 @@ export function SessionList({ onSelect }: { onSelect: (session: ClaudeSessionInf
     api
       .get<ClaudeSessionsResponse>('/claude/sessions')
       .then((res) => {
-        if (!cancelled) setSessions(res.sessions)
+        if (!cancelled) withViewTransition(() => setSessions(res.sessions))
       })
       .catch((e) => {
         if (!cancelled) setError(errorMessage(e))
@@ -29,7 +31,7 @@ export function SessionList({ onSelect }: { onSelect: (session: ClaudeSessionInf
   }, [])
 
   if (error) return <ErrorBanner message={error} onDismiss={() => setError(null)} />
-  if (!sessions) return <p className="empty-state">불러오는 중...</p>
+  if (!sessions) return <Skeleton />
   if (sessions.length === 0) return <p className="empty-state">대화 로그가 없습니다.</p>
 
   const byProject = new Map<string, ClaudeSessionInfo[]>()

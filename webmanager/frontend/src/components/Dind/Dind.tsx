@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { DindContainer, DindImage } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
 import { ContainerTable } from './ContainerTable'
 import { ImageTable } from './ImageTable'
 import { DindLogPanel } from './DindLogPanel'
 import { DindInspectPanel } from './DindInspectPanel'
 import '../Processes/Processes.css'
+import { withViewTransition } from '../../utils/viewTransition'
 
 const POLL_INTERVAL_MS = 5000
 
@@ -43,7 +45,7 @@ export function Dind() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
       loadingRef.current = false
     }
   }, [])
@@ -101,7 +103,7 @@ export function Dind() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : tab === 'containers' ? (
         <ContainerTable
           containers={containers}

@@ -4,7 +4,9 @@ import type { FileEntry, FileStat } from '../../api/types'
 import { formatBytes } from '../../utils/format'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Sheet } from '../common/Sheet'
+import { Skeleton } from '../common/Skeleton'
 import './FileManager.css'
+import { withViewTransition } from '../../utils/viewTransition'
 
 export function InfoPanel({ entry, onClose }: { entry: FileEntry; onClose: () => void }) {
   const [stat, setStat] = useState<FileStat | null>(null)
@@ -25,7 +27,7 @@ export function InfoPanel({ entry, onClose }: { entry: FileEntry; onClose: () =>
         if (!cancelled) setError(errorMessage(e))
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) withViewTransition(() => setLoading(false))
       })
     return () => {
       cancelled = true
@@ -36,7 +38,7 @@ export function InfoPanel({ entry, onClose }: { entry: FileEntry; onClose: () =>
     <Sheet open onClose={onClose} title={`정보 — ${entry.name}`}>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : stat ? (
         <dl className="file-manager-info-list">
           <div>

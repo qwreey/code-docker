@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { TailscaleGlobalConfig } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
+import { withViewTransition } from '../../utils/viewTransition'
 
 export function GlobalSettings() {
   const [socksAddress, setSocksAddress] = useState('')
@@ -24,7 +26,7 @@ export function GlobalSettings() {
         if (!cancelled) setError(errorMessage(e))
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) withViewTransition(() => setLoading(false))
       })
     return () => {
       cancelled = true
@@ -57,7 +59,7 @@ export function GlobalSettings() {
       <h2>전역 설정</h2>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : (
         <form onSubmit={handleSubmit}>
           <div className="form-grid">

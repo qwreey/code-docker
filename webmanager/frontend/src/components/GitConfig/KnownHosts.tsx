@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { KnownHostEntry } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
+import { withViewTransition } from '../../utils/viewTransition'
 
 export function KnownHosts() {
   const [entries, setEntries] = useState<KnownHostEntry[]>([])
@@ -20,7 +22,7 @@ export function KnownHosts() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
     }
   }, [])
 
@@ -66,7 +68,7 @@ export function KnownHosts() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : entries.length === 0 ? (
         <p className="empty-state">등록된 known_hosts 항목이 없습니다.</p>
       ) : (

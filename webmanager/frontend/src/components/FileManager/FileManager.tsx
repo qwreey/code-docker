@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, apiUrl, errorMessage } from '../../api/client'
 import type { FileEntry, FileOpResult, FileUploadResult } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
 import { FileTable } from './FileTable'
 import { InfoPanel } from './InfoPanel'
 import { FileEditorSheet } from './FileEditorSheet'
 import { DestinationDialog } from './DestinationDialog'
 import '../common/common.css'
 import './FileManager.css'
+import { withViewTransition } from '../../utils/viewTransition'
 
 interface Crumb {
   label: string
@@ -69,7 +71,7 @@ export function FileManager() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
     }
   }, [currentPath])
 
@@ -315,7 +317,7 @@ export function FileManager() {
       )}
 
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : (
         <FileTable
           entries={entries}

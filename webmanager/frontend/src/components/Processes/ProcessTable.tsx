@@ -3,9 +3,11 @@ import { api, errorMessage } from '../../api/client'
 import type { ProcessInfo } from '../../api/types'
 import { fuzzyMatch, type FuzzyMatchResult } from '../../utils/fuzzyMatch'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
 import { ProcessRowCells } from './ProcessRow'
 import { ProcessTree } from './ProcessTree'
 import './Processes.css'
+import { withViewTransition } from '../../utils/viewTransition'
 
 const POLL_INTERVAL_MS = 4000
 
@@ -73,7 +75,7 @@ export function ProcessTable() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
       loadingRef.current = false
     }
   }, [])
@@ -191,7 +193,7 @@ export function ProcessTable() {
       </div>
 
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : sorted.length === 0 ? (
         <p className="empty-state">
           {processes.length === 0 ? '실행 중인 프로세스가 없습니다.' : '조건에 맞는 프로세스가 없습니다.'}

@@ -3,6 +3,8 @@ import { api, errorMessage } from '../../api/client'
 import type { GitSshHost } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { CopyButton } from '../common/CopyButton'
+import { Skeleton } from '../common/Skeleton'
+import { withViewTransition } from '../../utils/viewTransition'
 
 export function SshHosts() {
   const [hosts, setHosts] = useState<GitSshHost[]>([])
@@ -24,7 +26,7 @@ export function SshHosts() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
     }
   }, [])
 
@@ -73,7 +75,7 @@ export function SshHosts() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : hosts.length === 0 ? (
         <p className="empty-state">등록된 호스트가 없습니다.</p>
       ) : (

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { PortInfo } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
 import { KillButtons } from './KillButtons'
 import './Processes.css'
+import { withViewTransition } from '../../utils/viewTransition'
 
 const POLL_INTERVAL_MS = 4000
 
@@ -24,7 +26,7 @@ export function PortTable() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
       loadingRef.current = false
     }
   }, [])
@@ -39,7 +41,7 @@ export function PortTable() {
     <div>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : ports.length === 0 ? (
         <p className="empty-state">리스닝 중인 포트가 없습니다.</p>
       ) : (

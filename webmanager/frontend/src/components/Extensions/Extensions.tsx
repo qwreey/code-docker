@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { CodeExtensionsResponse, RecommendationsResponse, RecommendedExtension } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
 import '../common/common.css'
 import './Extensions.css'
+import { withViewTransition } from '../../utils/viewTransition'
 
 const SHOW_RECOMMENDATIONS_KEY = 'webmanager.extensions.showRecommendations'
 
@@ -66,7 +68,7 @@ export function Extensions() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
       loadingRef.current = false
     }
   }, [])
@@ -208,7 +210,7 @@ export function Extensions() {
 
       {showRecommendations &&
         (loading && extensions.length === 0 ? (
-          <p className="empty-state">불러오는 중...</p>
+          <Skeleton />
         ) : extensions.length === 0 ? (
           <p className="empty-state">추천 익스텐션 목록이 없습니다.</p>
         ) : (

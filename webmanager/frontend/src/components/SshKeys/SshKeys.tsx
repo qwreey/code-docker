@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { SshKey } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
 import '../common/common.css'
 import './SshKeys.css'
+import { withViewTransition } from '../../utils/viewTransition'
 
 export function SshKeys() {
   const [keys, setKeys] = useState<SshKey[]>([])
@@ -22,7 +24,7 @@ export function SshKeys() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
     }
   }, [])
 
@@ -70,7 +72,7 @@ export function SshKeys() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : keys.length === 0 ? (
         <p className="empty-state">등록된 키가 없습니다.</p>
       ) : (

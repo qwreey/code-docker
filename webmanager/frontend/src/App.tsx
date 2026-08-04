@@ -16,6 +16,7 @@ import { Terminal } from './components/Terminal/Terminal'
 import { RequiresUnlock } from './components/common/RequiresUnlock'
 import { UnlockModalHost } from './components/common/UnlockModal'
 import { EnvVersionBanner } from './components/common/EnvVersionBanner'
+import { Skeleton } from './components/common/Skeleton'
 import { withViewTransition } from './utils/viewTransition'
 import './App.css'
 
@@ -68,7 +69,7 @@ function App() {
         {active === 'extensions' && <Extensions />}
         {active === 'terminal' && <Terminal />}
         {active === 'files' && (
-          <Suspense fallback={<p className="empty-state">불러오는 중...</p>}>
+          <Suspense fallback={<Skeleton />}>
             <RequiresUnlock>
               <FileManager />
             </RequiresUnlock>

@@ -3,6 +3,8 @@ import { api, ApiError, errorMessage } from '../../api/client'
 import type { GpgKey, GpgKeyCreated } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { CopyButton } from '../common/CopyButton'
+import { Skeleton } from '../common/Skeleton'
+import { withViewTransition } from '../../utils/viewTransition'
 
 const NOT_INSTALLED_NOTICE = '컨테이너에 gnupg가 아직 설치되어 있지 않습니다 (다음 이미지 빌드부터 사용 가능합니다).'
 
@@ -37,7 +39,7 @@ export function GpgKeys({ onUseKey }: { onUseKey: (keyId: string) => void }) {
         setError(errorMessage(e))
       }
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
     }
   }, [])
 
@@ -102,7 +104,7 @@ export function GpgKeys({ onUseKey }: { onUseKey: (keyId: string) => void }) {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : keys.length === 0 ? (
         <p className="empty-state">등록된 GPG 키가 없습니다.</p>
       ) : (

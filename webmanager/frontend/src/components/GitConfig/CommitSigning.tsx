@@ -4,6 +4,8 @@ import type { GitSigningConfig, GitSigningMode, SshSigningKey } from '../../api/
 import { ErrorBanner } from '../common/ErrorBanner'
 import { CopyButton } from '../common/CopyButton'
 import { GpgKeys } from './GpgKeys'
+import { Skeleton } from '../common/Skeleton'
+import { withViewTransition } from '../../utils/viewTransition'
 
 const MODE_LABELS: Record<GitSigningMode, string> = {
   none: '없음',
@@ -38,7 +40,7 @@ export function CommitSigning() {
         if (!cancelled) setError(errorMessage(e))
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) withViewTransition(() => setLoading(false))
       })
     return () => {
       cancelled = true
@@ -87,7 +89,7 @@ export function CommitSigning() {
       <h2>커밋 서명</h2>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : (
         <>
           <form onSubmit={handleSubmit}>

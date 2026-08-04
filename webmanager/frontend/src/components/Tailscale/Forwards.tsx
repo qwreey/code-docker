@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { TailscaleForward } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
+import { withViewTransition } from '../../utils/viewTransition'
 
 export function Forwards() {
   const [forwards, setForwards] = useState<TailscaleForward[]>([])
@@ -25,7 +27,7 @@ export function Forwards() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
     }
   }, [])
 
@@ -95,7 +97,7 @@ export function Forwards() {
       {notice && <p className="success-note">{notice}</p>}
 
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : forwards.length === 0 ? (
         <p className="empty-state">등록된 forward가 없습니다.</p>
       ) : (

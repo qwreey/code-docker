@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { ExpandableEditor } from '../common/ExpandableEditor'
+import { Skeleton } from '../common/Skeleton'
+import { withViewTransition } from '../../utils/viewTransition'
 
 export function RawConfigEditor() {
   const [content, setContent] = useState('')
@@ -18,7 +20,7 @@ export function RawConfigEditor() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
     }
   }, [])
 
@@ -49,7 +51,7 @@ export function RawConfigEditor() {
       </p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : (
         <>
           <ExpandableEditor

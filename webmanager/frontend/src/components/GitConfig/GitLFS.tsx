@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { LFSStatus } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
+import { withViewTransition } from '../../utils/viewTransition'
 
 export function GitLFS() {
   const [installed, setInstalled] = useState(false)
@@ -17,7 +19,7 @@ export function GitLFS() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
     }
   }, [])
 
@@ -43,7 +45,7 @@ export function GitLFS() {
       <h2>Git LFS</h2>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : installed ? (
         <span className="badge badge-green">설치됨</span>
       ) : (

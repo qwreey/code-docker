@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { TailscalePeerInfo, TailscaleStatusResponse } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
+import { withViewTransition } from '../../utils/viewTransition'
 
 // While a login is pending, poll faster than a human would manually refresh
 // so the banner clears itself once the user finishes signing in elsewhere
@@ -30,7 +32,7 @@ export function Status() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
     }
   }, [])
 
@@ -63,7 +65,7 @@ export function Status() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {loading && !data ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : !data ? null : !data.available ? (
         <p className="tailscale-status-note">tailscale 상태를 확인할 수 없습니다 (설치/실행 여부 확인 필요)</p>
       ) : authPending && status ? (

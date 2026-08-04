@@ -12,6 +12,8 @@ import type {
 } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Sheet } from '../common/Sheet'
+import { Skeleton } from '../common/Skeleton'
+import { withViewTransition } from '../../utils/viewTransition'
 import { formatDurationMs } from '../../utils/format'
 import { Heatmap } from './Heatmap'
 import { WeeklyChart } from './WeeklyChart'
@@ -359,7 +361,7 @@ export function ClaudeCode() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
       loadingRef.current = false
     }
   }, [])
@@ -433,7 +435,7 @@ export function ClaudeCode() {
       <p className="section-description">Claude Code CLI의 로그인 상태와 사용 통계를 보여줍니다.</p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {loading && !status ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : (
         status &&
         (status.installed ? (

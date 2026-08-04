@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { ProjectInfo, ProjectsResponse } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
 import { ProjectTable } from './ProjectTable'
 import '../common/common.css'
 import './Projects.css'
+import { withViewTransition } from '../../utils/viewTransition'
 
 const SCAN_POLL_INTERVAL_MS = 2000
 
@@ -26,7 +28,7 @@ export function Projects() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
       loadingRef.current = false
     }
   }, [])
@@ -87,7 +89,7 @@ export function Projects() {
       {data?.scanning && <p className="projects-scanning-note">스캔이 진행 중입니다 — 완료되면 자동으로 갱신됩니다.</p>}
 
       {loading && !data ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : data && data.projects.length === 0 && !data.scanning ? (
         <p className="empty-state">스캔된 프로젝트가 없습니다.</p>
       ) : (

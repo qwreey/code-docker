@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { api } from '../../api/client'
 import { ErrorBanner } from './ErrorBanner'
 import { useAuthStatus } from './useAuthStatus'
+import { Skeleton } from './Skeleton'
 import './RequiresUnlock.css'
 
 /**
@@ -37,7 +38,7 @@ export function RequiresUnlock({ children }: { children: ReactNode }) {
   }
 
   if (!status) {
-    return <p className="empty-state">불러오는 중...</p>
+    return <Skeleton />
   }
 
   if (!status.required || status.unlocked) {

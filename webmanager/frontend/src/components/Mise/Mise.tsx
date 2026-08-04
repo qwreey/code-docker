@@ -11,9 +11,11 @@ import type {
   RecommendationsResponse,
 } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
 import '../common/common.css'
 import { JobPanel } from './JobPanel'
 import './Mise.css'
+import { withViewTransition } from '../../utils/viewTransition'
 
 const JOB_POLL_INTERVAL_MS = 800
 const SHOW_RECOMMENDATIONS_KEY = 'webmanager.mise.showRecommendations'
@@ -81,7 +83,7 @@ export function Mise() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
       loadingRef.current = false
     }
   }, [loadTools])
@@ -215,7 +217,7 @@ export function Mise() {
         <div className="mise-section">
           <h2>추천 도구 설치</h2>
           {loading && recommendations.length === 0 ? (
-            <p className="empty-state">불러오는 중...</p>
+            <Skeleton />
           ) : recommendations.length === 0 ? (
             <p className="empty-state">추천 도구 목록이 없습니다.</p>
           ) : (
@@ -276,7 +278,7 @@ export function Mise() {
           설정에는 반영되지 않은 버전입니다.
         </p>
         {loading && tools.length === 0 ? (
-          <p className="empty-state">불러오는 중...</p>
+          <Skeleton />
         ) : tools.length === 0 ? (
           <p className="empty-state">전역으로 설치되거나 선언된 도구가 없습니다.</p>
         ) : (

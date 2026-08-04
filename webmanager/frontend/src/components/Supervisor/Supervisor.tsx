@@ -2,10 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { SupervisorProcess } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
 import { ProcessTable } from './ProcessTable'
 import { LogPanel } from './LogPanel'
 import '../common/common.css'
 import './Supervisor.css'
+import { withViewTransition } from '../../utils/viewTransition'
 
 const POLL_INTERVAL_MS = 4000
 
@@ -28,7 +30,7 @@ export function Supervisor() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
+      withViewTransition(() => setLoading(false))
       loadingRef.current = false
     }
   }, [])
@@ -61,7 +63,7 @@ export function Supervisor() {
       </div>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {loading ? (
-        <p className="empty-state">불러오는 중...</p>
+        <Skeleton />
       ) : (
         <ProcessTable
           processes={processes}
