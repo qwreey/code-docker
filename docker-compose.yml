@@ -67,6 +67,13 @@ services:
       # `error_log ... warn;` above. Use "error" for even quieter, or
       # "info"/"debug" to restore the old chatter.
       VECTOR_LOG_LEVEL: "warn"
+      # tailscaled's own output (not vector's) is uniquely chatty - a single
+      # restart logs dozens of internal-plumbing lines. See
+      # vector.default.toml for details.
+      #   errors (default) - vector allowlists tailscaled down to
+      #     login/auth-URL lines, ipn state transitions, and fatal errors.
+      #   all - unfiltered, tailscaled's full output passes through.
+      TAILSCALE_LOG_LEVEL: "errors"
       # Path `webmanager --env-migrate`/the startup version-mismatch check
       # read the current example-env.webmanager template from. Left unset to
       # use the image's own copy. Deliberately not settable via

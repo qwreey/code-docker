@@ -159,7 +159,7 @@ code-docker 가 고유한 tailscale IP를 가지도록 하여, ssh/adb 를 위�
 - **code-server**: `code-service.*.sh`, `code-config.*.yaml`, `code-env.*.sh`, `code-runner.*.sh`, `recommendations.*.yaml`, `shell.*`
 - **tailscale**: `tailscale-service.*.sh`, `tailscale-forward.*.sh`, `tailscale-status.*.sh`, `tailscale-config.*.yaml`
 - **webmanager**: `webmanager.*.sh`, `supervisor-metadata.*.yaml`, `example-env.webmanager`(런타임 환경변수 템플릿, 저장소 루트)
-- **기타**: `supervisord.*.conf`, `supervisord/*.conf`, `user-init.*.sh`, `sshd-service.*.sh`, `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`, `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅, `NGINX_LOG_LEVEL`로 access_log 상세도 조절)
+- **기타**: `supervisord.*.conf`, `supervisord/*.conf`, `user-init.*.sh`, `sshd-service.*.sh`, `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`(`TAILSCALE_LOG_LEVEL`로 유독 시끄러운 tailscaled 로그를 로그인/상태전환/fatal 에러만 남도록 필터링), `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅, `NGINX_LOG_LEVEL`로 access_log 상세도 조절)
 
 # 코드 서버 패치
 

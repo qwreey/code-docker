@@ -200,6 +200,25 @@ sink, `docker compose logs` 에서 프로그램 구분이 되도록 함)하고, 
 보는 대략적인 추정치일 뿐이라 정확한 파싱은 아닙니다. `/code/.vector/logs` 는 별도 보존 기간
 정책 없이 계속 쌓이므로 필요하면 직접 정리하세요.
 
+`tailscaled`는 다른 프로그램들과 비교해 유독 시끄럽습니다 — 재시작 한 번에 DNS
+모드 선택/WireGuard 장치 생성/컨트롤 플레인 루틴 추적 같은 내부 구현 상세를
+수십 줄씩 찍고, 평상시에도 magicsock/netcheck/derp/라우트 감시 관련 잡음이
+하루 수십만 줄까지 쌓입니다(이 프로젝트 호스트에서 직접 측정: `journalctl -u
+tailscaled` 393,830줄 중 실제 신호(ipn 상태 전환/인증 URL/fatal 에러)는 403줄뿐).
+이건 이 프로젝트나 컨테이너 특유의 문제가 아니라 tailscale 팀도 인정한
+오래된 업스트림 이슈입니다(로그 레벨 자체가 없어서 팀이 제안하는 방법도
+"외부에서 필터링"뿐 — [tailscale/tailscale#282](https://github.com/tailscale/tailscale/issues/282),
+실사용자 보고로 tailscaled 로그가 200GB까지 쌓이거나 특정 메시지가 몇 달째
+2-3초 간격으로 찍히는 사례가 있습니다). nginx의 `NGINX_LOG_LEVEL`처럼 상태코드
+같은 깔끔한 필터 기준이 없어서, `docker-compose.yml`의
+`TAILSCALE_LOG_LEVEL`(기본값 `errors`)은 tailscaled 프로그램에 한해 블록리스트가
+아니라 허용리스트 방식으로 걸러냅니다 — 로그인/인증 URL, ipn 상태 전환
+(`NeedsLogin`/`Starting`/`Running`/...), fatal 에러만 통과시키고 나머지 내부
+구현 상세는 버립니다(다른 프로그램의 로그는 전혀 건드리지 않음). `all`로
+설정하면 tailscaled도 필터링 없이 예전처럼 전부 찍힙니다.
+`vector.default.toml`의 `get_env_var`로 이벤트마다 직접 읽으므로, 값을 바꿔도
+vector 재시작만 하면 되고 nginx의 envsubst 같은 재렌더링은 필요 없습니다.
+
 ### `nginx-service.*.sh` (nginx 실행)
 
 컨테이너 안에서 `nginx -g "daemon off;"`를 실행하는 진입점입니다(`daemon off`는

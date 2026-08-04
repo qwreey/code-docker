@@ -18,6 +18,23 @@ type = "file"
 # both fds straight to the container's own stdout).
 include = ["/var/log/*/stdout.log*", "/var/log/*/stderr.log*"]
 
+# vector now starts before the programs it tails (see supervisord.default.conf
+# priority=1 - needed so it's the LAST to stop, not the first), so at its
+# initial directory scan most stdout.log files are freshly created and empty.
+# The default "checksum" fingerprint strategy needs at least one complete
+# line before it can fingerprint a file at all, and once a file is skipped
+# for being "too small to fingerprint" it isn't reliably retried later - so
+# whichever program hadn't logged a full line yet at that first scan (varies
+# run to run) went missing from `docker compose logs`/webmanager Logs
+# entirely for that boot. device_and_inode sidesteps this: it identifies
+# files by OS-level device+inode rather than content, so a brand-new empty
+# file is trackable immediately. This is safe for our rotation scheme
+# specifically because supervisord rotates by rename (stdout.log ->
+# stdout.log.1, fresh stdout.log created) rather than copytruncate, so a
+# rotated file keeps its own inode instead of having it reused in place -
+# the exact case where device_and_inode is normally unsafe.
+fingerprint.strategy = "device_and_inode"
+
 # Extracts app_name from the tailed file's path, e.g.
 # "/var/log/code-server/stdout.log" (or a rotated "...stdout.log.1") ->
 # "code-server". Using the second-to-last path segment (rather than a fixed
@@ -49,13 +66,63 @@ if contains(msg_lower, "error") || contains(msg_lower, "fatal") || contains(msg_
 }
 '''
 
+# tailscaled is uniquely chatty compared to every other program here - a
+# single restart alone logs dozens of internal-plumbing lines (DNS mode
+# selection, WireGuard device setup, control-plane routine tracing, etc.),
+# none of which carry decision-relevant information, and steady-state
+# runtime chatter (magicsock/netcheck/derp/route-monitor lines) can run into
+# the hundreds of thousands of lines a day even when idle (measured on this
+# project's own host: journalctl -u tailscaled had 393,830 lines, of which
+# only 403 were an actual ipn-state-transition/auth-URL/fatal-error signal).
+# This isn't specific to this project or a container artifact - it's a
+# long-standing, widely-reported upstream issue tailscale's own team
+# acknowledged and never actually fixed (they don't use log levels, so their
+# own suggested workaround is external filtering, same idea as this
+# transform): https://github.com/tailscale/tailscale/issues/282 (real-world
+# reports there include 200GB of accumulated tailscaled logs, and the same
+# "magicsock: derp-N does not know about peer [...], removing route" line
+# repeating every 2-3 seconds for months).
+#
+# Unlike nginx's NGINX_LOG_LEVEL, tailscaled has no status-code-like field to
+# filter on, so this is an allowlist of substrings (safer than a blocklist -
+# tailscaled's plumbing lines vastly outnumber, and could outlive, any list
+# of patterns we keep in sync) rather than a level check. TAILSCALE_LOG_LEVEL
+# (docker-compose.yml), read live per-event via get_env_var so no
+# envsubst/restart is needed to change it:
+#   errors (default) - only the allowlisted lines below pass through for the
+#     tailscaled program specifically; every other program's events are
+#     untouched.
+#   all - no filtering, tailscaled's full output passes through like every
+#     other program (previous behavior).
+[transforms.filter_tailscaled]
+type = "filter"
+inputs = ["tag_level"]
+condition = '''
+msg = to_string!(.message)
+.app_name != "tailscaled" ||
+  (get_env_var("TAILSCALE_LOG_LEVEL") ?? "errors") == "all" ||
+  # ipn state transitions (NeedsLogin/Starting/Running/...) - the actual
+  # connectivity narrative, without the internals behind each transition.
+  contains(msg, "Switching ipn state") ||
+  # The login/auth-URL flow (first-time login, or after a key expires) -
+  # "To authenticate, visit:" plus the tab-indented URL line printed right
+  # after it, whichever login server is configured (not just tailscale.com's,
+  # since TAILSCALE_LOGIN_SERVER can point at a self-hosted Headscale).
+  contains(msg, "To authenticate") ||
+  contains(msg, "Received auth URL") ||
+  contains(msg, "AuthURL") ||
+  (starts_with(msg, "\t") && contains(msg, "https://")) ||
+  contains(msg, "Success.") ||
+  contains(msg, "Fatal")
+'''
+
 # console sink's "text" codec only ever prints the `message` field, so the
 # "[app_name] message" label has to be baked into `message` itself. Done in
 # a separate transform (rather than in tag_level above) so the unmodified
 # original message still reaches the webmanager_logs sink below.
 [transforms.format_console]
 type = "remap"
-inputs = ["tag_level"]
+inputs = ["filter_tailscaled"]
 source = '''
 .message = "[" + string!(.app_name) + "] " + string!(.message)
 '''
@@ -74,7 +141,7 @@ encoding.codec = "text"
 # strips vector's other auto-added fields (file, host, source_type).
 [sinks.webmanager_logs]
 type = "file"
-inputs = ["tag_level"]
+inputs = ["filter_tailscaled"]
 path = "/code/.vector/logs/%Y-%m-%d.jsonl"
 encoding.codec = "json"
 encoding.only_fields = ["timestamp", "app_name", "level", "message"]
