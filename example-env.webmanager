@@ -75,9 +75,11 @@ WEBMANAGER_ENV_VERSION=5
 #WEBMANAGER_PROJECTS_OLD_DAYS=90
 #. 유저가 직접 편집하는 "재생성 가능 폴더" 패턴 파일 경로.
 #WEBMANAGER_PROJECTS_PATTERNS_PATH=
-#. "code-server에서 열기" 링크(${url}/?folder=${path})를 만들 외부 접속 가능한
-#. code-server 기본 URL. 비워두면 그 버튼이 안 보입니다(멀티 인스턴스/PREFIX/
-#. 프록시 구성이 제각각이라 webmanager가 자체적으로 추론할 수 없음).
+#. "code-server에서 열기" 링크(${url}/?folder=${path})를 만들 code-server
+#. 기본 URL. code-server와 webmanager는 기본적으로 같은 origin(nginx가 80번
+#. 포트에서 함께 라우팅)이라 비워두면 접속 중인 페이지의 origin을 그대로
+#. 씁니다. 다른 도메인/포트로 webmanager에 접속하는 경우에만 명시적으로
+#. 설정하세요.
 #WEBMANAGER_CODE_SERVER_URL=
 
 #. --- Task Manager 탭 ---

@@ -173,13 +173,18 @@ dependencies on each other or on anything still queued):
    now-implemented extensions API) → M5 (MCP server list, deliberately last
    within this feature — `claude mcp list` has no `--json` output and needs a
    real multi-server example to design the parser against).
-2. `.claude/qa-request/projects-plan-done.md` — Projects tab phase 2 (delete UI for
-   reclaimable folders). Phase 1 (read-only) is done; phase 2 needs the exact
-   same path-validation pattern already used by phase 1's rescan endpoint
-   (exact match against the cache) plus a confirm dialog, no exceptions.
-3. `.claude/extension-search-plan.md` — extension search + marketplace-URL
+2. `.claude/extension-search-plan.md` — extension search + marketplace-URL
    paste-to-install (with an open-vsx cross-lookup + vsix-direct-download
    fallback). Design done, not started.
+
+Projects tab phase 2 (`.claude/qa-request/projects-plan-done.md`, delete UI for
+reclaimable folders) is now done too — same exact-match path-validation
+convention as phase 1's rescan endpoint, extended to a project+reclaimable-path
+pair (`internal/projects.Scanner.DeleteReclaimable`), plus a mandatory confirm
+dialog. The "code-server에서 열기" link also now falls back to
+`window.location.origin` when `WEBMANAGER_CODE_SERVER_URL` is unset (same-origin
+nginx routing made that a safe default) and renders as a real `<a href>` instead
+of a `window.open` button.
 
 **Lower-priority / no dedicated plan doc yet** — tracked only in `plan.md`'s
 TODO table: code-server settings.json editor (revisit once caddy-plan's

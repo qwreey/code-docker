@@ -40,3 +40,33 @@ func (s *Server) handleRescanProject(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, info)
 	}
 }
+
+// handleDeleteReclaimable deletes one reclaimable subtree (node_modules,
+// target, ...) from disk — never the project directory itself, that's out
+// of scope. Both path (the project) and target (the reclaimable entry) must
+// exactly match the scan cache, validated by
+// internal/projects.Scanner.DeleteReclaimable using the same exact-match
+// convention as handleRescanProject above. Gated by s.gate in main.go since
+// this is a destructive write, unlike the read-only project endpoints.
+func (s *Server) handleDeleteReclaimable(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	target := r.URL.Query().Get("target")
+	if path == "" || target == "" {
+		writeError(w, http.StatusBadRequest, "path and target are required")
+		return
+	}
+
+	info, err := s.projectScanner.DeleteReclaimable(path, target)
+	switch {
+	case errors.Is(err, projects.ErrUnknownProject):
+		writeError(w, http.StatusBadRequest, "unknown project path")
+	case errors.Is(err, projects.ErrUnknownReclaimable):
+		writeError(w, http.StatusBadRequest, "unknown reclaimable path")
+	case errors.Is(err, projects.ErrProjectGone):
+		writeError(w, http.StatusNotFound, "project no longer exists")
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, err.Error())
+	default:
+		writeJSON(w, http.StatusOK, info)
+	}
+}

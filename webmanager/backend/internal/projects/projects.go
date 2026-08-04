@@ -52,8 +52,9 @@ type ReclaimableEntry struct {
 }
 
 var (
-	ErrUnknownProject = errors.New("unknown project path")
-	ErrProjectGone    = errors.New("project no longer exists")
+	ErrUnknownProject     = errors.New("unknown project path")
+	ErrProjectGone        = errors.New("project no longer exists")
+	ErrUnknownReclaimable = errors.New("unknown reclaimable path")
 )
 
 // Scanner owns the scan roots, the on-disk cache, and the "one full scan at
@@ -272,7 +273,78 @@ func (s *Scanner) RescanOne(path string) (ProjectInfo, error) {
 	if idx == -1 {
 		return ProjectInfo{}, ErrUnknownProject
 	}
+	return s.rescanAndStore(root, path)
+}
 
+// DeleteReclaimable removes exactly one reclaimable subtree from disk and
+// returns the freshly rescanned project. Both projectPath and
+// reclaimablePath must exactly match an existing cached project and one of
+// that *same* project's cached Reclaimable entries — the same validation
+// convention RescanOne uses (exact match against the cache, never a
+// prefix/contains check) — so an arbitrary filesystem path can never reach
+// os.RemoveAll. Deleting the project directory itself is out of scope and
+// unreachable through this method: only paths already present in a
+// project's Reclaimable slice (populated solely by the pattern-matching
+// walk in scanProject) are ever valid targets.
+func (s *Scanner) DeleteReclaimable(projectPath, reclaimablePath string) (ProjectInfo, error) {
+	s.mu.Lock()
+	idx := -1
+	var root string
+	valid := false
+	for i, p := range s.cache.Projects {
+		if p.Path != projectPath {
+			continue
+		}
+		idx = i
+		root = p.Root
+		for _, entry := range p.Reclaimable {
+			if entry.Path == reclaimablePath {
+				valid = true
+				break
+			}
+		}
+		break
+	}
+	s.mu.Unlock()
+	if idx == -1 {
+		return ProjectInfo{}, ErrUnknownProject
+	}
+	if !valid {
+		return ProjectInfo{}, ErrUnknownReclaimable
+	}
+
+	// Defensive: if the reclaimable entry itself is a symlink (an unusual
+	// case — a real node_modules/target is always a plain directory), only
+	// remove the link, never recurse into whatever it points to.
+	// os.RemoveAll already behaves this way on its own (it Lstats its
+	// argument and, for anything that isn't itself a directory — a
+	// symlink's mode never is — just calls Remove directly instead of
+	// walking into the target), but this makes the intent explicit rather
+	// than relying on that as an implementation detail.
+	if fi, err := os.Lstat(reclaimablePath); err == nil {
+		if fi.Mode()&os.ModeSymlink != 0 {
+			if err := os.Remove(reclaimablePath); err != nil {
+				return ProjectInfo{}, err
+			}
+		} else if err := os.RemoveAll(reclaimablePath); err != nil {
+			return ProjectInfo{}, err
+		}
+	} else if !os.IsNotExist(err) {
+		return ProjectInfo{}, err
+	}
+	// If it's already gone (os.IsNotExist), fall through to the rescan
+	// below so the cache still reflects reality instead of erroring.
+
+	return s.rescanAndStore(root, projectPath)
+}
+
+// rescanAndStore re-scans an already-validated project path and writes the
+// result back into the cache in place of the previous entry. If the
+// directory no longer exists on disk, it's removed from the cache instead
+// and ErrProjectGone is returned. Shared by RescanOne and
+// DeleteReclaimable, which each do their own distinct up-front validation
+// before converging on the same "rescan → store" tail.
+func (s *Scanner) rescanAndStore(root, path string) (ProjectInfo, error) {
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			s.mu.Lock()

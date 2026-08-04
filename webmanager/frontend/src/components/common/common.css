@@ -7,6 +7,7 @@
   font-weight: 600;
   letter-spacing: 0.03em;
   border: 1px solid transparent;
+  white-space: nowrap;
 }
 
 .badge-green {
@@ -86,6 +87,7 @@
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
+  text-decoration: none;
   transition: background-color 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
 }
 

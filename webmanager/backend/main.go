@@ -231,6 +231,8 @@ func main() {
 	mux.HandleFunc("GET /api/projects", s.handleListProjects)
 	mux.HandleFunc("POST /api/projects/scan", s.handleScanProjects)
 	mux.HandleFunc("POST /api/projects/rescan", s.handleRescanProject)
+	// Destructive (os.RemoveAll under the hood), unlike the reads above — gated.
+	mux.Handle("POST /api/projects/delete-reclaimable", gate.RequirePassword(http.HandlerFunc(s.handleDeleteReclaimable)))
 
 	mux.HandleFunc("GET /api/recommendations", s.handleGetRecommendations)
 	mux.HandleFunc("GET /api/code-extensions", s.handleListCodeExtensions)

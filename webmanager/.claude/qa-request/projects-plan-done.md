@@ -1,4 +1,4 @@
-# 프로젝트 리스트 관리 (webmanager 신규 탭) — 1단계 완료
+# 프로젝트 리스트 관리 (webmanager 신규 탭) — 1, 2단계 완료
 
 ## 구현 완료 (2026-08-02)
 
@@ -18,8 +18,35 @@
 내장하고 `/code/.webmanager/projects-patterns.yaml`이 없으면 최초 읽기 시점에 그
 내장 기본값으로 시드하는 방식으로 구현 — 리빌드 없이 사용자가 바로 편집 가능.
 
-**2단계(삭제 기능)는 여전히 미구현** — 아래 "2단계 (이후, 이 문서 범위 밖): 삭제"
-절 그대로 남아있는 설계.
+## 구현 완료 (2026-08-04, 2단계 삭제 + code-server 열기 개선)
+
+아래 "2단계 (이후, 이 문서 범위 밖): 삭제" 절 설계대로 구현. 백엔드:
+`internal/projects.Scanner.DeleteReclaimable(projectPath, reclaimablePath string)`
+— `RescanOne`과 동일한 "캐시에 있는 정확한 경로만 허용" 검증(프로젝트 경로 +
+그 프로젝트의 캐시된 `Reclaimable` 엔트리 경로 쌍으로 검증)에 이어
+`os.RemoveAll`로 삭제(대상이 심볼릭 링크면 링크만 `os.Remove`, 타겟까지 재귀
+삭제하지 않도록 명시적으로 분기), 이후 해당 프로젝트를 다시 스캔해 갱신된
+`ProjectInfo`를 반환. `RescanOne`과 공통되는 "재스캔 후 캐시에 저장" 꼬리
+부분은 `rescanAndStore` 헬퍼로 추출해 공유. `handlers_projects.go`에
+`POST /api/projects/delete-reclaimable?path=&target=` 추가, `main.go`에서
+`s.gate.RequirePassword`로 게이트(다른 파괴적 쓰기 액션과 동일).
+
+프론트: `ProjectTable.tsx`의 재생성 가능 폴더 표에 행마다 삭제 버튼 추가,
+`DeleteReclaimableDialog.tsx`(`Processes/KillConfirmDialog.tsx`와 동일한 원칙 —
+기본 포커스는 취소, Enter가 삭제에 바인딩되지 않음, Esc로 취소, 대상 경로와
+용량을 다이얼로그에 명시)로 확인 필수화.
+
+"code-server에서 열기"는 `codeServerUrl`이 비어있으면 `window.location.origin`로
+폴백하도록 바꿔 버튼을 항상 노출(nginx가 code-server `/`와 webmanager
+`/manager`를 같은 origin으로 통합한 뒤로 이 가정이 대부분 성립함), `window.open`
+대신 실제 `<a href>` 앵커로 바꿔 좌클릭=같은 탭 이동/중간 클릭·Ctrl+클릭=새 탭이라는
+브라우저 기본 동작을 그대로 활용(`target="_blank"` 없음, `rel="noopener"`만 추가).
+
+`.badge` 베이스 클래스에 `white-space: nowrap` 추가해 "오래됨" 등 배지가 좁은
+화면에서 줄바꿈되며 뚱뚱해지는 문제 해결(`.table-wrapper`에 이미
+`overflow-x: auto`가 있어 필요하면 테이블이 가로 스크롤됨).
+
+`go build`/`go vet`/`gofmt`, `npm run build`/`npm run lint` 전부 클린 확인.
 
 ---
 

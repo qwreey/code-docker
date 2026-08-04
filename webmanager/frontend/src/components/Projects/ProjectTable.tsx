@@ -1,7 +1,8 @@
 import { Fragment, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
-import type { MiseToolEntry, MiseToolsResponse, ProjectInfo } from '../../api/types'
+import type { MiseToolEntry, MiseToolsResponse, ProjectInfo, ReclaimableEntry } from '../../api/types'
 import { formatBytes } from '../../utils/format'
+import { DeleteReclaimableDialog } from './DeleteReclaimableDialog'
 import './Projects.css'
 
 const STALE_AFTER_MS = 60 * 60 * 1000
@@ -35,6 +36,8 @@ export function ProjectTable({
   const [rescanning, setRescanning] = useState<Set<string>>(new Set())
   const [miseTools, setMiseTools] = useState<Map<string, MiseToolEntry[]>>(new Map())
   const [miseLoading, setMiseLoading] = useState<Set<string>>(new Set())
+  const [pendingDelete, setPendingDelete] = useState<{ project: ProjectInfo; entry: ReclaimableEntry } | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) {
@@ -94,9 +97,32 @@ export function ProjectTable({
     })
   }
 
-  function openInCodeServer(e: React.MouseEvent, path: string) {
-    e.stopPropagation()
-    window.open(`${codeServerUrl}/?folder=${encodeURIComponent(path)}`, '_blank')
+  // Same-origin fallback: nginx now serves code-server (/) and webmanager
+  // (/manager) from the same origin/port, so the page webmanager is loaded
+  // from is also code-server's origin in the common case. codeServerUrl
+  // (WEBMANAGER_CODE_SERVER_URL) only needs to be set explicitly when
+  // webmanager is reached through a different domain/port than code-server.
+  const effectiveCodeServerUrl = codeServerUrl || window.location.origin
+
+  function codeServerHref(path: string): string {
+    return `${effectiveCodeServerUrl}/?folder=${encodeURIComponent(path)}`
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    const { project, entry } = pendingDelete
+    setDeleting(true)
+    try {
+      const updated = await api.post<ProjectInfo>(
+        `/projects/delete-reclaimable?path=${encodeURIComponent(project.path)}&target=${encodeURIComponent(entry.path)}`,
+      )
+      onProjectUpdated(updated)
+      setPendingDelete(null)
+    } catch (e) {
+      onError(errorMessage(e))
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const sorted = [...projects].sort((a, b) => {
@@ -173,15 +199,14 @@ export function ProjectTable({
                       >
                         {isRescanning ? '갱신 중...' : '새로고침'}
                       </button>
-                      {codeServerUrl && (
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-small"
-                          onClick={(e) => openInCodeServer(e, project.path)}
-                        >
-                          code-server에서 열기
-                        </button>
-                      )}
+                      <a
+                        href={codeServerHref(project.path)}
+                        className="btn btn-primary btn-small"
+                        onClick={(e) => e.stopPropagation()}
+                        rel="noopener"
+                      >
+                        code-server에서 열기
+                      </a>
                     </div>
                   </td>
                 </tr>
@@ -203,6 +228,7 @@ export function ProjectTable({
                                 <th>패턴</th>
                                 <th>경로</th>
                                 <th>용량</th>
+                                <th aria-label="동작" />
                               </tr>
                             </thead>
                             <tbody>
@@ -213,6 +239,15 @@ export function ProjectTable({
                                   </td>
                                   <td className="mono-cell">{entry.path}</td>
                                   <td>{formatBytes(entry.sizeBytes)}</td>
+                                  <td>
+                                    <button
+                                      type="button"
+                                      className="btn btn-danger btn-small"
+                                      onClick={() => setPendingDelete({ project, entry })}
+                                    >
+                                      삭제
+                                    </button>
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
@@ -253,6 +288,14 @@ export function ProjectTable({
           })}
         </tbody>
       </table>
+      {pendingDelete && (
+        <DeleteReclaimableDialog
+          entry={pendingDelete.entry}
+          busy={deleting}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={confirmDelete}
+        />
+      )}
     </div>
   )
 }
