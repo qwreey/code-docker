@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, errorMessage } from '../../api/client'
+import { api, ApiError, errorMessage } from '../../api/client'
 import type {
   ClaudeInstallJob,
   ClaudeMiseVersionInfo,
@@ -11,6 +11,7 @@ import type {
   MiseJobStatus,
 } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { RestartNeededBanner } from '../common/RestartNeededBanner'
 import { Sheet } from '../common/Sheet'
 import { Skeleton } from '../common/Skeleton'
 import { withViewTransition } from '../../utils/viewTransition'
@@ -32,6 +33,33 @@ type ClaudeSubTab = 'status' | 'analytics' | 'sessions' | 'management'
 
 const JOB_POLL_INTERVAL_MS = 800
 
+// Only the NotInstalled flow persists its job id (see useClaudeInstallJob's
+// `persist` param) - that's the one that traps the user behind a modal
+// overlay, so it's the one that needs to survive a tab switch/remount.
+// The InstalledView update banner is a small inline banner, not a blocking
+// overlay, so losing track of an in-flight update job on tab switch is a
+// pre-existing, lower-stakes gap left alone here.
+const CLAUDE_INSTALL_JOB_STORAGE_KEY = 'webmanager.claude.installJobId'
+
+function loadPersistedInstallJobId(): string | null {
+  try {
+    return localStorage.getItem(CLAUDE_INSTALL_JOB_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function savePersistedInstallJobId(jobId: string | null) {
+  try {
+    if (jobId) localStorage.setItem(CLAUDE_INSTALL_JOB_STORAGE_KEY, jobId)
+    else localStorage.removeItem(CLAUDE_INSTALL_JOB_STORAGE_KEY)
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - resuming after a
+    // tab switch just won't work, same best-effort contract as every other
+    // localStorage use in this app.
+  }
+}
+
 interface InstallJobState {
   jobId: string
   status: MiseJobStatus | null
@@ -40,22 +68,34 @@ interface InstallJobState {
 // Shared by both the NotInstalled install button and the InstalledView
 // "지금 업데이트" button - POST /api/claude/install always resolves+installs
 // the latest version, so "install" and "update" are the same backend action.
-function useClaudeInstallJob(onDone: () => void) {
-  const [job, setJob] = useState<InstallJobState | null>(null)
+//
+// Deliberately does NOT call onDone() as soon as the job succeeds - that
+// used to swap the whole view (NotInstalled -> InstalledView) out from under
+// the user mid-read of the install log. Success instead exposes `succeeded`
+// so the caller can offer an explicit "다시 로드" action; onDone only fires
+// when the caller invokes `reload()`.
+function useClaudeInstallJob(onDone: () => void, persist = false) {
+  const [job, setJob] = useState<InstallJobState | null>(() => {
+    if (!persist) return null
+    const jobId = loadPersistedInstallJobId()
+    return jobId ? { jobId, status: null } : null
+  })
   const [error, setError] = useState<string | null>(null)
 
   const busy = job !== null && (!job.status || job.status.running)
+  const succeeded = Boolean(job?.status && !job.status.running && job.status.exitCode === 0)
 
   const start = useCallback(async () => {
     if (busy) return
     setError(null)
     try {
       const res = await api.post<ClaudeInstallJob>('/claude/install')
+      if (persist) savePersistedInstallJobId(res.jobId)
       setJob({ jobId: res.jobId, status: null })
     } catch (e) {
       setError(errorMessage(e))
     }
-  }, [busy])
+  }, [busy, persist])
 
   useEffect(() => {
     if (!job || (job.status && !job.status.running)) return
@@ -66,11 +106,17 @@ function useClaudeInstallJob(onDone: () => void) {
         const status = await api.get<MiseJobStatus>(`/mise/jobs/${encodeURIComponent(job.jobId)}`)
         if (cancelled) return
         setJob((prev) => (prev && prev.jobId === job.jobId ? { ...prev, status } : prev))
-        if (!status.running && status.exitCode === 0) {
-          onDone()
-        }
       } catch (e) {
-        if (!cancelled) setError(errorMessage(e))
+        if (cancelled) return
+        if (persist && e instanceof ApiError && e.status === 404) {
+          // Stale/unknown job id (e.g. server restarted since it was
+          // persisted) - not retryable, drop back to the pre-job state
+          // rather than getting stuck showing an error forever.
+          savePersistedInstallJobId(null)
+          setJob(null)
+          return
+        }
+        setError(errorMessage(e))
       }
     }
 
@@ -83,11 +129,22 @@ function useClaudeInstallJob(onDone: () => void) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.jobId, job?.status?.running])
 
-  return { job, busy, error, start, close: () => setJob(null), clearError: () => setError(null) }
+  const close = useCallback(() => {
+    if (persist) savePersistedInstallJobId(null)
+    setJob(null)
+  }, [persist])
+
+  const reload = useCallback(() => {
+    if (persist) savePersistedInstallJobId(null)
+    setJob(null)
+    onDone()
+  }, [persist, onDone])
+
+  return { job, busy, succeeded, error, start, close, reload, clearError: () => setError(null) }
 }
 
 function NotInstalled({ onInstalled }: { onInstalled: () => void }) {
-  const { job, busy, error, start, close, clearError } = useClaudeInstallJob(onInstalled)
+  const { job, busy, succeeded, error, start, close, reload, clearError } = useClaudeInstallJob(onInstalled, true)
 
   return (
     <div className="claude-ghost-wrap">
@@ -108,7 +165,14 @@ function NotInstalled({ onInstalled }: { onInstalled: () => void }) {
           </p>
           {error && <ErrorBanner message={error} onDismiss={clearError} />}
           {job ? (
-            <JobPanel kind="install" toolLabel="Claude Code" status={job.status} onClose={close} />
+            <>
+              <JobPanel kind="install" toolLabel="Claude Code" status={job.status} onClose={close} />
+              {succeeded && (
+                <button type="button" className="btn btn-primary claude-install-reload" onClick={reload}>
+                  다시 로드
+                </button>
+              )}
+            </>
           ) : (
             <button type="button" className="btn btn-primary" onClick={start} disabled={busy}>
               Claude Code 설치
@@ -193,16 +257,20 @@ function UpdateBanner({
   onUpdate,
   updateJob,
   updateBusy,
+  updateSucceeded,
   updateError,
   onCloseUpdateJob,
+  onReloadUpdateJob,
   onDismissUpdateError,
 }: {
   miseVersion: ClaudeMiseVersionInfo
   onUpdate: () => void
   updateJob: InstallJobState | null
   updateBusy: boolean
+  updateSucceeded: boolean
   updateError: string | null
   onCloseUpdateJob: () => void
+  onReloadUpdateJob: () => void
   onDismissUpdateError: () => void
 }) {
   return (
@@ -212,7 +280,14 @@ function UpdateBanner({
       </div>
       {updateError && <ErrorBanner message={updateError} onDismiss={onDismissUpdateError} />}
       {updateJob ? (
-        <JobPanel kind="install" toolLabel="Claude Code" status={updateJob.status} onClose={onCloseUpdateJob} />
+        <>
+          <JobPanel kind="install" toolLabel="Claude Code" status={updateJob.status} onClose={onCloseUpdateJob} />
+          {updateSucceeded && (
+            <button type="button" className="btn btn-primary btn-small" onClick={onReloadUpdateJob}>
+              다시 로드
+            </button>
+          )}
+        </>
       ) : (
         <button type="button" className="btn btn-primary btn-small" onClick={onUpdate} disabled={updateBusy}>
           지금 업데이트
@@ -243,8 +318,16 @@ function InstalledView({
 }) {
   const auth = status.auth ?? null
   const stats = status.stats ?? null
-  const { job: updateJob, busy: updateBusy, error: updateError, start: startUpdate, close: closeUpdateJob, clearError: clearUpdateError } =
-    useClaudeInstallJob(onUpdated)
+  const {
+    job: updateJob,
+    busy: updateBusy,
+    succeeded: updateSucceeded,
+    error: updateError,
+    start: startUpdate,
+    close: closeUpdateJob,
+    reload: reloadUpdateJob,
+    clearError: clearUpdateError,
+  } = useClaudeInstallJob(onUpdated)
 
   return (
     <>
@@ -254,8 +337,10 @@ function InstalledView({
           onUpdate={startUpdate}
           updateJob={updateJob}
           updateBusy={updateBusy}
+          updateSucceeded={updateSucceeded}
           updateError={updateError}
           onCloseUpdateJob={closeUpdateJob}
+          onReloadUpdateJob={reloadUpdateJob}
           onDismissUpdateError={clearUpdateError}
         />
       )}
@@ -330,6 +415,7 @@ export function ClaudeCode() {
   const [loading, setLoading] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [subTab, setSubTab] = useState<ClaudeSubTab>('status')
+  const [restartCheckToken, setRestartCheckToken] = useState(0)
 
   const loadingRef = useRef(false)
 
@@ -394,7 +480,13 @@ export function ClaudeCode() {
   const handleUpdated = useCallback(() => {
     load()
     loadMiseVersion()
+    setRestartCheckToken((t) => t + 1)
   }, [load, loadMiseVersion])
+
+  const handleInstalled = useCallback(() => {
+    load()
+    setRestartCheckToken((t) => t + 1)
+  }, [load])
 
   async function handleToggleHideVersionCheck(checked: boolean) {
     const prev = prefs
@@ -427,6 +519,7 @@ export function ClaudeCode() {
       </div>
       <p className="section-description">Claude Code CLI의 로그인 상태와 사용 통계를 보여줍니다.</p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+      <RestartNeededBanner refreshToken={restartCheckToken} />
       {loading && !status ? (
         <Skeleton />
       ) : (
@@ -493,7 +586,7 @@ export function ClaudeCode() {
             )}
           </>
         ) : (
-          <NotInstalled onInstalled={load} />
+          <NotInstalled onInstalled={handleInstalled} />
         ))
       )}
 

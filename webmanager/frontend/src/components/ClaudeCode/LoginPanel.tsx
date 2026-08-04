@@ -147,8 +147,13 @@ export function LoginPanel({ onLoggedIn }: { onLoggedIn: () => void }) {
       {url && (
         <div className="claude-login-url-row">
           <span>아래 링크를 열어 로그인하세요:</span>
-          <a href={url} target="_blank" rel="noopener noreferrer" className="claude-login-url">
-            {url}
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-primary btn-small claude-login-url-link"
+          >
+            로그인 페이지 열기
           </a>
           <CopyButton text={url} />
         </div>

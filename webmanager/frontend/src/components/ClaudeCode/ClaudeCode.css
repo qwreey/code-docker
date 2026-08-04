@@ -96,6 +96,7 @@
 
 .claude-ghost-wrap {
   position: relative;
+  min-height: 22rem;
 }
 
 .claude-skeleton-grid {
@@ -127,11 +128,20 @@
   width: 55%;
 }
 
+/* Scoped to .claude-ghost-wrap (position: relative above), not the
+   viewport - deliberately `absolute` rather than `fixed` like Sheet/
+   ConfirmDialog's backdrops, so it only ever covers this tab's own content
+   and never the sidebar. That's what lets a user switch to any other
+   sidebar tab while an install job keeps running in the background;
+   ClaudeCode unmounts on tab switch but the job id is persisted (see
+   useClaudeInstallJob in ClaudeCode.tsx) so coming back just resumes
+   polling instead of losing track of it. */
 .claude-install-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 1000;
+  z-index: 5;
   background: rgba(15, 18, 26, 0.45);
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -150,6 +160,10 @@
   font-size: 0.9rem;
   line-height: 1.6;
   color: var(--text);
+}
+
+.claude-install-reload {
+  margin-top: 0.75rem;
 }
 
 .claude-install-message code {
@@ -192,10 +206,12 @@
   font-size: 0.85rem;
 }
 
-.claude-login-url {
-  font-family: var(--mono);
-  font-size: 0.8rem;
-  word-break: break-all;
+/* Real <a href> styled as a button (not a raw inline URL) - large OAuth
+   query strings used to stretch this row's layout, same fix as Tailscale's
+   .tailscale-login-link (Tailscale/Tailscale.css). The full URL is still on
+   hover/right-click since it's a genuine href, just not force-displayed. */
+.claude-login-url-link {
+  text-decoration: none;
 }
 
 .claude-login-code-row {
