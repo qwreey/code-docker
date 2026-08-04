@@ -19,6 +19,14 @@
 # 아니라 docker-compose.yml 자체의 이름 짓기에만 쓰입니다.
 #PREFIX=""
 
+# docker-compose.yml을 레포지토리 바깥(예: ~/code-docker/)으로 복사해 쓰는
+# 경우의 빌드 컨텍스트 경로입니다. PREFIX와 마찬가지로 컨테이너 안 환경변수가
+# 아니라 build.context에만 쓰입니다. 기본값 "."은 이 파일이 레포지토리 바로
+# 안에 있다고 가정합니다 - README의 기본 사용법처럼 레포를 builds/code-docker
+# 로 클론했다면 docker-compose.yml을 직접 고치는 대신 여기서
+# BUILD_CONTEXT="builds/code-docker" 로 지정하세요.
+#BUILD_CONTEXT="."
+
 # Web app name
 #PWA_NAME="code-docker"
 #PWA_SHORT_NAME="code-docker"

@@ -20,7 +20,7 @@ git clone --recurse-submodules https://github.com/qwreey/code-docker.git builds/
 cp builds/code-docker/docker-compose.yml ./ # 컴포즈 파일 복사
 ```
 
-그런 다음 `docker-compose.yml` 파일을 읽고 편집하세요. 특히 `build: .` 부분은 `build: builds/code-docker` 로 꼭 변경되어야합니다.
+그런 다음 `example-env` 를 `.env` 로 복사하고, `BUILD_CONTEXT="builds/code-docker"` 로 설정하세요 (레포지토리를 `builds/code-docker` 에 클론했으므로 빌드 컨텍스트가 `docker-compose.yml` 과 다른 위치를 가리켜야 합니다). `docker-compose.yml` 자체는 고칠 필요 없습니다 - 나머지 커스터마이징이 필요하면 마저 읽고 편집하세요.
 
 이제 `docker compose build` 를 수행하고 잘 빌드가 되는지 확인합니다.
 만약 빌드에 성공했다면 `docker compose up -d` 를 수행하세요.

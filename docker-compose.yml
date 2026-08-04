@@ -20,9 +20,11 @@ services:
     container_name: "${PREFIX:-}code-docker"
     hostname: code-docker
     build:
-      # Change this if you cloned this docker-compose file to outside
-      # ex: builds/code-docker
-      context: .
+      # Defaults to "." (this docker-compose.yml living next to the repo).
+      # If you cloned this docker-compose file to outside the repo (ex:
+      # builds/code-docker), set BUILD_CONTEXT in .env instead of editing
+      # this file - see example-env.
+      context: "${BUILD_CONTEXT:-.}"
       # Name resolution can fail if the host uses something like Tailscale,
       # so we work around this by using the host network only at build time.
       network: host
@@ -120,9 +122,9 @@ services:
     container_name: "${PREFIX:-}code-docker-dind"
     hostname: code-docker-dind
     build:
-      # Same reasoning as code-docker's context above: change this if you
-      # cloned this docker-compose file to outside, ex: builds/code-docker
-      context: .
+      # Same reasoning as code-docker's context above: set BUILD_CONTEXT in
+      # .env instead of editing this file.
+      context: "${BUILD_CONTEXT:-.}"
       network: host
       target: dind
     privileged: true
