@@ -14,6 +14,10 @@ export interface JobPanelProps {
   // Omit to hide the restart prompt entirely (e.g. a caller that doesn't
   // consider its job PATH-affecting).
   offerRestart?: boolean
+  // Overrides the header verb text (defaults to kind's "설치"/"삭제") - used
+  // by Mise.tsx's deactivate/reactivate actions, which run the same
+  // install/uninstall job machinery under a different user-facing label.
+  actionLabel?: string
 }
 
 const RESTART_OUTCOME_TEXT: Record<RestartOutcome, string> = {
@@ -22,7 +26,7 @@ const RESTART_OUTCOME_TEXT: Record<RestartOutcome, string> = {
   error: '재시작 요청에 실패했습니다. Supervisor 탭에서 직접 재시작해 주세요.',
 }
 
-export function JobPanel({ kind, toolLabel, status, onClose, offerRestart = true }: JobPanelProps) {
+export function JobPanel({ kind, toolLabel, status, onClose, offerRestart = true, actionLabel }: JobPanelProps) {
   const [restartOutcome, setRestartOutcome] = useState<RestartOutcome | null>(null)
 
   const jobDone = status !== null && !status.running
@@ -37,7 +41,7 @@ export function JobPanel({ kind, toolLabel, status, onClose, offerRestart = true
     <div className={`mise-job-panel${jobDone ? (jobFailed ? ' mise-job-error' : ' mise-job-success') : ''}`}>
       <div className="mise-job-header">
         <strong>
-          {kind === 'install' ? '설치' : '삭제'}: {toolLabel}
+          {actionLabel ?? (kind === 'install' ? '설치' : '삭제')}: {toolLabel}
         </strong>
         <span className="mise-job-status">
           {!status

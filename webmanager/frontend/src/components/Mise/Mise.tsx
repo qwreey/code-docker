@@ -43,6 +43,7 @@ function saveShowRecommendations(value: boolean) {
 interface JobState {
   jobId: string
   kind: 'install' | 'uninstall'
+  action?: 'deactivate' | 'reactivate'
   toolId: string
   toolLabel: string
   status: MiseJobStatus | null
@@ -58,13 +59,14 @@ export function Mise() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [job, setJob] = useState<JobState | null>(null)
-  const [removeFromConfigChecked, setRemoveFromConfigChecked] = useState<Set<string>>(new Set())
+  const [removeFromConfigOnDelete, setRemoveFromConfigOnDelete] = useState(false)
   const [envData, setEnvData] = useState<Record<string, string> | null>(null)
   const [envLoading, setEnvLoading] = useState(false)
   const [envError, setEnvError] = useState<string | null>(null)
   const [categoryOpen, setCategoryOpen] = useState<Record<string, boolean>>({})
   const [showRecommendations, setShowRecommendations] = useState(loadShowRecommendations)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; tool: MiseToolEntry } | null>(null)
+  const [deactivateTarget, setDeactivateTarget] = useState<{ id: string; tool: MiseToolEntry } | null>(null)
 
   const loadingRef = useRef(false)
 
@@ -136,13 +138,14 @@ export function Mise() {
 
   function handleDelete(id: string, tool: MiseToolEntry) {
     if (busy) return
+    setRemoveFromConfigOnDelete(false)
     setDeleteTarget({ id, tool })
   }
 
   async function confirmDelete() {
     if (!deleteTarget) return
     const { id, tool } = deleteTarget
-    const removeFromConfig = removeFromConfigChecked.has(keyFor(id, tool.version))
+    const removeFromConfig = removeFromConfigOnDelete
     setDeleteTarget(null)
     setError(null)
     try {
@@ -153,13 +156,47 @@ export function Mise() {
     }
   }
 
-  function toggleRemoveFromConfig(key: string, checked: boolean) {
-    setRemoveFromConfigChecked((prev) => {
-      const next = new Set(prev)
-      if (checked) next.add(key)
-      else next.delete(key)
-      return next
-    })
+  function handleDeactivate(id: string, tool: MiseToolEntry) {
+    if (busy) return
+    setDeactivateTarget({ id, tool })
+  }
+
+  async function confirmDeactivate() {
+    if (!deactivateTarget) return
+    const { id, tool } = deactivateTarget
+    setDeactivateTarget(null)
+    setError(null)
+    try {
+      const res = await api.del<MiseJob>('/mise/tools', { id, version: tool.version, global: true, configOnly: true })
+      setJob({
+        jobId: res.jobId,
+        kind: 'uninstall',
+        action: 'deactivate',
+        toolId: id,
+        toolLabel: `${id}@${tool.version}`,
+        status: null,
+      })
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }
+
+  async function handleReactivate(id: string, tool: MiseToolEntry) {
+    if (busy) return
+    setError(null)
+    try {
+      const res = await api.post<MiseJob>('/mise/tools', { id, version: tool.version, global: true })
+      setJob({
+        jobId: res.jobId,
+        kind: 'install',
+        action: 'reactivate',
+        toolId: id,
+        toolLabel: `${id}@${tool.version}`,
+        status: null,
+      })
+    } catch (e) {
+      setError(errorMessage(e))
+    }
   }
 
   function toggleCategory(category: string) {
@@ -216,7 +253,13 @@ export function Mise() {
       <RestartNeededBanner refreshToken={job ? `${job.jobId}:${job.status?.running}` : undefined} />
 
       {job && (
-        <JobPanel kind={job.kind} toolLabel={job.toolLabel} status={job.status} onClose={() => setJob(null)} />
+        <JobPanel
+          kind={job.kind}
+          toolLabel={job.toolLabel}
+          status={job.status}
+          onClose={() => setJob(null)}
+          actionLabel={job.action === 'deactivate' ? '비활성화' : job.action === 'reactivate' ? '재활성화' : undefined}
+        />
       )}
 
       {showRecommendations && (
@@ -302,8 +345,10 @@ export function Mise() {
               <tbody>
                 {tools.map((tool) => {
                   const key = keyFor(tool.name, tool.version)
-                  const checked = removeFromConfigChecked.has(key)
-                  const isThisJob = job?.toolId === tool.name && job.kind === 'uninstall'
+                  const isDeleteJob = job?.toolId === tool.name && job.kind === 'uninstall' && job.action !== 'deactivate'
+                  const isDeactivateJob = job?.toolId === tool.name && job.action === 'deactivate'
+                  const isReactivateJob = job?.toolId === tool.name && job.action === 'reactivate'
+                  const declared = tool.source !== null
                   return (
                     <tr key={key}>
                       <td>{tool.name}</td>
@@ -321,22 +366,33 @@ export function Mise() {
                       </td>
                       <td>
                         <div className="mise-tool-actions">
-                          <label className="mise-remove-config-toggle">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => toggleRemoveFromConfig(key, e.target.checked)}
+                          {declared && tool.installed && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-small"
                               disabled={busy}
-                            />
-                            설정에서도 제거
-                          </label>
+                              onClick={() => handleDeactivate(tool.name, tool)}
+                            >
+                              {isDeactivateJob && busy ? '비활성화 중...' : '비활성화'}
+                            </button>
+                          )}
+                          {!declared && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-small"
+                              disabled={busy}
+                              onClick={() => handleReactivate(tool.name, tool)}
+                            >
+                              {isReactivateJob && busy ? '재활성화 중...' : '재활성화'}
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="btn btn-danger btn-small"
                             disabled={busy}
                             onClick={() => handleDelete(tool.name, tool)}
                           >
-                            {isThisJob && busy ? '삭제 중...' : '삭제'}
+                            {isDeleteJob && busy ? '삭제 중...' : '삭제'}
                           </button>
                         </div>
                       </td>
@@ -392,18 +448,43 @@ export function Mise() {
         title="도구 삭제"
         confirmLabel="삭제"
       >
-        {deleteTarget &&
-          (removeFromConfigChecked.has(keyFor(deleteTarget.id, deleteTarget.tool.version)) ? (
-            <>
-              &quot;{deleteTarget.id}@{deleteTarget.tool.version}&quot;을(를) 삭제하고 설정 파일에서도
-              제거하시겠습니까?
-            </>
-          ) : (
-            <>
-              &quot;{deleteTarget.id}@{deleteTarget.tool.version}&quot;을(를) 삭제하시겠습니까? (설정 파일의 항목은
-              유지됩니다)
-            </>
-          ))}
+        {deleteTarget && (
+          <>
+            {removeFromConfigOnDelete ? (
+              <>
+                &quot;{deleteTarget.id}@{deleteTarget.tool.version}&quot;을(를) 삭제하고 설정 파일에서도 제거하시겠습니까?
+              </>
+            ) : (
+              <>
+                &quot;{deleteTarget.id}@{deleteTarget.tool.version}&quot;을(를) 삭제하시겠습니까? (설정 파일의 항목은
+                유지됩니다)
+              </>
+            )}
+            <label className="confirm-dialog-checkbox">
+              <input
+                type="checkbox"
+                checked={removeFromConfigOnDelete}
+                onChange={(e) => setRemoveFromConfigOnDelete(e.target.checked)}
+              />
+              설정에서도 제거
+            </label>
+          </>
+        )}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={deactivateTarget !== null}
+        onClose={() => setDeactivateTarget(null)}
+        onConfirm={confirmDeactivate}
+        title="도구 비활성화"
+        confirmLabel="비활성화"
+      >
+        {deactivateTarget && (
+          <>
+            &quot;{deactivateTarget.id}@{deactivateTarget.tool.version}&quot;을(를) 전역 설정에서 비활성화하시겠습니까?
+            설치된 바이너리는 그대로 유지되고, 다시 필요할 때 재활성화할 수 있습니다.
+          </>
+        )}
       </ConfirmDialog>
     </section>
   )

@@ -108,21 +108,30 @@ func (s *Server) handleCreateMiseTool(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, jobResponse{JobID: jobID})
 }
 
-// miseDeleteRequest is DELETE /api/mise/tools's body. RemoveFromConfig
-// defaults to false (plain `mise uninstall`, which only removes the
-// installed version — mise.toml's [tools] entry survives, so a later
-// `mise install` re-fetches it) when omitted; true also runs
-// `mise use --remove <id>` afterward to drop the config entry itself.
+// miseDeleteRequest is DELETE /api/mise/tools's body. Three real outcomes:
+//   - plain uninstall (RemoveFromConfig/ConfigOnly both false, the default):
+//     `mise uninstall` only — removes the installed version, mise.toml's
+//     [tools] entry survives (a later `mise install` re-fetches it).
+//   - uninstall+removeFromConfig (RemoveFromConfig true): also runs
+//     `mise use --remove <id>` afterward, dropping the config entry too —
+//     removes both the binary and the declaration.
+//   - configOnly (ConfigOnly true): skips `mise uninstall` entirely and only
+//     runs `mise use --remove <id>` — a "deactivate" mode that drops the
+//     tool from mise's config while leaving the installed binary in place.
+//     ConfigOnly takes priority when both are set (RemoveFromConfig is then
+//     redundant, not a conflict).
 type miseDeleteRequest struct {
 	ID               string `json:"id"`
 	Version          string `json:"version"`
 	Global           bool   `json:"global"`
 	Path             string `json:"path"`
 	RemoveFromConfig bool   `json:"removeFromConfig"`
+	ConfigOnly       bool   `json:"configOnly"`
 }
 
-// handleDeleteMiseTool uninstalls a tool version, optionally also removing
-// its entry from mise's config, as a background job (see miseDeleteRequest).
+// handleDeleteMiseTool uninstalls a tool version, removes its config entry,
+// or both, as a background job — see miseDeleteRequest for the three
+// outcomes this controls.
 func (s *Server) handleDeleteMiseTool(w http.ResponseWriter, r *http.Request) {
 	var body miseDeleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -152,8 +161,11 @@ func (s *Server) handleDeleteMiseTool(w http.ResponseWriter, r *http.Request) {
 	}
 
 	spec := body.ID + "@" + body.Version
-	argSets := [][]string{{"uninstall", spec}}
-	if body.RemoveFromConfig {
+	var argSets [][]string
+	if !body.ConfigOnly {
+		argSets = append(argSets, []string{"uninstall", spec})
+	}
+	if body.ConfigOnly || body.RemoveFromConfig {
 		removeArgs := []string{"use"}
 		if body.Global {
 			removeArgs = append(removeArgs, "-g")

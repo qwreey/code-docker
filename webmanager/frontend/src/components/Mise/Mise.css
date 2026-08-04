@@ -116,15 +116,6 @@
   justify-content: flex-end;
 }
 
-.mise-remove-config-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
 .mise-job-panel {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
