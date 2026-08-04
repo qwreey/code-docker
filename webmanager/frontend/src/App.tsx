@@ -16,6 +16,7 @@ import { Terminal } from './components/Terminal/Terminal'
 import { RequiresUnlock } from './components/common/RequiresUnlock'
 import { UnlockModalHost } from './components/common/UnlockModal'
 import { EnvVersionBanner } from './components/common/EnvVersionBanner'
+import { withViewTransition } from './utils/viewTransition'
 import './App.css'
 
 // FileManager pulls in the CodeMirror editor chunk and is a sizable feature
@@ -44,7 +45,7 @@ function App() {
       </div>
       <Sidebar
         active={active}
-        onSelect={setActive}
+        onSelect={(id) => withViewTransition(() => setActive(id))}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
