@@ -47,10 +47,31 @@ func (s *Server) handleSessionHeartbeat(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	s.sessionHeartbeats.Heartbeat(body.ID, body.Folder, body.UserAgent)
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	shouldClose := s.sessionHeartbeats.Heartbeat(body.ID, body.Folder, body.UserAgent)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true, "shouldClose": shouldClose})
 }
 
 func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.sessionHeartbeats.List())
+}
+
+// handleRequestSessionClose flags a session for close on its next heartbeat
+// response. Unlike the heartbeat endpoint above, this is an operator action
+// (someone in the Sessions UI clicking "닫기 시도") rather than a passive
+// client self-report, so it's gated like the rest of this app's writes —
+// see gate.RequirePassword at its registration in main.go. Not a security
+// feature: it only asks the tab to close itself via window.close(), which
+// browsers silently ignore for tabs they didn't script-open (see the
+// code-patch comment in session-heartbeat.default.js).
+func (s *Server) handleRequestSessionClose(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !uuidRe.MatchString(id) {
+		writeError(w, http.StatusBadRequest, "id must be a UUID")
+		return
+	}
+	if !s.sessionHeartbeats.RequestClose(id) {
+		writeError(w, http.StatusNotFound, "no such session")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

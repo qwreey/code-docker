@@ -30,6 +30,11 @@ export function Sessions() {
   const [sessions, setSessions] = useState<OpenSession[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // In-flight close requests only - purely for disabling the button while the
+  // POST is outstanding. The requested/not-requested state itself always
+  // comes from the server's closeRequested field (via the next load()), so
+  // this never has to be reconciled against it.
+  const [closingIds, setClosingIds] = useState<Set<string>>(new Set())
 
   const loadingRef = useRef(false)
 
@@ -54,6 +59,25 @@ export function Sessions() {
     return () => clearInterval(timer)
   }, [load])
 
+  const requestClose = useCallback(
+    async (id: string) => {
+      setClosingIds((prev) => new Set(prev).add(id))
+      try {
+        await api.post(`/sessions/${id}/close`, {})
+        await load()
+      } catch (e) {
+        setError(errorMessage(e))
+      } finally {
+        setClosingIds((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      }
+    },
+    [load],
+  )
+
   return (
     <section>
       <div className="section-header">
@@ -62,6 +86,8 @@ export function Sessions() {
       <p className="section-description">
         지금 이 code-docker에 접속해서 30초마다 신호를 보내고 있는 code-server 브라우저 탭 목록입니다. 최근 5분
         이내 신호가 없으면 목록에서 사라지고, 30분 이상 신호가 없으면 완전히 잊혀집니다.
+        <br />* 닫기는 강제적 세션 삭제 기능이 아닙니다. 브라우저에 닫는 요청을 날리는 기능으로 편의 기능일 뿐, 보안
+        도구가 아닙니다
       </p>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
@@ -78,6 +104,7 @@ export function Sessions() {
                 <th>폴더</th>
                 <th>브라우저 / OS</th>
                 <th>마지막 신호</th>
+                <th>동작</th>
               </tr>
             </thead>
             <tbody>
@@ -86,6 +113,16 @@ export function Sessions() {
                   <td>{s.folder || '알 수 없음'}</td>
                   <td title={s.userAgent}>{summarizeUserAgent(s.userAgent)}</td>
                   <td>{formatLastSeen(s.lastSeen)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-small"
+                      disabled={s.closeRequested || closingIds.has(s.id)}
+                      onClick={() => requestClose(s.id)}
+                    >
+                      {s.closeRequested ? '닫기 요청됨' : '닫기 시도'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

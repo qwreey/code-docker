@@ -38,6 +38,13 @@ type Entry struct {
 	Folder    string    `json:"folder"`
 	UserAgent string    `json:"userAgent"`
 	LastSeen  time.Time `json:"lastSeen"`
+
+	// CloseRequested is set by RequestClose (an operator action from the
+	// Sessions UI) and echoed back to the client on its next heartbeat so it
+	// can attempt window.close(). One-shot and not cancellable by design —
+	// see RequestClose's doc comment — so it must survive every subsequent
+	// Heartbeat upsert until the entry itself is gone (tab closes or GC).
+	CloseRequested bool `json:"closeRequested"`
 }
 
 // Store is a tiny in-memory id -> Entry map guarded by a mutex, mirroring
@@ -54,16 +61,43 @@ func NewStore() *Store {
 }
 
 // Heartbeat upserts the entry for id with the given folder/userAgent and the
-// current time as LastSeen.
-func (s *Store) Heartbeat(id, folder, userAgent string) {
+// current time as LastSeen, preserving any CloseRequested already set on the
+// prior entry (a client that hasn't yet acted on a close request must keep
+// getting it on every heartbeat until the tab actually closes or the entry
+// is GC'd). Returns the resulting CloseRequested state so the caller can
+// include it in the heartbeat response.
+func (s *Store) Heartbeat(id, folder, userAgent string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	closeRequested := s.entries[id].CloseRequested
 	s.entries[id] = Entry{
-		ID:        id,
-		Folder:    folder,
-		UserAgent: userAgent,
-		LastSeen:  time.Now(),
+		ID:             id,
+		Folder:         folder,
+		UserAgent:      userAgent,
+		LastSeen:       time.Now(),
+		CloseRequested: closeRequested,
 	}
+	return closeRequested
+}
+
+// RequestClose marks the entry for id as close-requested, so its next
+// heartbeat response tells the client to attempt window.close(). Returns
+// false if id isn't in the store (caller should 404). Deliberately one-shot
+// and not cancellable — there is no matching "unrequest" method, by design
+// (this is a convenience nudge, not a security/force-close feature; see
+// package doc comment). An entry that gets GC'd and later heartbeats again
+// under the same id is treated as fresh (CloseRequested: false) rather than
+// remembering the old request — the request doesn't outlive the entry.
+func (s *Store) RequestClose(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, ok := s.entries[id]
+	if !ok {
+		return false
+	}
+	e.CloseRequested = true
+	s.entries[id] = e
+	return true
 }
 
 // List returns every entry heartbeat-ed within listWindow, most-recent

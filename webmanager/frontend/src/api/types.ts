@@ -626,6 +626,7 @@ export interface OpenSession {
   folder: string
   userAgent: string
   lastSeen: string
+  closeRequested: boolean
 }
 
 // Mirrors internal/devproxy.Expose/Info — GET /api/dev-proxy/exposes.

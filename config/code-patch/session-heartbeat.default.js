@@ -35,11 +35,20 @@
     // session list, nothing more.
     async function heartbeat() {
         try {
-            await fetch(HEARTBEAT_URL, {
+            const res = await fetch(HEARTBEAT_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id, folder, userAgent: navigator.userAgent }),
             });
+            const body = await res.json();
+            if (body && body.shouldClose) {
+                // Best-effort only: most browsers refuse to script-close a tab
+                // that wasn't itself opened via window.open() from a script,
+                // and silently no-op instead of throwing. That's an accepted
+                // limitation of this convenience feature, not a bug to work
+                // around - see the Sessions UI's "닫기 시도" note.
+                window.close();
+            }
         } catch {
             return;
         }

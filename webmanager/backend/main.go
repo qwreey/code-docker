@@ -194,7 +194,7 @@ func main() {
 	mux.Handle("GET /api/logs/range", gate.RequirePassword(http.HandlerFunc(s.handleLogRange)))
 
 	mux.HandleFunc("GET /api/processes", s.handleListSystemProcesses)
-	mux.HandleFunc("POST /api/processes/{pid}/signal", s.handleSignalProcess)
+	mux.Handle("POST /api/processes/{pid}/signal", gate.RequirePassword(http.HandlerFunc(s.handleSignalProcess)))
 	mux.HandleFunc("GET /api/ports", s.handleListPorts)
 
 	mux.HandleFunc("GET /api/system/resources", s.handleSystemResources)
@@ -261,12 +261,12 @@ func main() {
 
 	mux.HandleFunc("GET /api/recommendations", s.handleGetRecommendations)
 	mux.HandleFunc("GET /api/code-extensions", s.handleListCodeExtensions)
-	mux.HandleFunc("POST /api/code-extensions", s.handleInstallCodeExtension)
-	mux.HandleFunc("DELETE /api/code-extensions/{id}", s.handleUninstallCodeExtension)
+	mux.Handle("POST /api/code-extensions", gate.RequirePassword(http.HandlerFunc(s.handleInstallCodeExtension)))
+	mux.Handle("DELETE /api/code-extensions/{id}", gate.RequirePassword(http.HandlerFunc(s.handleUninstallCodeExtension)))
 
 	mux.HandleFunc("GET /api/mise/tools", s.handleListMiseTools)
-	mux.HandleFunc("POST /api/mise/tools", s.handleCreateMiseTool)
-	mux.HandleFunc("DELETE /api/mise/tools", s.handleDeleteMiseTool)
+	mux.Handle("POST /api/mise/tools", gate.RequirePassword(http.HandlerFunc(s.handleCreateMiseTool)))
+	mux.Handle("DELETE /api/mise/tools", gate.RequirePassword(http.HandlerFunc(s.handleDeleteMiseTool)))
 	mux.HandleFunc("GET /api/mise/env", s.handleMiseEnv)
 	mux.HandleFunc("GET /api/mise/jobs/{id}", s.handleMiseJobStatus)
 
@@ -294,6 +294,7 @@ func main() {
 	// the side actually worth gating here.
 	mux.HandleFunc("POST /api/sessions/heartbeat", s.handleSessionHeartbeat)
 	mux.Handle("GET /api/sessions", gate.RequirePassword(http.HandlerFunc(s.handleListSessions)))
+	mux.Handle("POST /api/sessions/{id}/close", gate.RequirePassword(http.HandlerFunc(s.handleRequestSessionClose)))
 
 	mux.HandleFunc("GET /api/ui/sidebar-order", s.handleGetSidebarOrder)
 	mux.HandleFunc("PUT /api/ui/sidebar-order", s.handlePutSidebarOrder)
