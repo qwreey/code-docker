@@ -433,7 +433,7 @@ export function ClaudeCode() {
         status &&
         (status.installed ? (
           <>
-            <div className="processes-tabs processes-maintabs">
+            <div className="processes-tabs">
               <button
                 type="button"
                 className={`processes-tab${subTab === 'status' ? ' processes-tab-active' : ''}`}
