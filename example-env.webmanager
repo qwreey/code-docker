@@ -29,7 +29,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=5
+WEBMANAGER_ENV_VERSION=6
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -81,6 +81,14 @@ WEBMANAGER_ENV_VERSION=5
 #. 씁니다. 다른 도메인/포트로 webmanager에 접속하는 경우에만 명시적으로
 #. 설정하세요.
 #WEBMANAGER_CODE_SERVER_URL=
+
+#. --- PWA manifest shortcuts ---
+#. nginx가 /manifest.json 요청을 code-server 대신 webmanager로 넘겨서, 원본
+#. manifest에 "Open manager" 점프리스트 항목만 추가한 뒤 돌려줍니다(실패 시
+#. code-server 원본으로 자동 폴백). webmanager가 code-server의 실제 manifest를
+#. fetch할 내부 URL - nginx를 다시 거치지 않고 code-server 내부 포트로 직접
+#. 접근합니다.
+#WEBMANAGER_CODE_SERVER_MANIFEST_URL=http://127.0.0.1:8080/manifest.json
 
 #. --- Task Manager 탭 ---
 #. 리소스 히스토리 그래프 샘플링 주기(초)와 보관 기간(분).

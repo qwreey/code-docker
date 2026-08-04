@@ -30,6 +30,14 @@ type Config struct {
 	ProjectsPatternsPath string
 	CodeServerURL        string
 
+	// CodeServerManifestURL is where internal/manifestpatch fetches
+	// code-server's real manifest.json from — code-server's own internal
+	// port directly, not through nginx (see config/nginx.default.conf's
+	// `location = /manifest.json`, which is what routes browser requests
+	// here in the first place; fetching back through nginx would just be an
+	// unnecessary hairpin).
+	CodeServerManifestURL string
+
 	SystemHistoryIntervalSeconds string
 	SystemHistoryWindowMinutes   string
 
@@ -149,6 +157,8 @@ func loadConfig() Config {
 		ProjectsOldDays:      getenv("WEBMANAGER_PROJECTS_OLD_DAYS", "90"),
 		ProjectsPatternsPath: getenv("WEBMANAGER_PROJECTS_PATTERNS_PATH", "/code/.webmanager/projects-patterns.yaml"),
 		CodeServerURL:        getenv("WEBMANAGER_CODE_SERVER_URL", ""),
+
+		CodeServerManifestURL: getenv("WEBMANAGER_CODE_SERVER_MANIFEST_URL", "http://127.0.0.1:8080/manifest.json"),
 
 		SystemHistoryIntervalSeconds: getenv("WEBMANAGER_SYSTEM_HISTORY_INTERVAL_SECONDS", "5"),
 		SystemHistoryWindowMinutes:   getenv("WEBMANAGER_SYSTEM_HISTORY_WINDOW_MINUTES", "10"),
