@@ -20,6 +20,7 @@ import (
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
 	"webmanager/internal/supervisor"
+	"webmanager/internal/tailscale"
 	"webmanager/internal/termsession"
 )
 
@@ -113,6 +114,7 @@ func main() {
 		),
 		miseJobs:           mise.NewJobStore(),
 		loginMgr:           claudecode.NewLoginManager(),
+		tailscaleLogin:     tailscale.NewLoginManager(),
 		diskUsage:          diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
 		termSessions:       termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
 		gate:               gate,
@@ -166,6 +168,8 @@ func main() {
 	mux.Handle("POST /api/tailscale/publish", gate.RequirePassword(http.HandlerFunc(s.handleAddTailscalePublish)))
 	mux.Handle("DELETE /api/tailscale/publish/{name}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteTailscalePublish)))
 	mux.HandleFunc("GET /api/tailscale/status", s.handleTailscaleStatus)
+	mux.Handle("POST /api/tailscale/login/start", gate.RequirePassword(http.HandlerFunc(s.handleTailscaleLoginStart)))
+	mux.Handle("POST /api/tailscale/login/cancel", gate.RequirePassword(http.HandlerFunc(s.handleTailscaleLoginCancel)))
 
 	// Gated entirely (reads included, unlike the rest of webmanager): log
 	// content can leak secrets, so even listing/viewing requires unlock.

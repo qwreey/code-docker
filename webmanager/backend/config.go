@@ -14,6 +14,7 @@ type Config struct {
 	StaticDir            string
 	TailscaleConfigPath  string
 	TailscaleBinPath     string
+	TailscaleLoginServer string
 	SSHSigningKeyPath    string
 	VectorLogDir         string
 	SystemDiskPath       string
@@ -116,17 +117,20 @@ func getenv(key, def string) string {
 
 func loadConfig() Config {
 	return Config{
-		Addr:                 getenv("WEBMANAGER_ADDR", ":81"),
-		SupervisorSock:       getenv("SUPERVISOR_SOCK", "/run/supervisor.sock"),
-		SSHAuthorizedKeys:    getenv("SSH_AUTHORIZED_KEYS", "/code/.ssh/authorized_keys"),
-		GitConfigPath:        getenv("GIT_CONFIG_PATH", "/code/.gitconfig"),
-		SSHClientConfig:      getenv("SSH_CLIENT_CONFIG", "/code/.ssh/config"),
-		SSHKeysDir:           getenv("SSH_KEYS_DIR", "/code/.ssh/keys"),
-		SSHKnownHostsPath:    getenv("WEBMANAGER_SSH_KNOWN_HOSTS_PATH", "/code/.ssh/known_hosts"),
-		GitCredentialsPath:   getenv("GIT_CREDENTIALS_PATH", "/code/.git-credentials"),
-		StaticDir:            getenv("WEBMANAGER_STATIC_DIR", "./static"),
-		TailscaleConfigPath:  getenv("TAILSCALE_CONFIG_PATH", "/code/.tailscale/config.yaml"),
-		TailscaleBinPath:     getenv("WEBMANAGER_TAILSCALE_BINPATH", ""),
+		Addr:                getenv("WEBMANAGER_ADDR", ":81"),
+		SupervisorSock:      getenv("SUPERVISOR_SOCK", "/run/supervisor.sock"),
+		SSHAuthorizedKeys:   getenv("SSH_AUTHORIZED_KEYS", "/code/.ssh/authorized_keys"),
+		GitConfigPath:       getenv("GIT_CONFIG_PATH", "/code/.gitconfig"),
+		SSHClientConfig:     getenv("SSH_CLIENT_CONFIG", "/code/.ssh/config"),
+		SSHKeysDir:          getenv("SSH_KEYS_DIR", "/code/.ssh/keys"),
+		SSHKnownHostsPath:   getenv("WEBMANAGER_SSH_KNOWN_HOSTS_PATH", "/code/.ssh/known_hosts"),
+		GitCredentialsPath:  getenv("GIT_CREDENTIALS_PATH", "/code/.git-credentials"),
+		StaticDir:           getenv("WEBMANAGER_STATIC_DIR", "./static"),
+		TailscaleConfigPath: getenv("TAILSCALE_CONFIG_PATH", "/code/.tailscale/config.yaml"),
+		TailscaleBinPath:    getenv("WEBMANAGER_TAILSCALE_BINPATH", ""),
+		// Same env var tailscale-service.default.sh reads, so an on-demand
+		// `tailscale up` triggered from here uses the same login server.
+		TailscaleLoginServer: getenv("TAILSCALE_LOGIN_SERVER", ""),
 		SSHSigningKeyPath:    getenv("SSH_SIGNING_KEY_PATH", "/code/.ssh/signing_key"),
 		VectorLogDir:         getenv("VECTOR_LOG_DIR", "/code/.vector/logs"),
 		SystemDiskPath:       getenv("SYSTEM_DISK_PATH", "/code"),

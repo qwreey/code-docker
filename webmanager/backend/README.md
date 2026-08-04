@@ -166,8 +166,8 @@ fields, invalid host/keyId format, etc.) are unaffected.
   `name` already exists
 - Every tailscale mutation restarts the `tailscale-forward` supervisord
   program after a successful write (same effect as `bin/forward-reload`) —
-  actually performing a login (`tailscale up`) remains out of scope, but
-  read-only status is not — see `GET /api/tailscale/status` further down
+  see `GET /api/tailscale/status` and `POST /api/tailscale/login/start`
+  further down for status and on-demand login, which are handled separately
 - `GET /api/logs/apps` — real supervisord process names, `{"mock": false}`
 - `GET /api/logs/entries?app=&level=&limit=` — real log entries read from
   the `vector`-produced JSONL files at `VECTOR_LOG_DIR` (see
@@ -339,10 +339,24 @@ fields, invalid host/keyId format, etc.) are unaffected.
   an error. `status` carries `backendState`/`authUrl`/`tailnetName` plus
   `self`/`peers` (each `{hostName, dnsName, tailscaleIPs, relay, online,
   tags, os}`, `peers` flattened from the CLI's map-shaped `Peer` field and
-  sorted by hostname). This supersedes the note two entries up ("tailscale
-  login/status are explicitly out of scope here") for status specifically —
-  `tailscale up`/actually performing a login remains genuinely out of scope,
-  this endpoint is read-only
+  sorted by hostname). Read-only.
+- `POST /api/tailscale/login/start` *(gated)* — starts `tailscale up` (with
+  `TAILSCALE_LOGIN_SERVER` if set) as a detached background process and
+  returns immediately (`internal/tailscale/login.go`'s `LoginManager`); the
+  frontend just keeps polling the status endpoint above for the resulting
+  `authUrl` instead of a dedicated session/status endpoint like Claude's
+  login flow needs — `tailscale status --json` already exposes progress
+  structurally, no stdout scraping required. A no-op if already logged in or
+  if a login is already pending (`authUrl` set) rather than starting a
+  second concurrent `tailscale up` against the same daemon. This reverses an
+  earlier "actually performing a login remains out of scope" decision, for
+  the same reason `claude/login/*` reversed its own equivalent decision (see
+  `webmanager/CLAUDE.md`) — `tailscale-service.default.sh`'s automatic first-
+  boot attempt now only fires once ever (a marker file, not every restart,
+  to stop pending logins piling up on the control server), so retrying
+  needs a surface that doesn't require a container restart.
+- `POST /api/tailscale/login/cancel` *(gated)* → always `{"ok": true}`,
+  idempotent — kills the in-flight `tailscale up` process if any
 
 - `GET /api/dind/containers` — every container in the `code-docker-dind`
   sidecar (running and stopped, `docker ps -a` equivalent):

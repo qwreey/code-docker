@@ -10,9 +10,13 @@ code-docker 가 고유한 tailscale IP를 가지도록 하여, ssh/adb 를 위�
 
 ## 최초 로그인과 상태 배너
 
+**자동 로그인 시도는 컨테이너 생애주기 동안 딱 한 번만 일어납니다** (`state/.login-attempted` 마커로 추적). 로그인을 완료하지 않은 채 컨테이너를 껐다 켰다 하면 매 재부팅마다 새 인증 요청이 tailscale 컨트롤 서버에 등록되는 문제가 있었어서(일종의 self-DDoS), 이후 재시도는 사람이 명시적으로 트리거해야만 일어나도록 바뀌었습니다. 로그인 서버(`TAILSCALE_LOGIN_SERVER`)를 바꾸려고 `/code/.tailscale/state` 를 지우고 재시작하는 절차([아래](#자체-호스팅-로그인-서버-headscale) 참고)를 밟으면 이 마커도 같이 지워지므로 자동 시도가 다시 한 번 살아납니다 - 별도로 신경 쓸 필요 없습니다.
+
 최초 실행 시 `docker compose logs -f code-docker` 로 로그를 확인하면 `tailscaled` 프로그램 쪽에 인증 URL이 출력됩니다. 이 URL을 브라우저로 한 번 열어 로그인하면 됩니다 (auth key 대신 인터랙티브 로그인 방식). 로그인 상태는 `/code/.tailscale/state` 에 영속되므로 컨테이너를 재생성해도 다시 로그인할 필요가 없습니다.
 
-로그를 뒤질 필요 없이, code-server 화면 자체에도 로그인이 필요할 때 우측 상단에 배너로 뜹니다 (URL, 현재 상태 문자열까지 그대로 표시됩니다). 로그인이 완료되면 별도로 "Tailscale connected" 토스트도 뜹니다. 이미 브라우저 알림 권한을 허용해둔 상태라면 OS 알림도 함께 뜹니다. `code-patch` 가 기본으로 심어주는 `/code/.server/patch/tailscale-notify.js`(폴링 + 표시할 내용) 와 `/code/.server/patch/cd-dialog.js`(배너/토스트/알림을 그리는 재사용 가능한 `window.CDDialog` 모듈) 두 파일로 구성되며, [빌드 커스터마이징 문서의 `code-patch/`](build-customization.md) 를 통해 관리됩니다 - `patch/*.js` 자체는 [코드 서버 패치](code-server-patch.md)와 동일하게 동작하는 파일이라 직접 편집/교체 가능합니다.
+자동 시도를 놓쳤거나(이미 재부팅을 몇 번 했다거나) 이미 소진된 상태라면, [webmanager의 Tailscale 탭](webmanager.md#tailscale)에서 "로그인 시도하기" 버튼으로 로그인을 다시 트리거할 수 있습니다 - 컨테이너를 재시작할 필요가 없습니다.
+
+로그를 뒤질 필요 없이, code-server 화면 자체에도 로그인이 필요할 때 우측 상단에 배너로 뜹니다 (URL이 있으면 로그인 링크를, 아직 없으면 webmanager로 가는 링크를 보여줍니다 - 현재 상태 문자열도 그대로 표시됩니다). 배너의 "Ignore"를 누르면 같은 상태에 대해서는 다시 뜨지 않습니다(브라우저 `localStorage`에 저장, 상태가 실제로 바뀌면 한 번은 다시 뜹니다). 배너에는 tailscale을 아예 쓰지 않을 거라면 [`TAILSCALE_ENABLED=false`](#켜고-끄기)로 끌 수 있다는 안내도 함께 표시됩니다. 로그인이 완료되면 별도로 "Tailscale connected" 토스트도 뜹니다. 이미 브라우저 알림 권한을 허용해둔 상태라면 OS 알림도 함께 뜹니다. `code-patch` 가 기본으로 심어주는 `/code/.server/patch/tailscale-notify.js`(폴링 + 표시할 내용 + ignore 상태) 와 `/code/.server/patch/cd-dialog.js`(배너/토스트/알림을 그리는 재사용 가능한 `window.CDDialog` 모듈) 두 파일로 구성되며, [빌드 커스터마이징 문서의 `code-patch/`](build-customization.md) 를 통해 관리됩니다 - `patch/*.js` 자체는 [코드 서버 패치](code-server-patch.md)와 동일하게 동작하는 파일이라 직접 편집/교체 가능합니다.
 
 ## 자체 호스팅 로그인 서버 (Headscale)
 

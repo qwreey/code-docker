@@ -22,6 +22,7 @@ export function Status() {
   const [data, setData] = useState<TailscaleStatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [starting, setStarting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -41,17 +42,37 @@ export function Status() {
   }, [load])
 
   const status = data?.status
-  const authPending = Boolean(data?.available && status?.authUrl && status.backendState !== 'Running')
+  // needsLogin covers both "an auth attempt is already pending" (authUrl
+  // set) and "not logged in, nothing pending yet" - the latter is now the
+  // common case, since tailscale-service.default.sh's automatic `tailscale
+  // up` only fires once ever (see its LOGIN_ATTEMPTED_MARKER), not on every
+  // restart. The login-trigger button below only makes sense for the second
+  // case; once authUrl appears, this just falls back to the plain link.
+  const needsLogin = Boolean(data?.available && status && status.backendState !== 'Running')
+  const authPending = needsLogin && Boolean(status?.authUrl)
 
   // Separate effect (rather than folding into the initial-load effect) so it
-  // starts/stops purely based on the derived authPending flag - it naturally
+  // starts/stops purely based on the derived needsLogin flag - it naturally
   // stops polling the moment a refresh (manual or interval-driven) reports
   // the login as resolved.
   useEffect(() => {
-    if (!authPending) return
+    if (!needsLogin) return
     const timer = setInterval(load, AUTH_POLL_INTERVAL_MS)
     return () => clearInterval(timer)
-  }, [authPending, load])
+  }, [needsLogin, load])
+
+  const handleStartLogin = useCallback(async () => {
+    if (starting) return
+    setStarting(true)
+    try {
+      await api.post('/tailscale/login/start')
+      await load()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setStarting(false)
+    }
+  }, [starting, load])
 
   return (
     <div className="card">
@@ -68,21 +89,32 @@ export function Status() {
         <Skeleton />
       ) : !data ? null : !data.available ? (
         <p className="tailscale-status-note">tailscale 상태를 확인할 수 없습니다 (설치/실행 여부 확인 필요)</p>
-      ) : authPending && status ? (
+      ) : needsLogin && status ? (
         <ErrorBanner
           variant="warning"
           message={
             <span>
               <strong>Tailscale 로그인이 필요합니다</strong> (상태: {status.backendState})
               <br />
-              <a
-                href={status.authUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-primary btn-small tailscale-login-link"
-              >
-                로그인하러 가기
-              </a>
+              {authPending ? (
+                <a
+                  href={status.authUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary btn-small tailscale-login-link"
+                >
+                  로그인하러 가기
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-small"
+                  onClick={handleStartLogin}
+                  disabled={starting}
+                >
+                  {starting ? '시도하는 중...' : '로그인 시도하기'}
+                </button>
+              )}
             </span>
           }
         />

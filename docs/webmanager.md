@@ -28,7 +28,10 @@ supervisord 프로그램 목록 조회 및 start/stop/restart, 표준출력/표�
 
 `/code/.tailscale/config.yaml`의 `forwards`/`publish` 항목 조회/추가/삭제
 (저장 시 `tailscale-forward` 자동 재시작 — `forward-reload`와 동일 효과). 로그인
-상태/URL은 다루지 않음 — [tailscale 연결](tailscale.md)의 배너를 그대로 씁니다
+상태(URL/`backendState`, 피어 목록)를 읽기 전용으로 보여주고, 아직 로그인 시도가
+없는 상태라면 "로그인 시도하기" 버튼으로 `tailscale up`을 온디맨드로 트리거할 수
+있습니다 — [tailscale 연결](tailscale.md#최초-로그인과-상태-배너)의 자동 시도가
+컨테이너 생애주기 동안 한 번만 일어나도록 바뀐 것과 짝을 이루는 재시도 경로입니다
 
 ### Logs
 

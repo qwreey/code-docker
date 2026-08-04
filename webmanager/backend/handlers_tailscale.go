@@ -162,6 +162,50 @@ func (s *Server) handleTailscaleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: true, Status: &status})
 }
 
+// handleTailscaleLoginStart triggers an on-demand `tailscale up`, for the
+// "로그인 시도하기" retry button in the Tailscale tab - the automatic attempt
+// tailscale-service.default.sh makes on first boot only fires once ever (see
+// LOGIN_ATTEMPTED_MARKER there), so this is how a later retry happens
+// without needing a container restart. Gated like the other tailscale
+// mutations: it changes live daemon state, not a passive read.
+//
+// Deliberately checks current status first and skips starting a second
+// process if a login is already pending (AuthURL set) - the frontend should
+// just keep polling the existing GET /api/tailscale/status instead, which
+// already reports BackendState/AuthURL without any stdout scraping.
+func (s *Server) handleTailscaleLoginStart(w http.ResponseWriter, r *http.Request) {
+	binPath, ok := tailscale.FindBinary(s.cfg.TailscaleBinPath)
+	if !ok {
+		writeError(w, http.StatusNotFound, "tailscale is not installed")
+		return
+	}
+
+	if status, err := tailscale.GetStatus(r.Context(), binPath); err == nil {
+		if status.BackendState == "Running" {
+			writeError(w, http.StatusConflict, "already logged in")
+			return
+		}
+		if status.AuthURL != "" {
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+			return
+		}
+	}
+
+	if err := s.tailscaleLogin.Start(binPath, s.cfg.TailscaleLoginServer); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// handleTailscaleLoginCancel kills an in-flight on-demand login attempt, if
+// any. Always 200 - idempotent, matching tailscale.LoginManager.Cancel's
+// contract.
+func (s *Server) handleTailscaleLoginCancel(w http.ResponseWriter, r *http.Request) {
+	_ = s.tailscaleLogin.Cancel()
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 func (s *Server) handleDeleteTailscalePublish(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if err := tailscale.DeletePublish(s.cfg.TailscaleConfigPath, name); err != nil {
