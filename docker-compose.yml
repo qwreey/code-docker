@@ -58,6 +58,12 @@ services:
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
       TAILSCALE_LOG_LEVEL: "${TAILSCALE_LOG_LEVEL:-errors}"
       WEBMANAGER_ENV_TEMPLATE_PATH: "${WEBMANAGER_ENV_TEMPLATE_PATH:-/etc/code-docker/webmanager/example-env.webmanager}"
+      # Internal Caddy instance for exposing dev servers via a wildcard
+      # subdomain - see docs/dev-proxy.md. CADDY_ADAPTER_DOMAIN is empty by
+      # default (feature inert until set, e.g. "*.dev.example.com").
+      CADDY_ADAPTER_ENABLED: "${CADDY_ADAPTER_ENABLED:-true}"
+      CADDY_ADAPTER_DOMAIN: "${CADDY_ADAPTER_DOMAIN:-}"
+      CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-8082}"
     # webmanager(admin panel, port 81) settings all live in .env.webmanager,
     # not here - copy example-env.webmanager to .env.webmanager and uncomment
     # only what you need (every value already has a sane default). See the
@@ -98,6 +104,12 @@ services:
       # Uncomment this (and set WEBMANAGER_ADDR=:81 in .env.webmanager) only
       # if you want to bypass nginx and reach it directly on its own port.
       # - 81:81
+      # Internal Caddy dev-proxy listener (see docs/dev-proxy.md) - point
+      # your outer reverse proxy's wildcard subdomain block here instead of
+      # publishing it directly, same "reverse proxy in front" recommendation
+      # as port 80 above. Not published by default since exposure strategy
+      # is up to your own deployment (shared docker network vs host port).
+      # - 8082:8082
     volumes:
       - "${HOME_VOLUME:-./code}:/code"
       - "${SSHD_VOLUME:-./sshd}:/etc/ssh"
