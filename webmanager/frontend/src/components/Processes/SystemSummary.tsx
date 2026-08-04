@@ -20,19 +20,6 @@ interface DiskInfo {
   available: boolean
 }
 
-function ProgressBar({ percent }: { percent: number }) {
-  const clamped = Math.min(100, Math.max(0, Number.isFinite(percent) ? percent : 0))
-  const danger = clamped >= DANGER_THRESHOLD
-  return (
-    <div className="system-summary-bar">
-      <div
-        className={`system-summary-bar-fill${danger ? ' system-summary-bar-fill-danger' : ''}`}
-        style={{ width: `${clamped}%` }}
-      />
-    </div>
-  )
-}
-
 interface Segment {
   key: string
   label: string

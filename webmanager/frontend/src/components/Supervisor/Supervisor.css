@@ -28,6 +28,11 @@
   flex-wrap: nowrap;
 }
 
+.btn-icon {
+  padding: 0.35rem;
+  line-height: 0;
+}
+
 .log-stream-toggle {
   display: inline-flex;
   border: 1px solid var(--border);

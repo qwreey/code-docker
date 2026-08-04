@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react'
+import { Play, RotateCw, ScrollText, Square } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
 import type { ProcessInfo, SupervisorProcess } from '../../api/types'
 import { buildProcessTree, type ProcessTreeNode } from '../../utils/processTree'
@@ -22,6 +23,17 @@ const ACTION_LABEL: Record<Action, string> = {
   start: '시작',
   stop: '정지',
   restart: '재시작',
+}
+
+// supervisord formats a running program's description as e.g.
+// "pid 1234, uptime 0:01:23" — that's already shown in the separate PID/
+// uptime columns, so it's stripped here rather than shown redundantly.
+// Anything else supervisord or a custom program puts in the description
+// (e.g. a plain reason string for a stopped/fatal process) is left as-is.
+const REDUNDANT_DESCRIPTION_RE = /pid \d+, uptime [\d:]+/
+
+function trimDescription(description: string): string {
+  return description.replace(REDUNDANT_DESCRIPTION_RE, '').trim()
 }
 
 // A subtree is cached for this long before an expand re-fetches — process
@@ -128,10 +140,12 @@ export function ProcessTable({ processes, busy, onAction, onShowLogs }: ProcessT
             const restartDisabled = isTransitioning || isBusy || proc.disableRestart
             const logsDisabled = proc.disableLogs
 
-            const startTitle = proc.disableStart && proc.note ? proc.note : undefined
-            const stopTitle = proc.disableStop && proc.note ? proc.note : undefined
-            const restartTitle = proc.disableRestart && proc.note ? proc.note : undefined
-            const logsTitle = proc.disableLogs && proc.note ? proc.note : undefined
+            const startTitle = startDisabled && proc.note ? proc.note : ACTION_LABEL.start
+            const stopTitle = stopDisabled && proc.note ? proc.note : ACTION_LABEL.stop
+            const restartTitle = restartDisabled && proc.note ? proc.note : ACTION_LABEL.restart
+            const logsTitle = logsDisabled && proc.note ? proc.note : '로그'
+
+            const description = trimDescription(proc.description)
 
             const subtree = isExpanded ? collectSubtree(buildProcessTree(allProcesses, proc.pid)) : []
 
@@ -145,44 +159,48 @@ export function ProcessTable({ processes, busy, onAction, onShowLogs }: ProcessT
                   </td>
                   <td>{proc.pid || '-'}</td>
                   <td>{uptime}</td>
-                  <td className="process-description">{proc.description}</td>
+                  <td className="process-description">{description || null}</td>
                   <td>
                     <div className="process-actions">
                       <button
                         type="button"
-                        className="btn btn-small"
+                        className="btn btn-small btn-icon"
                         disabled={startDisabled}
                         title={startTitle}
+                        aria-label={startTitle}
                         onClick={() => handleAction(proc.name, 'start')}
                       >
-                        시작
+                        <Play size={14} />
                       </button>
                       <button
                         type="button"
-                        className="btn btn-small"
+                        className="btn btn-small btn-icon"
                         disabled={stopDisabled}
                         title={stopTitle}
+                        aria-label={stopTitle}
                         onClick={() => handleAction(proc.name, 'stop')}
                       >
-                        정지
+                        <Square size={14} />
                       </button>
                       <button
                         type="button"
-                        className="btn btn-small"
+                        className="btn btn-small btn-icon"
                         disabled={restartDisabled}
                         title={restartTitle}
+                        aria-label={restartTitle}
                         onClick={() => handleAction(proc.name, 'restart')}
                       >
-                        재시작
+                        <RotateCw size={14} />
                       </button>
                       <button
                         type="button"
-                        className="btn btn-secondary btn-small"
+                        className="btn btn-secondary btn-small btn-icon"
                         disabled={logsDisabled}
                         title={logsTitle}
+                        aria-label={logsTitle}
                         onClick={() => onShowLogs(proc.name)}
                       >
-                        로그
+                        <ScrollText size={14} />
                       </button>
                       <button
                         type="button"

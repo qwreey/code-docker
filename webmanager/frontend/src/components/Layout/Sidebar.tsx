@@ -1,10 +1,49 @@
 import { useEffect, useRef, useState } from 'react'
+import {
+  Activity,
+  Bot,
+  Container,
+  FileText,
+  Folder,
+  GitBranch,
+  GripVertical,
+  HardDrive,
+  KeyRound,
+  Network,
+  Puzzle,
+  Route,
+  Server,
+  Terminal,
+  Users,
+  Wrench,
+} from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
 import type { SidebarOrder } from '../../api/types'
+import { Logo } from '../common/Logo'
 import { SECTIONS } from './sections'
 import type { SectionId, SectionMeta } from './sections'
 import { SidebarFooter } from './SidebarFooter'
 import './Layout.css'
+
+// 탭 하나당 아이콘 하나 - 목록이 길어질수록 라벨 텍스트만으로는 훑어보기
+// 어려워서 추가함. SidebarFooter.tsx의 THEME_ICON과 같은 Record 매핑 패턴.
+const SECTION_ICON: Record<SectionId, typeof Server> = {
+  supervisor: Server,
+  'ssh-keys': KeyRound,
+  'git-config': GitBranch,
+  tailscale: Network,
+  'dev-proxy': Route,
+  logs: FileText,
+  processes: Activity,
+  projects: Folder,
+  mise: Wrench,
+  dind: Container,
+  terminal: Terminal,
+  claude: Bot,
+  extensions: Puzzle,
+  files: HardDrive,
+  sessions: Users,
+}
 
 interface SidebarProps {
   active: SectionId
@@ -82,51 +121,61 @@ export function Sidebar({ active, onSelect, open, onClose }: SidebarProps) {
     <>
       {open && <div className="sidebar-backdrop" onClick={onClose} />}
       <nav className={'sidebar' + (open ? ' sidebar-open' : '')} aria-label="섹션 메뉴">
-        <div className="sidebar-title">webmanager</div>
+        <div className="sidebar-title">
+          <Logo size={20} className="sidebar-title-mark" />
+          webmanager
+        </div>
         <div className="sidebar-list-wrap">
           <ul className="sidebar-list">
-            {sections.map((section) => (
-              <li
-                key={section.id}
-                draggable
-                className={dragOverId === section.id ? 'sidebar-drag-over' : undefined}
-                onDragStart={() => {
-                  dragIdRef.current = section.id
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault()
-                  if (dragOverId !== section.id) setDragOverId(section.id)
-                }}
-                onDragLeave={() => setDragOverId((prev) => (prev === section.id ? null : prev))}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  handleDrop(section.id)
-                }}
-                onDragEnd={() => {
-                  dragIdRef.current = null
-                  setDragOverId(null)
-                }}
-              >
-                <button
-                  type="button"
-                  className={
-                    'sidebar-item' +
-                    (section.id === active ? ' sidebar-item-active' : '') +
-                    (!section.implemented ? ' sidebar-item-disabled' : '')
-                  }
-                  onClick={() => {
-                    onSelect(section.id)
-                    onClose()
+            {sections.map((section) => {
+              const SectionIcon = SECTION_ICON[section.id]
+              return (
+                <li
+                  key={section.id}
+                  draggable
+                  className={dragOverId === section.id ? 'sidebar-drag-over' : undefined}
+                  onDragStart={() => {
+                    dragIdRef.current = section.id
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    if (dragOverId !== section.id) setDragOverId(section.id)
+                  }}
+                  onDragLeave={() => setDragOverId((prev) => (prev === section.id ? null : prev))}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    handleDrop(section.id)
+                  }}
+                  onDragEnd={() => {
+                    dragIdRef.current = null
+                    setDragOverId(null)
                   }}
                 >
-                  <span className="sidebar-drag-handle" aria-hidden="true">
-                    ⠿
-                  </span>
-                  <span>{section.label}</span>
-                  {!section.implemented && <span className="sidebar-badge">구현 예정</span>}
-                </button>
-              </li>
-            ))}
+                  <button
+                    type="button"
+                    className={
+                      'sidebar-item' +
+                      (section.id === active ? ' sidebar-item-active' : '') +
+                      (!section.implemented ? ' sidebar-item-disabled' : '')
+                    }
+                    onClick={() => {
+                      onSelect(section.id)
+                      onClose()
+                    }}
+                  >
+                    {/* 평소엔 섹션 아이콘, hover/focus 시 같은 자리에서 드래그
+                        핸들(GripVertical)로 크로스페이드 - 드래그 가능함을
+                        암시. 실제 드래그 로직은 위 <li>의 핸들러 그대로. */}
+                    <span className="sidebar-icon-slot">
+                      <SectionIcon size={16} className="sidebar-item-icon" aria-hidden="true" />
+                      <GripVertical size={16} className="sidebar-drag-handle" aria-hidden="true" />
+                    </span>
+                    <span>{section.label}</span>
+                    {!section.implemented && <span className="sidebar-badge">구현 예정</span>}
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         </div>
         <SidebarFooter />

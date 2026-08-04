@@ -1,20 +1,3 @@
-.delete-reclaimable-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 18, 26, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1100;
-  padding: 1.5rem;
-}
-
-.delete-reclaimable-card {
-  width: 100%;
-  max-width: 420px;
-  margin-top: 0;
-}
-
 .delete-reclaimable-target {
   display: flex;
   align-items: center;
@@ -38,11 +21,4 @@
   font-weight: 600;
   font-size: 0.82rem;
   white-space: nowrap;
-}
-
-.delete-reclaimable-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
 }

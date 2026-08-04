@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Pin, PinOff, Plus, X } from 'lucide-react'
 import type { TerminalProfile, TerminalSessionInfo } from '../../api/types'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { Sheet } from '../common/Sheet'
 import './TerminalHome.css'
 
@@ -50,6 +51,7 @@ export function TerminalHome({
   onNewSession: () => void
 }) {
   const [draft, setDraft] = useState<ProfileDraft | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<TerminalProfile | null>(null)
   // Drag-to-reorder, same plain HTML5 drag-event pattern as the sidebar's
   // tab reordering (Layout/Sidebar.tsx) — a ref for the dragged id (doesn't
   // need to trigger a render) plus state just for the drop-target highlight.
@@ -79,10 +81,11 @@ export function TerminalHome({
     setDraft(null)
   }
 
-  function deleteProfile(profile: TerminalProfile) {
-    if (!window.confirm(`"${profile.label}" 프로파일을 삭제하시겠습니까?`)) return
-    onSaveProfiles(profiles.filter((p) => p.id !== profile.id))
-    if (draft?.editingId === profile.id) setDraft(null)
+  function confirmDeleteProfile() {
+    if (!pendingDelete) return
+    onSaveProfiles(profiles.filter((p) => p.id !== pendingDelete.id))
+    if (draft?.editingId === pendingDelete.id) setDraft(null)
+    setPendingDelete(null)
   }
 
   function handleProfileDrop(targetId: string) {
@@ -199,7 +202,7 @@ export function TerminalHome({
                   <button type="button" className="btn btn-secondary btn-small" onClick={() => startEdit(p)}>
                     편집
                   </button>
-                  <button type="button" className="btn btn-danger btn-small" onClick={() => deleteProfile(p)}>
+                  <button type="button" className="btn btn-danger btn-small" onClick={() => setPendingDelete(p)}>
                     삭제
                   </button>
                 </div>
@@ -260,6 +263,18 @@ export function TerminalHome({
           </div>
         )}
       </Sheet>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={confirmDeleteProfile}
+        title="프로파일 삭제"
+        confirmLabel="삭제"
+      >
+        <p>
+          <strong>{pendingDelete?.label}</strong> 프로파일을 삭제하시겠습니까?
+        </p>
+      </ConfirmDialog>
     </div>
   )
 }
