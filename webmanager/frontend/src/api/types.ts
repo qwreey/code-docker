@@ -607,3 +607,13 @@ export interface TerminalProfile {
 export interface TerminalProfilesDoc {
   profiles: TerminalProfile[]
 }
+
+// Mirrors internal/sessionheartbeat.Entry — GET /api/sessions, a
+// visibility-only list of code-server browser tabs currently reporting a
+// heartbeat (see webmanager/.claude/qa-request/session-heartbeat-plan-done.md).
+export interface OpenSession {
+  id: string
+  folder: string
+  userAgent: string
+  lastSeen: string
+}

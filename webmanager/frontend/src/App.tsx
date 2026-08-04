@@ -13,6 +13,7 @@ import { Extensions } from './components/Extensions/Extensions'
 import { Mise } from './components/Mise/Mise'
 import { Dind } from './components/Dind/Dind'
 import { Terminal } from './components/Terminal/Terminal'
+import { Sessions } from './components/Sessions/Sessions'
 import { RequiresUnlock } from './components/common/RequiresUnlock'
 import { UnlockModalHost } from './components/common/UnlockModal'
 import { EnvVersionBanner } from './components/common/EnvVersionBanner'
@@ -74,6 +75,11 @@ function App() {
               <FileManager />
             </RequiresUnlock>
           </Suspense>
+        )}
+        {active === 'sessions' && (
+          <RequiresUnlock>
+            <Sessions />
+          </RequiresUnlock>
         )}
       </main>
       <UnlockModalHost />

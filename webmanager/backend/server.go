@@ -11,6 +11,7 @@ import (
 	"webmanager/internal/mise"
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
+	"webmanager/internal/sessionheartbeat"
 	"webmanager/internal/supervisor"
 	"webmanager/internal/tailscale"
 	"webmanager/internal/termsession"
@@ -27,15 +28,16 @@ type Server struct {
 	// instances from resourceHistory's own internal HostCPUSampler for the
 	// same reason cgroupSampler and resourceHistory's cpu Sampler are kept
 	// apart (see cgroup.HistorySampler's doc comment).
-	hostCPUSampler *cgroup.HostCPUSampler
-	hostSensors    *cgroup.HostSensors
-	projectScanner *projects.Scanner
-	miseJobs       *mise.JobStore
-	loginMgr       *claudecode.LoginManager
-	tailscaleLogin *tailscale.LoginManager
-	diskUsage      *diskusage.Analyzer
-	termSessions   *termsession.Registry
-	gate           *authgate.Gate
+	hostCPUSampler    *cgroup.HostCPUSampler
+	hostSensors       *cgroup.HostSensors
+	projectScanner    *projects.Scanner
+	miseJobs          *mise.JobStore
+	loginMgr          *claudecode.LoginManager
+	tailscaleLogin    *tailscale.LoginManager
+	diskUsage         *diskusage.Analyzer
+	termSessions      *termsession.Registry
+	sessionHeartbeats *sessionheartbeat.Store
+	gate              *authgate.Gate
 
 	// envTemplateVersion is cfg.EnvTemplatePath's WEBMANAGER_ENV_VERSION at
 	// startup ("" if the template was unreadable) — see

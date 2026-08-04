@@ -19,6 +19,7 @@ import (
 	"webmanager/internal/mise"
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
+	"webmanager/internal/sessionheartbeat"
 	"webmanager/internal/supervisor"
 	"webmanager/internal/tailscale"
 	"webmanager/internal/termsession"
@@ -117,6 +118,7 @@ func main() {
 		tailscaleLogin:     tailscale.NewLoginManager(),
 		diskUsage:          diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
 		termSessions:       termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
+		sessionHeartbeats:  sessionheartbeat.NewStore(),
 		gate:               gate,
 		envTemplateVersion: envTemplateVersion,
 	}
@@ -251,6 +253,16 @@ func main() {
 	mux.HandleFunc("POST /api/auth/unlock", s.handleAuthUnlock)
 	mux.HandleFunc("GET /api/auth/status", s.handleAuthStatus)
 
+	// session-heartbeat: see webmanager/.claude/qa-request/
+	// session-heartbeat-plan-done.md for why this pair inverts the usual
+	// reads-open/writes-gated convention. The POST comes from an anonymous
+	// code-server tab (code-server itself runs with auth: none) with no
+	// credential to present, so gating it would just break the feature; the
+	// GET reveals what folders are open across every connected tab, which is
+	// the side actually worth gating here.
+	mux.HandleFunc("POST /api/sessions/heartbeat", s.handleSessionHeartbeat)
+	mux.Handle("GET /api/sessions", gate.RequirePassword(http.HandlerFunc(s.handleListSessions)))
+
 	mux.HandleFunc("GET /api/ui/sidebar-order", s.handleGetSidebarOrder)
 	mux.HandleFunc("PUT /api/ui/sidebar-order", s.handlePutSidebarOrder)
 
@@ -319,6 +331,7 @@ func main() {
 	defer cancelBg()
 	go s.resourceHistory.Run(bgCtx)
 	go s.termSessions.Run(bgCtx)
+	go s.sessionHeartbeats.Run(bgCtx)
 
 	go func() {
 		log.Printf("webmanager listening on %s", cfg.Addr)

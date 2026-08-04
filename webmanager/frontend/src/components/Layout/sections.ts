@@ -12,6 +12,7 @@ export type SectionId =
   | 'claude'
   | 'extensions'
   | 'files'
+  | 'sessions'
 
 export interface SectionMeta {
   id: SectionId
@@ -33,4 +34,5 @@ export const SECTIONS: SectionMeta[] = [
   { id: 'claude', label: 'Claude Code', implemented: true },
   { id: 'extensions', label: 'Code Extensions', implemented: true },
   { id: 'files', label: 'Files', implemented: true },
+  { id: 'sessions', label: '열린 세션', implemented: true },
 ]
