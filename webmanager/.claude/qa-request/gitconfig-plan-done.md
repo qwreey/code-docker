@@ -19,7 +19,7 @@
   fingerprint 계산 재사용) — `GitConfig.tsx`에 `KnownHosts.tsx` 추가.
   **비밀번호 게이트**: 이 문서에 나온 모든 쓰기(user/signing/ssh-hosts/
   credentials/lfs-install/raw-편집/gpg-keys/known-hosts의 POST·PUT·DELETE)에
-  적용됨, 읽기는 그대로 열림 — 자세히는 `.claude/authgate-plan-done.md`.
+  적용됨, 읽기는 그대로 열림 — 자세히는 `.claude/archive/authgate-plan-done.md`.
 
 ## 어떻게 동작하는가 (`internal/gitconfig`)
 

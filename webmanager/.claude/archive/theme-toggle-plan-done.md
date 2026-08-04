@@ -97,5 +97,5 @@ computed style/기능(클릭 → localStorage/data-theme 반영 → CSS var 변�
 
 ## 참고
 
-- `authgate-plan-done.md` — 비밀번호 게이트 메커니즘.
+- `archive/authgate-plan-done.md` — 비밀번호 게이트 메커니즘.
 - `terminal-plan-done.md` — 왜 터미널 색상이 이 작업 범위 밖인지.

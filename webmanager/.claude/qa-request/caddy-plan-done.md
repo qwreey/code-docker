@@ -19,7 +19,7 @@
 >   이 변경에 맞춰 `internal/authgate`의 토큰도 HMAC 서명 자기서술형으로
 >   재설계됨(세션 저장소 삭제, 같은 토큰을 웹매니저 쓰기 게이트=10분 /
 >   Dev Proxy 열람=24시간으로 다른 TTL 적용) — 자세한 내용은
->   `.claude/authgate-plan-done.md`. `WEBMANAGER_AUTH_COOKIE_DOMAIN`(신규)을
+>   `.claude/archive/authgate-plan-done.md`. `WEBMANAGER_AUTH_COOKIE_DOMAIN`(신규)을
 >   설정해야 웹매니저 잠금 해제가 dev-proxy 서브도메인에도 적용됨.
 > - **`preserve_host`(`header_up Host {host}`) 기본값 — "없음"으로 확정, 폼에
 >   옵션 자체를 두지 않음.** 사용자 판단: "이미 밖에서 그거 안 쓰고 대부분 앱이

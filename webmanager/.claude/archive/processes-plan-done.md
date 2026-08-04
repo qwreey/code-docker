@@ -59,7 +59,9 @@
 - kill: `syscall.Kill` 직접 사용(gopsutil의 `SendSignal` 대신) — `ESRCH`→404,
   `EPERM`→403 매핑을 정확히 하기 위해.
 - API: `GET /api/processes`, `GET /api/ports`, `POST /api/processes/{pid}/signal`
-  (body `{signal: "TERM"|"KILL"}`).
+  (body `{signal: "TERM"|"KILL"}`, 비밀번호 게이트 — 임의 프로세스에 SIGKILL을
+  보내는 파괴적 동작이라 다른 kill/stop/restart류와 동급으로 취급, 원래
+  게이트 없이 나갔던 걸 보안 감사로 발견해 2026-08-05에 추가함).
 
 ## 컨테이너 전체 cpu/mem/disk 추적
 
@@ -178,3 +180,39 @@ Projects 탭과 동일한 패턴으로 짧게 폴링하다 멈춤(자동 폴링 
 (`docker compose build && up`)은 아직 안 함** — 특히 컨테이너 안 `/proc/mounts`
 구성이 이 데스크톱과 다를 수 있어(예: `/dev`, `/run`이 어떤 fstype으로
 잡히는지) 실제 컨테이너에서 한 번 확인 권장.
+
+## 업데이트 (2026-08-05): 디스크 카드 회귀 수정 — 구현 완료
+
+이후 QA 라운드(`plan.md`의 "여유공간 프레이밍 대신 폴더별 비중 프레이밍으로"
+변경)에서 의도치 않게 두 가지가 함께 빠졌던 걸 실사용 피드백으로 발견,
+`3ae8e6c` 커밋 대비 회귀로 확인하고 고침(`Processes/SystemSummary.tsx`,
+`Processes.css`):
+
+- **`<h2>디스크</h2>` 타이틀 누락** — CPU/메모리 카드엔 있는데 디스크 카드만
+  빠져 있었음, 복원.
+- **호스트 마운트(`/code`) 사용량이 텍스트 캡션 한 줄로 축소돼 있었음** —
+  메모리 카드의 cgroup 섹션과 동일한 형태(라벨 + `system-summary-bar`
+  퍼센트 바 + 서브텍스트)로 복원.
+- **"여유공간 프레이밍 제거" 결정은 일부 철회**: 컨테이너 디스크 스택 바
+  자체는 "각 세그먼트 합이 100%"인 프레이밍(위 2026-08-03 업데이트에서 확정)
+  그대로 유지하되, "여유" 세그먼트를 단색 회색 대신 빗금
+  (`repeating-linear-gradient`) 패턴으로 렌더링해서 "다른 카테고리"가 아니라
+  "남은 공간"으로 읽히게 함(Storage Sense류 느낌 복원) — 완전히 별도 여유
+  공간 표시로 되돌리지 않고, 기존 스택 바 프레이밍 안에서 시각적으로만
+  구분. 바 전체에 옅은 배경 + padding(`perf-mem-stack-tracked`)도 추가해서
+  트랙 느낌을 줌. 안 쓰는 `.perf-disk-host-note*` CSS 제거.
+
+`npm run build`/`npm run lint` 클린. 브라우저로 직접 확인은 안 함.
+
+**후속 정정(같은 날)**: 위에서 되살린 "여유" 세그먼트가 `statfs`의 `Bavail`을
+그대로 썼는데, 이건 컨테이너가 아니라 **호스트 디스크/스토리지 풀 전체의
+실제 여유 공간**(overlay2 등 명시적 per-container 용량 제한이 없는 스토리지
+드라이버에서는 다른 컨테이너/호스트 프로세스가 같은 디스크에 뭘 쓰든 안
+쓰든 그대로 반영됨) — "컨테이너 저장공간 센스"의 취지(외부 요소 영향 없이
+이 컨테이너 자신에 대한 요약)와 어긋남. **고침**(`internal/diskusage/
+diskusage.go`의 `scan()`): `FreeBytes`를 `Bavail`이 아니라
+`total - (du로 합산한 최상위 디렉토리 사용량 합)`으로 계산하도록 변경 —
+이제 "여유"+"컨테이너가 쓴 것"이 항상 정확히 `total`(=100%)이 되고, 다른
+프로세스/컨테이너가 같은 디스크의 다른 곳을 얼마나 쓰든 이 값에 영향을
+안 줌. `TotalBytes`는 그대로 `statfs`의 물리 용량 유지(이건 다른 소비자의
+영향을 안 받는 고정값이라 문제 없음). `go build`/`go vet`/`gofmt` 클린.

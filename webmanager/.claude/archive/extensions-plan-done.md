@@ -29,7 +29,8 @@ override 안내 추가). `go build`/`go vet`/`gofmt`, `npm run build`/`npm run l
 - **삭제(uninstall) — 구현 완료**: `DELETE /api/code-extensions/{id}` →
   `internal/extensions.Uninstall()`(`--uninstall-extension <id>`,
   `Install()`과 거의 동일한 구조), 프론트에 `window.confirm` 확인 다이얼로그
-  포함 삭제 버튼. 게이트는 install과 동일하게 안 걸음.
+  포함 삭제 버튼. install/uninstall 둘 다 `gate.RequirePassword` 적용됨
+  (2026-08-05, 보안 감사로 누락 발견 — `archive/authgate-plan-done.md` 참고).
 - **비활성화(disable) — 조사 후 구현 안 하기로 결정**: 개별 익스텐션의 영속적
   on/off는 VS Code가 문서화 안 된 SQLite(`state.vscdb`, 예전엔 `storage.json`)
   에 저장 — 버전마다 포맷이 바뀐 이력이 있어 직접 건드리기엔 부서지기 쉬움.
@@ -94,5 +95,5 @@ override 안내 추가). `go build`/`go vet`/`gofmt`, `npm run build`/`npm run l
 
 - 도구 추천 목록/`recommendations.yaml` 전체 설계는 `mise-plan.md`
 - 전체 우선순위는 `webmanager/plan.md`, `webmanager/CLAUDE.md`
-- `claude-plan.md`도 별개로 "Claude Code 확장 미설치 배너" 하나를 원함 — 이 기능이
+- `archive/claude-plan-done.md`(당시 claude-plan.md)도 별개로 "Claude Code 확장 미설치 배너" 하나를 원함 — 이 기능이
   먼저 만들어지면 그 배너도 이 API를 재사용하면 됨(중복 구현 방지)

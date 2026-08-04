@@ -16,7 +16,7 @@
   쓰기 힘드니 짧은 유예 윈도우가 낫다"는 사용자 판단). 인메모리 세션 저장소,
   컨테이너 재시작하면 전부 날아감(의도된 동작, redis 등 불필요 — 사실상 단일
   사용자 도구라 오버엔지니어링 방지).
-- **2026-08-04 갱신 — Dev Proxy(`.claude/research/caddy-plan.md`) 추가에 맞춰
+- **2026-08-04 갱신 — Dev Proxy(`.claude/qa-request/caddy-plan-done.md`) 추가에 맞춰
   토큰을 HMAC 서명 자기서술형으로 재설계**(`internal/authgate/gate.go`):
   세션 맵/뮤텍스는 삭제, 토큰이 발급 시각(unix epoch)을 담고 랜덤 HMAC
   시크릿(프로세스 시작 시 생성, 영속화 안 함 — 재시작하면 시크릿도 새로
@@ -27,7 +27,7 @@
   `Domain` 속성도 신규 지원(`WEBMANAGER_AUTH_COOKIE_DOMAIN`, 기본 비어있어
   기존 호스트 전용 동작 그대로) — Dev Proxy 와일드카드 서브도메인과 상위
   도메인을 공유하도록 설정하면 웹매니저에서 한 번 푼 잠금이 dev-proxy
-  서브도메인에도 그대로 적용됨. 자세한 배경은 `.claude/research/caddy-plan.md`
+  서브도메인에도 그대로 적용됨. 자세한 배경은 `.claude/qa-request/caddy-plan-done.md`
   참고.
 - 원래 설계는 `webmanager/.claude/archive/terminal-plan-done.md`의 "인증" 절 — 거기서
   터미널 전용으로 처음 설계됐다가, 파일 매니저가 두 번째로 같은 급의 게이트를
@@ -55,12 +55,18 @@
 - Logs: 전체(읽기 포함)
 - Terminal: 전체(`GET /api/terminal`, `GET/PUT /api/terminal/settings`)
 - 파일 매니저: 전체
+- Processes: `POST /api/processes/{pid}/signal` — 임의 PID에 SIGTERM/SIGKILL을
+  보내는, dind stop/remove·supervisor restart 못지않게 파괴적인 동작인데
+  누락돼 있던 걸 보안 감사(`.claude/code-docker-sec.md` 1.1)로 발견, 게이트
+  추가함(2026-08-05)
+- 익스텐션/mise 설치·삭제: `POST/DELETE /api/code-extensions*`,
+  `POST/DELETE /api/mise/tools` — 원래 "이번 라운드 범위 밖"으로 미뤄뒀던
+  것을 같은 감사(1.2)에서 재검토, 딱히 게이트 안 할 이유가 없어서 추가함
+  (2026-08-05). job 진행 조회(`GET /api/mise/jobs/{id}`)는 새 작업을 시작하지
+  않는 순수 폴링이라 게이트 안 함.
 
 게이트 안 함(명시적으로 열어둠): 위 목록에 없는 모든 GET(프로세스 목록, ssh
 키 목록, git/tailscale 설정 조회, projects, claude, extensions/mise 조회 등).
-**extensions/mise의 설치·삭제(쓰기)는 이번 라운드 범위 밖으로 판단해서 게이트
-안 함** — 사용자가 명시적으로 언급 안 한 부분, 나중에 필요해지면 같은 패턴으로
-저비용 추가 가능.
 
 ## 프론트: 전역 401 인터셉터
 
@@ -83,9 +89,12 @@ argon2id 해시 한 줄만 stdout에 출력(프롬프트/에러는 stderr). 루�
 `README.md`와 `docker-compose.yml` 양쪽에 인라인으로 문서화(다른 `.md` 참조
 없이 그 자리에서 따라할 수 있게 — 사용자가 명시적으로 요청한 방식).
 
-## 아직 안 된 것
+## 업데이트: 터미널 `RequiresUnlock` 갭 해소
 
-- **터미널 자체가 `RequiresUnlock`으로 안 감싸져 있음** — WebSocket 특성상
-  REST와 다른 처리 필요, 지금은 설정 API(`/api/terminal/settings`)는 전역
-  인터셉터 혜택을 받지만 WS 업그레이드 자체가 401이면 조용히 실패함(에러 UI
-  없음). `question.md` 참고.
+이전엔 터미널 탭 자체가 `RequiresUnlock`으로 안 감싸져 있어서, WS 업그레이드가
+401이면 에러 UI 없이 조용히 실패하는 갭이 있었음(`RequiresUnlock.tsx`의
+주석에 "terminal is expected to reuse this unchanged later"라고 이미
+적혀있던 대로) — `App.tsx`에서 Logs/Files/Sessions와 동일하게 Terminal도
+`<RequiresUnlock>`로 감싸서 해소. 잠금 해제 REST 플로우를 먼저 통과해야
+Terminal 컴포넌트가 마운트(=WS 연결 시작)되므로, 그 시점엔 이미 언락 쿠키가
+있어 WS 핸드셰이크도 정상 통과함.

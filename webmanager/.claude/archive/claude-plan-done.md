@@ -1,4 +1,8 @@
-# Claude Code 상태/관리 패널 조사 (M1+M2+M3 + 로그인(OAuth) 연계 구현 완료, M4부터 미착수)
+# Claude Code 상태/관리 패널 — M1~M3 + 로그인(OAuth)/설치/mise 버전확인 구현 완료
+
+M4(익스텐션 설치 배너)/M5(MCP 서버 목록)는 미착수 상태로 남아있었으나, 범위가
+좁고 독립적이라 이 문서에서 분리해 `../claude-rework-v2.md`로 옮김 — 이 문서는
+이제 순수 완료 기록(설계 조사 + 구현 노트)으로만 남는다.
 
 ## 구현 완료 (2026-08-03): 로그인(OAuth) 연계
 
@@ -36,7 +40,7 @@ CLI 버전 업데이트로 문구가 바뀌어도 안 깨지도록 일부러 느
 split해서 마켓플레이스 서픽스는 서브텍스트로). `go build`/`go vet`/`gofmt`,
 `npm run build`/`npm run lint` 전부 클린.
 
-> `research/caddy-plan.md`/`.claude/archive/tailscale-design.md`(레포 루트)와 같은 성격으로
+> `qa-request/caddy-plan-done.md`/`.claude/archive/tailscale-design.md`(레포 루트)와 같은 성격으로
 > 시작한 문서였으나, 이제 마일스톤까지 정리돼서 **M1은 바로 구현 착수 가능한 상태**.
 > 저장소 일반 컨벤션은 루트 `CLAUDE.md`, webmanager 컨벤션은 `webmanager/CLAUDE.md`,
 > `webmanager/plan.md` 참고.
@@ -91,7 +95,7 @@ split해서 마켓플레이스 서픽스는 서브텍스트로). `go build`/`go 
   `stats-cache.json`은 이 디렉토리 밑.
 - **타임아웃**: `claude auth status` 등 서브커맨드 호출에 `context.WithTimeout`
   5초 정도 — 네트워크 헬스체크가 섞여있을 수 있어 응답이 느려도 webmanager 전체가
-  멈추면 안 됨(claude-plan.md 본문의 MCP 관련 경고와 동일한 이유, 여기도 미리 적용).
+  멈추면 안 됨(이 문서 본문의 MCP 관련 경고와 동일한 이유, 여기도 미리 적용).
 
 ### `GET /api/claude/status`
 

@@ -4,7 +4,7 @@
 
 추가/삭제(쓰기)에 비밀번호 게이트 적용됨 — 목록 조회(읽기)는 그대로 열려있음
 ("퍼블릭 키라 조회는 상관없다"는 사용자 판단). 자세히는
-`.claude/authgate-plan-done.md`.
+`.claude/archive/authgate-plan-done.md`.
 
 ## 기능
 

@@ -57,7 +57,7 @@ Claude Code 탭, Caddy dev-proxy는 전부 `webmanager/.claude/`로 이동함). 
 
 ## 사용자 세션 뷰어 — 추후 구현, 실현 가능성부터 확인 필요
 
-`webmanager/.claude/research/session-viewer-plan.md` 참고 — 착수 전 리서치/실현 가능성
+`webmanager/.claude/archive/session-viewer-plan.md` 참고 — 착수 전 리서치/실현 가능성
 확인이 필요해서 별도 계획 문서로 분리함(여기 브레인스토밍 목록에는 포인터만).
 
 ## mise opt-out 플래그 — 검토했으나 보류 (2026-08-03)
@@ -74,7 +74,7 @@ opt-out 자체의 실익이 낮다고 판단(mise 없이 도구를 설치/관리
   mise를 안 쓰고 싶은 사람은 mise를 호출하는 `default.sh`들(`code-runner.default.sh`
   등)을 override로 갈아끼우기만 하면 됨 — 새로 만들 것 없이 이미 되는 얘기.
 - webmanager 쪽만 갭 — Mise 탭과 Claude 탭의 mise 기반 UI(설치/버전확인/업데이트
-  버튼)는 mise 존재를 가정하고 만들어짐(`webmanager/.claude/claude-plan.md` 참고).
+  버튼)는 mise 존재를 가정하고 만들어짐(`webmanager/.claude/archive/claude-plan-done.md` 참고).
   이번 라운드에서 이 갭을 메우지 않기로 함.
 - 혹시 나중에 필요해지면: `WEBMANAGER_MISE_FEATURES=false`류 환경변수 하나로 Mise
   탭 자체와 Claude 탭의 설치/버전확인 UI를 숨기는 정도가 제일 저비용인 방향으로

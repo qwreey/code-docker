@@ -55,7 +55,7 @@ start|stop|rm [-f]`로 셸아웃, 컨테이너 ID는 M1과 같은
 ## 원본 계획 (리서치 라운드, 2026-08-02 — 위 M1 구현으로 대체된 부분 제외하고는
 여전히 유효)
 
-`research/caddy-plan.md`에서 확정된 우선순위: **웹쉘보다 먼저** 진행 (`archive/terminal-plan-done.md` 다음
+`qa-request/caddy-plan-done.md`에서 확정된 우선순위: **웹쉘보다 먼저** 진행 (`archive/terminal-plan-done.md` 다음
 이 아니라 그 앞 — 전체 순서는 `webmanager/CLAUDE.md` 참고). 이번 라운드는 사용자
 요청으로 **리서치만** 진행(라이브러리 선택, 위험 완화, 로그 스트리밍) — 구현은
 여전히 시작 안 함.
@@ -162,7 +162,7 @@ API 초안에 아예 포함하지 않는다 — 나중에 필요해지면 별도
   반영할 것(실행 중 컨테이너 삭제 시도는 "먼저 정지하시겠습니까" 안내 또는 강제
   삭제임을 명확히 알리는 별도 문구).
 - 읽기 전용 우선 출시: 권장. 이 저장소에 이미 Projects 탭이 "1단계 읽기 전용(용량/
-  재생성 가능 폴더 탐지) → 2단계 삭제 UI"로 나눈 전례가 있다(`qa-request/projects-plan-done.md`
+  재생성 가능 폴더 탐지) → 2단계 삭제 UI"로 나눈 전례가 있다(`archive/projects-plan-done.md`
   / `CLAUDE.md` 큐 항목 2번). dind도 동일하게 자연스러운 M1/M2로 나뉜다: **M1 =
   목록(containers/images) + inspect 상세 + 로그 조회(follow 없이도 우선 가치 있음)**,
   **M2 = start/stop/remove(확인 다이얼로그 포함)**. M1은 뮤테이션이 전혀 없어

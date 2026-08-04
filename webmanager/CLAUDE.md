@@ -89,7 +89,7 @@ to leave login to the user's own terminal — that assumed SSH/code-server
 access was always available, which stopped being true once webmanager needed
 to support org/company deployments where webmanager itself is the only
 surface ever opened. A Claude Code conversation-log viewer inside the same
-tab (`.claude/session-log-plan.md`, `internal/claudecode/sessions.go`) lists
+tab (`.claude/archive/claude-session-log-plan-done.md`, `internal/claudecode/sessions.go`) lists
 and renders every session transcript found under
 `CLAUDE_CONFIG_DIR/projects/*/*.jsonl` as a condensed chat view — the
 backend stays schema-agnostic (cheap listing + raw cursor-paginated line
@@ -106,7 +106,7 @@ open Claude tab — `RequiresUnlock` wraps just that sub-section, not the
 whole tab, which the component doc comment notes is a supported pattern
 (not only from `App.tsx`). Sub-agent/sidechain transcripts and
 externally-spilled tool-result files are out of scope for v1. A shared
-password gate (`internal/authgate` — see `.claude/authgate-plan-done.md` for
+password gate (`internal/authgate` — see `.claude/archive/authgate-plan-done.md` for
 the full list of what it gates; principle is reads-stay-open/writes-gated,
 with Terminal/File Manager/Logs/Supervisor-log-view/Claude-session-log gated
 entirely), a file
@@ -132,7 +132,7 @@ into the real content via the same utility instead of snapping — see
 "First-load skeleton" under Ground rules below for the pattern to follow
 when adding a new tab. A `.env.webmanager` migration tool
 (`webmanager --env-migrate`, `internal/envmigrate` — see
-`.claude/qa-request/env-migration-plan-done.md`): reconciles a user's file
+`.claude/archive/env-migration-plan-done.md`): reconciles a user's file
 against the image's current `example-env.webmanager`, archiving removed keys
 into a `#~` section and preserving both the user's actively-set values and
 their own plain-`#` comments; `#!important`/`#!` template-only markers let an
@@ -145,7 +145,7 @@ banner (dismiss state persisted backend-side via `internal/envversionprefs`)
 when the running file is stale. A single-origin merge of code-server (`/`)
 and webmanager (`/manager`) via an in-container nginx supervisord program
 (`config/nginx.default.conf`, `[program:nginx]` — see
-`.claude/qa-request/expose-plan-done.md`): code-server's `bind-addr` and
+`.claude/archive/expose-plan-done.md`): code-server's `bind-addr` and
 webmanager's `WEBMANAGER_ADDR` both moved to internal-only ports,
 `code-config.default.yaml` is now regenerated on every start (no more
 once-only guard) same as every other override-pattern file, and the 4
@@ -156,9 +156,9 @@ real-container QA by the repo owner is still pending. A follow-on milestone
 PWA `shortcuts` entry) had 4 open questions in `.claude/question.md`; trigger
 and display-form are now implemented (`.window-appicon` click opens `/manager`
 in an iframe overlay modal, `config/code-patch/webmanager-launcher.default.js`
-— see `.claude/qa-request/expose-plan-done.md`'s "나중 마일스톤" section);
+— see `.claude/archive/expose-plan-done.md`'s "나중 마일스톤" section);
 the PWA `shortcuts` entry is now implemented too
-(`.claude/qa-request/manifest-shortcuts-plan-done.md`) — rather than a
+(`.claude/archive/manifest-shortcuts-plan-done.md`) — rather than a
 second installable PWA (rejected: it would double the installed-app icon
 count per code-docker instance for a "check occasionally" use case),
 `config/nginx.default.conf` intercepts just `/manifest.json` with an
@@ -171,18 +171,34 @@ exactly as fetched, and responds 502 on any failure so nginx's
 `/_code_not_ready.html` already uses — falls back to code-server's own
 manifest directly; code-server-autoinstall's vendored manifest route itself
 is never touched. An "열린 세션" (open sessions)
-tab (`.claude/qa-request/session-heartbeat-plan-done.md`, `internal/
+tab (`.claude/archive/session-heartbeat-plan-done.md`, `internal/
 sessionheartbeat`) lists which code-server browser tabs are currently
 connected and what folder each has open, fed by a client-generated UUID that
 a new code-patch script (`config/code-patch/session-heartbeat.default.js`)
 POSTs to `/api/sessions/heartbeat` every 30s — chosen over querying
 code-server's own connection API specifically to sidestep that approach's
-unresolved feasibility question (`.claude/research/session-viewer-plan.md`,
-still parked); `GET /api/sessions` is password-gated like most of this app's
-sensitive reads, but the heartbeat POST itself is deliberately left ungated,
-a documented exception to the reads-open/writes-gated convention since
-code-server runs with `auth: none` and has no credential to attach to that
-request in the first place. Keep extending as
+unresolved feasibility question (`.claude/archive/session-viewer-plan.md`,
+kept only as a record of the unresearched option); `GET /api/sessions` is
+password-gated like most of this app's sensitive reads, but the heartbeat
+POST itself is deliberately left ungated, a documented exception to the
+reads-open/writes-gated convention since code-server runs with `auth: none`
+and has no credential to attach to that request in the first place. A Dev
+Proxy tab (`.claude/qa-request/caddy-plan-done.md`, `internal/devproxy`) runs
+an internal Caddy instance (`caddy-adapter` supervisord program) that exposes
+dev servers on wildcard subdomains — expose CRUD writes/validates
+`.caddy` file fragments (`caddy adapt` for syntax validation, then `caddy
+reload`), with `internal/authgate` wired into Caddy's `forward_auth` for
+per-expose auth (`GET /api/auth/verify`, standalone login page
+`/manager/dev-auth`) — this reversed the original "auth stays outside,
+webmanager doesn't touch it" decision, and prompted authgate's redesign to a
+session-store-free HMAC-signed token so the same token can carry different
+TTLs for webmanager's write-gate (10 min) vs. Dev Proxy viewing (24h). A
+per-project git status panel (`.claude/qa-request/project-git-status-plan-done.md`,
+`internal/projectgit`) reports status/log/diff/remotes/branches/tags for one
+already-known project path — read-only only (no stage/commit/push/pull yet),
+ungated since it's read-only, and deliberately placed in
+`components/common/Git/` so it isn't tied to the Projects tab specifically.
+Keep extending as
 needed; see `plan.md`'s "구현 완료" table before assuming something isn't
 done yet. **Open questions the repo owner still needs to weigh in on are
 consolidated in `.claude/question.md`** — none of them block further work,
@@ -191,10 +207,11 @@ they're just recorded defaults or genuinely-undecided design questions.
 **Can be started anytime, independent of the queue below** (no blocking
 dependencies on each other or on anything still queued):
 
-1. `.claude/claude-plan.md` — Claude Code status/management tab, **M4
+1. `.claude/claude-rework-v2.md` — Claude Code status/management tab, **M4
    onward** (M1/M2/M3 done; install/mise-version-check/login automation are
    done too, as a separate track outside the M-numbering — see "Already
-   implemented" above). M4 (extension-install banner, reuse the
+   implemented" above; the full M1-M3 design/implementation history moved to
+   `.claude/archive/claude-plan-done.md`). M4 (extension-install banner, reuse the
    now-implemented extensions API) → M5 (MCP server list, deliberately last
    within this feature — `claude mcp list` has no `--json` output and needs a
    real multi-server example to design the parser against).
@@ -202,7 +219,7 @@ dependencies on each other or on anything still queued):
    paste-to-install (with an open-vsx cross-lookup + vsix-direct-download
    fallback). Design done, not started.
 
-Projects tab phase 2 (`.claude/qa-request/projects-plan-done.md`, delete UI for
+Projects tab phase 2 (`.claude/archive/projects-plan-done.md`, delete UI for
 reclaimable folders) is now done too — same exact-match path-validation
 convention as phase 1's rescan endpoint, extended to a project+reclaimable-path
 pair (`internal/projects.Scanner.DeleteReclaimable`), plus a mandatory confirm
@@ -212,29 +229,25 @@ nginx routing made that a safe default) and renders as a real `<a href>` instead
 of a `window.open` button.
 
 **Lower-priority / no dedicated plan doc yet** — tracked only in `plan.md`'s
-TODO table: code-server settings.json editor (revisit once caddy-plan's
-Monaco decision lands, see `ideas.md` — though the CodeMirror editor built
-this round already lowers that decision's stakes), bind-address strategy (last priority), vector
-JSONL log retention policy, i18n (LinguiJS, deliberately deferred until
-strings stabilize), embedding a code-docker help/guide inside webmanager
-(`.claude/research/guide-plan.md` — idea stage only, explicitly not to be implemented
-until the repo owner answers the open questions in that doc), a code-server/
-mise version-check panel (`.claude/research/version-panel-plan.md` — same idea-stage
-tier as guide-plan, explicitly lowest priority, several genuinely unresolved
-questions like what signal even means "container rebuild needed"), an active
-sessions viewer (`.claude/research/session-viewer-plan.md` — same lowest-priority
-tier; before touching this one, the very definition of "session" needs to be
-confirmed interactively with the repo owner, don't just pick one and build
-it), a file manager rework (`.claude/filemanager-rework-plan.md` — drag-drop
+TODO table: code-server settings.json editor (the CodeMirror editor built for
+git raw-config editing/the file manager already covers the "no editor
+component" blocker, but the conclusion is still to skip this — code-server's
+own integrated editor is already a better experience than webmanager
+reimplementing settings-schema validation/autocomplete, see `ideas.md`),
+bind-address strategy (last priority), vector JSONL log retention policy,
+i18n (LinguiJS, deliberately deferred until strings stabilize), embedding a
+code-docker help/guide inside webmanager (`.claude/research/guide-plan.md` —
+idea stage only, explicitly not to be implemented until the repo owner
+answers the open questions in that doc), a code-server/mise version-check
+panel (`.claude/research/version-panel-plan.md` — same idea-stage tier as
+guide-plan, explicitly lowest priority, several genuinely unresolved
+questions like what signal even means "container rebuild needed"), a file
+manager rework (`.claude/research/filemanager-rework-plan.md` — drag-drop
 move, grid/list/table views, multi-tab, benchmarked loosely against Termix;
-same lowest-priority tier, scope needs to be discussed with the repo owner
+lowest-priority tier, scope needs to be discussed with the repo owner
 before starting — several open questions in the doc, e.g. whether grid-view
 thumbnails conflict with the existing file manager's deliberate no-thumbnails
-decision). `.claude/research/caddy-plan.md` — Caddy-based dev-server expose (wildcard subdomain reverse
-proxy) — also lives here, deliberately below dind/terminal-M2: most of its
-design is settled, but it still has open decisions (e.g. `preserve_host`
-default) and was explicitly deprioritized below the rest of the active
-queue.
+decision).
 
 ## Ground rules
 
@@ -300,7 +313,7 @@ queue.
 - **`example-env.webmanager`**: whenever a change adds/removes/renames a key
   or meaningfully changes a default, bump `WEBMANAGER_ENV_VERSION` in that
   file itself (it's the single source of truth — no separate Go constant to
-  keep in sync, see `.claude/env-migration-plan.md`). Keep every descriptive/
+  keep in sync, see `.claude/archive/env-migration-plan-done.md`). Keep every descriptive/
   section-header comment prefixed `#.` (never a bare `#`, including blank
   spacer lines within a multi-line explanation) — bare `#` is reserved for
   content a *user* adds to their own `.env.webmanager`, and `--env-migrate`

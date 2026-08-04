@@ -1,4 +1,4 @@
-# 확인/결정 필요 목록 (전체 취합, 2026-08-02 최신)
+# 확인/결정 필요 목록 (전체 취합, 2026-08-05 정리)
 
 `attention-needed.md`를 대체함(중복 방지를 위해 이 문서로 흡수 후 삭제) —
 `feedback/feedback-2026-08-02.md`(실사용 피드백 라운드)와 그 전 라운드의 "사용자 확인
@@ -8,19 +8,10 @@
 
 ## 지금 바로 결정하면 유용한 것 (작지만 실사용에 영향)
 
-- ~~비밀번호 게이트 해시 계산 CLI 헬퍼가 없음~~ — **해결됨(2026-08-03)**:
-  `webmanager --hash-password`(새 서브커맨드, 별도 바이너리/빌드 타겟
-  아니라 기존 webmanager 바이너리를 재사용 — `hashpassword.go`)가
-  `docker compose exec code-docker /etc/code-docker/webmanager/webmanager
-  --hash-password`로 바로 실행 가능. 비밀번호 두 번 입력(오타 확인, 화면에
-  안 보임 — TTY일 때만, 파이프 입력이면 한 줄만 읽음)받아 argon2id 해시
-  한 줄만 stdout에 출력. `README.md`(사용자 문서)와 `docker-compose.yml`의
-  `WEBMANAGER_AUTH_PASSWORD_HASH` 주석에 인라인으로 문서화됨(다른 `.md`
-  참조 없이 그 자리에서 바로 따라할 수 있게).
 - **비밀번호 게이트 미설정 상태**: 지금 `WEBMANAGER_AUTH_PASSWORD_HASH`가
   설정 안 돼 있으면 Terminal/파일 매니저/Logs/각종 쓰기 액션 전부 그냥 열려
-  있음(기존 신뢰 모델 그대로) — 위 CLI 헬퍼가 이제 있으니 설정 자체는
-  더 이상 막혀있지 않음.
+  있음(기존 신뢰 모델 그대로) — `webmanager --hash-password` CLI 헬퍼가
+  있으니 설정 자체는 막혀있지 않음(`archive/authgate-plan-done.md` 참고).
 - **`WEBMANAGER_FILES_ROOT` 기본값이 `/code`로 좁혀져 있음** — 컨테이너 전체
   (`/etc`, `/usr` 등)까지 파일 매니저로 브라우징하고 싶으면 이 값을 `/`로
   바꿔야 함. 지금은 "루트 폴더를 code-server 밖에서 만지고 싶다"는 원래
@@ -38,10 +29,10 @@
 변경 시각으로 대체 표시.
 
 **비밀번호 게이트 적용 범위** (완료): 읽기는 열림/쓰기만 게이트가 원칙, 예외로
-터미널·파일 매니저·Logs(전체)·Supervisor 로그 조회는 통째로 게이트. extensions/
-mise의 설치·삭제(쓰기)는 이번 라운드에 게이트 **안 함**(사용자가 명시적으로
-언급 안 한 범위) — 필요하면 알려줘, 저비용으로 추가 가능. 전체 목록은
-`.claude/authgate-plan-done.md`.
+터미널·파일 매니저·Logs(전체)·Supervisor 로그 조회는 통째로 게이트.
+extensions/mise의 설치·삭제(쓰기)와 프로세스 시그널 전송도 보안 감사
+(`.claude/code-docker-sec.md`)로 누락이 발견돼 2026-08-05에 게이트 추가함.
+전체 목록은 `.claude/archive/authgate-plan-done.md`.
 
 ## 아직 구현 안 된 것 — 계획 문서만 존재 (착수 전 결정 필요한 질문 포함)
 
@@ -64,18 +55,14 @@ mise의 설치·삭제(쓰기)는 이번 라운드에 게이트 **안 함**(사�
   중요한 요청으로 기록됨, API 설계까지 초안 있음. (익스텐션 "더 보기" 정보
   링크와 삭제(uninstall)는 이미 구현 완료 — `.claude/archive/extensions-plan-done.md`
   참고. mise 쪽 "더 보기" 링크는 `mise registry --json`이 홈페이지 필드를
-  주는지부터 확인 필요, `.claude/qa-request/mise-plan-done.md` 참고.)
-- **caddy** (`.claude/research/caddy-plan.md`, 우선순위 낮음) — 유일하게 남은 디테일
-  (`preserve_host` 기본값)은 급하지 않다고 이미 정리됨. Monaco 도입 고민은
-  이제 공용 `CodeEditor`(CodeMirror 6)로 해소돼서 더 이상 열린 질문 아님.
-- **code-server 안에서 매니저 여는 방법** (`.claude/qa-request/expose-plan-done.md`의
-  "나중 마일스톤" 절) — 4개 질문 중 **트리거/표시 형태 2개는 구현
-  완료(2026-08-04)**: `.window-appicon`(타이틀바 좌상단 아이콘) 클릭 →
-  90vw×90vh 오버레이 모달로 `/manager` iframe(`config/code-patch/
-  webmanager-launcher.default.js`, 실컨테이너 QA 대기). 남은 2개: PWA
-  `shortcuts` 필드(code-server manifest를 새로 패치해야 함, 홈 화면 꾹 눌러서
-  뭘 보여줄지 — 아직 미착수). 긴 세션을 폰으로 여는 건 이 마일스톤과 무관하게
-  `/manager` 경로만 생기면 이미 해결됨(오해 방지 기록).
+  주는지부터 확인 필요, `.claude/archive/mise-plan-done.md` 참고.)
+
+**caddy(Dev Proxy)와 "code-server 안에서 매니저 여는 방법"은 둘 다 구현
+완료돼서 이 목록에서 빠짐** — caddy는 `.claude/qa-request/caddy-plan-done.md`
+(`preserve_host` 기본값도 "없음"으로 확정됨), 매니저 여는 방법은 위젯 버튼
+(`.window-appicon` 클릭 → iframe 오버레이)과 PWA `shortcuts` 점프리스트
+항목 둘 다 구현됨(`.claude/archive/expose-plan-done.md`,
+`.claude/archive/manifest-shortcuts-plan-done.md`) — 남은 건 실컨테이너 QA뿐.
 
 ## 탭 이름 영어 통일 (2026-08-02 QoL 패치)
 
@@ -94,9 +81,6 @@ Terminal, mise)과 일관성 맞춤. **탭 이름/`<h1>` 제목만** 바꿨고, 
 
 - Logs 실시간 모드가 "이 시각 이후만" 서버 커서 대신 클라이언트 필터로 신규
   항목을 걸러냄(정확한 서버 커서가 더 효율적이지만 지금도 정상 동작).
-- CPU 코어별 히트맵에 마우스 올렸을 때 "그 코어의 최근 히스토리 그래프"는
-  아직 없음(순간값만 표시) — 백엔드는 이미 `points[].hostPerCorePercent`로
-  코어별 시계열을 제공하고 있어서 프론트만 붙이면 됨.
 - **webmanager 프론트 번들 크기 경고**: `npm run build`가 "청크 500KB 초과"
   경고를 계속 냄(CodeMirror/xterm.js는 이미 지연 로딩으로 분리됨, 주 번들
   자체가 기능이 늘면서 커짐). 에러 아니고 기능 지장도 없음 — 계속 커지면 탭

@@ -11,7 +11,7 @@
 - **로그 다이얼로그/바텀시트**: 이전 라운드에 이미 완료(공용 `Sheet` 컴포넌트
   재사용) — 유지.
 - **비밀번호 게이트**: start/stop/restart(쓰기)와 프로그램별 로그 조회(읽기)
-  전부 게이트됨 — 자세히는 `.claude/authgate-plan-done.md`.
+  전부 게이트됨 — 자세히는 `.claude/archive/authgate-plan-done.md`.
 
 ## 기능
 

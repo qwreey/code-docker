@@ -5,7 +5,7 @@
 - **비밀번호 게이트**: Logs 탭 전체(`/api/logs/*`, 읽기 포함)가 게이트됨 —
   "로그에 시크릿이 노출될 수 있다"는 사용자 판단. 프론트는 `RequiresUnlock`으로
   탭 진입 시점부터 감쌈(다른 부분 게이트 탭과 동일 패턴). 자세히는
-  `.claude/authgate-plan-done.md`.
+  `.claude/archive/authgate-plan-done.md`.
 - **UX 개선**: 필터 컨트롤이 스크롤에 안 딸려가던 문제 수정(`.logs-table-wrapper`에
   `max-height`+`overflow-y: auto`, 필터는 그 바깥 고정 영역), 실시간 새로고침
   모드에서 시작/종료 시각 필터 비활성화, 실시간 새로고침이 첫 페이지를 교체하는

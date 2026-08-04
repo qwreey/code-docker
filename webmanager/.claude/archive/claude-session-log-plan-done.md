@@ -106,7 +106,7 @@ Logs 탭의 "부분 실패는 라인 단위로 열화" 컨벤션을 그대로 �
 
 - `.claude/backlog/agent-fleet-audit-plan.md` (레포 루트) — 이 기능의 동기가
   된 원 문서.
-- `.claude/claude-plan.md` — 기존 Claude 탭 설계, `stats-cache.json`만 쓰고
+- `.claude/archive/claude-plan-done.md` — 기존 Claude 탭 설계, `stats-cache.json`만 쓰고
   원본 트랜스크립트는 "버전마다 깨질 위험" 때문에 일부러 안 건드리기로 했던
   결정 지점(이번 기능은 그 결정을 프론트엔드 벤더링 스키마로 우회해서 뒤집음).
 - https://github.com/d-kimuson/claude-code-viewer — 벤더링 출처.

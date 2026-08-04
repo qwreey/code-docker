@@ -18,7 +18,7 @@
   `internal/extensions.Uninstall()`(`Install()`과 거의 동일한 구조) +
   `DELETE /api/code-extensions/{id}` 핸들러 + `Extensions.tsx`의 삭제 버튼
   (`window.confirm` 확인 다이얼로그 포함, 파괴적 프론트엔드 액션 컨벤션 준수).
-  게이트는 install과 동일하게 안 걸음(`authgate-plan-done.md`의 "extensions
+  게이트는 install과 동일하게 안 걸음(`archive/authgate-plan-done.md`의 "extensions
   쓰기는 범위 밖" 기존 판단과 일관).
 - **비활성화(disable) — 구현 안 함, 의도적으로 보류**: `--disable-extensions`
   (복수형) 플래그는 있지만 이건 실행 시점에 **전체** 익스텐션을 끄는 launch-time
@@ -92,7 +92,7 @@ GET /api/code-extensions/lookup?text=<붙여넣은 텍스트 전체>
 POST /api/code-extensions/install-vsix   body {id, version}
   → marketplace에서 vsix 직접 다운로드 + 로컬 설치(사용자가 폴백에 명시적으로
     동의한 뒤에만 프론트가 호출) — 비밀번호 게이트는 필요 없어 보임(설치 자체는
-    이미 다른 익스텐션 설치와 동일 위험도, `authgate-plan-done.md`의 "extensions
+    이미 다른 익스텐션 설치와 동일 위험도, `archive/authgate-plan-done.md`의 "extensions
     쓰기는 범위 밖" 판단과 일관되게 안 건 채로 두는 게 맞아 보이나 최종 판단은
     구현 시점에 재확인)
 ```
@@ -107,6 +107,6 @@ POST /api/code-extensions/install-vsix   body {id, version}
 
 - `.claude/archive/extensions-plan-done.md` — 기존 구현(설치, open-vsx "더 보기"
   링크).
-- `.claude/qa-request/mise-plan-done.md` — mise 쪽에도 같은 "더 보기" 링크
+- `.claude/archive/mise-plan-done.md` — mise 쪽에도 같은 "더 보기" 링크
   아이디어가 계획만 되어 있음(`mise registry --json` 홈페이지 필드 지원 여부
   미확인).

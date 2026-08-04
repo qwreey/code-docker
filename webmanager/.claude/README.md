@@ -36,9 +36,8 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 
 | 문서 | 기능 | 우선순위 |
 |---|---|---|
-| `claude-plan.md` | Claude Code 상태/관리 탭 — **M1~M3 구현 완료**, M4(익스텐션 배너)부터 미착수 | M4는 바로 가능 |
-| `extension-search-plan.md` | 익스텐션 검색/마켓플레이스 URL 붙여넣기 설치 — "더 보기" 링크와 삭제(uninstall)는 이미 구현 완료돼서 이 문서에서 빠짐(각각 `archive/extensions-plan-done.md` 참고), 비활성화(disable)는 조사 후 미구현 결정 | M4 언저리, 급하지 않음 |
-| `authgate-plan-done.md` | 공용 비밀번호 게이트(`internal/authgate`) — 대부분 완료지만 **터미널 탭이 아직 `RequiresUnlock`으로 안 감싸져 있어서 WS 업그레이드가 401일 때 조용히 실패하는 실제 미해결 갭이 있음**(문서 자체의 "아직 안 된 것" 절 참고) — 그래서 archive로 안 옮김 | 작음, 남는 대로 처리 가능 |
+| `claude-rework-v2.md` | Claude Code 탭 남은 작업 — M4(익스텐션 설치 배너)/M5(MCP 서버 목록, `claude mcp list` 텍스트 파싱 필요). M1~M3+로그인/설치/mise 버전확인은 전부 완료돼서 `archive/claude-plan-done.md`로 분리됨 | M4는 바로 가능, M5는 실제 MCP 서버 출력 관찰부터 |
+| `extension-search-plan.md` | 익스텐션 검색/마켓플레이스 URL 붙여넣기 설치 — "더 보기" 링크와 삭제(uninstall)는 이미 구현 완료돼서 이 문서에서 빠짐(각각 `archive/extensions-plan-done.md` 참고), 비활성화(disable)는 조사 후 미구현 결정 | 급하지 않음 |
 
 ## 사용자 QA 대기 (`qa-request/*-plan-done.md`)
 
@@ -50,14 +49,9 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 |---|---|
 | `qa-request/sshkeys-plan-done.md` | SSH authorized_keys 관리 |
 | `qa-request/gitconfig-plan-done.md` | git user/email, 커밋 사이닝(SSH/GPG), 호스트별 SSH 키, HTTPS credential, git-lfs install, .gitconfig 원본 편집, known_hosts 관리 |
-| `qa-request/projects-plan-done.md` | 프로젝트 스캔/정리 1단계(용량/재생성 가능 폴더 탐지, 최근 편집 런처, mise 도구 표시, 읽기 전용 — 2단계 삭제는 미착수) |
-| `qa-request/mise-plan-done.md` | mise 관리(install/use/uninstall, 설치된 도구 목록, env 미리보기) + 설치 추천 목록(접기, 표시 토글) |
-| `qa-request/env-migration-plan-done.md` | `.env.webmanager` 마이그레이션 도구(`webmanager --env-migrate`) — 키 추가/삭제 반영(삭제된 키는 `#~` 아카이브), 유저 코멘트 보존, `#!important`/`#!` 마커, 경로 기반 템플릿(조직 커스텀 마운트 가능), 웹 UI 경고 배너(dismiss 영속화) |
-| `qa-request/expose-plan-done.md` | code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일 origin 통합(레포 루트 `expose.md` 리서치를 대체) — M1(nginx)~M3(프론트엔드 서브패스 대응) 코드/빌드 검증까지 완료. code-server 쪽에서 매니저를 여는 위젯/PWA 바로가기는 별도 마일스톤으로 남아있음(질문만 정리, 착수 안 함) |
+| `qa-request/project-git-status-plan-done.md` | 프로젝트별 git 상태 패널(신규) — staged/changed/untracked/behind/ahead/diverged/stashed/conflicts 요약, 커밋 로그/diff, 리모트/브랜치/태그. 읽기 전용만(스테이징/커밋/push·pull은 다음 마일스톤). `gitconfig-plan-done.md`(전역 git 설정)와는 별개 기능이니 혼동 금지 |
 | `qa-request/dind-plan-done.md` | Docker/dind 관리 — M1(목록/로그, 읽기 전용)+M2(start/stop/remove, 비밀번호 게이트)+M3(docker inspect 상세 뷰, 비밀번호 게이트) 전부 코드/빌드 검증까지 완료 |
-| `qa-request/terminal-home-plan-done.md` | 터미널 홈 탭 — 항상 열려있는 첫 탭에 세션 목록 전환 + 시작 위치/실행 명령 프로파일 CRUD, 세션 생성 시 cwd/초기 명령 지원하도록 `internal/termsession` 확장, 코드/빌드 검증까지 완료 |
-| `qa-request/session-heartbeat-plan-done.md` | 열린 브라우저 탭(어느 폴더를 열어놨는지) 목록 — 클라이언트가 UUID를 자체 발급해 30초마다 heartbeat를 보내는 방식으로 `research/session-viewer-plan.md`의 옵션 2(code-server 자체 연결 API) 불확실성을 우회, 새 사이드바 탭("열린 세션")으로 표시. 목록 조회(`GET /api/sessions`)는 authgate로 gate, heartbeat 수신(`POST /api/sessions/heartbeat`)은 code-server 쪽에 인증 수단이 없어서 의도적으로 ungate — reads-open/writes-gated 원칙의 문서화된 예외. 코드/빌드 검증까지 완료 |
-| `qa-request/manifest-shortcuts-plan-done.md` | code-server PWA manifest에 `shortcuts` 필드 주입("Open manager" 점프리스트 항목) — 별도 설치형 PWA는 만들지 않기로 확정(인스턴스별 아이콘 2배 증가 우려), nginx가 `/manifest.json`만 webmanager로 가로채 code-server 원본을 fetch+편집, webmanager 실패 시 code-server 원본으로 자동 폴백. nginx 문법은 디스포저블 컨테이너로 검증했지만 실컨테이너 확인은 아직 |
+| `qa-request/caddy-plan-done.md` | Dev Proxy 탭 — 내부 Caddy 인스턴스로 dev 서버를 와일드카드 서브도메인에 노출, `internal/devproxy`(Caddyfile 조각 CRUD) + `internal/authgate`의 `forward_auth` 연동. 설계 조사 문서였다가 실제로 구현 완료됨 |
 
 ## 완료, 사용자 실사용 검증까지 끝나서 아카이브됨 (`archive/*-plan-done.md`)
 
@@ -68,9 +62,20 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 | `archive/vector-logs-plan-done.md` | vector 로그 파이프라인 도입 + webmanager Logs 페이지(시간범위 필터, 커서 페이지네이션, 실시간 누적, 비밀번호 게이트) |
 | `archive/processes-plan-done.md` | "작업 관리자" 탭(구 Processes) — 성능/프로세스 서브탭, 코어별 CPU 히트맵(호버 히스토리 스파크라인 포함), 메모리 구성요소별 분해, 프로세스 트리+리스트, 필터/검색, 페이지네이션, 컨테이너 루트 디스크 사용량 분석 |
 | `archive/extensions-plan-done.md` | code-server 확장 추천/설치(카테고리별 그룹핑, 접기, 설치된 목록, 표시 토글, open-vsx "더 보기" 링크, 삭제(uninstall)) |
-| `archive/filemanager-plan-done.md` | 파일 관리자(업로드/다운로드/이동/복사/이름변경/멀티선택/텍스트편집/정보패널, 자체 비밀번호 게이트) — v1에서 미뤄둔 잔여 항목(업로드 진행률/chmod/zip 다운로드/실컨테이너 검증)은 `filemanager-rework-plan.md`로 옮김 |
+| `archive/filemanager-plan-done.md` | 파일 관리자(업로드/다운로드/이동/복사/이름변경/멀티선택/텍스트편집/정보패널, 자체 비밀번호 게이트) — v1에서 미뤄둔 잔여 항목(업로드 진행률/chmod/zip 다운로드/실컨테이너 검증)은 `research/filemanager-rework-plan.md`로 옮김 |
 | `archive/terminal-plan-done.md` | 웹쉘 — M1(임시 세션)+M2(named 영속 세션, `internal/termsession`, 탭 UI/유지 토글/유휴 자동정리)+비밀번호 게이트+모바일 컨트롤/키바인딩/테마+모바일 키보드 대응 레이아웃, 전부 구현 완료 |
 | `archive/theme-toggle-plan-done.md` | Light/Dark 수동 토글(3-way) + 사이드바 하단 잠금 상태 표시 + `index.css` 컬러 시스템 중앙화(다크 모드 기본 UI 토큰 신규 설계 포함) — "모든 컴포넌트는 색상을 하드코딩하지 말고 이 CSS 변수를 참조하라"는 가이드는 `frontend/src/index.css` 최상단 주석에 있음 |
+| `archive/authgate-plan-done.md` | 공용 비밀번호 게이트(`internal/authgate`, argon2id + ENV 전용 저장, HMAC 서명 토큰, 읽기 열림/쓰기 게이트 원칙 + 터미널/파일매니저/Logs 통째 게이트) — 터미널 탭이 `RequiresUnlock`으로 안 감싸져 있던 갭도 해소됨 |
+| `archive/claude-plan-done.md` | Claude Code 상태 탭 M1(퀵 오버뷰)+M2(히트맵/주간그래프/모델별 토큰)+M3(Skills/Plugins) + 설치 버튼(mise 재사용)/mise 버전 확인·업데이트/버전 확인 무시 체크박스(백엔드 영속)/브라우저 내 로그인 자동화. 남은 M4/M5는 `claude-rework-v2.md`로 분리 |
+| `archive/claude-session-log-plan-done.md` | Claude 탭 안 대화 로그 뷰어 — `CLAUDE_CONFIG_DIR/projects/*/*.jsonl` 세션 트랜스크립트 목록/축약 채팅뷰, 벤더링한 Zod 스키마(`d-kimuson/claude-code-viewer`)로 프론트에서 파싱, Terminal/Files/Logs와 동급으로 비밀번호 게이트 |
+| `archive/manifest-shortcuts-plan-done.md` | code-server PWA manifest에 `shortcuts` 필드 주입("Open manager" 점프리스트 항목) — nginx가 `/manifest.json`만 webmanager로 가로채 원본을 fetch+편집, 실패 시 code-server 원본으로 자동 폴백 |
+| `archive/terminal-home-plan-done.md` | 터미널 홈 탭 — 항상 열려있는 첫 탭에 세션 목록 전환 + 시작 위치/실행 명령 프로파일 CRUD, 데스크탑 가로 분할/카드형 목록/드래그앤드롭 정렬까지 UI 개선 라운드 포함 |
+| `archive/session-heartbeat-plan-done.md` | 열린 브라우저 탭(어느 폴더를 열어놨는지) 목록 — 클라이언트가 UUID를 자체 발급해 30초마다 heartbeat를 보내는 방식, 새 사이드바 탭("열린 세션") |
+| `archive/session-viewer-plan.md` | (대체 기록용) code-server 자체 연결 API를 조회하는 "세션" 개념의 원래 아이디어 — 실제 구현은 `archive/session-heartbeat-plan-done.md`가 5번째 방식(heartbeat)으로 우회해서 대체함, 이 문서는 미조사 옵션 기록으로만 보존 |
+| `archive/projects-plan-done.md` | 프로젝트 스캔/정리 1단계(용량/재생성 가능 폴더 탐지, 최근 편집 런처, mise 도구 표시)+2단계(재생성 가능 폴더 단위 삭제, 확인 다이얼로그, 비밀번호 게이트) |
+| `archive/mise-plan-done.md` | mise 관리(install/use/uninstall, 설치된 도구 목록, env 미리보기, 추천 목록) + 설정에서만 제거하고 바이너리는 유지하는 비활성화/재활성화 토글 |
+| `archive/expose-plan-done.md` | code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일 origin 통합 |
+| `archive/env-migration-plan-done.md` | `.env.webmanager` 마이그레이션 도구(`webmanager --env-migrate`) — 키 추가/삭제 반영, 유저 코멘트 보존, `#!important`/`#!` 마커, 경로 기반 템플릿, 웹 UI 경고 배너(백업 안내 + 명령어 인라인 코드 표기 포함) |
 
 ## 공동 리서치 필요 (`research/*-plan.md`)
 
@@ -78,15 +83,9 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 
 | 문서 | 기능 | 우선순위 |
 |---|---|---|
-| `research/caddy-plan.md` | dev 서버를 와일드카드 서브도메인으로 자동 expose (Caddy 인스턴스) — 설계 대부분 확정, `preserve_host` 기본값 등 남은 결정 있음 | dind/터미널보다도 낮음 |
 | `research/guide-plan.md` | code-docker 도움말/가이드를 webmanager에 임베드 — 아이디어 단계, 구현 안 함 | 미정(사용자 검토 대기) |
-| `research/version-panel-plan.md` | code-server/mise 버전 관리 패널 — 아이디어 단계, "컨테이너 재빌드 필요"를 뭘로 판단할지부터 불명확 | 최하(guide-plan과 동급) |
-| `research/session-viewer-plan.md` | 활성 세션 목록 보기 — 아이디어 단계, "세션"의 정의부터 불명확해서 착수 시 사용자와 인터랙티브 확인 필수 | 최하 |
-| `filemanager-rework-plan.md` | 파일 매니저 리워크(드래그앤드롭 이동, 그리드/리스트/테이블 뷰, 멀티탭) — Termix류 벤치마킹, 아이디어 단계, 착수 전 스코프를 사용자와 논의 필수. v1에서 미뤄둔 잔여 항목(업로드 진행률/chmod/zip 다운로드 등)도 여기 기록됨(리워크와는 별개) | 최하 |
-
-`filemanager-rework-plan.md`는 최상위에 남아있음 — "착수 가능"이 아니라
-"사용자와 상의 필요"라 원칙상 `research/`에 속하지만, 파일 매니저 관련
-문서들끼리 묶어 찾기 쉽게 유지(대신 위 표에 실어서 분류는 명시).
+| `research/version-panel-plan.md` | code-server/mise 버전 관리 패널 — 아이디어 단계, "컨테이너 재빌드 필요"를 뭘로 판단할지부터 불명확 | 최하 |
+| `research/filemanager-rework-plan.md` | 파일 매니저 리워크(드래그앤드롭 이동, 그리드/리스트/테이블 뷰, 멀티탭) — Termix류 벤치마킹, 아이디어 단계, 착수 전 스코프를 사용자와 논의 필수. v1에서 미뤄둔 잔여 항목(업로드 진행률/chmod/zip 다운로드 등)도 여기 기록됨(리워크와는 별개) | 최하 |
 
 ## 프로젝트 전체 컨텍스트 (`base/`, plan/done 개념 없음)
 
@@ -100,6 +99,7 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 | 문서 | 내용 |
 |---|---|
 | `feedback/feedback-2026-08-02.md` | 실제로 써보고 나온 개선 요청들을 어떻게 처리했는지(무엇을 구현했고, 무엇을 계획만 해뒀는지) 추적 — 다시 조사/구현하기 전에 먼저 확인할 것 |
+| `feedback/feedback-2026-08-05.md` | `qa-request`/완료 문서들 실사용 QA 결과 + `.claude/` 문서 전체 재배치·모순 정리 라운드 처리 기록 |
 
 전체 순서/우선순위는 `webmanager/CLAUDE.md`가 최종 소스 — 위 표의 "우선순위" 칸은
 힌트일 뿐 그쪽이 바뀌면 이 표도 갱신할 것.

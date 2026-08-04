@@ -24,8 +24,24 @@ zip 디렉토리 다운로드는 이번 라운드에 미포함(파일 단위만)
 전부 클린.
 
 **v1에서 미뤄둔 항목(업로드 진행률/chmod/zip 다운로드/실컨테이너 검증)은
-`.claude/filemanager-rework-plan.md`의 "v1에서 미뤄둔 것" 절로 옮김** — 이
+`.claude/research/filemanager-rework-plan.md`의 "v1에서 미뤄둔 것" 절로 옮김** — 이
 문서는 실제로 구현 완료된 부분만 남김.
+
+## 업데이트 (2026-08-05): 선택 툴바 위치 + 종류 칼럼 → 아이콘 — 구현 완료
+
+실사용 피드백 2건 반영(`FileManager/FileManager.tsx`, `FileTable.tsx`, 각
+`.css`):
+
+- **"N개 선택됨" 툴바가 처음 뜰 때 테이블이 위로 밀려 레이아웃이 움직임** —
+  조건부 마운트 대신 항상 렌더링하고 `position: sticky; bottom: 0`으로
+  `.app-content` 스크롤 영역 하단에 고정, 선택 없을 땐 `visibility: hidden`으로
+  숨기되 박스 높이는 유지. 바닥에 그 공간만큼 항상 여유가 있어서 선택
+  시작/해제로 레이아웃이 밀리지 않음.
+- **"종류"(폴더/파일) 칼럼이 이름보다 늦게 눈에 들어옴** — 칼럼 자체를 없애고
+  이름 앞에 Folder/File 아이콘(`lucide-react`)을 붙이는 방식으로 변경, 심볼릭
+  링크 배지는 이름 옆으로 이동.
+
+`npm run build`/`npm run lint` 클린. 브라우저로 직접 확인은 안 함.
 
 ---
 
@@ -357,9 +373,9 @@ README/`webmanager/CLAUDE.md`의 보안 각주(dind/터미널을 "webmanager에�
 - 정확한 `internal/files` 패키지 분할(list/stat/upload/download/mutate를 파일
   몇 개로 나눌지) — 다른 `internal/*` 패키지들과 비슷한 크기가 될 걸로 예상.
 - `mode`를 `os.FileMode.String()` 그대로 노출할지, chmod 변경 기능까지 v1에
-  넣을지 — **v1 스코프 밖으로 결론, 아직 미착수(`filemanager-rework-plan.md`
+  넣을지 — **v1 스코프 밖으로 결론, 아직 미착수(`research/filemanager-rework-plan.md`
   참고)**.
-- 업로드 중 진행률 표시 여부 — **미착수로 남음(`filemanager-rework-plan.md`
+- 업로드 중 진행률 표시 여부 — **미착수로 남음(`research/filemanager-rework-plan.md`
   참고)**.
 - 디렉토리 목록에 숨김 파일(`.`으로 시작) 기본 표시 여부/토글 UI — **구현
   완료**(토글 UI 있음).
@@ -379,7 +395,7 @@ README/`webmanager/CLAUDE.md`의 보안 각주(dind/터미널을 "webmanager에�
 - **디렉토리 다운로드(zip) 지원을 v1에 포함할지**: `archive/zip`(stdlib, 새
   의존성 없음)으로 구현 가능하지만, 스트리밍 중 압축이라 진행률 표시가 파일
   단일 다운로드보다 복잡해짐 — **결론: v1에서 뺴고 파일 단위 다운로드만
-  구현, zip은 미착수로 `filemanager-rework-plan.md`에 기록됨**.
+  구현, zip은 미착수로 `research/filemanager-rework-plan.md`에 기록됨**.
 - **비밀번호 게이트를 터미널과 공유할지, 파일 매니저 전용 별도 해시로 할지**:
   terminal-plan-done.md가 이미 열어둔 질문("터미널 전용 vs webmanager 전체")이 이
   문서로 두 번째 후보가 생기면서 더 구체화됨 — 공유하면 env var 하나로 두 기능

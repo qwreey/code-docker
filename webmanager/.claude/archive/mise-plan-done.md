@@ -1,5 +1,42 @@
 # mise 관리 계획 — 구현 완료
 
+## 추가 업데이트 — 비활성화/재활성화
+
+`DELETE /api/mise/tools`에 `configOnly bool` 필드 추가(`handlers_mise.go`).
+`configOnly: true`면 `mise uninstall` 스텝을 건너뛰고 `mise use --remove <id>`만
+실행 — 바이너리는 그대로 두고 전역 설정 선언만 지우는 "비활성화" 모드.
+`ConfigOnly`가 `RemoveFromConfig`보다 우선(둘 다 true여도 충돌 아님, remove 스텝
+한 번만 실행). 기존 `removeFromConfig`/기본 삭제 동작은 변경 없음.
+
+프론트(`Mise.tsx`): "설치된 도구" 테이블에 두 버튼 추가.
+- **비활성화** — `tool.source`가 있고(`declared`) `tool.installed`인 도구에 표시,
+  `DELETE /api/mise/tools`를 `{id, version, global: true, configOnly: true}`로
+  호출. 바이너리는 유지되지만 활성 도구 가용성이 바뀌는 액션이라 가벼운
+  `ConfirmDialog`를 새로 하나 더 둠(`deactivateTarget` 상태, 기존 삭제 확인
+  다이얼로그와 별개).
+- **재활성화** — `tool.source === null`(설치는 됐지만 전역 설정엔 미선언)인
+  도구에 표시, 기존 설치 엔드포인트(`POST /api/mise/tools`, `{id, version,
+  global: true}`, 이미 설치된 버전이라 빠르게 끝남)를 그대로 재사용 — 별도
+  확인 다이얼로그 없음(추가적인 동작이라 저위험 판단).
+- 두 액션 모두 기존 `JobPanel`/`GET /api/mise/jobs/:id` 폴링 UI를 그대로
+  재사용 — `JobPanel`에 `actionLabel?: string` prop만 추가(헤더 텍스트를
+  "비활성화"/"재활성화"로 오버라이드, 기본은 기존 kind 기반 "설치"/"삭제" 유지,
+  `ClaudeCode.tsx`의 기존 호출부는 변경 없음).
+- 기존 삭제(uninstall)/설치(install) 버튼과 동작은 그대로 유지.
+
+`go build`/`go vet`/`gofmt -l .`/`npm run build` 전부 클린.
+
+## 추가 업데이트 — "설정에서도 제거" 체크박스를 삭제 확인 다이얼로그 안으로
+
+원래 결정된 방향(체크박스는 테이블 행 상시 노출 토글이 아니라 삭제 확인
+다이얼로그 안에 있어야 함)이 미반영 상태로 남아있던 걸 실사용 피드백으로
+발견, 반영함(`Mise.tsx`, `Mise.css`). 다이얼로그를 열 때마다 체크 상태가
+기본 해제로 리셋되고, 체크 여부에 따라 확인 문구("...삭제하고 설정 파일에서도
+제거"/"...설정 파일의 항목은 유지됩니다")가 바뀌는 동작은 그대로. 별도 CSS
+없이 `ConfirmDialog`의 기존 `.confirm-dialog-checkbox` 스타일 재사용.
+
+`npm run build`/`npm run lint` 클린.
+
 ## 구현 완료 (2026-08-02)
 
 이 문서의 설계(리서치 → API 설계 → 백엔드/프론트 구현)대로 전부 구현 완료.
@@ -45,7 +82,7 @@ download` 등)는 stdout이 아니라 **stderr**로 나옴 — 구현은 이미 
   함 — 재구현할 로직이 없음. 익스텐션 기능(`internal/extensions`)과 완전히 같은
   모양의 "CLI shell-out + 결과 파싱"으로 끝남.
 - `mise ls --json`/`mise env --json`/`mise registry --json` 전부 구조화된 JSON을
-  내놓음 — `claude mcp list`(`claude-plan.md` M5가 뒤로 미뤄진 이유)처럼 텍스트
+  내놓음 — `claude mcp list`(`claude-rework-v2.md` M5가 뒤로 미뤄진 이유)처럼 텍스트
   파싱이 필요한 경우가 하나도 없음.
 - 설치 진행 로그는 라인 버퍼링된 평범한 텍스트 스트림(`[1/3] download`, `[2/3]
   verify` 등)이라 실제 PTY가 필요 없음 — `archive/terminal-plan-done.md`의 PTY/WebSocket
@@ -204,7 +241,7 @@ mise:
   시 이후 `mise ls`로 재확인하는 편이 안전.
 - **`mise ls [-g|-l|-c] [-C <dir>] [--json]`** — `--json`이 도구 이름 →
   `{version, requested_version, install_path, source:{type,path}, installed,
-  active}[]` 구조로 깔끔하게 나옴. `claude mcp list`(`claude-plan.md` M5가 텍스트
+  active}[]` 구조로 깔끔하게 나옴. `claude mcp list`(`claude-rework-v2.md` M5가 텍스트
   파싱 필요해서 뒤로 미뤄진 사례)와 달리 **파싱이 전혀 필요 없음**. `-C <dir>
   --local --json`으로 특정 디렉토리(cd 없이)를 지정하면 그 프로젝트 자신의
   `mise.toml`이 선언한 도구만 딱 나오고 `source.path`가 정확히 어떤 설정 파일인지
@@ -230,7 +267,7 @@ mise:
   `$HOME/.local/bin/mise env --shell bash`로 직접 호출하는 걸 확인함 — 즉 컨테이너
   안에서 mise 자신은 `/code/.local/bin/mise`에 고정으로 있고(mise가 설치하는
   다른 도구들과 달리 PATH shim에 안 얹혀있음), `webmanager` supervisord
-  프로그램의 PATH에 이게 잡혀 있다는 보장이 없음(`claude-plan.md`가 이미 같은
+  프로그램의 PATH에 이게 잡혀 있다는 보장이 없음(`archive/claude-plan-done.md`가 이미 같은
   문제를 `WEBMANAGER_CLAUDE_BINPATH`로 해결한 것과 동일 클래스의 문제). 아래
   "백엔드 설계" 절 참고.
 
@@ -394,7 +431,7 @@ GET  /api/mise/jobs/:id
 - 웹쉘(터미널) 설계는 `archive/terminal-plan-done.md` — 이 문서가 스트리밍 재사용을
   비권장했으므로 mise 쪽 구현은 이 문서의 M1/M2 진행 상황과 무관하게 진행 가능.
 - Projects 탭은 `projects-plan-done.md`.
-- `claude mcp list`의 텍스트 파싱 문제(비교 대상)는 `claude-plan.md`의 M5 절.
+- `claude mcp list`의 텍스트 파싱 문제(비교 대상)는 `claude-rework-v2.md`의 M5 절.
 
 ## 사용자 확인 필요
 

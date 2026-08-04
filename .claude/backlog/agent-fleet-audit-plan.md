@@ -155,7 +155,7 @@ git 서버 자체)에 있어야 의미가 있음.
 
 ## 참고
 
-- `webmanager/.claude/research/session-viewer-plan.md` — "세션"이라는
+- `webmanager/.claude/archive/session-viewer-plan.md` — "세션"이라는
   단어의 다의성 경고, 착수 전 사용자와 인터랙티브 스코프 확인이 필요하다는
   문서 스타일도 동일하게 참고.
 - 루트 `CLAUDE.md` — override 패턴, vector 로그 파이프라인, `PREFIX` 다중

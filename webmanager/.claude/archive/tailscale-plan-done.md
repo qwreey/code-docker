@@ -8,7 +8,7 @@ tailscale-design.md`(레포 루트) — 프로젝트 전체에 걸친 내용이�
 ## 업데이트 (2026-08-02, 두 번째 라운드)
 
 쓰기(config PUT, forwards/publish의 POST·DELETE)에 비밀번호 게이트 적용됨,
-읽기는 그대로 열림 — 자세히는 `.claude/authgate-plan-done.md`.
+읽기는 그대로 열림 — 자세히는 `.claude/archive/authgate-plan-done.md`.
 
 ## 기능
 
@@ -48,3 +48,21 @@ tailscale-design.md`(레포 루트) — 프로젝트 전체에 걸친 내용이�
 `src/components/Tailscale/` — `GlobalSettings`/`Forwards`/`Publish` 서브섹션,
 로그인 상태는 code-server 배너를 보라는 안내 문구만 표시. 뮤테이션 후 "저장됨
 (tailscale-forward 재시작됨)" 트랜지언트 알림.
+
+## 업데이트 (2026-08-05): 서브탭 분리 — 구현 완료
+
+페이지가 너무 길어지고, "아래 상태 카드는 조회 전용입니다 — forwards/publish
+설정을 관리하려면 이어지는 섹션을 사용하세요" 같은 안내 문구로 스크롤을
+유도하기보다 Task Manager의 성능/프로세스 서브탭과 같은 패턴으로 나누는 게
+낫다는 실사용 피드백 반영(`Tailscale/Tailscale.tsx`, `Tailscale.css`).
+우측 상단에 탭 버튼 2개:
+
+- **기본 설정**: `Status`(로그인/피어 상태) + `GlobalSettings`(전역 설정,
+  앞으로 늘어날 전역 설정도 여기로) — "신원/설정" 성격.
+- **포워드 / 퍼블리시**: `Forwards` + `Publish` — "트래픽 방향" 성격.
+
+두 그룹의 성격이 충분히 달라서(하나는 상태 조회+전역 설정, 다른 하나는 개별
+항목 CRUD) 나누는 이점이 있다는 판단. sshd 자동 노출 경고 배너는 두 탭 모두에
+해당하는 내용이라 탭 밖(공통 영역)에 그대로 둠.
+
+`npm run build`/`npm run lint` 클린. 브라우저로 직접 확인은 안 함.

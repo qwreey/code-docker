@@ -1,5 +1,45 @@
 # 활성 세션(열린 브라우저 탭) 목록 — heartbeat 방식
 
+> **추가 업데이트 (2026-08-05)**: "닫기 시도" 편의 버튼 추가 — 기존
+> heartbeat 요청/응답 왕복에 그대로 편승, 별도 폴링 루프 없음. `Entry`에
+> `CloseRequested bool` (`json:"closeRequested"`) 필드 추가. `Store.Heartbeat`는
+> upsert 시 기존 엔트리의 `CloseRequested`를 보존하도록 바뀌었고(반환 타입도
+> `bool`로 변경 — upsert 후의 `CloseRequested` 상태를 돌려줌), 새 메서드
+> `Store.RequestClose(id string) bool`이 엔트리의 `CloseRequested`를
+> `true`로 세팅(없으면 `false` 반환 → 핸들러가 404 처리). **취소 불가,
+> 의도된 설계**: `RequestClose`를 되돌리는 "unrequest" 메서드는 존재하지
+> 않음 — 저장소 소유자가 명시적으로 요청한 제약. 엔트리가 GC로 사라진 뒤
+> 같은 id로 다시 heartbeat가 오면 `CloseRequested: false`인 새 엔트리로
+> 취급(요청이 엔트리 수명을 넘어 지속되지 않음).
+>
+> `handleSessionHeartbeat`는 응답에 `shouldClose`를 포함하도록 변경
+> (`{"ok": true, "shouldClose": <bool>}`), 기존 UUID 검증/바디 크기 제한/
+> ungated 상태는 그대로. 새 핸들러 `handleRequestSessionClose`
+> (`POST /api/sessions/{id}/close`)는 같은 `uuidRe`로 id 검증 후
+> `Store.RequestClose` 호출, 없으면 404, 있으면 `{"ok": true}` —
+> `GET /api/sessions`와 동일하게 `gate.RequirePassword`로 감쌈(운영자
+> 액션이므로 heartbeat POST와 달리 게이트 필요). `main.go`에 라우트 등록은
+> 기존 세션 라우트 2개 바로 옆(295~297줄 근처).
+>
+> 클라이언트 패치(`config/code-patch/session-heartbeat.default.js`)는
+> heartbeat `fetch` 성공 후 응답 JSON을 파싱해 `shouldClose`가 true면
+> `window.close()` 호출. `window.close()`는 태생적으로 best-effort —
+> 스크립트가 직접 `window.open()`으로 연 탭이 아니면 대부분의 브라우저가
+> 조용히 무시(에러 없이 no-op)한다는 걸 주석으로 명시, 우회 시도 안 함.
+>
+> 프론트엔드(`Sessions.tsx`)에 "닫기 시도" 버튼 컬럼 추가 —
+> `s.closeRequested`가 참이거나 요청이 in-flight면 비활성화하고 라벨을
+> "닫기 요청됨"으로 바꿈. `closingIds`(로컬 `Set<string>`)는 순수히
+> in-flight 스피너용이고, 요청됨/안 됨 상태 자체는 항상 서버의
+> `closeRequested` 필드를 신뢰(성공 후 `load()`로 재조회) — 별도의
+> local-only 상태를 만들어 서버 상태와 어긋날 여지를 두지 않음.
+> `api/types.ts`의 `OpenSession`에 `closeRequested: boolean` 추가.
+> 페이지 설명문에 "* 닫기는 강제적 세션 삭제 기능이 아닙니다..." 문구
+> 그대로 추가.
+>
+> 검증: `go build ./...`, `go vet ./...`, `gofmt -l .`(무결과),
+> `npm run build`, `npm run lint` 전부 통과.
+
 > **구현 완료 (코드/빌드 검증)** — 아래 설계 그대로 구현됨: 백엔드
 > `internal/sessionheartbeat`(store.go 대신 `sessionheartbeat.go` 한 파일 —
 > 소규모 패키지라 굳이 분리 안 함), `main.go`에 라우트 2개 + GC 고루틴
