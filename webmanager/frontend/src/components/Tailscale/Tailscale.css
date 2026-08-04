@@ -31,9 +31,12 @@
   text-decoration: none;
 }
 
+/* Stacked, not side-by-side - "내 정보" is a narrow key-value list but "피어
+   목록" is a 5-column table that needs full width to stay readable; a
+   side-by-side auto-fit grid squeezed the peer table into half the page. */
 .tailscale-status-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
