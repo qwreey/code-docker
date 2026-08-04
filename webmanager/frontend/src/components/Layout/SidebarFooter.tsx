@@ -4,6 +4,7 @@ import { useTheme } from '../../useTheme'
 import type { ThemeChoice } from '../../theme'
 import { requestUnlock } from '../../api/client'
 import { useAuthStatus } from '../common/useAuthStatus'
+import { withViewTransition } from '../../utils/viewTransition'
 
 const THEME_CYCLE: ThemeChoice[] = ['system', 'light', 'dark']
 const THEME_ICON: Record<ThemeChoice, typeof Monitor> = { system: Monitor, light: Sun, dark: Moon }
@@ -76,7 +77,7 @@ export function SidebarFooter() {
         type="button"
         className="sidebar-theme-btn"
         title={`테마: ${THEME_LABEL[theme]} (클릭하면 ${THEME_LABEL[nextTheme(theme)]}로 전환)`}
-        onClick={() => setTheme(nextTheme(theme))}
+        onClick={() => withViewTransition(() => setTheme(nextTheme(theme)))}
       >
         <ThemeIcon size={16} aria-hidden="true" />
       </button>
