@@ -35,6 +35,24 @@ export function requestUnlock(): Promise<void> {
 // of re-triggering the prompter (which could otherwise recurse).
 const UNLOCK_PATH = '/auth/unlock'
 
+// Each useAuthStatus() consumer (SidebarFooter, RequiresUnlock, ...) keeps
+// its own independent status copy, refreshed only when its own caller
+// triggers it - so a successful unlock in one place (e.g. a 401 popping the
+// modal from a gated write elsewhere) left every other consumer's copy
+// stale. Notifying here, the one place every unlock path (proactive click
+// or 401-triggered) funnels through, lets every mounted consumer self-refresh
+// without needing to know about the others.
+const authStatusListeners = new Set<() => void>()
+
+export function onAuthStatusChange(cb: () => void): () => void {
+  authStatusListeners.add(cb)
+  return () => authStatusListeners.delete(cb)
+}
+
+function notifyAuthStatusChange() {
+  authStatusListeners.forEach((cb) => cb())
+}
+
 // import.meta.env.BASE_URL is '/' in dev and '/manager/' in a production
 // build (see vite.config.ts) - prefixing every API URL with it is what lets
 // the same build work whether nginx strips a /manager prefix in front of it
@@ -45,6 +63,10 @@ export function apiUrl(path: string): string {
 
 async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
   const res = await fetch(apiUrl(path), init)
+
+  if (path === UNLOCK_PATH && res.ok) {
+    notifyAuthStatusChange()
+  }
 
   if (res.status === 204) {
     return undefined as T

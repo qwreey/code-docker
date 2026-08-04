@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, errorMessage } from '../../api/client'
+import { api, errorMessage, onAuthStatusChange } from '../../api/client'
 import type { AuthStatus } from '../../api/types'
 
 // Shared GET /auth/status fetch - originally only RequiresUnlock.tsx called
@@ -21,6 +21,7 @@ export function useAuthStatus() {
 
   useEffect(() => {
     refresh()
+    return onAuthStatusChange(refresh)
   }, [refresh])
 
   return { status, error, refresh }
