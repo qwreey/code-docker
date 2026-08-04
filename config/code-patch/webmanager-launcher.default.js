@@ -15,6 +15,14 @@
     cursor: pointer;
     transition: filter .15s ease, box-shadow .15s ease;
     border-radius: 4px;
+    /* .titlebar-drag-region overlays the whole titlebar with
+       -webkit-app-region:drag (workbench.css) - every other clickable
+       titlebar widget (menubar, command-center, window-controls) opts back
+       out with no-drag, but .window-appicon never needed to until this
+       script made it clickable. Without this, clicks here move the window
+       instead of firing, in installed-PWA/window-controls-overlay mode. */
+    app-region: no-drag;
+    -webkit-app-region: no-drag;
 }
 .window-appicon.cd-webmanager-launcher:hover {
     filter: brightness(1.4);
