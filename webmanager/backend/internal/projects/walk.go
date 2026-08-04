@@ -39,7 +39,7 @@ func scanProject(root, path string, patterns map[string]struct{}, oldDays int) P
 		Reclaimable:          reclaimable,
 		LastModified:         lastMod.Format(time.RFC3339),
 		Stale:                stale,
-		TechStack:            detectTechStack(path),
+		TechStack:            detectTechStack(path, patterns),
 		ScannedAt:            now.Format(time.RFC3339),
 	}
 }
@@ -155,11 +155,27 @@ var techStackMarkers = []struct {
 	{"composer.json", "PHP"},
 }
 
-// detectTechStack only checks the project's top-level directory for marker
-// files, not a deep search.
-func detectTechStack(dir string) []string {
+// techStackScanDepth bounds how many levels below the project root
+// detectTechStack will descend looking for marker files — deep enough to
+// catch a monorepo subpackage (e.g. api-generated/package.json one level
+// down, or packages/foo/go.mod two levels down) without doing a full
+// unbounded walk.
+const techStackScanDepth = 2
+
+// detectTechStack checks the project's top-level directory, then descends
+// up to techStackScanDepth levels (skipping .git and any reclaimable
+// pattern match, e.g. node_modules, so it never walks into a dependency
+// tree) for marker files. A monorepo subpackage whose own package.json/
+// go.mod/etc. isn't hoisted or mirrored at the project root still earns the
+// project a badge this way.
+func detectTechStack(dir string, patterns map[string]struct{}) []string {
 	result := []string{}
 	seen := make(map[string]bool, len(techStackMarkers))
+	scanTechStackDir(dir, patterns, techStackScanDepth, seen, &result)
+	return result
+}
+
+func scanTechStackDir(dir string, patterns map[string]struct{}, depth int, seen map[string]bool, result *[]string) {
 	for _, m := range techStackMarkers {
 		if seen[m.badge] {
 			continue
@@ -167,8 +183,28 @@ func detectTechStack(dir string) []string {
 		if _, err := os.Stat(filepath.Join(dir, m.file)); err != nil {
 			continue
 		}
-		result = append(result, m.badge)
+		*result = append(*result, m.badge)
 		seen[m.badge] = true
 	}
-	return result
+	if depth <= 0 || len(seen) == len(techStackMarkers) {
+		return
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if name == ".git" {
+			continue
+		}
+		if _, ok := patterns[name]; ok {
+			continue
+		}
+		scanTechStackDir(filepath.Join(dir, name), patterns, depth-1, seen, result)
+	}
 }
