@@ -111,9 +111,17 @@ vscord 확장으로 Discord Rich Presence를 연동하고, ssh 소켓 포워딩�
 
 자세한 내용은 [docs/tips/dind.md](docs/tips/dind.md)를 확인하세요.
 
+## 환경 변수 설정 (.env)
+
+`PWA_NAME`, `TZ`, `LANG`, 마운트할 볼륨 경로(`HOME_VOLUME`/`SSHD_VOLUME`/`DIND_VOLUME`), tailscale 관련 값, 로그 상세도 등 `docker-compose.yml`이 읽는 값들은 모두 `example-env`에 설명과 함께 정리되어 있습니다. `example-env`를 `.env`로 복사한 뒤 필요한 값만 주석을 풀어 쓰세요 - 전부 합리적인 기본값이 있어 이 파일이 없어도 정상 동작합니다. 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다.
+
+```sh
+cp example-env .env
+```
+
 ## 여러 code-docker 인스턴스 사용
 
-여러 인스턴스 구동 시 container_name 이 겹칠 수 있습니다. 기본적으로 `${PREFIX:-}`를 붙여서 `docker-compose.yml`을 제공하므로 `.env` 파일을 만들고 `PREFIX`를 적절히 설정해주면 해결됩니다.
+여러 인스턴스 구동 시 container_name 이 겹칠 수 있습니다. `.env`에 `PREFIX`를 적절히 설정해주면 해결됩니다 (기본적으로 `${PREFIX:-}`를 붙여서 `docker-compose.yml`을 제공합니다).
 
 ## tailscale 연결
 
