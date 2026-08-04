@@ -43,7 +43,11 @@ export function EnvVersionBanner() {
         <span>
           .env.webmanager 버전({status.fileVersion || '알수없음'})이 이 이미지의
           example-env.webmanager 버전({status.currentVersion})과 다릅니다 — 새로 추가되거나
-          바뀐 설정이 있을 수 있어요. 아래 명령으로 마이그레이션하세요:
+          바뀐 설정이 있을 수 있어요. 먼저 백업해두고:
+          <br />
+          <code>cp .env.webmanager .env.webmanager.bak</code>
+          <br />
+          아래 명령으로 마이그레이션하세요:
           <br />
           <code>
             cat .env.webmanager | docker compose exec -T code-docker

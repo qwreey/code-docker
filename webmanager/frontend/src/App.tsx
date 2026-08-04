@@ -81,7 +81,11 @@ function App() {
           {active === 'dind' && <Dind />}
           {active === 'claude' && <ClaudeCode />}
           {active === 'extensions' && <Extensions />}
-          {active === 'terminal' && <Terminal />}
+          {active === 'terminal' && (
+            <RequiresUnlock>
+              <Terminal />
+            </RequiresUnlock>
+          )}
           {active === 'files' && (
             <Suspense fallback={<Skeleton />}>
               <RequiresUnlock>
