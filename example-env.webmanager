@@ -29,7 +29,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=8
+WEBMANAGER_ENV_VERSION=9
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -71,6 +71,11 @@ WEBMANAGER_ENV_VERSION=8
 #. --- mise 탭 ---
 #. `mise` 바이너리 경로 오버라이드.
 #WEBMANAGER_MISE_BINPATH=
+
+#. --- 재시작 필요 배너 (mise/익스텐션/Claude Code 탭 공용) ---
+#. 도구 설치/삭제가 끝난 뒤 "code-server 재시작 필요" 상태를 저장하는 경로.
+#. code-server의 PID가 바뀌면(=재시작되면) 자동으로 사라집니다.
+#WEBMANAGER_RESTART_STATUS_PATH=
 
 #. --- Tailscale 탭 (상태 조회) ---
 #. `tailscale` 바이너리 경로 오버라이드. 이미지에 이미 PATH로 잡혀 있어야 하므로

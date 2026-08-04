@@ -126,7 +126,7 @@ func (s *Server) handleClaudeInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jobID := s.miseJobs.Start(miseBin, []string{"use", "-g", "-y", "claude-code@" + version})
+	jobID := s.miseJobs.StartWithCallback(s.onMiseJobDone, miseBin, []string{"use", "-g", "-y", "claude-code@" + version})
 	writeJSON(w, http.StatusOK, jobResponse{JobID: jobID})
 }
 

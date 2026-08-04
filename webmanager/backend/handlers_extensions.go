@@ -90,6 +90,7 @@ func (s *Server) handleInstallCodeExtension(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	s.markRestartDirty()
 
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
@@ -105,6 +106,7 @@ func (s *Server) handleUninstallCodeExtension(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	s.markRestartDirty()
 
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

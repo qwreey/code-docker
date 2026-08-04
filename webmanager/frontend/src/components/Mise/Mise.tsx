@@ -10,7 +10,9 @@ import type {
   MiseToolsResponse,
   RecommendationsResponse,
 } from '../../api/types'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { RestartNeededBanner } from '../common/RestartNeededBanner'
 import { Skeleton } from '../common/Skeleton'
 import '../common/common.css'
 import { JobPanel } from './JobPanel'
@@ -62,6 +64,7 @@ export function Mise() {
   const [envError, setEnvError] = useState<string | null>(null)
   const [categoryOpen, setCategoryOpen] = useState<Record<string, boolean>>({})
   const [showRecommendations, setShowRecommendations] = useState(loadShowRecommendations)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; tool: MiseToolEntry } | null>(null)
 
   const loadingRef = useRef(false)
 
@@ -131,14 +134,16 @@ export function Mise() {
     }
   }
 
-  async function handleDelete(id: string, tool: MiseToolEntry) {
+  function handleDelete(id: string, tool: MiseToolEntry) {
     if (busy) return
-    const key = keyFor(id, tool.version)
-    const removeFromConfig = removeFromConfigChecked.has(key)
-    const confirmMessage = removeFromConfig
-      ? `"${id}@${tool.version}"을(를) 삭제하고 설정 파일에서도 제거하시겠습니까?`
-      : `"${id}@${tool.version}"을(를) 삭제하시겠습니까? (설정 파일의 항목은 유지됩니다)`
-    if (!window.confirm(confirmMessage)) return
+    setDeleteTarget({ id, tool })
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    const { id, tool } = deleteTarget
+    const removeFromConfig = removeFromConfigChecked.has(keyFor(id, tool.version))
+    setDeleteTarget(null)
     setError(null)
     try {
       const res = await api.del<MiseJob>('/mise/tools', { id, version: tool.version, global: true, removeFromConfig })
@@ -208,6 +213,7 @@ export function Mise() {
         mise로 관리하는 전역(global) 런타임/도구를 추천 목록에서 설치하거나 설치된 버전을 확인하고 삭제할 수 있습니다.
       </p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+      <RestartNeededBanner refreshToken={job ? `${job.jobId}:${job.status?.running}` : undefined} />
 
       {job && (
         <JobPanel kind={job.kind} toolLabel={job.toolLabel} status={job.status} onClose={() => setJob(null)} />
@@ -378,6 +384,27 @@ export function Mise() {
           )
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        title="도구 삭제"
+        confirmLabel="삭제"
+      >
+        {deleteTarget &&
+          (removeFromConfigChecked.has(keyFor(deleteTarget.id, deleteTarget.tool.version)) ? (
+            <>
+              &quot;{deleteTarget.id}@{deleteTarget.tool.version}&quot;을(를) 삭제하고 설정 파일에서도
+              제거하시겠습니까?
+            </>
+          ) : (
+            <>
+              &quot;{deleteTarget.id}@{deleteTarget.tool.version}&quot;을(를) 삭제하시겠습니까? (설정 파일의 항목은
+              유지됩니다)
+            </>
+          ))}
+      </ConfirmDialog>
     </section>
   )
 }

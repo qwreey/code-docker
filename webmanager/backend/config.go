@@ -128,6 +128,12 @@ type Config struct {
 	// internal/envversionprefs) — not gated, purely a "don't nag me again
 	// about this exact version" UI preference, same tier as SidebarOrderPath.
 	EnvVersionDismissPath string
+
+	// RestartStatusPath is where the "code-server restart needed" flag (see
+	// internal/restartstatus) is persisted — set after a mise tool/Claude
+	// Code/extension install or uninstall completes, cleared implicitly the
+	// moment code-server's live PID no longer matches what was recorded.
+	RestartStatusPath string
 }
 
 func getenv(key, def string) string {
@@ -209,5 +215,7 @@ func loadConfig() Config {
 		EnvTemplatePath:       getenv("WEBMANAGER_ENV_TEMPLATE_PATH", "/etc/code-docker/webmanager/example-env.webmanager"),
 		EnvVersion:            getenv("WEBMANAGER_ENV_VERSION", ""),
 		EnvVersionDismissPath: getenv("WEBMANAGER_ENV_VERSION_DISMISS_PATH", "/code/.webmanager/env-version-dismiss.json"),
+
+		RestartStatusPath: getenv("WEBMANAGER_RESTART_STATUS_PATH", "/code/.webmanager/restart-status.json"),
 	}
 }

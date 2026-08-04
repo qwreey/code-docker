@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { CodeExtensionsResponse, RecommendationsResponse, RecommendedExtension } from '../../api/types'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { RestartNeededBanner } from '../common/RestartNeededBanner'
 import { Skeleton } from '../common/Skeleton'
 import '../common/common.css'
 import './Extensions.css'
@@ -46,9 +48,11 @@ export function Extensions() {
   const [loading, setLoading] = useState(true)
   const [installingId, setInstallingId] = useState<string | null>(null)
   const [uninstallingId, setUninstallingId] = useState<string | null>(null)
+  const [uninstallTarget, setUninstallTarget] = useState<string | null>(null)
   const [installedSectionOpen, setInstalledSectionOpen] = useState(false)
   const [categoryOpen, setCategoryOpen] = useState<Record<string, boolean>>({})
   const [showRecommendations, setShowRecommendations] = useState(loadShowRecommendations)
+  const [restartCheckToken, setRestartCheckToken] = useState(0)
 
   const loadingRef = useRef(false)
 
@@ -102,6 +106,7 @@ export function Extensions() {
       setInstalled((prev) => new Set(prev).add(id))
       setInstalledList((prev) => (prev.includes(id) ? prev : [...prev, id]))
       setError(null)
+      setRestartCheckToken((t) => t + 1)
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -109,8 +114,14 @@ export function Extensions() {
     }
   }
 
-  async function handleUninstall(id: string) {
-    if (!window.confirm(`"${id}" 익스텐션을 삭제하시겠습니까?`)) return
+  function handleUninstall(id: string) {
+    setUninstallTarget(id)
+  }
+
+  async function confirmUninstall() {
+    if (!uninstallTarget) return
+    const id = uninstallTarget
+    setUninstallTarget(null)
     setUninstallingId(id)
     try {
       await api.del<{ ok: true }>(`/code-extensions/${encodeURIComponent(id)}`)
@@ -121,6 +132,7 @@ export function Extensions() {
       })
       setInstalledList((prev) => prev.filter((x) => x !== id))
       setError(null)
+      setRestartCheckToken((t) => t + 1)
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -161,6 +173,7 @@ export function Extensions() {
       </div>
       <p className="section-description">추천 code-server 익스텐션을 확인하고 바로 설치할 수 있습니다.</p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+      <RestartNeededBanner refreshToken={restartCheckToken} />
 
       <div className="extensions-group">
         <button
@@ -275,6 +288,20 @@ export function Extensions() {
             <p className="extensions-note">설치 후 변경 사항을 code-server에 반영하려면 재시작이 필요할 수 있습니다.</p>
           </>
         ))}
+
+      <ConfirmDialog
+        open={uninstallTarget !== null}
+        onClose={() => setUninstallTarget(null)}
+        onConfirm={confirmUninstall}
+        title="익스텐션 삭제"
+        confirmLabel="삭제"
+      >
+        {uninstallTarget && (
+          <>
+            &quot;{uninstallTarget}&quot; 익스텐션을 삭제하시겠습니까?
+          </>
+        )}
+      </ConfirmDialog>
     </section>
   )
 }

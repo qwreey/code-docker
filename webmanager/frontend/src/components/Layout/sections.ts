@@ -36,5 +36,5 @@ export const SECTIONS: SectionMeta[] = [
   { id: 'claude', label: 'Claude Code', implemented: true },
   { id: 'extensions', label: 'Code Extensions', implemented: true },
   { id: 'files', label: 'Files', implemented: true },
-  { id: 'sessions', label: '열린 세션', implemented: true },
+  { id: 'sessions', label: 'Sessions', implemented: true },
 ]

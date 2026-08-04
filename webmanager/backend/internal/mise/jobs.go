@@ -108,6 +108,16 @@ func newJobID() string {
 // job/polling model itself is what removes the need for a timeout (see
 // mise-plan.md's "스트리밍 방식" section).
 func (s *JobStore) Start(binPath string, argSets ...[]string) string {
+	return s.StartWithCallback(nil, binPath, argSets...)
+}
+
+// StartWithCallback is Start, plus onDone(exitCode) invoked once in the same
+// background goroutine right after the job finishes (after Status already
+// reflects the final state). onDone may be nil (Start's case) — used by
+// callers that need a completion signal without polling Status themselves,
+// e.g. handlers_mise.go/handlers_claude.go marking the restart-needed flag
+// only when the job actually succeeded.
+func (s *JobStore) StartWithCallback(onDone func(exitCode int), binPath string, argSets ...[]string) string {
 	id := newJobID()
 	j := &job{running: true, lines: []string{}, startedAt: time.Now()}
 
@@ -136,6 +146,10 @@ func (s *JobStore) Start(binPath string, argSets ...[]string) string {
 		code := lastCode
 		j.exitCode = &code
 		s.mu.Unlock()
+
+		if onDone != nil {
+			onDone(lastCode)
+		}
 	}()
 
 	return id

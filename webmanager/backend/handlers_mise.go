@@ -104,7 +104,7 @@ func (s *Server) handleCreateMiseTool(w http.ResponseWriter, r *http.Request) {
 		args = []string{"use", "-C", body.Path, "-y", spec}
 	}
 
-	jobID := s.miseJobs.Start(binPath, args)
+	jobID := s.miseJobs.StartWithCallback(s.onMiseJobDone, binPath, args)
 	writeJSON(w, http.StatusOK, jobResponse{JobID: jobID})
 }
 
@@ -164,7 +164,7 @@ func (s *Server) handleDeleteMiseTool(w http.ResponseWriter, r *http.Request) {
 		argSets = append(argSets, removeArgs)
 	}
 
-	jobID := s.miseJobs.Start(binPath, argSets...)
+	jobID := s.miseJobs.StartWithCallback(s.onMiseJobDone, binPath, argSets...)
 	writeJSON(w, http.StatusOK, jobResponse{JobID: jobID})
 }
 
