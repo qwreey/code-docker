@@ -1,5 +1,14 @@
 FROM docker:latest AS docker-bin
 
+# code-docker-dind's image - see docker-compose.yml's code-docker-dind service
+# and dind-entrypoint.sh's own comments for why this wraps the stock
+# docker:dind entrypoint. Built as a stage here (COPY at build time) rather
+# than bind-mounted at runtime so it isn't tied to the compose file's
+# location - see the "context:" comment on the main service below.
+FROM docker:dind AS dind
+COPY script/dind-entrypoint.sh /dind-entrypoint.sh
+ENTRYPOINT ["/dind-entrypoint.sh"]
+
 FROM node:24-alpine AS webmanager-frontend
 WORKDIR /src
 COPY webmanager/frontend/package.json webmanager/frontend/package-lock.json ./

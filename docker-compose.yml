@@ -119,7 +119,12 @@ services:
   code-docker-dind:
     container_name: "${PREFIX:-}code-docker-dind"
     hostname: code-docker-dind
-    image: docker:dind
+    build:
+      # Same reasoning as code-docker's context above: change this if you
+      # cloned this docker-compose file to outside, ex: builds/code-docker
+      context: .
+      network: host
+      target: dind
     privileged: true
     restart: unless-stopped
     environment:
@@ -127,12 +132,6 @@ services:
     volumes:
       # Persist pulled images/containers across restarts
       - "${DIND_VOLUME:-./dind}:/var/lib/docker"
-      # Binds the daemon to code-docker-internal only (see script) instead
-      # of the stock entrypoint's hardcoded 0.0.0.0, so it's unreachable
-      # from code-docker-external even though that network is attached
-      # below (needed for `docker pull`).
-      - ./script/dind-entrypoint.sh:/dind-entrypoint.sh:ro
-    entrypoint: ["/dind-entrypoint.sh"]
     networks:
       code-docker-internal:
         # Extra name that only resolves on this network, so code-docker
