@@ -33,6 +33,9 @@
   - `agent-fleet-audit-plan.md` — 병렬 Claude Code 에이전트 컨테이너를
     제한된 git 계정으로 격리하면서 뭘 시도했는지 기록을 남기는 방법 조사
     (세션 트랜스크립트/훅/OTel 등, 착수 전 질문 다수)
+  - `readme-revamp-plan.md` — README.md 재단장(뱃지, 소개 문단 다듬기)
+    아이디어 — 문서 콘텐츠 자체를 `docs/`로 옮기는 작업(2026-08-05)은 이미
+    끝났고, 이건 그 다음 단계
 
 - **webmanager 전용 계획/설계**: `webmanager/.claude/` — 완료된 기능은
   `*-plan-done.md`, 아직 안 한 건 `*-plan.md`. 인덱스는 그 폴더의 `README.md`.

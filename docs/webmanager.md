@@ -163,7 +163,7 @@ git-lfs 는 `config/build.default.sh`에 포함되어 기본으로 설치됩니�
 > **주의: webmanager 는 자체 로그인 화면이 없습니다.** code-server 와 같은 80번 포트,
 > `/manager` 경로를 공유하므로 앞단 리버스 프록시의 forward-auth 하나가 둘 다 보호합니다
 > — 프록시 설정 없이 80번 포트를 그대로 인터넷에 노출하면 안 됩니다 (README의
-> [보안 (로그인)](../README.md#보안-로그인) 절과 동일한 방식으로 프록시를
+> [보안 (로그인)](index.md#보안-로그인) 절과 동일한 방식으로 프록시를
 > 구성하세요). SSH 키/git credential 파일을 직접 다루는 기능이라 code-server 의
 > `auth: none` 보다 더 신중한 접근 통제가 필요합니다. **특히 Terminal(브라우저에서
 > 곧바로 root 쉘)과 파일(임의 파일시스템 read/write/delete) 탭은 webmanager 안에서

@@ -8,7 +8,7 @@
 
 ## 1. ssh를 통해 소켓을 전송
 
-`ssh -R 5037:localhost:5037 code -TN` 를 로컬에서 수행하여 로컬 adb 소켓을 code-docker에 연결해줍니다. 여기서 `code`는 [README의 ssh 연결](../../README.md#ssh-연결) 절에서 설정한 `~/.ssh/config`의 `Host code` 별칭입니다 - 다른 이름으로 설정했다면 그 이름을 그대로 쓰세요.
+`ssh -R 5037:localhost:5037 code -TN` 를 로컬에서 수행하여 로컬 adb 소켓을 code-docker에 연결해줍니다. 여기서 `code`는 [ssh 연결](../index.md#ssh-연결) 절에서 설정한 `~/.ssh/config`의 `Host code` 별칭입니다 - 다른 이름으로 설정했다면 그 이름을 그대로 쓰세요.
 
 이것을 자동화 하기 위해 `autossh` 등의 도구를 사용하는것을 고려하세요. 이를 로컬 데스크탑 환경의 autolaunch 또는 service 요소로 등록하면 지속적으로 사용가능합니다.
 
