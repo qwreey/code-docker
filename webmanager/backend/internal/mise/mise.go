@@ -135,16 +135,41 @@ type rawToolEntry struct {
 // .tool-versions only). Callers must have already validated path against
 // the Projects cache (see internal/projects.Scanner.IsKnownPath) before
 // calling this with a non-empty path — this function does not re-validate.
+//
+// The `-g` global case only reports tools declared in the global mise
+// config — a tool installed via a bare `mise install` that was never
+// `use -g`'d never shows up here at all (confirmed against a real `mise`:
+// it's simply absent from `-g`'s output, not present-with-installed:false).
+// handleClaudeMiseVersion relies on exactly that narrower "is this actually
+// managed by mise's global config" signal, so this function's `-g` behavior
+// stays as-is; ListInstalledTools below is the broader query for callers
+// that want every install regardless of config membership (the mise tab's
+// own tools list).
 func ListTools(ctx context.Context, binPath, path string) ([]Tool, error) {
-	ctx, cancel := context.WithTimeout(ctx, readTimeout)
-	defer cancel()
-
 	var args []string
 	if path == "" {
 		args = []string{"ls", "-g", "--json"}
 	} else {
 		args = []string{"ls", "-C", path, "--local", "--json"}
 	}
+	return runList(ctx, binPath, args)
+}
+
+// ListInstalledTools runs `mise ls --json -C <defaultHomeDir>` (no `-g`) —
+// a superset of ListTools(ctx, bin, "")'s output that also includes tools
+// installed via a bare `mise install` that were never added to the global
+// config (those entries come back with Active=false and a nil Source,
+// since they aren't tied to any config file). `-C <defaultHomeDir>` pins
+// the directory context the same way GetEnv does, so this can't
+// accidentally pick up some unrelated project's local mise.toml if
+// webmanager's own process cwd ever changes.
+func ListInstalledTools(ctx context.Context, binPath string) ([]Tool, error) {
+	return runList(ctx, binPath, []string{"ls", "-C", defaultHomeDir, "--json"})
+}
+
+func runList(ctx context.Context, binPath string, args []string) ([]Tool, error) {
+	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
 
 	cmd := exec.CommandContext(ctx, binPath, args...)
 	out, err := cmd.Output()

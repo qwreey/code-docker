@@ -12,8 +12,9 @@ type miseToolsResponse struct {
 	Tools []mise.Tool `json:"tools"`
 }
 
-// handleListMiseTools reports installed/declared mise tools: global
-// (`mise ls -g --json`) when path is omitted, or one project's own
+// handleListMiseTools reports installed/declared mise tools: every install
+// mise knows about at $HOME (`mise ls --json`, both global-config-declared
+// and bare-`mise install`ed) when path is omitted, or one project's own
 // mise.toml/.tool-versions (`mise ls -C <path> --local --json`) when given.
 // path must exactly match an entry already in the Projects cache — the same
 // convention handleRescanProject uses — so this can never shell out against
@@ -33,7 +34,13 @@ func (s *Server) handleListMiseTools(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tools, err := mise.ListTools(r.Context(), binPath, path)
+	var tools []mise.Tool
+	var err error
+	if path == "" {
+		tools, err = mise.ListInstalledTools(r.Context(), binPath)
+	} else {
+		tools, err = mise.ListTools(r.Context(), binPath, path)
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

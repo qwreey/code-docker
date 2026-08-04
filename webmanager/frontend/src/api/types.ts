@@ -470,15 +470,21 @@ export interface MiseRecommendationCategory {
 }
 
 export interface MiseToolEntry {
+  name: string
   version: string
   requestedVersion: string
   installPath: string
-  source: { type: string; path: string }
+  source: { type: string; path: string } | null
   installed: boolean
   active: boolean
 }
 
-export type MiseToolsResponse = Record<string, MiseToolEntry>
+// GET /api/mise/tools's body - a flat array, not a map: a single tool name
+// can have more than one entry (e.g. two installed versions), which a
+// Record<name, entry> can't represent. Each entry carries its own `name`.
+export interface MiseToolsResponse {
+  tools: MiseToolEntry[]
+}
 
 export interface MiseJob {
   jobId: string

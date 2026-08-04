@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
-import type { MiseToolsResponse, ProjectInfo } from '../../api/types'
+import type { MiseToolEntry, MiseToolsResponse, ProjectInfo } from '../../api/types'
 import { formatBytes } from '../../utils/format'
 import './Projects.css'
 
@@ -33,7 +33,7 @@ export function ProjectTable({
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [rescanning, setRescanning] = useState<Set<string>>(new Set())
-  const [miseTools, setMiseTools] = useState<Map<string, MiseToolsResponse>>(new Map())
+  const [miseTools, setMiseTools] = useState<Map<string, MiseToolEntry[]>>(new Map())
   const [miseLoading, setMiseLoading] = useState<Set<string>>(new Set())
 
   function toggleSort(key: SortKey) {
@@ -66,7 +66,7 @@ export function ProjectTable({
     setMiseLoading((prev) => new Set(prev).add(path))
     try {
       const res = await api.get<MiseToolsResponse>(`/mise/tools?path=${encodeURIComponent(path)}`)
-      setMiseTools((prev) => new Map(prev).set(path, res))
+      setMiseTools((prev) => new Map(prev).set(path, res.tools))
     } catch (e) {
       onError(errorMessage(e))
     } finally {
@@ -217,19 +217,18 @@ export function ProjectTable({
                           </table>
                         )}
                         {(() => {
-                          const projectMiseTools = miseTools.get(project.path)
-                          const entries = projectMiseTools ? Object.entries(projectMiseTools) : []
+                          const entries = miseTools.get(project.path) ?? []
                           if (miseLoading.has(project.path)) {
                             return <p className="empty-state projects-mise-loading">mise 도구 확인 중...</p>
                           }
-                          if (!projectMiseTools || entries.length === 0) return null
+                          if (entries.length === 0) return null
                           return (
                             <div className="projects-mise-section">
                               <div className="projects-detail-header">이 프로젝트가 쓰는 도구</div>
                               <ul className="projects-mise-list">
-                                {entries.map(([id, tool]) => (
-                                  <li key={id} className="projects-mise-row">
-                                    <span className="projects-mise-id">{id}</span>
+                                {entries.map((tool) => (
+                                  <li key={`${tool.name}@${tool.version}`} className="projects-mise-row">
+                                    <span className="projects-mise-id">{tool.name}</span>
                                     <span className="mono-cell">{tool.version}</span>
                                     {tool.installed ? (
                                       <span className="badge badge-green">설치됨</span>

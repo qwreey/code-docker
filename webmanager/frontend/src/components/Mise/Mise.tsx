@@ -50,7 +50,7 @@ function keyFor(id: string, version: string): string {
 
 export function Mise() {
   const [recommendations, setRecommendations] = useState<MiseRecommendationCategory[]>([])
-  const [tools, setTools] = useState<MiseToolsResponse>({})
+  const [tools, setTools] = useState<MiseToolEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [job, setJob] = useState<JobState | null>(null)
@@ -67,7 +67,7 @@ export function Mise() {
 
   const loadTools = useCallback(async () => {
     const res = await api.get<MiseToolsResponse>('/mise/tools')
-    setTools(res)
+    setTools(res.tools)
   }, [])
 
   const load = useCallback(async () => {
@@ -181,7 +181,7 @@ export function Mise() {
     }
   }
 
-  const toolEntries = Object.entries(tools)
+  const installedToolNames = new Set(tools.filter((t) => t.installed).map((t) => t.name))
   const envEntries = envData ? Object.entries(envData) : []
 
   return (
@@ -235,7 +235,7 @@ export function Mise() {
                   {isOpen && (
                     <ul className="mise-list">
                       {group.tools.map((tool) => {
-                        const installed = tools[tool.id]?.installed ?? false
+                        const installed = installedToolNames.has(tool.id)
                         const isThisJob = job?.toolId === tool.id && job.kind === 'install'
                         return (
                           <li className="mise-row" key={tool.id}>
@@ -269,11 +269,16 @@ export function Mise() {
       )}
 
       <div className="mise-section">
-        <h2>설치된 도구 목록</h2>
-        {loading && toolEntries.length === 0 ? (
+        <h2>설치된 도구</h2>
+        <p className="section-description">
+          전역 mise 설정에 선언됐거나 실제로 설치된 도구입니다. &quot;활성&quot;은 그 버전이{' '}
+          <code>mise use -g</code>로 전역 활성화됐다는 뜻이고, 활성 표시가 없는 항목은 설치는 돼 있지만 전역
+          설정에는 반영되지 않은 버전입니다.
+        </p>
+        {loading && tools.length === 0 ? (
           <p className="empty-state">불러오는 중...</p>
-        ) : toolEntries.length === 0 ? (
-          <p className="empty-state">전역(global)으로 설치된 도구가 없습니다.</p>
+        ) : tools.length === 0 ? (
+          <p className="empty-state">전역으로 설치되거나 선언된 도구가 없습니다.</p>
         ) : (
           <div className="table-wrapper">
             <table className="process-info-table">
@@ -287,13 +292,13 @@ export function Mise() {
                 </tr>
               </thead>
               <tbody>
-                {toolEntries.map(([id, tool]) => {
-                  const key = keyFor(id, tool.version)
+                {tools.map((tool) => {
+                  const key = keyFor(tool.name, tool.version)
                   const checked = removeFromConfigChecked.has(key)
-                  const isThisJob = job?.toolId === id && job.kind === 'uninstall'
+                  const isThisJob = job?.toolId === tool.name && job.kind === 'uninstall'
                   return (
-                    <tr key={id}>
-                      <td>{id}</td>
+                    <tr key={key}>
+                      <td>{tool.name}</td>
                       <td className="mono-cell">{tool.version}</td>
                       <td className="mono-cell">{tool.requestedVersion}</td>
                       <td className="mise-status-badges">
@@ -319,7 +324,7 @@ export function Mise() {
                             type="button"
                             className="btn btn-danger btn-small"
                             disabled={busy}
-                            onClick={() => handleDelete(id, tool)}
+                            onClick={() => handleDelete(tool.name, tool)}
                           >
                             {isThisJob && busy ? '삭제 중...' : '삭제'}
                           </button>
