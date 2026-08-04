@@ -130,61 +130,63 @@ export function FileTable({
               </td>
               <td>{entry.isDir ? '-' : formatBytes(entry.size)}</td>
               <td>{new Date(entry.modTime).toLocaleString()}</td>
-              <td className="file-manager-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-small"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onInfo(entry)
-                  }}
-                >
-                  정보
-                </button>
-                {!entry.isDir && (
+              <td>
+                <div className="file-manager-actions">
                   <button
                     type="button"
                     className="btn btn-secondary btn-small"
                     onClick={(e) => {
                       e.stopPropagation()
-                      onDownload(entry)
+                      onInfo(entry)
                     }}
                   >
-                    다운로드
+                    정보
                   </button>
-                )}
-                {!entry.isDir && (
+                  {!entry.isDir && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-small"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDownload(entry)
+                      }}
+                    >
+                      다운로드
+                    </button>
+                  )}
+                  {!entry.isDir && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-small"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onEdit(entry)
+                      }}
+                    >
+                      편집
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="btn btn-secondary btn-small"
                     onClick={(e) => {
                       e.stopPropagation()
-                      onEdit(entry)
+                      onStartRename(entry)
                     }}
                   >
-                    편집
+                    이름변경
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-small"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onStartRename(entry)
-                  }}
-                >
-                  이름변경
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger btn-small"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDelete(entry)
-                  }}
-                >
-                  삭제
-                </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-small"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDelete(entry)
+                    }}
+                  >
+                    삭제
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

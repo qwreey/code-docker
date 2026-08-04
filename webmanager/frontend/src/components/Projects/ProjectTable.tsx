@@ -160,27 +160,29 @@ export function ProjectTable({
                     )}
                   </td>
                   <td>{project.stale && <span className="badge badge-yellow">오래됨</span>}</td>
-                  <td className="projects-actions">
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-small"
-                      disabled={isRescanning}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        rescanProject(project.path)
-                      }}
-                    >
-                      {isRescanning ? '갱신 중...' : '새로고침'}
-                    </button>
-                    {codeServerUrl && (
+                  <td>
+                    <div className="projects-actions">
                       <button
                         type="button"
-                        className="btn btn-primary btn-small"
-                        onClick={(e) => openInCodeServer(e, project.path)}
+                        className="btn btn-secondary btn-small"
+                        disabled={isRescanning}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          rescanProject(project.path)
+                        }}
                       >
-                        code-server에서 열기
+                        {isRescanning ? '갱신 중...' : '새로고침'}
                       </button>
-                    )}
+                      {codeServerUrl && (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-small"
+                          onClick={(e) => openInCodeServer(e, project.path)}
+                        >
+                          code-server에서 열기
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
                 {isExpanded && (
