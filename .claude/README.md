@@ -30,6 +30,9 @@
   - `code-patch-widgets.md` — `window.CDDialog` 기반 브라우저 위젯 아이디어 (상태
     표시줄, 확인창, 리소스 미터 등 code-server 패치 쪽)
   - `pastebin-integration.md` — 외부 pastebin 연동 아이디어 (초기 메모 수준)
+  - `agent-fleet-audit-plan.md` — 병렬 Claude Code 에이전트 컨테이너를
+    제한된 git 계정으로 격리하면서 뭘 시도했는지 기록을 남기는 방법 조사
+    (세션 트랜스크립트/훅/OTel 등, 착수 전 질문 다수)
 
 - **webmanager 전용 계획/설계**: `webmanager/.claude/` — 완료된 기능은
   `*-plan-done.md`, 아직 안 한 건 `*-plan.md`. 인덱스는 그 폴더의 `README.md`.
