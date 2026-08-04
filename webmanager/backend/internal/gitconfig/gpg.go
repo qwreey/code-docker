@@ -110,8 +110,16 @@ func parseSecretKeysColon(out []byte) []GPGKey {
 }
 
 // listSecretKeys runs `gpg --list-secret-keys --with-colons [filter]`. gpg
-// exits non-zero when a filter matches nothing (verified: "error reading
-// key: No secret key", exit 2) — that's not a real error, just "no match".
+// exits non-zero when nothing matches — a specific filter (verified: "error
+// reading key: No secret key", exit 2), or an empty/not-yet-initialized
+// keyring (observed on some gpg versions/states even with no filter, e.g.
+// before the homedir's keybox has ever been touched) — that's not a real
+// error, just "no keys yet", and should come back as an empty list like
+// every other "nothing here yet" case in this package (sshkeys.List, etc.),
+// not a 500. checkGPG() already guarantees the gpg binary itself is
+// runnable before this is ever called, so the only failure worth surfacing
+// here is the process not starting at all (*exec.Error, not *exec.
+// ExitError) — an *exec.ExitError just means gpg ran and reported nothing.
 func listSecretKeys(filter string) ([]GPGKey, error) {
 	args := []string{"--list-secret-keys", "--with-colons"}
 	if filter != "" {
@@ -119,7 +127,8 @@ func listSecretKeys(filter string) ([]GPGKey, error) {
 	}
 	out, err := exec.Command("gpg", args...).Output()
 	if err != nil {
-		if filter != "" {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			return []GPGKey{}, nil
 		}
 		return nil, gpgExecError("gpg --list-secret-keys", err)
