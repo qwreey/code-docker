@@ -156,8 +156,33 @@ real-container QA by the repo owner is still pending. A follow-on milestone
 PWA `shortcuts` entry) had 4 open questions in `.claude/question.md`; trigger
 and display-form are now implemented (`.window-appicon` click opens `/manager`
 in an iframe overlay modal, `config/code-patch/webmanager-launcher.default.js`
-— see `.claude/qa-request/expose-plan-done.md`'s "나중 마일스톤" section),
-PWA `shortcuts` is still open/not designed. Keep extending as
+— see `.claude/qa-request/expose-plan-done.md`'s "나중 마일스톤" section);
+the PWA `shortcuts` entry is now implemented too
+(`.claude/qa-request/manifest-shortcuts-plan-done.md`) — rather than a
+second installable PWA (rejected: it would double the installed-app icon
+count per code-docker instance for a "check occasionally" use case),
+`config/nginx.default.conf` intercepts just `/manifest.json` with an
+exact-match `location` that proxies to a new webmanager package
+(`internal/manifestpatch`) which fetches code-server's real manifest
+straight from its internal port, merges in a `shortcuts` array (an "Open
+manager" jump-list entry pointing at `/manager/`) leaving every other field
+exactly as fetched, and responds 502 on any failure so nginx's
+`error_page 502 503 504 = @manifest_fallback` — the same idiom
+`/_code_not_ready.html` already uses — falls back to code-server's own
+manifest directly; code-server-autoinstall's vendored manifest route itself
+is never touched. An "열린 세션" (open sessions)
+tab (`.claude/qa-request/session-heartbeat-plan-done.md`, `internal/
+sessionheartbeat`) lists which code-server browser tabs are currently
+connected and what folder each has open, fed by a client-generated UUID that
+a new code-patch script (`config/code-patch/session-heartbeat.default.js`)
+POSTs to `/api/sessions/heartbeat` every 30s — chosen over querying
+code-server's own connection API specifically to sidestep that approach's
+unresolved feasibility question (`.claude/research/session-viewer-plan.md`,
+still parked); `GET /api/sessions` is password-gated like most of this app's
+sensitive reads, but the heartbeat POST itself is deliberately left ungated,
+a documented exception to the reads-open/writes-gated convention since
+code-server runs with `auth: none` and has no credential to attach to that
+request in the first place. Keep extending as
 needed; see `plan.md`'s "구현 완료" table before assuming something isn't
 done yet. **Open questions the repo owner still needs to weigh in on are
 consolidated in `.claude/question.md`** — none of them block further work,

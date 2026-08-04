@@ -56,6 +56,8 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 | `qa-request/expose-plan-done.md` | code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일 origin 통합(레포 루트 `expose.md` 리서치를 대체) — M1(nginx)~M3(프론트엔드 서브패스 대응) 코드/빌드 검증까지 완료. code-server 쪽에서 매니저를 여는 위젯/PWA 바로가기는 별도 마일스톤으로 남아있음(질문만 정리, 착수 안 함) |
 | `qa-request/dind-plan-done.md` | Docker/dind 관리 — M1(목록/로그, 읽기 전용)+M2(start/stop/remove, 비밀번호 게이트)+M3(docker inspect 상세 뷰, 비밀번호 게이트) 전부 코드/빌드 검증까지 완료 |
 | `qa-request/terminal-home-plan-done.md` | 터미널 홈 탭 — 항상 열려있는 첫 탭에 세션 목록 전환 + 시작 위치/실행 명령 프로파일 CRUD, 세션 생성 시 cwd/초기 명령 지원하도록 `internal/termsession` 확장, 코드/빌드 검증까지 완료 |
+| `qa-request/session-heartbeat-plan-done.md` | 열린 브라우저 탭(어느 폴더를 열어놨는지) 목록 — 클라이언트가 UUID를 자체 발급해 30초마다 heartbeat를 보내는 방식으로 `research/session-viewer-plan.md`의 옵션 2(code-server 자체 연결 API) 불확실성을 우회, 새 사이드바 탭("열린 세션")으로 표시. 목록 조회(`GET /api/sessions`)는 authgate로 gate, heartbeat 수신(`POST /api/sessions/heartbeat`)은 code-server 쪽에 인증 수단이 없어서 의도적으로 ungate — reads-open/writes-gated 원칙의 문서화된 예외. 코드/빌드 검증까지 완료 |
+| `qa-request/manifest-shortcuts-plan-done.md` | code-server PWA manifest에 `shortcuts` 필드 주입("Open manager" 점프리스트 항목) — 별도 설치형 PWA는 만들지 않기로 확정(인스턴스별 아이콘 2배 증가 우려), nginx가 `/manifest.json`만 webmanager로 가로채 code-server 원본을 fetch+편집, webmanager 실패 시 code-server 원본으로 자동 폴백. nginx 문법은 디스포저블 컨테이너로 검증했지만 실컨테이너 확인은 아직 |
 
 ## 완료, 사용자 실사용 검증까지 끝나서 아카이브됨 (`archive/*-plan-done.md`)
 
