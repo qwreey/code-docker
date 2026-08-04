@@ -33,6 +33,61 @@
   font-size: 0.7rem;
 }
 
+.projects-detail-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.projects-detail-section {
+  padding-bottom: 1.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.projects-detail-section:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.projects-detail-meta {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0.4rem 0 0.6rem;
+}
+
+.projects-detail-stale {
+  margin-left: 0.5rem;
+}
+
+.projects-detail-tech {
+  margin-bottom: 0.75rem;
+}
+
+.projects-delete-target {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--color-red-bg);
+  border: 1px solid var(--color-red-border);
+  margin-bottom: 0.9rem;
+}
+
+.projects-delete-path {
+  color: var(--color-red-fg);
+  word-break: break-all;
+  font-size: 0.8rem;
+}
+
+.projects-delete-size {
+  color: var(--color-red-fg);
+  font-weight: 600;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
 .projects-path {
   font-family: var(--mono);
   font-size: 0.75rem;

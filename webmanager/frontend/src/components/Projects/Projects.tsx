@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
 import type { ProjectInfo, ProjectsResponse } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
@@ -66,12 +67,22 @@ export function Projects() {
     })
   }
 
+  function handleProjectDeleted(path: string) {
+    setData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        projects: prev.projects.filter((p) => p.path !== path),
+      }
+    })
+  }
+
   return (
     <section>
       <div className="section-header">
         <h1>Projects</h1>
         <button type="button" className="btn btn-secondary btn-small" onClick={rescanAll} disabled={loading}>
-          {loading ? '스캔 중...' : '전체 다시 스캔'}
+          <RefreshCw size={14} className={loading ? 'icon-spin' : undefined} /> 전체 다시 스캔
         </button>
       </div>
       <p className="section-description">
@@ -98,6 +109,7 @@ export function Projects() {
             projects={data.projects}
             codeServerUrl={data.codeServerUrl}
             onProjectUpdated={handleProjectUpdated}
+            onProjectDeleted={handleProjectDeleted}
             onError={setError}
           />
         )

@@ -1,0 +1,278 @@
+/* Section wrapper - deliberately local to this component (not reused from
+   Projects.css's .projects-detail-section/.projects-detail-header) so
+   GitStatusPanel stays droppable into any panel without also requiring the
+   Projects tab's own stylesheet to be loaded. Caller is expected to place
+   it inside a flex-column list of sections (see .projects-detail-sections
+   in ProjectTable.tsx) which supplies the gap between siblings. */
+.git-panel-section {
+  padding-bottom: 1.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.git-panel-section:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.git-panel-header {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin-bottom: 0.6rem;
+}
+
+.git-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.git-status-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.git-status-branch,
+.git-status-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  background: var(--color-gray-bg);
+  color: var(--color-gray-fg);
+  border: 1px solid var(--color-gray-border);
+}
+
+.git-status-branch {
+  font-weight: 600;
+  color: var(--text-heading);
+  background: var(--surface-hover);
+  border-color: var(--border);
+}
+
+.git-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.git-status-actions .btn svg {
+  margin-right: 0.1rem;
+}
+
+/* Diff rendering - plain pre-split lines + CSS coloring, no diff library. */
+.git-diff-view {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.git-diff-line {
+  padding: 0 0.4rem;
+}
+
+.git-diff-line-context {
+  color: var(--code-text);
+}
+
+.git-diff-line-file {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.git-diff-line-hunk {
+  color: var(--color-gray-fg);
+  background: var(--color-gray-bg);
+}
+
+.git-diff-line-add {
+  color: var(--color-green-fg);
+  background: var(--color-green-bg);
+}
+
+.git-diff-line-del {
+  color: var(--color-red-fg);
+  background: var(--color-red-bg);
+}
+
+/* Commit log */
+.git-commit-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.git-commit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.git-commit-row:hover {
+  background: var(--surface-hover);
+}
+
+.git-commit-row-top {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.git-commit-shorthash {
+  color: var(--text-muted);
+  flex: none;
+}
+
+.git-commit-row-subject {
+  font-size: 0.86rem;
+  color: var(--text-heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-commit-row-meta {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.git-commit-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.git-commit-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.git-commit-subject {
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.git-commit-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.git-commit-hash {
+  color: var(--text-muted);
+}
+
+/* Changes (unstaged/staged) */
+.git-changes-toggle {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Remotes */
+.git-remote-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.git-remote-row {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.git-remote-name {
+  font-weight: 600;
+  color: var(--text-heading);
+  margin-bottom: 0.2rem;
+}
+
+.git-remote-url {
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* Branches */
+.git-branch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.git-branch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.git-branch-row-current {
+  border-color: var(--color-green-border);
+  background: var(--color-green-bg);
+}
+
+.git-branch-name {
+  flex: 1;
+}
+
+/* Tags */
+.git-tag-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.git-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.git-tag-name {
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.git-tag-date {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.git-tag-hash {
+  color: var(--text-muted);
+  margin-left: auto;
+}

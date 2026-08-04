@@ -75,6 +75,13 @@
   word-break: break-all;
 }
 
+.restart-needed-banner-content {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -127,6 +134,28 @@
 .btn-small {
   padding: 0.25rem 0.6rem;
   font-size: 0.78rem;
+}
+
+.btn-icon {
+  padding: 0.35rem;
+  line-height: 0;
+}
+
+.btn-icon.btn-small {
+  padding: 0.3rem;
+}
+
+.icon-spin {
+  animation: icon-spin-rotate 0.8s linear infinite;
+}
+
+@keyframes icon-spin-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .section-header {

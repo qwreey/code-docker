@@ -244,6 +244,20 @@ func main() {
 	mux.HandleFunc("POST /api/projects/rescan", s.handleRescanProject)
 	// Destructive (os.RemoveAll under the hood), unlike the reads above — gated.
 	mux.Handle("POST /api/projects/delete-reclaimable", gate.RequirePassword(http.HandlerFunc(s.handleDeleteReclaimable)))
+	// Whole-project-folder delete, distinct from delete-reclaimable above — gated.
+	mux.Handle("POST /api/projects/delete", gate.RequirePassword(http.HandlerFunc(s.handleDeleteProject)))
+
+	// Git status/history — all reads (staging/commit/push/pull/merge are out
+	// of scope for this round), so none of these are gated. See
+	// handlers_projectgit.go's file doc comment.
+	mux.HandleFunc("GET /api/projects/git/status", s.handleProjectGitStatus)
+	mux.HandleFunc("GET /api/projects/git/log", s.handleProjectGitLog)
+	mux.HandleFunc("GET /api/projects/git/diff/commit", s.handleProjectGitDiffCommit)
+	mux.HandleFunc("GET /api/projects/git/diff/unstaged", s.handleProjectGitDiffUnstaged)
+	mux.HandleFunc("GET /api/projects/git/diff/staged", s.handleProjectGitDiffStaged)
+	mux.HandleFunc("GET /api/projects/git/remotes", s.handleProjectGitRemotes)
+	mux.HandleFunc("GET /api/projects/git/branches", s.handleProjectGitBranches)
+	mux.HandleFunc("GET /api/projects/git/tags", s.handleProjectGitTags)
 
 	mux.HandleFunc("GET /api/recommendations", s.handleGetRecommendations)
 	mux.HandleFunc("GET /api/code-extensions", s.handleListCodeExtensions)
@@ -255,6 +269,12 @@ func main() {
 	mux.HandleFunc("DELETE /api/mise/tools", s.handleDeleteMiseTool)
 	mux.HandleFunc("GET /api/mise/env", s.handleMiseEnv)
 	mux.HandleFunc("GET /api/mise/jobs/{id}", s.handleMiseJobStatus)
+
+	// Boolean, no sensitive content — same open-read tier as the rest.
+	// Set by mise/extension/Claude Code install-or-uninstall completions
+	// (see handlers_restartstatus.go), self-clears once code-server's live
+	// PID no longer matches what was recorded.
+	mux.HandleFunc("GET /api/system/restart-needed", s.handleRestartStatus)
 
 	// Not gated by RequirePassword: handleAuthUnlock is how a locked-out
 	// client unlocks in the first place, and handleAuthStatus lets the

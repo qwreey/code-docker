@@ -338,6 +338,42 @@ func (s *Scanner) DeleteReclaimable(projectPath, reclaimablePath string) (Projec
 	return s.rescanAndStore(root, projectPath)
 }
 
+// DeleteProject permanently removes an entire project directory from disk
+// and drops it from the cache. path must exactly match an existing cached
+// project's Path — the same validation convention RescanOne/DeleteReclaimable
+// use (exact match against the cache, never a prefix/contains check) — so an
+// arbitrary filesystem path can never reach os.RemoveAll. Unlike
+// DeleteReclaimable there's no rescan-afterward tail: the project itself is
+// gone, so it's simply removed from the cache in place.
+func (s *Scanner) DeleteProject(path string) error {
+	s.mu.Lock()
+	found := false
+	for _, p := range s.cache.Projects {
+		if p.Path == path {
+			found = true
+			break
+		}
+	}
+	s.mu.Unlock()
+	if !found {
+		return ErrUnknownProject
+	}
+
+	if err := os.RemoveAll(path); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, p := range s.cache.Projects {
+		if p.Path == path {
+			s.cache.Projects = append(s.cache.Projects[:i], s.cache.Projects[i+1:]...)
+			break
+		}
+	}
+	return saveCache(s.cachePath, s.cache)
+}
+
 // rescanAndStore re-scans an already-validated project path and writes the
 // result back into the cache in place of the previous entry. If the
 // directory no longer exists on disk, it's removed from the cache instead

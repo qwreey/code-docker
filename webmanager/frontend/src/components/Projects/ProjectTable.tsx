@@ -1,7 +1,11 @@
-import { Fragment, useState } from 'react'
+import { useState } from 'react'
+import { ExternalLink, RefreshCw, Trash2 } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
 import type { MiseToolEntry, MiseToolsResponse, ProjectInfo, ReclaimableEntry } from '../../api/types'
 import { formatBytes } from '../../utils/format'
+import { ConfirmDialog } from '../common/ConfirmDialog'
+import { GitStatusPanel } from '../common/Git/GitStatusPanel'
+import { Sheet } from '../common/Sheet'
 import { DeleteReclaimableDialog } from './DeleteReclaimableDialog'
 import './Projects.css'
 
@@ -23,21 +27,25 @@ export function ProjectTable({
   projects,
   codeServerUrl,
   onProjectUpdated,
+  onProjectDeleted,
   onError,
 }: {
   projects: ProjectInfo[]
   codeServerUrl: string
   onProjectUpdated: (project: ProjectInfo) => void
+  onProjectDeleted: (path: string) => void
   onError: (message: string) => void
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('lastModified')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [detailsPath, setDetailsPath] = useState<string | null>(null)
   const [rescanning, setRescanning] = useState<Set<string>>(new Set())
   const [miseTools, setMiseTools] = useState<Map<string, MiseToolEntry[]>>(new Map())
   const [miseLoading, setMiseLoading] = useState<Set<string>>(new Set())
   const [pendingDelete, setPendingDelete] = useState<{ project: ProjectInfo; entry: ReclaimableEntry } | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [pendingDeleteProject, setPendingDeleteProject] = useState<ProjectInfo | null>(null)
+  const [deletingProject, setDeletingProject] = useState(false)
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) {
@@ -81,20 +89,12 @@ export function ProjectTable({
     }
   }
 
-  function toggleExpand(project: ProjectInfo) {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(project.path)) {
-        next.delete(project.path)
-      } else {
-        next.add(project.path)
-        if (isStale(project.scannedAt)) {
-          rescanProject(project.path)
-        }
-        loadMiseTools(project.path)
-      }
-      return next
-    })
+  function openDetails(project: ProjectInfo) {
+    setDetailsPath(project.path)
+    if (isStale(project.scannedAt)) {
+      rescanProject(project.path)
+    }
+    loadMiseTools(project.path)
   }
 
   // Same-origin fallback: nginx now serves code-server (/) and webmanager
@@ -125,6 +125,22 @@ export function ProjectTable({
     }
   }
 
+  async function confirmDeleteProject() {
+    if (!pendingDeleteProject) return
+    const project = pendingDeleteProject
+    setDeletingProject(true)
+    try {
+      await api.post(`/projects/delete?path=${encodeURIComponent(project.path)}`)
+      onProjectDeleted(project.path)
+      setPendingDeleteProject(null)
+      if (detailsPath === project.path) setDetailsPath(null)
+    } catch (e) {
+      onError(errorMessage(e))
+    } finally {
+      setDeletingProject(false)
+    }
+  }
+
   const sorted = [...projects].sort((a, b) => {
     const cmp =
       sortKey === 'totalSizeBytes'
@@ -137,12 +153,14 @@ export function ProjectTable({
     return <p className="empty-state">프로젝트가 없습니다.</p>
   }
 
+  const detailsProject = detailsPath ? (projects.find((p) => p.path === detailsPath) ?? null) : null
+
   return (
     <div className="table-wrapper">
       <table className="process-info-table projects-table">
         <thead>
           <tr>
-            <th aria-label="펼치기" />
+            <th aria-label="상세보기" />
             <th>이름</th>
             {COLUMNS.map((col) => (
               <th key={col.key}>
@@ -159,135 +177,191 @@ export function ProjectTable({
         </thead>
         <tbody>
           {sorted.map((project) => {
-            const isExpanded = expanded.has(project.path)
             const isRescanning = rescanning.has(project.path)
             return (
-              <Fragment key={project.path}>
-                <tr
-                  className="projects-row"
-                  onClick={() => toggleExpand(project)}
-                >
-                  <td className="projects-expand-cell">{isExpanded ? '▼' : '▶'}</td>
-                  <td>
-                    <div>{project.name}</div>
-                    <div className="projects-path">{project.path}</div>
-                  </td>
-                  <td>{new Date(project.lastModified).toLocaleString()}</td>
-                  <td>{formatBytes(project.totalSizeBytes)}</td>
-                  <td>
-                    {project.techStack.length === 0 ? (
-                      <span className="projects-no-badge">-</span>
-                    ) : (
-                      project.techStack.map((tech) => (
-                        <span key={tech} className="badge badge-gray projects-tech-badge">
-                          {tech}
-                        </span>
-                      ))
-                    )}
-                  </td>
-                  <td>{project.stale && <span className="badge badge-yellow">오래됨</span>}</td>
-                  <td>
-                    <div className="projects-actions">
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-small"
-                        disabled={isRescanning}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          rescanProject(project.path)
-                        }}
-                      >
-                        {isRescanning ? '갱신 중...' : '새로고침'}
-                      </button>
-                      <a
-                        href={codeServerHref(project.path)}
-                        className="btn btn-primary btn-small"
-                        onClick={(e) => e.stopPropagation()}
-                        rel="noopener"
-                      >
-                        code-server에서 열기
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-                {isExpanded && (
-                  <tr className="projects-detail-row">
-                    <td colSpan={7}>
-                      <div className="projects-detail">
-                        <div className="projects-detail-header">
-                          재생성 가능 폴더 합계: {formatBytes(project.reclaimableSizeBytes)}
-                          {' · '}
-                          마지막 스캔: {new Date(project.scannedAt).toLocaleString()}
-                        </div>
-                        {project.reclaimable.length === 0 ? (
-                          <p className="empty-state">재생성 가능한 폴더가 없습니다.</p>
-                        ) : (
-                          <table className="projects-reclaimable-table">
-                            <thead>
-                              <tr>
-                                <th>패턴</th>
-                                <th>경로</th>
-                                <th>용량</th>
-                                <th aria-label="동작" />
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {project.reclaimable.map((entry) => (
-                                <tr key={entry.path}>
-                                  <td>
-                                    <span className="badge badge-gray">{entry.pattern}</span>
-                                  </td>
-                                  <td className="mono-cell">{entry.path}</td>
-                                  <td>{formatBytes(entry.sizeBytes)}</td>
-                                  <td>
-                                    <button
-                                      type="button"
-                                      className="btn btn-danger btn-small"
-                                      onClick={() => setPendingDelete({ project, entry })}
-                                    >
-                                      삭제
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        )}
-                        {(() => {
-                          const entries = miseTools.get(project.path) ?? []
-                          if (miseLoading.has(project.path)) {
-                            return <p className="empty-state projects-mise-loading">mise 도구 확인 중...</p>
-                          }
-                          if (entries.length === 0) return null
-                          return (
-                            <div className="projects-mise-section">
-                              <div className="projects-detail-header">이 프로젝트가 쓰는 도구</div>
-                              <ul className="projects-mise-list">
-                                {entries.map((tool) => (
-                                  <li key={`${tool.name}@${tool.version}`} className="projects-mise-row">
-                                    <span className="projects-mise-id">{tool.name}</span>
-                                    <span className="mono-cell">{tool.version}</span>
-                                    {tool.installed ? (
-                                      <span className="badge badge-green">설치됨</span>
-                                    ) : (
-                                      <span className="badge badge-gray">미설치</span>
-                                    )}
-                                    {tool.active && <span className="badge badge-green">활성</span>}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )
-                        })()}
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
+              <tr key={project.path} className="projects-row" onClick={() => openDetails(project)}>
+                <td className="projects-expand-cell" aria-hidden="true">
+                  ▶
+                </td>
+                <td>
+                  <div>{project.name}</div>
+                  <div className="projects-path">{project.path}</div>
+                </td>
+                <td>{new Date(project.lastModified).toLocaleString()}</td>
+                <td>{formatBytes(project.totalSizeBytes)}</td>
+                <td>
+                  {project.techStack.length === 0 ? (
+                    <span className="projects-no-badge">-</span>
+                  ) : (
+                    project.techStack.map((tech) => (
+                      <span key={tech} className="badge badge-gray projects-tech-badge">
+                        {tech}
+                      </span>
+                    ))
+                  )}
+                </td>
+                <td>{project.stale && <span className="badge badge-yellow">오래됨</span>}</td>
+                <td>
+                  <div className="projects-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-small btn-icon"
+                      title="새로고침"
+                      aria-label="새로고침"
+                      disabled={isRescanning}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        rescanProject(project.path)
+                      }}
+                    >
+                      <RefreshCw size={14} className={isRescanning ? 'icon-spin' : undefined} />
+                    </button>
+                    <a
+                      href={codeServerHref(project.path)}
+                      className="btn btn-secondary btn-small btn-icon"
+                      title="code-server에서 열기"
+                      aria-label="code-server에서 열기"
+                      onClick={(e) => e.stopPropagation()}
+                      rel="noopener"
+                    >
+                      <ExternalLink size={14} />
+                    </a>
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-small btn-icon"
+                      title="프로젝트 삭제"
+                      aria-label="프로젝트 삭제"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setPendingDeleteProject(project)
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
             )
           })}
         </tbody>
       </table>
+
+      {detailsProject && (
+        <Sheet
+          open
+          onClose={() => setDetailsPath(null)}
+          title={detailsProject.name}
+          headerActions={
+            <button
+              type="button"
+              className="btn btn-danger btn-small btn-icon"
+              title="프로젝트 삭제"
+              aria-label="프로젝트 삭제"
+              onClick={() => setPendingDeleteProject(detailsProject)}
+            >
+              <Trash2 size={14} />
+            </button>
+          }
+        >
+          <div className="projects-detail-sections">
+            <section className="projects-detail-section">
+              <div className="projects-detail-header">개요</div>
+              <div className="projects-path mono-cell">{detailsProject.path}</div>
+              <div className="projects-detail-meta">
+                총 용량 {formatBytes(detailsProject.totalSizeBytes)} · 재생성 가능 폴더 합계{' '}
+                {formatBytes(detailsProject.reclaimableSizeBytes)} · 마지막 스캔{' '}
+                {new Date(detailsProject.scannedAt).toLocaleString()}
+                {detailsProject.stale && <span className="badge badge-yellow projects-detail-stale">오래됨</span>}
+              </div>
+              <div className="projects-detail-tech">
+                {detailsProject.techStack.length === 0 ? (
+                  <span className="projects-no-badge">-</span>
+                ) : (
+                  detailsProject.techStack.map((tech) => (
+                    <span key={tech} className="badge badge-gray projects-tech-badge">
+                      {tech}
+                    </span>
+                  ))
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                disabled={rescanning.has(detailsProject.path)}
+                onClick={() => rescanProject(detailsProject.path)}
+              >
+                <RefreshCw size={14} className={rescanning.has(detailsProject.path) ? 'icon-spin' : undefined} />{' '}
+                다시 스캔
+              </button>
+            </section>
+
+            <section className="projects-detail-section">
+              <div className="projects-detail-header">재생성 가능한 폴더</div>
+              {detailsProject.reclaimable.length === 0 ? (
+                <p className="empty-state">재생성 가능한 폴더가 없습니다.</p>
+              ) : (
+                <table className="projects-reclaimable-table">
+                  <thead>
+                    <tr>
+                      <th>패턴</th>
+                      <th>경로</th>
+                      <th>용량</th>
+                      <th aria-label="동작" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detailsProject.reclaimable.map((entry) => (
+                      <tr key={entry.path}>
+                        <td>
+                          <span className="badge badge-gray">{entry.pattern}</span>
+                        </td>
+                        <td className="mono-cell">{entry.path}</td>
+                        <td>{formatBytes(entry.sizeBytes)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-small"
+                            onClick={() => setPendingDelete({ project: detailsProject, entry })}
+                          >
+                            삭제
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
+
+            <section className="projects-detail-section">
+              <div className="projects-detail-header">이 프로젝트가 쓰는 도구</div>
+              {miseLoading.has(detailsProject.path) ? (
+                <p className="empty-state projects-mise-loading">mise 도구 확인 중...</p>
+              ) : (miseTools.get(detailsProject.path) ?? []).length === 0 ? (
+                <p className="empty-state">감지된 도구가 없습니다.</p>
+              ) : (
+                <ul className="projects-mise-list">
+                  {(miseTools.get(detailsProject.path) ?? []).map((tool) => (
+                    <li key={`${tool.name}@${tool.version}`} className="projects-mise-row">
+                      <span className="projects-mise-id">{tool.name}</span>
+                      <span className="mono-cell">{tool.version}</span>
+                      {tool.installed ? (
+                        <span className="badge badge-green">설치됨</span>
+                      ) : (
+                        <span className="badge badge-gray">미설치</span>
+                      )}
+                      {tool.active && <span className="badge badge-green">활성</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <GitStatusPanel path={detailsProject.path} />
+          </div>
+        </Sheet>
+      )}
+
       {pendingDelete && (
         <DeleteReclaimableDialog
           entry={pendingDelete.entry}
@@ -296,6 +370,31 @@ export function ProjectTable({
           onConfirm={confirmDelete}
         />
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteProject !== null}
+        onClose={() => setPendingDeleteProject(null)}
+        onConfirm={confirmDeleteProject}
+        title="프로젝트 삭제"
+        confirmLabel="삭제"
+        busyLabel="삭제 중..."
+        busy={deletingProject}
+        requireTypedConfirmation={pendingDeleteProject?.name}
+        requireCheckbox="이 작업은 되돌릴 수 없음을 이해했습니다"
+      >
+        {pendingDeleteProject && (
+          <>
+            <p className="section-description">
+              다음 프로젝트 폴더 전체를 디스크에서 완전히 삭제합니다. 재생성 가능한 폴더뿐 아니라 소스 코드를
+              포함한 모든 내용이 사라지며 되돌릴 수 없습니다.
+            </p>
+            <div className="projects-delete-target">
+              <div className="mono-cell projects-delete-path">{pendingDeleteProject.path}</div>
+              <div className="projects-delete-size">{formatBytes(pendingDeleteProject.totalSizeBytes)}</div>
+            </div>
+          </>
+        )}
+      </ConfirmDialog>
     </div>
   )
 }

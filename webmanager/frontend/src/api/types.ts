@@ -514,6 +514,14 @@ export interface MiseEnvResponse {
   env: Record<string, string>
 }
 
+// GET /api/system/restart-needed's body - true as long as code-server's
+// live PID still matches whatever was recorded when a mise/extension/Claude
+// Code install or uninstall last completed (see backend's
+// internal/restartstatus). Self-clears once code-server actually restarts.
+export interface RestartStatusResponse {
+  dirty: boolean
+}
+
 export interface LFSStatus {
   installed: boolean
 }
@@ -579,6 +587,7 @@ export interface TerminalSettings {
   keybindings: KeyBinding[]
   themeId: string
   customThemes: TerminalTheme[]
+  homeLabel: string // custom Home tab title, "" = use the default "홈"
 }
 
 // Mirrors internal/termsession.Info — M2 named sessions (see
@@ -589,6 +598,7 @@ export interface TerminalSessionInfo {
   createdAt: string
   lastAttachedAt: string
   attached: boolean
+  pid: number // PTY-leader shell pid, for cross-referencing GET /api/processes
 }
 
 export interface SidebarOrder {
@@ -630,4 +640,58 @@ export interface DevProxyInfo {
   name: string
   raw: string
   structured?: DevProxyExpose
+}
+
+// Mirrors internal/projects' git-status contract (GET /api/projects/git/*).
+// status never errors (always 200, isGitRepo: false + zero-valued fields for
+// a non-repo path); the rest 400/502 with {error} on failure.
+export interface GitStatus {
+  isGitRepo: boolean
+  branch: string
+  staged: number
+  changed: number
+  untracked: number
+  behind: number
+  ahead: number
+  diverged: number
+  stashed: number
+  conflicts: number
+  clean: boolean
+}
+
+export interface GitCommit {
+  hash: string
+  shortHash: string
+  authorName: string
+  authorEmail: string
+  date: string // ISO string
+  subject: string
+}
+
+export interface GitLogResponse {
+  commits: GitCommit[]
+  hasMore: boolean
+  nextCursor?: string
+}
+
+export interface GitDiffResponse {
+  text: string // raw unified diff, "" if nothing to show
+}
+
+export interface GitRemote {
+  name: string
+  fetchUrl: string
+  pushUrl: string
+}
+
+export interface GitBranch {
+  name: string
+  current: boolean
+  remote: boolean
+}
+
+export interface GitTag {
+  name: string
+  date?: string
+  hash?: string
 }

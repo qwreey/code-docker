@@ -10,6 +10,11 @@ interface DeleteReclaimableDialogProps {
   onConfirm: () => void
 }
 
+// Thin wrapper around the shared ConfirmDialog (see its doc comment for why
+// a plain window.confirm() is wrong for an irreversible os.RemoveAll — same
+// reasoning applies here, ConfirmDialog just centralizes it). Kept as its
+// own component rather than inlined at each call site since the styled
+// path/size target block below is specific to this reclaimable-folder flow.
 export function DeleteReclaimableDialog({ entry, busy, onCancel, onConfirm }: DeleteReclaimableDialogProps) {
   return (
     <ConfirmDialog
@@ -21,7 +26,7 @@ export function DeleteReclaimableDialog({ entry, busy, onCancel, onConfirm }: De
       busyLabel="삭제 중..."
       busy={busy}
     >
-      <p>
+      <p className="section-description">
         다음 폴더를 디스크에서 완전히 삭제합니다. 이 작업은 되돌릴 수 없습니다(단,{' '}
         <code>{entry.pattern}</code>류 폴더는 대부분 다시 설치/빌드하면 재생성됩니다).
       </p>

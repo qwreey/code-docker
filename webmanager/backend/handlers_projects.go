@@ -70,3 +70,29 @@ func (s *Server) handleDeleteReclaimable(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusOK, info)
 	}
 }
+
+// handleDeleteProject permanently deletes an entire project's directory from
+// disk — distinct from handleDeleteReclaimable above, which only ever
+// touches a reclaimable subtree within a project. path must exactly match an
+// existing cached project's Path, validated by
+// internal/projects.Scanner.DeleteProject using the same exact-match
+// convention as every other project mutation endpoint (never a
+// prefix/contains check). Gated by s.gate in main.go since this is a
+// destructive write.
+func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		writeError(w, http.StatusBadRequest, "path is required")
+		return
+	}
+
+	err := s.projectScanner.DeleteProject(path)
+	switch {
+	case errors.Is(err, projects.ErrUnknownProject):
+		writeError(w, http.StatusBadRequest, "unknown project path")
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, err.Error())
+	default:
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	}
+}
