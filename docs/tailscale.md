@@ -22,6 +22,14 @@ code-docker 가 고유한 tailscale IP를 가지도록 하여, ssh/adb 를 위�
 
 기본적으로 공식 tailscale.com 컨트롤 서버에 로그인합니다. Headscale 등 자체 호스팅 서버를 쓰고싶다면 `docker-compose.yml` 의 `TAILSCALE_LOGIN_SERVER` 환경변수를 원하는 URL로 설정하세요 (`tailscale up --login-server=` 로 전달됩니다). 이미 로그인된 상태에서 이 값을 바꾼 경우, `/code/.tailscale/state` 를 지우고 컨테이너를 재시작해야 새 서버로 다시 로그인합니다.
 
+## 호스트네임 지정 (MagicDNS)
+
+기본적으로 tailscaled 는 이 컨테이너의 `hostname:code-docker` 를 그대로 tailnet 호스트네임으로 등록합니다 (MagicDNS로 `https://code-docker.your-tailnet.ts.net` 형태로 접근 가능). 이 값은 `docker-compose.yml` 에 고정되어 있고 [`PREFIX`](build-customization.md)로 인스턴스별로 분리되지 않으므로, 같은 tailnet 에 여러 code-docker 인스턴스를 올리면 이름이 충돌합니다.
+
+`docker-compose.yml` 의 `TAILSCALE_HOSTNAME` 환경변수를 원하는 이름으로 설정하면 (아직 로그인 전이라면) 최초 자동 로그인 시도나 webmanager의 "로그인 시도하기" 버튼이 이 값을 `tailscale up --hostname=` 으로 전달합니다.
+
+이미 로그인되어 있는 상태에서 이 값을 바꾸는 경우, 자동 재시도는 `BackendState`가 이미 `Running`이면 아예 스킵되므로 `docker compose up -d`만으로는 반영되지 않습니다 - [웹 터미널](webmanager.md#terminal)에서 `tailscale up --hostname=원하는이름` 을 직접 한 번 실행하면 재로그인 없이 즉시 이름이 바뀝니다 (또는 `/code/.tailscale/state`를 지우고 재시작해 처음부터 다시 로그인해도 됩니다).
+
 ## 설정 파일
 
 수신/발신 설정은 `/code/.tailscale/config.yaml` 을 편집합니다 (최초 실행 시 기본값이 자동 생성됩니다).

@@ -73,6 +73,17 @@
 # tailscale.com control server instead.
 #TAILSCALE_LOGIN_SERVER="" # ex: https://tail.qwreey.moe
 
+# Tailnet hostname registered by `tailscale up --hostname=` (this is what
+# shows up in MagicDNS, e.g. https://code-docker.your-tailnet.ts.net).
+# Leave unset/empty and tailscaled falls back to its own os.Hostname()
+# default, which is this container's `hostname:` in docker-compose.yml -
+# fixed to "code-docker" and NOT PREFIX-namespaced, so running multiple
+# instances on the same tailnet collide on this name unless you set it
+# explicitly per instance. Only applied by the automatic first-boot login
+# attempt - see docs/tailscale.md#호스트네임-지정-magicdns for how to change
+# it after you've already logged in once.
+#TAILSCALE_HOSTNAME="" # ex: code-docker
+
 # In-container nginx (config/nginx.default.conf) access_log verbosity:
 #   errors - only log non-2xx/3xx responses (via an nginx map/if on
 #     $status), so routine traffic doesn't flood `docker compose logs`.

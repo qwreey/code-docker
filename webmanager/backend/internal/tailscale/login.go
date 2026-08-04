@@ -31,12 +31,12 @@ func NewLoginManager() *LoginManager {
 	return &LoginManager{}
 }
 
-// Start spawns `tailscale up` (optionally with --login-server) in the
-// background and returns immediately; a goroutine reaps the process when it
-// finishes. A no-op, non-error if a previous Start's process is still
+// Start spawns `tailscale up` (optionally with --login-server/--hostname) in
+// the background and returns immediately; a goroutine reaps the process when
+// it finishes. A no-op, non-error if a previous Start's process is still
 // running - the caller should just keep polling status instead of stacking
 // a second login attempt onto the same daemon.
-func (m *LoginManager) Start(binPath, loginServer string) error {
+func (m *LoginManager) Start(binPath, loginServer, hostname string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -47,6 +47,9 @@ func (m *LoginManager) Start(binPath, loginServer string) error {
 	args := []string{"up"}
 	if loginServer != "" {
 		args = append(args, "--login-server="+loginServer)
+	}
+	if hostname != "" {
+		args = append(args, "--hostname="+hostname)
 	}
 	cmd := exec.Command(binPath, args...)
 	if err := cmd.Start(); err != nil {

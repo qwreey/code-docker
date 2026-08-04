@@ -76,6 +76,9 @@ if [ "$backend_state" != "Running" ]; then
         if [ -n "${TAILSCALE_LOGIN_SERVER:-}" ]; then
             tailscale_up_args+=(--login-server="$TAILSCALE_LOGIN_SERVER")
         fi
+        if [ -n "${TAILSCALE_HOSTNAME:-}" ]; then
+            tailscale_up_args+=(--hostname="$TAILSCALE_HOSTNAME")
+        fi
         tailscale up "${tailscale_up_args[@]}" &
         up_pid=$!
         pids="$pids $up_pid"

@@ -15,6 +15,7 @@ type Config struct {
 	TailscaleConfigPath  string
 	TailscaleBinPath     string
 	TailscaleLoginServer string
+	TailscaleHostname    string
 	SSHSigningKeyPath    string
 	VectorLogDir         string
 	SystemDiskPath       string
@@ -131,6 +132,10 @@ func loadConfig() Config {
 		// Same env var tailscale-service.default.sh reads, so an on-demand
 		// `tailscale up` triggered from here uses the same login server.
 		TailscaleLoginServer: getenv("TAILSCALE_LOGIN_SERVER", ""),
+		// Same env var tailscale-service.default.sh reads, so an on-demand
+		// `tailscale up` triggered from here registers under the same
+		// MagicDNS hostname the automatic first-boot attempt would have used.
+		TailscaleHostname:    getenv("TAILSCALE_HOSTNAME", ""),
 		SSHSigningKeyPath:    getenv("SSH_SIGNING_KEY_PATH", "/code/.ssh/signing_key"),
 		VectorLogDir:         getenv("VECTOR_LOG_DIR", "/code/.vector/logs"),
 		SystemDiskPath:       getenv("SYSTEM_DISK_PATH", "/code"),

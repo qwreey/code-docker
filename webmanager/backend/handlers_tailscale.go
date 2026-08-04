@@ -191,7 +191,7 @@ func (s *Server) handleTailscaleLoginStart(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	if err := s.tailscaleLogin.Start(binPath, s.cfg.TailscaleLoginServer); err != nil {
+	if err := s.tailscaleLogin.Start(binPath, s.cfg.TailscaleLoginServer, s.cfg.TailscaleHostname); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

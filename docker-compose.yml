@@ -45,6 +45,11 @@ services:
       DOCKER_HOST: "${DOCKER_HOST:-tcp://dind:2375}"
       TAILSCALE_ENABLED: "${TAILSCALE_ENABLED:-true}"
       TAILSCALE_LOGIN_SERVER: "${TAILSCALE_LOGIN_SERVER:-}"
+      # Empty falls back to tailscaled's own os.Hostname() default, which is
+      # this container's `hostname:` below - fixed to "code-docker" and NOT
+      # PREFIX-namespaced, so multiple instances on one tailnet collide on
+      # MagicDNS name unless set explicitly per instance. See example-env.
+      TAILSCALE_HOSTNAME: "${TAILSCALE_HOSTNAME:-}"
       NGINX_LOG_LEVEL: "${NGINX_LOG_LEVEL:-errors}"
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
       TAILSCALE_LOG_LEVEL: "${TAILSCALE_LOG_LEVEL:-errors}"

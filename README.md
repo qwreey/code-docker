@@ -132,6 +132,7 @@ code-docker 가 고유한 tailscale IP를 가지도록 하여, ssh/adb 를 위�
 - [켜고 끄기](docs/tailscale.md#켜고-끄기)
 - [최초 로그인과 상태 배너](docs/tailscale.md#최초-로그인과-상태-배너)
 - [자체 호스팅 로그인 서버 (Headscale)](docs/tailscale.md#자체-호스팅-로그인-서버-headscale)
+- [호스트네임 지정 (MagicDNS)](docs/tailscale.md#호스트네임-지정-magicdns)
 - [포트 가져오기 (forwards)](docs/tailscale.md#포트-가져오기-forwards)
 - [포트 내보내기 (publish)](docs/tailscale.md#포트-내보내기-publish)
 - [보안: tailnet ACL 설정](docs/tailscale.md#보안-tailnet-acl-설정) — 놓치기 쉬운 필수 설정입니다
