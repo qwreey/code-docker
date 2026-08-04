@@ -133,7 +133,12 @@ func main() {
 
 	mux.HandleFunc("GET /api/ssh/keys", s.handleListSSHKeys)
 	mux.Handle("POST /api/ssh/keys", gate.RequirePassword(http.HandlerFunc(s.handleAddSSHKey)))
+	mux.Handle("PUT /api/ssh/keys/{id}", gate.RequirePassword(http.HandlerFunc(s.handleUpdateSSHKey)))
 	mux.Handle("DELETE /api/ssh/keys/{id}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteSSHKey)))
+	mux.Handle("POST /api/ssh/keys/comments", gate.RequirePassword(http.HandlerFunc(s.handleAddSSHComment)))
+	mux.Handle("PUT /api/ssh/keys/comments/{id}", gate.RequirePassword(http.HandlerFunc(s.handleUpdateSSHComment)))
+	mux.Handle("DELETE /api/ssh/keys/comments/{id}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteSSHComment)))
+	mux.Handle("POST /api/ssh/keys/reorder", gate.RequirePassword(http.HandlerFunc(s.handleReorderSSHKeys)))
 
 	mux.HandleFunc("GET /api/git/config", s.handleGetGitConfig)
 	mux.Handle("PUT /api/git/config", gate.RequirePassword(http.HandlerFunc(s.handlePutGitConfig)))

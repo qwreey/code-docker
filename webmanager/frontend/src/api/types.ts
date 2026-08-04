@@ -57,6 +57,19 @@ export interface SshKey {
   raw: string
 }
 
+// Mirrors internal/sshkeys.Entry — GET /api/ssh/keys returns the whole
+// authorized_keys file as an ordered mix of key and standalone "#" comment
+// entries (people use those as freeform section markers). Exactly one of
+// key/text is set, matching kind.
+export type SshEntryKind = 'key' | 'comment'
+
+export interface SshEntry {
+  id: string
+  kind: SshEntryKind
+  key?: SshKey
+  text?: string
+}
+
 export interface GitUserConfig {
   name: string
   email: string

@@ -37,3 +37,53 @@
   outline: 2px solid var(--accent-border);
   outline-offset: 1px;
 }
+
+.ssh-key-drag-handle-cell {
+  width: 1.5rem;
+  padding-right: 0 !important;
+}
+
+.ssh-key-drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.ssh-keys-table tbody tr[draggable='true'] {
+  cursor: default;
+}
+
+.ssh-key-drag-over {
+  outline: 2px dashed var(--accent-border, var(--accent));
+  outline-offset: -2px;
+}
+
+.ssh-key-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.ssh-key-editing-row td {
+  padding: 0.75rem 0.9rem;
+}
+
+.ssh-key-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.ssh-key-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ssh-comment-row {
+  background: var(--surface-hover);
+}
+
+.ssh-comment-text {
+  font-family: var(--mono);
+  font-style: italic;
+  color: var(--text-muted);
+}
