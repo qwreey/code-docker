@@ -55,7 +55,7 @@ export function Mise() {
   const [error, setError] = useState<string | null>(null)
   const [job, setJob] = useState<JobState | null>(null)
   const [removeFromConfigChecked, setRemoveFromConfigChecked] = useState<Set<string>>(new Set())
-  const [envData, setEnvData] = useState<MiseEnvResponse | null>(null)
+  const [envData, setEnvData] = useState<Record<string, string> | null>(null)
   const [envLoading, setEnvLoading] = useState(false)
   const [envError, setEnvError] = useState<string | null>(null)
   const [categoryOpen, setCategoryOpen] = useState<Record<string, boolean>>({})
@@ -173,7 +173,7 @@ export function Mise() {
     setEnvError(null)
     try {
       const res = await api.get<MiseEnvResponse>('/mise/env')
-      setEnvData(res)
+      setEnvData(res.env)
     } catch (e) {
       setEnvError(errorMessage(e))
     } finally {

@@ -490,7 +490,9 @@ export interface MiseJobStatus {
   lines: string[]
 }
 
-export type MiseEnvResponse = Record<string, string>
+export interface MiseEnvResponse {
+  env: Record<string, string>
+}
 
 export interface LFSStatus {
   installed: boolean
