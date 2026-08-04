@@ -39,6 +39,7 @@
 - [`vector.*.toml`](#vectortoml-vector-로그-파이프라인-설정)
 - [`nginx-service.*.sh`](#nginx-servicesh-nginx-실행)
 - [`nginx.*.conf`](#nginxconf-단일-origin-라우팅-설정)
+- [`nginx-error.*.html`](#nginx-errorhtml-code-server-준비-중-페이지)
 
 ### `build.*.sh` (빌드 스크립트)
 
@@ -248,3 +249,24 @@ access_log 상세도는 `docker-compose.yml`의 `NGINX_LOG_LEVEL`로 조절합�
 만들어 그걸로 nginx를 실행합니다. override 작성 시 이 자리표시자를 그대로 두면
 `NGINX_LOG_LEVEL` 토글이 계속 동작하고, 지우면 그냥 고정된 access_log 동작이
 됩니다.
+
+### `nginx-error.*.html` (code-server 준비 중 페이지)
+
+`location /`(code-server 프록시)에서 upstream(`127.0.0.1:8080`)에 연결할 수
+없어 502/503/504가 나면, nginx의 기본 에러 페이지 대신 이 파일을 대신
+보여줍니다 — 컨테이너가 막 시작했거나 code-server가 재시작 중이라 아직
+포트가 열리지 않은, 실제로는 에러가 아닌 흔한 상황을 사용자에게 "곧
+끝난다"고 알려주기 위함입니다. 페이지 안 JS가 몇 초 간격으로 같은 주소를
+`fetch`해보고, 200이 돌아오는 순간 자동으로 새로고침합니다(수동 "지금 다시
+확인" 버튼도 있음). webmanager로 바로 가는 링크도 있어서, code-server가
+왜 안 뜨는지 로그(Logs 탭)로 바로 확인할 수 있습니다 — webmanager는
+별도 supervisord 프로그램이라 code-server가 죽어있어도 보통 정상 응답합니다.
+
+`/manager/`(webmanager) 쪽에는 이 처리가 걸려있지 않습니다 — 이 페이지가
+다루는 시나리오는 code-server 기동 지연이지, webmanager 쪽 문제가 아니기
+때문입니다.
+
+이 파일은 `nginx.*.conf`처럼 envsubst 템플릿이 아니라 순수 정적 HTML입니다.
+`location = /_code_not_ready.html` 블록이 `try_files`로 `nginx-error.
+override.html`을 먼저 찾고, 없으면 `nginx-error.default.html`을 씁니다 —
+override 파일을 만들면 셸 스크립트를 거치지 않고 바로 nginx가 선택합니다.
