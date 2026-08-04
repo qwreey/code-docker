@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Download, Info, Pencil, Trash2, TextCursorInput } from 'lucide-react'
+import { Download, File, Folder, Info, Pencil, Trash2, TextCursorInput } from 'lucide-react'
 import type { FileEntry } from '../../api/types'
 import { formatBytes } from '../../utils/format'
 import './FileManager.css'
@@ -89,7 +89,6 @@ export function FileTable({
               />
             </th>
             <th>이름</th>
-            <th>종류</th>
             <th>크기</th>
             <th>수정 시각</th>
             <th aria-label="동작" />
@@ -116,17 +115,21 @@ export function FileTable({
                   />
                 ) : (
                   <>
-                    <span className="file-manager-name">{entry.name}</span>
+                    <span className="file-manager-name-row">
+                      {entry.isDir ? (
+                        <Folder size={15} className="file-manager-name-icon file-manager-name-icon-dir" />
+                      ) : (
+                        <File size={15} className="file-manager-name-icon" />
+                      )}
+                      <span className="file-manager-name">{entry.name}</span>
+                      {entry.isSymlink && (
+                        <span className="badge badge-yellow file-manager-symlink-badge">심볼릭 링크</span>
+                      )}
+                    </span>
                     {entry.isSymlink && entry.symlinkTarget && (
                       <span className="file-manager-symlink-target">→ {entry.symlinkTarget}</span>
                     )}
                   </>
-                )}
-              </td>
-              <td>
-                <span className="file-manager-type">{entry.isDir ? '폴더' : '파일'}</span>
-                {entry.isSymlink && (
-                  <span className="badge badge-yellow file-manager-symlink-badge">심볼릭 링크</span>
                 )}
               </td>
               <td>{entry.isDir ? '-' : formatBytes(entry.size)}</td>

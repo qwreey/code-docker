@@ -294,28 +294,6 @@ export function FileManager() {
       )}
       {uploadSummary && <div className="info-note">{uploadSummary}</div>}
 
-      {selected.size > 0 && (
-        <div className="file-manager-selection-toolbar">
-          <span className="file-manager-selection-count">{selected.size}개 선택됨</span>
-          <button type="button" className="btn btn-secondary btn-small" onClick={() => setBulkMode('move')}>
-            이동
-          </button>
-          <button type="button" className="btn btn-secondary btn-small" onClick={() => setBulkMode('copy')}>
-            복사
-          </button>
-          <button
-            type="button"
-            className="btn btn-danger btn-small"
-            onClick={() => handleDelete(Array.from(selected))}
-          >
-            삭제
-          </button>
-          <button type="button" className="btn btn-secondary btn-small" onClick={() => setSelected(new Set())}>
-            선택 해제
-          </button>
-        </div>
-      )}
-
       {loading ? (
         <Skeleton />
       ) : (
@@ -336,6 +314,29 @@ export function FileManager() {
           onSubmitRename={submitRename}
         />
       )}
+
+      {/* Always rendered (not conditionally mounted) and pinned via sticky
+          bottom - reserves its own height at the bottom of .app-content's
+          scroll area at all times so the first selection doesn't shift the
+          table above it. Hidden via visibility (keeps its box, drops it from
+          the a11y tree/tab order) rather than unmounting when empty. */}
+      <div
+        className={`file-manager-selection-toolbar${selected.size === 0 ? ' file-manager-selection-toolbar-empty' : ''}`}
+      >
+        <span className="file-manager-selection-count">{selected.size}개 선택됨</span>
+        <button type="button" className="btn btn-secondary btn-small" onClick={() => setBulkMode('move')}>
+          이동
+        </button>
+        <button type="button" className="btn btn-secondary btn-small" onClick={() => setBulkMode('copy')}>
+          복사
+        </button>
+        <button type="button" className="btn btn-danger btn-small" onClick={() => handleDelete(Array.from(selected))}>
+          삭제
+        </button>
+        <button type="button" className="btn btn-secondary btn-small" onClick={() => setSelected(new Set())}>
+          선택 해제
+        </button>
+      </div>
 
       {infoTarget && <InfoPanel entry={infoTarget} onClose={() => setInfoTarget(null)} />}
       {editingEntry && (

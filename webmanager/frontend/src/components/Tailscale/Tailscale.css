@@ -1,3 +1,33 @@
+/* Top-right tab group in .section-header - same visual language as Task
+   Manager's .processes-tabs (border-inclusive pill, active tab filled with
+   --accent), just not shared cross-folder CSS since the two features don't
+   otherwise depend on each other. */
+.tailscale-tabs {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  flex: none;
+  height: 2.15rem;
+}
+
+.tailscale-tab {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  border: none;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.4rem 1.1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tailscale-tab-active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
 .tailscale-table {
   width: 100%;
   border-collapse: collapse;

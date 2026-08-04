@@ -75,8 +75,15 @@
   border-radius: var(--radius);
   background: var(--accent-bg);
   border: 1px solid var(--accent-border);
-  margin-bottom: 0.9rem;
+  margin-top: 0.9rem;
   font-size: 0.85rem;
+  position: sticky;
+  bottom: 0;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.file-manager-selection-toolbar-empty {
+  visibility: hidden;
 }
 
 .file-manager-selection-count {
@@ -92,20 +99,31 @@
   min-width: 10rem;
 }
 
+.file-manager-name-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.file-manager-name-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.file-manager-name-icon-dir {
+  color: var(--accent);
+}
+
 .file-manager-name {
   font-weight: 500;
 }
 
 .file-manager-symlink-target {
   display: block;
+  margin-left: 1.35rem;
   font-family: var(--mono);
   font-size: 0.75rem;
   color: var(--text-muted);
-}
-
-.file-manager-type {
-  color: var(--text-muted);
-  font-size: 0.85rem;
 }
 
 .file-manager-symlink-badge {
