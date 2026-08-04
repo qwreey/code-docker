@@ -301,13 +301,15 @@ export function Mise() {
                       <td>{tool.name}</td>
                       <td className="mono-cell">{tool.version}</td>
                       <td className="mono-cell">{tool.requestedVersion}</td>
-                      <td className="mise-status-badges">
-                        {tool.installed ? (
-                          <span className="badge badge-green">설치됨</span>
-                        ) : (
-                          <span className="badge badge-gray">미설치</span>
-                        )}
-                        {tool.active && <span className="badge badge-green">활성</span>}
+                      <td>
+                        <div className="mise-status-badges">
+                          {tool.installed ? (
+                            <span className="badge badge-green">설치됨</span>
+                          ) : (
+                            <span className="badge badge-gray">미설치</span>
+                          )}
+                          {tool.active && <span className="badge badge-green">활성</span>}
+                        </div>
                       </td>
                       <td>
                         <div className="mise-tool-actions">
