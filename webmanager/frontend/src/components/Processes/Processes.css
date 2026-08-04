@@ -588,6 +588,27 @@
   min-width: 3px;
 }
 
+/* Free-space segment (disk breakdown only) - hatched instead of flat-colored
+   so it reads as "room left", not another usage category. Also used on the
+   matching legend swatch. */
+.perf-mem-seg-free {
+  background-color: var(--color-gray-bg);
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-gray-border) 0,
+    var(--color-gray-border) 2px,
+    transparent 2px,
+    transparent 6px
+  );
+}
+
+/* Wraps the whole stack in a faint track + a little padding so the bar reads
+   as "this is the full capacity" even where the hatched free segment ends. */
+.perf-mem-stack-tracked {
+  background: var(--color-gray-bg);
+  padding: 2px;
+}
+
 .perf-mem-legend {
   display: flex;
   flex-wrap: wrap;
@@ -613,19 +634,5 @@
   color: var(--text-heading);
   font-weight: 600;
   margin-left: auto;
-}
-
-/* Secondary caption below DiskBreakdownSection - host mount capacity, kept
-   as plain text (no bar) since the free-space framing it used to carry
-   (a used/free progress bar) isn't the useful view here; the breakdown
-   above is. */
-.perf-disk-host-note {
-  margin-top: 0.6rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.perf-disk-host-note-danger {
-  color: var(--color-red-fg);
 }
 

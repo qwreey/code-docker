@@ -25,6 +25,7 @@ interface Segment {
   label: string
   bytes: number
   colorVar: string
+  free?: boolean
 }
 
 function buildSegments(data: DiskBreakdownResponse): Segment[] {
@@ -51,8 +52,11 @@ function buildSegments(data: DiskBreakdownResponse): Segment[] {
   if (otherBytes > 0) {
     segments.push({ key: '__other__', label: '기타', bytes: otherBytes, colorVar: 'var(--viz-seq-3)' })
   }
+  // Free space gets its own hatched (not flat-colored) segment so it doesn't
+  // read as just another usage category - it's the inverse of one, à la
+  // Windows Storage Sense / 삼성 저장공간 분석기 showing how much room is left.
   if (data.freeBytes > 0) {
-    segments.push({ key: '__free__', label: '여유', bytes: data.freeBytes, colorVar: 'var(--color-gray-border)' })
+    segments.push({ key: '__free__', label: '여유', bytes: data.freeBytes, colorVar: '', free: true })
   }
   return segments
 }
@@ -129,12 +133,12 @@ function DiskBreakdownSection() {
         </p>
       ) : (
         <>
-          <div className="perf-mem-stack">
+          <div className="perf-mem-stack perf-mem-stack-tracked">
             {segments.map((s) => (
               <div
                 key={s.key}
-                className="perf-mem-seg"
-                style={{ width: `${(s.bytes / data.totalBytes) * 100}%`, background: s.colorVar }}
+                className={`perf-mem-seg${s.free ? ' perf-mem-seg-free' : ''}`}
+                style={{ width: `${(s.bytes / data.totalBytes) * 100}%`, background: s.free ? undefined : s.colorVar }}
                 title={`${s.label}: ${formatBytes(s.bytes)}`}
               />
             ))}
@@ -142,7 +146,10 @@ function DiskBreakdownSection() {
           <div className="perf-mem-legend">
             {segments.map((s) => (
               <span className="perf-mem-legend-item" key={s.key}>
-                <span className="perf-mem-legend-swatch" style={{ background: s.colorVar }} />
+                <span
+                  className={`perf-mem-legend-swatch${s.free ? ' perf-mem-seg-free' : ''}`}
+                  style={{ background: s.free ? undefined : s.colorVar }}
+                />
                 {s.label} {formatBytes(s.bytes)}
               </span>
             ))}
@@ -162,29 +169,43 @@ function DiskBreakdownSection() {
 // CpuHeatmap/MemoryBreakdown below) — those duplicated numbers the
 // redesigned graphs already show in their own header/legend.
 //
-// The free-vs-used framing (a progress bar toward `disk.totalBytes`) that
-// used to lead this card was dropped — "how much room is left" isn't the
-// useful question here, "what's actually using the space" is, which is
-// exactly what DiskBreakdownSection's folder-percentage view already
-// answers. DiskBreakdownSection is now the primary content; the host/mount
-// numbers for `disk.path` (fed by Performance.tsx's shared /system/resources
-// poll, a different scope than DiskBreakdownSection's own container-root du
-// — see its doc comment) are kept only as a compact secondary caption below
-// it, since the underlying host mount's total capacity isn't otherwise
-// visible from the du-based breakdown alone.
+// Mirrors MemoryBreakdown's two-scope layout: DiskBreakdownSection above is
+// the container's own root filesystem broken down by top-level directory
+// (composition of usage, each colored segment's share sums to 100% of
+// capacity, with free space folded in as its own hatched — not flat-colored
+// — segment so it reads as "room left" rather than another category); below
+// it, the host mount for `disk.path` (a different scope, fed by
+// Performance.tsx's shared /system/resources poll) gets the same
+// used/total percent bar treatment as MemoryBreakdown's cgroup scope.
 export function DiskUsageCard({ disk }: { disk: DiskInfo }) {
   const diskPercent = disk.totalBytes > 0 ? (disk.usedBytes / disk.totalBytes) * 100 : 0
   const danger = disk.available && diskPercent >= DANGER_THRESHOLD
 
   return (
     <div className="card perf-card perf-card-disk">
+      <h2>디스크</h2>
+
       <DiskBreakdownSection />
 
-      <div className={`perf-disk-host-note${danger ? ' perf-disk-host-note-danger' : ''}`}>
-        호스트 마운트 <span className="system-summary-label-path">{disk.path}</span>:{' '}
-        {disk.available
-          ? `${formatBytes(disk.usedBytes)} / ${formatBytes(disk.totalBytes)} (${formatPercent(diskPercent)} 사용)`
-          : '확인 불가'}
+      <div className="perf-mem-scope">
+        <div className="perf-mem-scope-label">
+          호스트 마운트 (<span className="system-summary-label-path">{disk.path}</span>)
+        </div>
+        {disk.available ? (
+          <>
+            <div className="system-summary-bar">
+              <div
+                className={`system-summary-bar-fill${danger ? ' system-summary-bar-fill-danger' : ''}`}
+                style={{ width: `${Math.min(100, diskPercent)}%` }}
+              />
+            </div>
+            <div className="perf-mem-scope-sub">
+              {formatBytes(disk.usedBytes)} / {formatBytes(disk.totalBytes)} ({formatPercent(diskPercent)} 사용)
+            </div>
+          </>
+        ) : (
+          <div className="system-summary-unavailable">확인 불가</div>
+        )}
       </div>
     </div>
   )
