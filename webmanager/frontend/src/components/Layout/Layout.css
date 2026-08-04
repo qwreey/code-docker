@@ -11,10 +11,18 @@
 
 .sidebar-title {
   flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   font-weight: 700;
   font-size: 1.05rem;
   padding: 0.4rem 0.5rem 1rem;
   color: var(--text-heading);
+}
+
+.sidebar-title-mark {
+  flex: none;
+  color: var(--accent);
 }
 
 /* Scrolls independently from the footer below it (theme toggle + lock
@@ -51,18 +59,37 @@
   cursor: pointer;
 }
 
-.sidebar-drag-handle {
+/* Reserves one icon-sized slot per row. The section icon and the drag
+   handle both sit stacked in this same slot (absolutely positioned) and
+   crossfade between each other on hover/focus, instead of the label
+   shifting sideways or a second slot being added. */
+.sidebar-icon-slot {
+  position: relative;
   flex-shrink: 0;
-  width: 0.85rem;
-  text-align: center;
-  color: var(--text-muted);
-  cursor: grab;
-  line-height: 1;
-  /* only shown on hover/focus - always-visible handles looked noisy since
-     every row has one; kept a narrow reserved width (rather than none) so
-     the label doesn't shift sideways when it fades in */
-  opacity: 0;
+  width: 1rem;
+  height: 1rem;
+}
+
+.sidebar-icon-slot > svg {
+  position: absolute;
+  inset: 0;
   transition: opacity 0.12s ease;
+}
+
+.sidebar-item-icon {
+  opacity: 1;
+}
+
+.sidebar-drag-handle {
+  cursor: grab;
+  /* only shown on hover/focus - always-visible handles looked noisy since
+     every row has one */
+  opacity: 0;
+}
+
+.sidebar-item:hover .sidebar-item-icon,
+.sidebar-item:focus-visible .sidebar-item-icon {
+  opacity: 0;
 }
 
 .sidebar-item:hover .sidebar-drag-handle,
