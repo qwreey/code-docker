@@ -37,6 +37,13 @@ type Settings struct {
 	Keybindings  []KeyBinding    `json:"keybindings"`
 	ThemeID      string          `json:"themeId"`
 	CustomThemes []TerminalTheme `json:"customThemes"`
+	// HomeLabel overrides the Home tab's displayed title ("홈" if empty).
+	// Home is a virtual tab (never a real termsession.Session, see
+	// TerminalHome.tsx) with no session record of its own to store a
+	// custom name on, so its title rides along in this same
+	// already-backend-persisted, already-follows-the-user-across-devices
+	// settings blob instead of a new file.
+	HomeLabel string `json:"homeLabel"`
 }
 
 func empty() Settings {

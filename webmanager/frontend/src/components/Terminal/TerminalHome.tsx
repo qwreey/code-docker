@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Pin, PinOff, Plus, X } from 'lucide-react'
+import { Pencil, Pin, PinOff, Play, Plus, Trash2, X } from 'lucide-react'
 import type { TerminalProfile, TerminalSessionInfo } from '../../api/types'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { Sheet } from '../common/Sheet'
@@ -133,15 +133,21 @@ export function TerminalHome({
                 >
                   {s.pinned ? <Pin size={14} /> : <PinOff size={14} />}
                 </button>
-                <button
-                  type="button"
-                  className="terminal-home-icon-btn"
-                  onClick={() => onCloseSession(s.name)}
-                  title="세션 종료"
-                  aria-label={`${s.name} 세션 종료`}
-                >
-                  <X size={14} />
-                </button>
+                {/* Hidden entirely once pinned, same rule as the tab bar
+                    (TerminalTabs.tsx item 3) - pinning means "can't be
+                    closed from the UI" everywhere a session can be closed
+                    from, not just the tab bar. */}
+                {!s.pinned && (
+                  <button
+                    type="button"
+                    className="terminal-home-icon-btn"
+                    onClick={() => onCloseSession(s.name)}
+                    title="세션 종료"
+                    aria-label={`${s.name} 세션 종료`}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -187,25 +193,45 @@ export function TerminalHome({
                   setDragOverId(null)
                 }}
               >
-                <div className="terminal-home-profile-info">
-                  <span className="terminal-home-drag-handle" aria-hidden="true">
-                    ⠿
-                  </span>
-                  <span className="terminal-home-profile-label">{p.label}</span>
+                <div className="terminal-home-profile-header">
+                  <div className="terminal-home-profile-info">
+                    <span className="terminal-home-drag-handle" aria-hidden="true">
+                      ⠿
+                    </span>
+                    <span className="terminal-home-profile-label">{p.label}</span>
+                  </div>
+                  <div className="terminal-home-profile-actions">
+                    <button
+                      type="button"
+                      className="terminal-home-icon-btn"
+                      onClick={() => onOpenProfile(p)}
+                      title="실행"
+                      aria-label={`${p.label} 실행`}
+                    >
+                      <Play size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="terminal-home-icon-btn"
+                      onClick={() => startEdit(p)}
+                      title="편집"
+                      aria-label={`${p.label} 편집`}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="terminal-home-icon-btn terminal-home-icon-btn-danger"
+                      onClick={() => setPendingDelete(p)}
+                      title="삭제"
+                      aria-label={`${p.label} 삭제`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
                 {p.cwd && <span className="terminal-home-profile-detail mono-cell">{p.cwd}</span>}
                 {p.command && <span className="terminal-home-profile-detail mono-cell">{p.command}</span>}
-                <div className="terminal-home-profile-actions">
-                  <button type="button" className="btn btn-primary btn-small" onClick={() => onOpenProfile(p)}>
-                    실행
-                  </button>
-                  <button type="button" className="btn btn-secondary btn-small" onClick={() => startEdit(p)}>
-                    편집
-                  </button>
-                  <button type="button" className="btn btn-danger btn-small" onClick={() => setPendingDelete(p)}>
-                    삭제
-                  </button>
-                </div>
               </li>
             ))}
           </ul>
@@ -228,7 +254,10 @@ export function TerminalHome({
         }
       >
         {draft && (
-          <div className="form-grid">
+          // Stacked (not the shared .form-grid's auto-fit columns) - this
+          // form is opened from a narrow Sheet as often as a wide desktop
+          // view, and 3 short fields don't need columns to stay readable.
+          <div className="form-grid terminal-home-profile-form">
             <div className="form-field">
               <label htmlFor="th-profile-label">이름</label>
               <input

@@ -4,7 +4,15 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
 import { api, apiUrl, errorMessage } from '../../api/client'
-import type { TerminalProfile, TerminalProfilesDoc, TerminalSessionInfo, TerminalSettings } from '../../api/types'
+import type {
+  ProcessInfo,
+  TerminalProfile,
+  TerminalProfilesDoc,
+  TerminalSessionInfo,
+  TerminalSettings,
+} from '../../api/types'
+import { buildProcessTree } from '../../utils/processTree'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { DEFAULT_KEYBINDINGS, type ModifierId } from './keybindings'
 import { DEFAULT_THEME_ID, findTheme, themeToXterm } from './themes'
 import { applyModifier } from './modifiers'
@@ -39,6 +47,7 @@ const EMPTY_SETTINGS: TerminalSettings = {
   keybindings: [],
   themeId: DEFAULT_THEME_ID,
   customThemes: [],
+  homeLabel: '',
 }
 
 // nextSessionName picks "세션 N" for the smallest N not already taken (or,
@@ -94,6 +103,11 @@ export function Terminal() {
   const [sessionActionError, setSessionActionError] = useState<string | null>(null)
   const [profiles, setProfiles] = useState<TerminalProfile[]>([])
   const [profilesError, setProfilesError] = useState<string | null>(null)
+  // Item 8: a close request (tab bar X, or Home tab's session list X) goes
+  // through requestClose below first, which shows this instead of closing
+  // immediately when the session's shell has a foreground child process.
+  const [closeConfirm, setCloseConfirm] = useState<{ name: string } | null>(null)
+  const [closeConfirmBusy, setCloseConfirmBusy] = useState(false)
   // Carries cwd/command from addSession(opts) through to the WS-connect
   // effect below, keyed by the session name they belong to — a ref (not
   // state) since it's write-then-read-once bookkeeping, not something a
@@ -111,6 +125,7 @@ export function Terminal() {
       keybindings: base.keybindings.length > 0 ? base.keybindings : DEFAULT_KEYBINDINGS,
       themeId: base.themeId || DEFAULT_THEME_ID,
       customThemes: base.customThemes,
+      homeLabel: base.homeLabel,
     }
   }, [settings])
 
@@ -233,6 +248,19 @@ export function Terminal() {
       setSaving(false)
     }
   }, [])
+
+  // Item 5: Home is a virtual tab with no termsession.Session of its own to
+  // rename, so its custom title rides along in the same already-persisted
+  // TerminalSettings blob (homeLabel) instead of a new backend feature -
+  // same save path/semantics as TerminalSettingsPanel's onSave (spreads the
+  // *resolved* effectiveSettings, not the possibly-still-null raw
+  // `settings`, matching that existing precedent).
+  const renameHome = useCallback(
+    (label: string) => {
+      saveSettings({ ...effectiveSettings, homeLabel: label })
+    },
+    [saveSettings, effectiveSettings],
+  )
 
   // xterm.js instance itself: created once and reused across session
   // switches (only the WebSocket underneath it changes — see the next
@@ -444,6 +472,51 @@ export function Terminal() {
     [activeSession, sessions, refreshSessions],
   )
 
+  // Item 8: before actually closing a session (tab bar X, or the Home tab's
+  // session-list X — pinned sessions never reach here, they have no close
+  // button at all per item 3), check whether its shell has any foreground
+  // child process running and confirm first if so, so e.g. an accidental
+  // click near "+" can't silently kill a running build/editor/ssh session.
+  // "Has a child process" is a cheap, reasonable heuristic for "something's
+  // running" — it doesn't distinguish a real foreground job from a
+  // background one (`sleep 100 &`), and a session whose pid the backend
+  // couldn't resolve (defensive-only, see termsession.Info.Pid) just skips
+  // the check and closes directly rather than blocking on a check that
+  // can't answer. GET /api/processes + buildProcessTree (already used by
+  // the Task Manager/Supervisor tabs) is reused rather than adding a
+  // dedicated backend endpoint for this.
+  const requestClose = useCallback(
+    async (name: string) => {
+      const session = sessions.find((s) => s.name === name)
+      if (!session || !session.pid) {
+        closeSession(name)
+        return
+      }
+      try {
+        const processes = await api.get<ProcessInfo[]>('/processes')
+        const [root] = buildProcessTree(processes, session.pid)
+        if (root && root.children.length > 0) {
+          setCloseConfirm({ name })
+          return
+        }
+      } catch {
+        // best-effort - if the process list itself can't be fetched, fall
+        // back to closing directly rather than blocking the user on a
+        // check that can't be answered
+      }
+      closeSession(name)
+    },
+    [sessions, closeSession],
+  )
+
+  const confirmClose = useCallback(async () => {
+    if (!closeConfirm) return
+    setCloseConfirmBusy(true)
+    await closeSession(closeConfirm.name)
+    setCloseConfirmBusy(false)
+    setCloseConfirm(null)
+  }, [closeConfirm, closeSession])
+
   const surfaceStyle = {
     '--kb-inset': `${keyboardInset}px`,
     // Lets the control bar/surface chrome (Terminal.css) blend into whatever
@@ -477,8 +550,10 @@ export function Terminal() {
         onSelect={selectSession}
         onAdd={addSession}
         onTogglePin={togglePin}
-        onClose={closeSession}
+        onClose={requestClose}
         onRename={renameSession}
+        homeLabel={effectiveSettings.homeLabel}
+        onRenameHome={renameHome}
       />
       {settingsError && (
         <p className="terminal-inline-notice">터미널 설정을 불러오지 못했습니다 ({settingsError}) — 기본값을 사용합니다.</p>
@@ -498,7 +573,7 @@ export function Terminal() {
             sessions={sessions}
             onSelectSession={selectSession}
             onTogglePin={togglePin}
-            onCloseSession={closeSession}
+            onCloseSession={requestClose}
             profiles={profiles}
             profilesError={profilesError}
             onSaveProfiles={saveProfiles}
@@ -525,6 +600,20 @@ export function Terminal() {
         onSave={saveSettings}
         onPreviewTheme={previewTheme}
       />
+      <ConfirmDialog
+        open={closeConfirm !== null}
+        onClose={() => setCloseConfirm(null)}
+        onConfirm={confirmClose}
+        title="세션을 닫으시겠습니까?"
+        confirmLabel="닫기"
+        busy={closeConfirmBusy}
+        busyLabel="닫는 중..."
+      >
+        <p>
+          <strong>{closeConfirm?.name}</strong> 세션에서 프로그램이 실행 중인 것으로 보입니다. 지금 닫으면 강제
+          종료됩니다.
+        </p>
+      </ConfirmDialog>
     </section>
   )
 }

@@ -91,11 +91,16 @@
   font-weight: 600;
 }
 
-/* Home tab (TerminalTabs.tsx) is a plain button, not a .terminal-tab-label
-   + separate action buttons like the real session tabs below it - nothing
-   to rename/pin/close. */
+/* Home tab (TerminalTabs.tsx) - like a real session tab it can show a
+   rename affordance while active, but never a pin/close button (it isn't a
+   real termsession.Session and can't be closed). */
 .terminal-tab-home {
   cursor: pointer;
+}
+
+.terminal-tab-drag-over {
+  outline: 2px dashed var(--accent-border, var(--accent));
+  outline-offset: -2px;
 }
 
 .terminal-tab-label {
@@ -143,6 +148,19 @@
 
 .terminal-tab-pinned {
   opacity: 1;
+}
+
+/* Plain, non-interactive "this tab is pinned" marker shown on inactive
+   pinned tabs (item 4) — the real toggle button (.terminal-tab-pin) only
+   renders on the active tab, but pinned status itself should still be
+   visible at a glance across every tab. */
+.terminal-tab-pin-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem;
+  color: var(--text-muted);
+  opacity: 0.75;
 }
 
 .terminal-tab-close {

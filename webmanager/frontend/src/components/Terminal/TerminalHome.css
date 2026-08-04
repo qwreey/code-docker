@@ -122,6 +122,19 @@
   background: var(--color-gray-bg);
 }
 
+.terminal-home-icon-btn-danger:hover {
+  color: var(--color-red-fg);
+  background: var(--color-red-bg);
+}
+
+/* Item 6: the profile create/edit form is always a single stacked column,
+   unlike the shared .form-grid's auto-fit columns elsewhere in the app -
+   better for the narrow Sheet/mobile widths this form is most often opened
+   from. */
+.terminal-home-profile-form {
+  grid-template-columns: 1fr;
+}
+
 /* Profile cards - a responsive grid (rather than a single-column list) so
    the pane's own width (roughly half the terminal on desktop, full width on
    mobile) decides how many columns fit. */
@@ -150,11 +163,27 @@
   outline-offset: -2px;
 }
 
+/* Name (left) + icon actions (right) on one row (item 7), rather than the
+   actions sitting in their own row at the bottom of the card. */
+.terminal-home-profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .terminal-home-profile-info {
   display: flex;
   align-items: center;
   gap: 0.35rem;
   min-width: 0;
+}
+
+.terminal-home-profile-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
 }
 
 .terminal-home-drag-handle {
@@ -182,16 +211,4 @@
   font-size: 0.78rem;
   color: var(--text-muted);
   overflow-wrap: anywhere;
-}
-
-/* margin-top: auto (not just a fixed gap) - grid rows stretch every card in
-   the row to the tallest one's height (default grid align-items: stretch),
-   so a card with less content (e.g. no cwd/command line) would otherwise
-   leave its action buttons floating in the middle of the leftover space
-   instead of pinned to the bottom like its taller neighbors. */
-.terminal-home-profile-actions {
-  display: flex;
-  gap: 0.4rem;
-  margin-top: auto;
-  padding-top: 0.3rem;
 }

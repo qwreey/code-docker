@@ -64,6 +64,13 @@ type Info struct {
 	CreatedAt      time.Time `json:"createdAt"`
 	LastAttachedAt time.Time `json:"lastAttachedAt"`
 	Attached       bool      `json:"attached"`
+	// Pid is the PTY-leader shell process's pid — exposed so the frontend
+	// can cheaply answer "is a foreground program running in this tab"
+	// itself (cross-referencing GET /api/processes' ppid tree) before
+	// closing a session, rather than the backend needing its own process-
+	// tree endpoint. 0 if the process somehow isn't available (defensive
+	// only; pty.Start succeeding means cmd.Process is always set).
+	Pid int `json:"pid"`
 }
 
 type Session struct {
@@ -273,12 +280,17 @@ func (s *Session) reapCheck(now time.Time) (pinned bool, idle time.Duration, att
 func (s *Session) info() Info {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	pid := 0
+	if s.cmd.Process != nil {
+		pid = s.cmd.Process.Pid
+	}
 	return Info{
 		Name:           s.Name,
 		Pinned:         s.pinned,
 		CreatedAt:      s.CreatedAt,
 		LastAttachedAt: s.lastAttachedAt,
 		Attached:       s.sink != nil,
+		Pid:            pid,
 	}
 }
 

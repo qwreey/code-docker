@@ -52,38 +52,50 @@ function App() {
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-      <main className="app-content">
+      {/* EnvVersionBanner lives here, above .app-content rather than inside
+          it, deliberately — Terminal.css's full-bleed layout relies on
+          .terminal-section being .app-content's *only* child (negative
+          margins that cancel .app-content's own padding), and having the
+          banner as a leading sibling *inside* .app-content broke that
+          assumption: the negative top margin pulled the terminal topbar up
+          into the banner's box instead of appearing below it. Keeping the
+          banner in its own flex row above .app-content (see App.css's
+          .app-main) means it's never in a position the negative margin can
+          reach, for every tab, not just Terminal. */}
+      <div className="app-main">
         <EnvVersionBanner />
-        {active === 'supervisor' && <Supervisor />}
-        {active === 'ssh-keys' && <SshKeys />}
-        {active === 'git-config' && <GitConfig />}
-        {active === 'tailscale' && <Tailscale />}
-        {active === 'dev-proxy' && <DevProxy />}
-        {active === 'logs' && (
-          <RequiresUnlock>
-            <Logs />
-          </RequiresUnlock>
-        )}
-        {active === 'processes' && <Processes />}
-        {active === 'projects' && <Projects />}
-        {active === 'mise' && <Mise />}
-        {active === 'dind' && <Dind />}
-        {active === 'claude' && <ClaudeCode />}
-        {active === 'extensions' && <Extensions />}
-        {active === 'terminal' && <Terminal />}
-        {active === 'files' && (
-          <Suspense fallback={<Skeleton />}>
+        <main className="app-content">
+          {active === 'supervisor' && <Supervisor />}
+          {active === 'ssh-keys' && <SshKeys />}
+          {active === 'git-config' && <GitConfig />}
+          {active === 'tailscale' && <Tailscale />}
+          {active === 'dev-proxy' && <DevProxy />}
+          {active === 'logs' && (
             <RequiresUnlock>
-              <FileManager />
+              <Logs />
             </RequiresUnlock>
-          </Suspense>
-        )}
-        {active === 'sessions' && (
-          <RequiresUnlock>
-            <Sessions />
-          </RequiresUnlock>
-        )}
-      </main>
+          )}
+          {active === 'processes' && <Processes />}
+          {active === 'projects' && <Projects />}
+          {active === 'mise' && <Mise />}
+          {active === 'dind' && <Dind />}
+          {active === 'claude' && <ClaudeCode />}
+          {active === 'extensions' && <Extensions />}
+          {active === 'terminal' && <Terminal />}
+          {active === 'files' && (
+            <Suspense fallback={<Skeleton />}>
+              <RequiresUnlock>
+                <FileManager />
+              </RequiresUnlock>
+            </Suspense>
+          )}
+          {active === 'sessions' && (
+            <RequiresUnlock>
+              <Sessions />
+            </RequiresUnlock>
+          )}
+        </main>
+      </div>
       <UnlockModalHost />
     </div>
   )
