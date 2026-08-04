@@ -1,0 +1,42 @@
+.dev-proxy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.dev-proxy-table th,
+.dev-proxy-table td {
+  text-align: left;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.dev-proxy-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dev-proxy-edit-row td {
+  padding-top: 0;
+}
+
+.dev-proxy-edit-panel {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dev-proxy-edit-toggle {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dev-proxy-checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}

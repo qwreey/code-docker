@@ -617,3 +617,17 @@ export interface OpenSession {
   userAgent: string
   lastSeen: string
 }
+
+// Mirrors internal/devproxy.Expose/Info — GET /api/dev-proxy/exposes.
+export interface DevProxyExpose {
+  name: string
+  target: string
+  apiTarget?: string
+  requireAuth: boolean
+}
+
+export interface DevProxyInfo {
+  name: string
+  raw: string
+  structured?: DevProxyExpose
+}

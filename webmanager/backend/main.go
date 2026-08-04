@@ -67,7 +67,7 @@ func main() {
 		log.Printf("main: REFUSING to honor WEBMANAGER_AUTH_PASSWORD_HASH because it's also set in /etc/environment — this could mean it was tampered with from inside the container")
 		authPasswordHash = ""
 	}
-	gate := authgate.New(authPasswordHash)
+	gate := authgate.New(authPasswordHash, cfg.AuthCookieDomain)
 
 	historyIntervalSeconds, err := strconv.Atoi(cfg.SystemHistoryIntervalSeconds)
 	if err != nil {
@@ -178,6 +178,15 @@ func main() {
 	mux.Handle("POST /api/tailscale/login/start", gate.RequirePassword(http.HandlerFunc(s.handleTailscaleLoginStart)))
 	mux.Handle("POST /api/tailscale/login/cancel", gate.RequirePassword(http.HandlerFunc(s.handleTailscaleLoginCancel)))
 
+	// internal/devproxy — Caddyfile fragments for the dev-proxy wildcard
+	// subdomain (see docs/dev-proxy.md). Reads open, writes gated, same
+	// convention as tailscale forwards/publish above.
+	mux.HandleFunc("GET /api/dev-proxy/exposes", s.handleListDevProxyExposes)
+	mux.Handle("POST /api/dev-proxy/exposes", gate.RequirePassword(http.HandlerFunc(s.handleCreateDevProxyExpose)))
+	mux.Handle("PUT /api/dev-proxy/exposes/{name}", gate.RequirePassword(http.HandlerFunc(s.handleUpdateDevProxyExpose)))
+	mux.Handle("DELETE /api/dev-proxy/exposes/{name}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteDevProxyExpose)))
+	mux.Handle("POST /api/dev-proxy/reload", gate.RequirePassword(http.HandlerFunc(s.handleReloadDevProxy)))
+
 	// Gated entirely (reads included, unlike the rest of webmanager): log
 	// content can leak secrets, so even listing/viewing requires unlock.
 	mux.Handle("GET /api/logs/apps", gate.RequirePassword(http.HandlerFunc(s.handleListLogApps)))
@@ -252,6 +261,9 @@ func main() {
 	// frontend render the right prompt state without guessing from a 401.
 	mux.HandleFunc("POST /api/auth/unlock", s.handleAuthUnlock)
 	mux.HandleFunc("GET /api/auth/status", s.handleAuthStatus)
+	// Not wrapped in RequirePassword — it IS the auth check (Caddy
+	// forward_auth upstream for internal/devproxy, see handlers_auth.go).
+	mux.HandleFunc("GET /api/auth/verify", s.handleAuthVerify)
 
 	// session-heartbeat: see webmanager/.claude/qa-request/
 	// session-heartbeat-plan-done.md for why this pair inverts the usual

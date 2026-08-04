@@ -56,6 +56,19 @@ type Config struct {
 	// existing reverse-proxy-only trust model.
 	AuthPasswordHash string
 
+	// AuthCookieDomain sets the unlock cookie's Domain attribute. Empty
+	// (default) keeps it host-only, unchanged from prior behavior. Set to a
+	// shared parent domain (e.g. ".example.com") to let one unlock also
+	// cover the dev-proxy wildcard subdomain (see internal/devproxy) — the
+	// same cookie is checked there via Gate.UnlockedForForwardAuth.
+	AuthCookieDomain string
+
+	// CaddyAdapterDomain mirrors CADDY_ADAPTER_DOMAIN (docker-compose.yml,
+	// e.g. "*.dev.example.com") — internal/devproxy strips the leading "*."
+	// to build each expose's full host. Empty means the feature isn't
+	// configured yet (see config/caddy-adapter.default.sh).
+	CaddyAdapterDomain string
+
 	// FilesRoot defaults to /code rather than / — narrower, safer default;
 	// an operator who wants full-container browsing can widen it.
 	FilesRoot           string
@@ -176,6 +189,9 @@ func loadConfig() Config {
 		SupervisorMetadataOverridePath: getenv("WEBMANAGER_SUPERVISOR_METADATA_OVERRIDE_PATH", "/etc/code-docker/supervisor-metadata.override.yaml"),
 
 		AuthPasswordHash: getenv("WEBMANAGER_AUTH_PASSWORD_HASH", ""),
+		AuthCookieDomain: getenv("WEBMANAGER_AUTH_COOKIE_DOMAIN", ""),
+
+		CaddyAdapterDomain: getenv("CADDY_ADAPTER_DOMAIN", ""),
 
 		FilesRoot:           getenv("WEBMANAGER_FILES_ROOT", "/code"),
 		FilesMaxUploadBytes: getenv("WEBMANAGER_FILES_MAX_UPLOAD_BYTES", "2147483648"),

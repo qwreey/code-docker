@@ -5,6 +5,7 @@ import { Supervisor } from './components/Supervisor/Supervisor'
 import { SshKeys } from './components/SshKeys/SshKeys'
 import { GitConfig } from './components/GitConfig/GitConfig'
 import { Tailscale } from './components/Tailscale/Tailscale'
+import { DevProxy } from './components/DevProxy/DevProxy'
 import { Logs } from './components/Logs/Logs'
 import { Processes } from './components/Processes/Processes'
 import { Projects } from './components/Projects/Projects'
@@ -57,6 +58,7 @@ function App() {
         {active === 'ssh-keys' && <SshKeys />}
         {active === 'git-config' && <GitConfig />}
         {active === 'tailscale' && <Tailscale />}
+        {active === 'dev-proxy' && <DevProxy />}
         {active === 'logs' && (
           <RequiresUnlock>
             <Logs />
