@@ -11,11 +11,14 @@ import { withViewTransition } from '../../utils/viewTransition'
 const AUTH_POLL_INTERVAL_MS = 3000
 
 function peerIPs(peer: TailscalePeerInfo): string {
-  return peer.tailscaleIPs.join(', ') || '-'
+  return (peer.tailscaleIPs ?? []).join(', ') || '-'
 }
 
 function peerTags(peer: TailscalePeerInfo): string {
-  return peer.tags.join(', ') || '-'
+  // Untagged peers (the common case - ACL tags are opt-in) come back from
+  // `tailscale status --json` with no Tags field at all, which the backend
+  // passes through as a null slice rather than an empty one.
+  return (peer.tags ?? []).join(', ') || '-'
 }
 
 // direct/relay is only meaningful for an active connection to a peer - an

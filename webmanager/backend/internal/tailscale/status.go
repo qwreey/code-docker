@@ -81,14 +81,27 @@ type peerInfoRaw struct {
 }
 
 func (r peerInfoRaw) toPeerInfo() PeerInfo {
+	// TailscaleIPs/Tags come back nil (JSON null, not []) whenever the CLI
+	// omits the field - Tags in particular is the common case, since ACL
+	// tags are opt-in and most peers/self have none. Normalize both to an
+	// empty slice so they always marshal as `[]`, not `null`, matching the
+	// frontend's non-nullable string[] type.
+	ips := r.TailscaleIPs
+	if ips == nil {
+		ips = []string{}
+	}
+	tags := r.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	return PeerInfo{
 		HostName:     r.HostName,
 		DNSName:      r.DNSName,
-		TailscaleIPs: r.TailscaleIPs,
+		TailscaleIPs: ips,
 		Relay:        r.Relay,
 		Direct:       r.CurAddr != "",
 		Online:       r.Online,
-		Tags:         r.Tags,
+		Tags:         tags,
 		OS:           r.OS,
 	}
 }
