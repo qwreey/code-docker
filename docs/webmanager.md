@@ -49,7 +49,7 @@ target(`host:port`), `/api/*` 경로 분리, expose별 인증 요구 여부를 �
 프로그램별 구조화 로그를 앱/레벨/시간 범위(존재하는 로그 기준으로 자동
 clamp됨)로 필터링해서 조회, 커서 기반 페이지네이션, 실시간 새로고침(신규 항목 누적)
 (아래 [구조화 로그(vector)](#구조화-로그-vector) 참고) — 로그에 시크릿이 노출될 수 있어 이 탭 전체가 비밀번호
-게이트 대상입니다(아래 [비밀번호 게이트](#비밀번호-게이트) 참고)
+게이트 대상입니다([비밀번호 게이트](webmanager-config.md#비밀번호-게이트) 참고)
 
 ### Task Manager
 
@@ -113,41 +113,12 @@ git-lfs 는 `config/build.default.sh`에 포함되어 기본으로 설치됩니�
 
 ## 비밀번호 게이트
 
-> **주의: webmanager는 자체 비밀번호 게이트를 지원합니다(선택 사항, 기본은 꺼짐).**
-> `WEBMANAGER_AUTH_PASSWORD_HASH` 환경변수에 argon2id로 해시한 비밀번호를 설정하면
-> `/api/auth/unlock`으로 풀기 전까진 접근할 수 없는 라우트가 생깁니다. 해제 후 다시
-> 안 물어보는 기간은 컨텍스트마다 다릅니다 — webmanager 자체의 쓰기 작업 재확인은
-> 10분, [Dev Proxy 인증](dev-proxy.md#인증)(Caddy `forward_auth` 경유)은 24시간(같은
-> 잠금 토큰을 서로 다른 기준으로 검사하는 구조입니다). **해시는 컨테이너가 이미 떠 있는 상태에서 아래 명령으로 직접
-> 생성합니다**(비밀번호를 두 번 입력받아 오타를 확인하고, 화면엔 안 보이며, 결과로
-> `$argon2id$...`로 시작하는 해시 한 줄만 출력됨 — 이 값을 그대로 `.env.webmanager`
-> 파일([`webmanager.*.sh`](build-customization.md#webmanagersh-webmanager-실행) 참고,
-> 없으면 저장소 루트의 `example-env.webmanager`를 복사해서 만드세요)의
-> `WEBMANAGER_AUTH_PASSWORD_HASH`에 붙여넣고 `docker compose up -d`로
-> 다시 올리면 적용됩니다, `restart`로는 새 환경변수가 안 먹습니다). **반드시 작은따옴표로
-> 감싸서 붙여넣으세요** (`WEBMANAGER_AUTH_PASSWORD_HASH='$argon2id$...'`) —
-> docker compose가 `env_file`도 `$변수` 형태로 해석하므로, 따옴표 없이 붙이면 해시 안의
-> `$` 뒤 조각들이 (없는 변수로 취급되어) 조용히 빈 문자열로 사라져 해시가 깨집니다:
->
-> ```
-> WEBMANAGER_AUTH_PASSWORD_HASH='$argon2id$v=19$m=65536,t=3,p=2$salt...$hash...'
-> ```
->
-> ```sh
-> docker compose exec code-docker /etc/code-docker/webmanager/webmanager --hash-password
-> ```
->
-> 원칙은 **조회(읽기)는 그대로 열어두고, 변경(쓰기)만 게이트** —
-> Supervisor의 start/stop/restart, Git Config/Tailscale/Dev Proxy의 모든 추가·수정·삭제, SSH
-> Keys 추가·삭제 등이 여기 해당합니다. 예외로 **Terminal, 파일 탭, Logs, Supervisor의
-> 프로그램별 로그 조회는 조회까지 통째로 게이트**됩니다(각각 root 쉘/임의 파일
-> 접근/로그 속 시크릿 노출 위험 때문). 값은 반드시 환경변수로만 주입해야 하며(설정
-> 파일에 저장하면 컨테이너 안에서 프로세스를 재시작해 우회할 수 있어 일부러 지원하지
-> 않습니다), `/etc/environment`에도 같은 이름의 변수가 있으면 조작 가능성으로 보고
-> 게이트가 무시됩니다. 설정하지 않으면 이 게이트는 기본적으로 열려 있으므로(다른
-> 탭과 동일하게 리버스 프록시 인증에만 의존), 컨테이너 밖에 노출한다면 반드시 설정을
-> 권장합니다 — 특히 Terminal(브라우저에서 곧바로 root 쉘)과 파일 탭(임의 파일시스템
-> read/write/delete)은 webmanager 안에서 가장 강한 권한을 가진 기능입니다.
+webmanager는 자체 비밀번호 게이트를 지원합니다(선택 사항, 기본은 꺼짐) — 원칙은
+**조회(읽기)는 그대로 열어두고, 변경(쓰기)만 게이트**이며, Terminal/파일 탭/Logs/
+Supervisor의 프로그램별 로그 조회는 조회까지 통째로 게이트됩니다. 켜는 방법
+(해시 생성, `WEBMANAGER_AUTH_PASSWORD_HASH` 설정)과 전체 동작 방식은
+[webmanager-config.md#비밀번호-게이트](webmanager-config.md#비밀번호-게이트)를
+확인하세요.
 
 ## 구조화 로그 (vector)
 
@@ -167,6 +138,6 @@ git-lfs 는 `config/build.default.sh`에 포함되어 기본으로 설치됩니�
 > 구성하세요). SSH 키/git credential 파일을 직접 다루는 기능이라 code-server 의
 > `auth: none` 보다 더 신중한 접근 통제가 필요합니다. **특히 Terminal(브라우저에서
 > 곧바로 root 쉘)과 파일(임의 파일시스템 read/write/delete) 탭은 webmanager 안에서
-> 가장 강한 권한을 가진 기능**이라 위 [비밀번호 게이트](#비밀번호-게이트)에 설명된 자체
-> 비밀번호 게이트(`WEBMANAGER_AUTH_PASSWORD_HASH`, 기본은 꺼짐)를 함께 설정하는 걸
-> 강력히 권장합니다.
+> 가장 강한 권한을 가진 기능**이라 [webmanager-config.md의 비밀번호
+> 게이트](webmanager-config.md#비밀번호-게이트)(`WEBMANAGER_AUTH_PASSWORD_HASH`,
+> 기본은 꺼짐)를 함께 설정하는 걸 강력히 권장합니다.

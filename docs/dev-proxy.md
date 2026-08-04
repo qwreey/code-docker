@@ -48,7 +48,7 @@ server {
 
 ## 인증
 
-expose마다 "인증 요구"를 켜면 해당 서브도메인에 [webmanager의 비밀번호 게이트](webmanager.md)가 적용됩니다 — 새 인증 프로바이더를 따로 붙이는 대신, 이미 있는 게이트를 Caddy의 `forward_auth`에 연결하는 방식입니다. 두 환경변수가 반드시 설정되어 있어야 동작합니다:
+expose마다 "인증 요구"를 켜면 해당 서브도메인에 [webmanager의 비밀번호 게이트](webmanager-config.md#비밀번호-게이트)가 적용됩니다 — 새 인증 프로바이더를 따로 붙이는 대신, 이미 있는 게이트를 Caddy의 `forward_auth`에 연결하는 방식입니다. 두 환경변수가 반드시 설정되어 있어야 동작합니다:
 
 - **`WEBMANAGER_CODE_SERVER_URL`** (`.env.webmanager`) — 인증이 안 된 요청을 리다이렉트할 로그인 페이지의 절대 URL을 서버가 조립하는 데 씁니다. 비어있으면 인증 요구 expose가 그냥 401만 반환하고 로그인 페이지로 넘어가지 않습니다.
 - **`WEBMANAGER_AUTH_COOKIE_DOMAIN`** (`.env.webmanager`) — webmanager와 dev-proxy 서브도메인이 공유하는 상위 도메인(예: `.example.com`). 비어있으면 webmanager에서 잠금 해제해도 그 쿠키가 dev-proxy 서브도메인으로 전달되지 않아서 계속 로그인 페이지가 뜹니다.

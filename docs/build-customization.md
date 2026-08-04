@@ -149,30 +149,10 @@ webmanager 바이너리를 실행합니다 ([webmanager (관리자 패널)](webm
 복사하면 `docker-compose.yml`이 자동으로 읽어들입니다(더 자세한 내부 동작은
 `webmanager/backend/README.md` 참고).
 
-**이미지를 업데이트했는데 `example-env.webmanager`의 키가 추가/삭제됐다면**,
-기존 `.env.webmanager`를 최신 구조에 맞게 재구성하는 `--env-migrate` 서브커맨드가
-있습니다:
-
-```sh
-cp .env.webmanager .env.webmanager.bak
-cat .env.webmanager | docker compose exec -T code-docker \
-  /etc/code-docker/webmanager/webmanager --env-migrate > .env.webmanager
-```
-
-활성화(주석 해제)해둔 값과 직접 남긴 코멘트는 보존되고, 더 이상 안 쓰이는 키는
-지우지 않고 파일 맨 아래 "더 이상 쓰이지 않는 키" 섹션으로 옮겨집니다. `#.`로
-시작하는 코멘트는 code-docker가 관리하는 설명이라 매번 갈아끼워지고, 순수 `#`로
-시작하는 코멘트만 여러분이 남긴 것으로 취급되어 보존됩니다 — `.env.webmanager`에
-직접 메모를 남기고 싶다면 `#.`가 아니라 `#`만 쓰세요. 값을 안 바꿔도 대부분 그냥
-잘 동작하긴 합니다(전부 합리적인 기본값이 있음)만, 새로 생긴 설정을 놓치지 않으려면
-가끔 확인하는 걸 권장합니다 — `.env.webmanager`의 버전이 이미지가 기대하는 버전과
-다르면 컨테이너 로그와 webmanager 웹 UI 양쪽에 알림이 뜹니다.
-
-여러 인스턴스를 운영하며 조직 공통 정책(특정 키를 항상 특정 값으로 강제)을
-반영한 커스텀 템플릿을 쓰고 싶다면, `WEBMANAGER_ENV_TEMPLATE_PATH`가 가리키는
-경로(기본 `/etc/code-docker/webmanager/example-env.webmanager`)에 볼륨을 하나
-마운트해서 이미지 기본 템플릿을 덮어쓰세요(`docker-compose.yml` 참고). 자세한
-설계는 `webmanager/.claude/env-migration-plan.md`.
+이미지를 업데이트했는데 `example-env.webmanager`의 키가 추가/삭제됐다면 기존
+`.env.webmanager`를 최신 구조로 재구성하는 `--env-migrate` 서브커맨드가 있고,
+webmanager 자체 비밀번호 게이트를 켜는 법도 별도로 정리되어 있습니다 —
+[webmanager-config.md](webmanager-config.md)를 확인하세요.
 
 ### `vector-service.*.sh` (vector 실행)
 
