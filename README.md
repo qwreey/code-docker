@@ -175,3 +175,5 @@ code-docker 가 고유한 tailscale IP를 가지도록 하여, ssh/adb 를 위�
 폰트나 css, js 를 커스텀으로 로드하고 싶은 경우 `/code/.server/patch` 폴더를 만들어 안에 css, js 를 만들어줄 수 있습니다. PWA 이름/아이콘, 타이틀바 아이콘 변경 방법도 포함됩니다.
 
 자세한 내용은 [docs/code-server-patch.md](docs/code-server-patch.md)를 확인하세요.
+
+기본으로 몇 가지 js 가 이 방식으로 주입됩니다 — 예를 들어 tailscale 로그인이 필요할 때 배너를 띄우는 `tailscale-notify.default.js`, 그리고 타이틀바 좌측 위 아이콘(`.window-appicon`)을 클릭하면 webmanager(위 "webmanager (관리자 패널)" 섹션 참고)를 오버레이 모달로 열어주는 `webmanager-launcher.default.js`가 있습니다. 다른 override 파일들처럼 `config/code-patch/webmanager-launcher.override.js`를 만들어 동작을 바꿀 수 있습니다.

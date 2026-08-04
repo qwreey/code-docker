@@ -153,8 +153,11 @@ frontend call-sites that hardcoded `/api/...` outside `src/api/client.ts` now
 go through `apiUrl()`/`import.meta.env.BASE_URL`. Code/build-verified only —
 real-container QA by the repo owner is still pending. A follow-on milestone
 (opening `/manager` as a widget/iframe from inside the code-server PWA, or a
-PWA `shortcuts` entry) is deliberately left as open questions only in
-`.claude/question.md`, not designed yet. Keep extending as
+PWA `shortcuts` entry) had 4 open questions in `.claude/question.md`; trigger
+and display-form are now implemented (`.window-appicon` click opens `/manager`
+in an iframe overlay modal, `config/code-patch/webmanager-launcher.default.js`
+— see `.claude/qa-request/expose-plan-done.md`'s "나중 마일스톤" section),
+PWA `shortcuts` is still open/not designed. Keep extending as
 needed; see `plan.md`'s "구현 완료" table before assuming something isn't
 done yet. **Open questions the repo owner still needs to weigh in on are
 consolidated in `.claude/question.md`** — none of them block further work,
