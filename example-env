@@ -44,6 +44,13 @@
 #HOME_VOLUME="./code"
 #SSHD_VOLUME="./sshd"
 
+# dind-authz(아래 DIND_TARGET 참고)의 실시간 conf.d 정책 디렉토리입니다. 반드시
+# code-docker(HOME_VOLUME/`/code`)와 다른 경로여야 합니다 - code-docker 자신이
+# 이 정책을 고칠 수 있으면 dind-authz를 켜는 의미가 없어집니다. 도커 호스트
+# 자체에 파일시스템 접근 권한이 있는 사람만 이 디렉토리를 건드릴 수 있어야
+# 합니다.
+#DIND_AUTHZ_VOLUME="./dind-authz"
+
 # Timezone for all processes in the container (glibc reads this
 # directly via tzdata, already installed - no /etc/localtime symlink
 # or entrypoint change needed). Empty means UTC. e.g. "Asia/Seoul".
@@ -62,6 +69,16 @@
 # Only change this if you want code-docker to talk to a different (or
 # external) docker daemon instead of the bundled dind sidecar.
 #DOCKER_HOST="tcp://dind:2375"
+
+# dind가 실제로 빌드/실행할 Dockerfile 스테이지입니다.
+#   dind        - 보호 없음 (예전 기본 동작 그대로)
+#   dind-authz  - 기본값. dind가 만드는 컨테이너에 privileged, 허용 목록 밖
+#     CapAdd, seccomp/apparmor 비활성화, pid/network/ipc/cgroupns=host, 디바이스
+#     패스스루, /code 밖 bind mount 소스를 거부하는 authz 플러그인을 내장.
+#     자세한 설계는 .claude/backlog/dind-authz-plan.md 참고.
+#   dind-authz-remap - 아직 구현되지 않음(계획만 있음) - LXC 등 중첩 가상화
+#     호스트에서 호환성 문제가 생길 수 있어 별도 스테이지로 분리해뒀습니다.
+#DIND_TARGET="dind-authz"
 
 # Set to "false" to disable all tailscale integration (tailscaled +
 # forwards/publish) - the two supervisord programs stay up but do

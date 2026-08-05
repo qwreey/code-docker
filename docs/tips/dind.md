@@ -22,6 +22,33 @@ code-docker 가 `code-docker-external`/`code-docker-internal` 양쪽에 다 붙�
 
 dind 쪽에는 `./dind:/var/lib/docker` 볼륨이 마운트되어있어 컨테이너/이미지가 재기동 후에도 유지됩니다.
 
-> 보안 주의: `code-docker-dind` 는 `privileged: true` 로 구동되며, 인증/TLS 없는 평문 tcp 소켓(2375)이 열려있습니다. `code-docker-external` 로부터는 격리되어있지만, `code-docker-internal` 네트워크에 연결된 컨테이너라면 누구든 이 소켓을 통해 특권 컨테이너를 자유롭게 생성할 수 있습니다. 이는 사실상 호스트 커널에 준하는 권한(컨테이너 탈출 포함)을 얻을 수 있다는 뜻이므로, `code-docker-internal` 에는 신뢰할 수 있는 서비스만 연결하고, code-docker 접근 권한 역시 신뢰할 수 없는 사용자에게 주지 마세요.
+> 보안 주의: `code-docker-dind` 는 `privileged: true` 로 구동되며, 인증/TLS 없는 평문 tcp 소켓(2375)이 열려있습니다. `code-docker-external` 로부터는 격리되어있지만, `code-docker-internal` 네트워크에 연결된 컨테이너라면 누구든 이 소켓에 요청을 보낼 수 있습니다. 아래 "요청 단위 제한 (dind-authz)" 절 덕분에 기본값에서는 이 소켓을 통해 생성되는 컨테이너 자체가 특권을 요구할 수 없게 막혀있지만, 그래도 `code-docker-internal` 에는 신뢰할 수 있는 서비스만 연결하고 code-docker 접근 권한을 신뢰할 수 없는 사용자에게 주지 않는 것이 기본 전제입니다.
+
+## 요청 단위 제한 (dind-authz)
+
+`docker-compose.yml`의 `DIND_TARGET` 이 어떤 Dockerfile 스테이지를 dind로 쓸지 고릅니다 (`example-env` 참고):
+
+- `dind` — 보호 없음, 예전 기본 동작 그대로.
+- `dind-authz` (**기본값**) — dind 안의 dockerd에 authorization 플러그인(`dind-authz/`, 순수 Go 표준 라이브러리로 작성)이 붙어서, 컨테이너 생성 요청에 아래 중 하나라도 포함되면 요청 자체를 거부합니다:
+  - `--privileged`
+  - `allowed_caps` 허용 목록(기본은 `NET_BIND_SERVICE`만) 밖의 `--cap-add`
+  - `--security-opt seccomp=unconfined`/`apparmor=unconfined`/`label=disable`
+  - `--pid=host`, `--network=host`, `--ipc=host`, `--cgroupns=host`
+  - `--device`, `--device-cgroup-rule`
+  - `/code/` 아래가 아닌 경로를 소스로 하는 bind mount (named volume은 영향 없음)
+- `dind-authz-remap` — 아직 구현되지 않음. LXC 등 중첩 가상화 호스트에서 userns-remap이 호환성 문제를 일으킬 수 있어 별도 스테이지로 분리해둔 계획입니다.
+
+정책은 이미지에 구운 기본값(`config/dind-authz/*.default.json`)과, `DIND_AUTHZ_VOLUME`(기본 `./dind-authz`)로 마운트되는 실시간 conf.d 디렉토리를 병합한 결과입니다. **이 디렉토리는 code-docker 어디에도 마운트되지 않습니다** — code-docker 자신이 자기를 제한하는 정책을 고칠 수 있으면 의미가 없기 때문에, 도커 호스트 자체에 파일시스템 접근 권한이 있는 사람만 편집할 수 있습니다. 예를 들어 특정 capability를 추가로 허용하려면:
+
+```json
+// ./dind-authz/10-my-exception.json (도커 호스트에서 직접 작성)
+{ "allowed_caps": { "SYS_PTRACE": true } }
+```
+
+파일을 추가/수정한 뒤 `docker compose restart code-docker-dind` 하면 반영됩니다 (재빌드는 필요 없습니다).
+
+`/code/` 아래로만 bind mount를 허용하는 이유는 보안뿐 아니라 실용적인 이유도 있습니다 — dind는 bind mount의 source 경로를 **자기 자신의 파일시스템 기준**으로 해석하므로(code-docker가 아니라), `code-docker-dind`에도 `/code`가 code-docker와 동일한 호스트 경로로 마운트되어 있습니다. 그래서 프로젝트 자신의 `docker-compose.yml`에 있는 `./data:/var/lib/postgresql/data` 같은 흔한 상대경로 마운트도 (프로젝트가 `/code` 아래에 있는 한) 정상적으로 동작합니다.
+
+설계 배경과 구현되지 않은 부분(userns-remap 등)은 `.claude/backlog/dind-authz-plan.md`를 참고하세요.
 
 webmanager의 [Docker/dind 관리 탭](../webmanager.md#dockerdind-관리)에서 컨테이너/이미지 목록, 로그 조회, 시작/정지/삭제도 브라우저에서 바로 할 수 있습니다.

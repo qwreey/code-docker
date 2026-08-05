@@ -9,6 +9,32 @@ FROM docker:dind AS dind
 COPY script/dind-entrypoint.sh /dind-entrypoint.sh
 ENTRYPOINT ["/dind-entrypoint.sh"]
 
+# dind-authz: an authorization plugin for the dockerd running inside dind
+# (see script/dind-entrypoint.sh) that denies container-create requests
+# asking for host-level privilege (Privileged, disallowed CapAdd,
+# unconfined seccomp/apparmor, pid/net/ipc/cgroupns=host, device
+# passthrough, or a bind-mount source outside /code) while allowing normal
+# dev containers (redis, postgres, ...) through untouched. See
+# .claude/backlog/dind-authz-plan.md for the full design rationale — a
+# hand-written Go binary was chosen over OPA/opa-docker-authz to avoid an
+# extra runtime and an untrusted binary fetch, matching this repo's existing
+# pattern of building its own Go binaries (see webmanager-backend below).
+FROM golang:1.25-alpine AS dind-authz-build
+WORKDIR /src
+COPY dind-authz/go.mod ./
+COPY dind-authz/*.go ./
+RUN CGO_ENABLED=0 go test ./... && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o /dind-authz .
+
+FROM dind AS dind-authz
+COPY --from=dind-authz-build /dind-authz /usr/local/bin/dind-authz
+# Baked-in defaults (git-tracked). The live, host-editable conf.d directory
+# (bind-mounted from DIND_AUTHZ_VOLUME at /etc/dind-authz.d, see
+# docker-compose.yml — deliberately NOT under /code, so code-docker itself
+# can never edit the policy that constrains it) is merged on top at
+# entrypoint time, not baked into the image.
+COPY config/dind-authz/*.default.json /etc/dind-authz-defaults.d/
+
 FROM node:24-alpine AS webmanager-frontend
 WORKDIR /src
 COPY webmanager/frontend/package.json webmanager/frontend/package-lock.json ./

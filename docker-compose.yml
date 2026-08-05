@@ -156,7 +156,14 @@ services:
       # .env instead of editing this file.
       context: "${BUILD_CONTEXT:-.}"
       network: host
-      target: dind
+      # dind (no protection) | dind-authz (default - denies
+      # privileged/dangerous-cap/host-namespace/out-of-/code-mount container
+      # creation) | dind-authz-remap (not implemented yet, see
+      # .claude/backlog/dind-authz-plan.md). A build-stage choice rather than
+      # a runtime toggle so an unwanted stage's code/config isn't even
+      # present in the image - see the plan doc for why (LXC-hosted Docker
+      # compatibility concerns with the remap stage in particular).
+      target: "${DIND_TARGET:-dind-authz}"
     privileged: true
     restart: unless-stopped
     environment:
@@ -164,6 +171,19 @@ services:
     volumes:
       # Persist pulled images/containers across restarts
       - "${DIND_VOLUME:-./dind}:/var/lib/docker"
+      # Same host path as code-docker's own /code (HOME_VOLUME) - DinD
+      # resolves bind-mount sources against ITS OWN filesystem, not the
+      # client's, so a project's `./data:/data`-style compose volume only
+      # works (and only round-trips through the dind-authz /code-only
+      # allow-list) if dind can see /code at the same absolute path.
+      - "${HOME_VOLUME:-./code}:/code"
+      # dind-authz's live, host-editable conf.d directory (dind-authz stage
+      # only - harmless no-op mount on the plain dind stage, nothing reads
+      # it there). Deliberately NOT mounted into code-docker anywhere, by
+      # any path - code-docker must never be able to edit the policy that
+      # constrains what it can ask dind to create. Only someone with direct
+      # access to the docker host's filesystem can edit this.
+      - "${DIND_AUTHZ_VOLUME:-./dind-authz}:/etc/dind-authz.d"
     networks:
       code-docker-internal:
         # Extra name that only resolves on this network, so code-docker

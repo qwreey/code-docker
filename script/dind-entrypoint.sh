@@ -35,7 +35,36 @@ if [ -z "$internal_ip" ]; then
 	internal_ip="0.0.0.0"
 fi
 
+# dind-authz (see Dockerfile's dind-authz stage) is only present on that
+# stage's image, not on the plain dind stage - self-detect rather than
+# needing a separate entrypoint script per stage.
+authz_arg=""
+if [ -x /usr/local/bin/dind-authz ]; then
+	mkdir -p /etc/docker/plugins /run/docker/plugins /etc/dind-authz.d
+	/usr/local/bin/dind-authz \
+		-socket=/run/docker/plugins/dind-authz.sock \
+		-policy-dirs=/etc/dind-authz-defaults.d,/etc/dind-authz.d &
+
+	echo "unix:///run/docker/plugins/dind-authz.sock" >/etc/docker/plugins/dind-authz.spec
+
+	waited=0
+	while [ ! -S /run/docker/plugins/dind-authz.sock ]; do
+		waited=$((waited + 1))
+		if [ "$waited" -ge 10 ]; then
+			echo >&2 "dind-entrypoint: dind-authz did not come up in time, aborting"
+			exit 1
+		fi
+		sleep 1
+	done
+
+	authz_arg="--authorization-plugin=dind-authz"
+fi
+
+# authz_arg is deliberately unquoted below: it's either empty or a single
+# well-known flag, and dockerd needs it word-split, not passed as one
+# (possibly empty) argument.
 exec /usr/local/bin/dockerd-entrypoint.sh dockerd \
 	--host=unix:///var/run/docker.sock \
 	--host="tcp://$internal_ip:2375" \
+	$authz_arg \
 	"$@"
