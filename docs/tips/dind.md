@@ -36,7 +36,7 @@ dind 쪽에는 `./dind:/var/lib/docker` 볼륨이 마운트되어있어 컨테�
   - `--pid=host`, `--network=host`, `--ipc=host`, `--cgroupns=host`
   - `--device`, `--device-cgroup-rule`
   - `/code/` 아래가 아닌 경로를 소스로 하는 bind mount (named volume은 영향 없음)
-- `dind-authz-remap` — 아직 구현되지 않음. LXC 등 중첩 가상화 호스트에서 userns-remap이 호환성 문제를 일으킬 수 있어 별도 스테이지로 분리해둔 계획입니다.
+- `dind-authz-remap` — dind-authz에 더해 [userns-remap](#추가-경화-userns-remap-dind-authz-remap)까지 적용. 기본값이 아닙니다 (아래 절 참고).
 
 정책은 이미지에 구운 기본값(`config/dind-authz/*.default.json`)과, `DIND_AUTHZ_VOLUME`(기본 `./dind-authz`)로 마운트되는 실시간 conf.d 디렉토리를 병합한 결과입니다. **이 디렉토리는 code-docker 어디에도 마운트되지 않습니다** — code-docker 자신이 자기를 제한하는 정책을 고칠 수 있으면 의미가 없기 때문에, 도커 호스트 자체에 파일시스템 접근 권한이 있는 사람만 편집할 수 있습니다. 예를 들어 특정 capability를 추가로 허용하려면:
 
@@ -49,6 +49,18 @@ dind 쪽에는 `./dind:/var/lib/docker` 볼륨이 마운트되어있어 컨테�
 
 `/code/` 아래로만 bind mount를 허용하는 이유는 보안뿐 아니라 실용적인 이유도 있습니다 — dind는 bind mount의 source 경로를 **자기 자신의 파일시스템 기준**으로 해석하므로(code-docker가 아니라), `code-docker-dind`에도 `/code`가 code-docker와 동일한 호스트 경로로 마운트되어 있습니다. 그래서 프로젝트 자신의 `docker-compose.yml`에 있는 `./data:/var/lib/postgresql/data` 같은 흔한 상대경로 마운트도 (프로젝트가 `/code` 아래에 있는 한) 정상적으로 동작합니다.
 
-설계 배경과 구현되지 않은 부분(userns-remap 등)은 `.claude/backlog/dind-authz-plan.md`를 참고하세요.
+## 추가 경화: userns-remap (dind-authz-remap)
+
+`DIND_TARGET=dind-authz-remap`으로 설정하면, dind-authz가 막는 요청 목록에 더해 dind 내부 dockerd 자체에 [userns-remap](https://docs.docker.com/engine/security/userns-remap/)이 적용됩니다 — dind가 만드는 컨테이너 안의 UID 0(root)가 호스트에서는 비특권 UID(`dockremap` 유저, 고정 범위 `165536:165536` — `docker:dind` 베이스 이미지가 이미 이 유저/subuid/subgid를 갖고 있어서 별도로 만들 필요가 없었습니다)로 매핑됩니다. dind-authz가 어떤 이유로든(플러그인 버그, CVE-2026-34040류의 authz 우회 등) 뚫리더라도, `--privileged` 요청은 데몬 자체가 독립적으로 한 번 더 거부하게 되는 2중 방어선입니다.
+
+**기본값이 아닙니다 (`DIND_TARGET`을 명시적으로 바꿔야 켜집니다).** 이유:
+
+1. **LXC 등 중첩 가상화 호스트와 궁합이 안 좋을 수 있음.** unprivileged LXC는 보통 호스트 쪽에서 이미 자체 UID remap을 걸고 있어서, 그 위에 dind가 또 한 번 remap을 얹으면 remap이 중첩됩니다 — 이런 조합에서 스토리지 드라이버/권한 문제가 보고된 사례들이 있습니다. 이 저장소는 여러 종류의 호스트에 배포되는 범용 이미지를 지향하므로 기본값으로 켜두면 원인 파악이 어려운 실패로 나타날 수 있습니다.
+2. **`/code` 아래 bind mount 쓰기가 기본적으로 막힙니다 — 직접 테스트로 확인한 실제 제약.** `/code`(그리고 그 아래 프로젝트 폴더들)는 보통 `root:root 755`로 되어있는데, remap된 컨테이너의 root는 호스트에서 `dockremap`(UID 165536)일 뿐이라 다른 사용자 소유의 755 디렉토리에는 쓰기 권한이 없습니다. 즉 `dind-authz-remap`을 켜면, redis/postgres 같은 컨테이너가 `-v /code/myproject/pgdata:/var/lib/postgresql/data`로 자기 데이터를 쓰려는 흔한 패턴이 **권한 오류로 그냥 실패**합니다 (실제로 재현해서 확인함). 해결 방법 두 가지:
+   - **(권장) bind mount 대신 named volume 사용** — `-v pgdata:/var/lib/postgresql/data`처럼 이름 있는 볼륨을 쓰면 Docker가 볼륨 디렉토리 소유권을 remap에 맞게 알아서 관리해줘서 이 문제가 아예 없습니다(직접 확인함). `/code` 아래 실제 파일로 남기고 싶은 게 아니라면 이쪽이 더 간단합니다.
+   - bind mount를 꼭 써야 한다면, 처음 한 번 dind 컨테이너 자신의 root로(`code-docker`가 아니라 `code-docker-dind`) 대상 디렉토리 소유권을 remap 대역으로 바꿔주세요: `docker exec code-docker-dind chown -R 165536:165536 /code/myproject/pgdata` — 이 명령 자체는 `code-docker`가 아니라 `code-docker-dind`(dind 자신)에서 실행해야 합니다(dind는 여전히 진짜 root라 임의 UID로 chown 가능하지만, code-docker에서 호스트 UID로 직접 chown하려면 보통 sudo/root 권한이 추가로 필요합니다).
+3. `dind-authz`만으로 이미 privileged/위험한 CapAdd/host 네임스페이스/`/code` 밖 마운트가 다 막혀 있어서, remap이 추가로 막는 건 "지금 알려진 구멍"이 아니라 "authz 플러그인 자체가 뚫렸을 때/아직 모르는 컨테이너 런타임 버그가 터졌을 때"에 대한 보험 성격입니다 — 필수는 아니지만, 위 제약을 감수할 수 있고 LXC 같은 중첩 호스트가 아니라면 켜서 손해 볼 건 없습니다.
+
+설계 배경 전체(왜 이 방식을 택했는지, 다른 대안들을 왜 버렸는지)는 `.claude/backlog/dind-authz-plan.md`를 참고하세요.
 
 webmanager의 [Docker/dind 관리 탭](../webmanager.md#dockerdind-관리)에서 컨테이너/이미지 목록, 로그 조회, 시작/정지/삭제도 브라우저에서 바로 할 수 있습니다.

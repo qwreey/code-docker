@@ -158,11 +158,12 @@ services:
       network: host
       # dind (no protection) | dind-authz (default - denies
       # privileged/dangerous-cap/host-namespace/out-of-/code-mount container
-      # creation) | dind-authz-remap (not implemented yet, see
-      # .claude/backlog/dind-authz-plan.md). A build-stage choice rather than
-      # a runtime toggle so an unwanted stage's code/config isn't even
-      # present in the image - see the plan doc for why (LXC-hosted Docker
-      # compatibility concerns with the remap stage in particular).
+      # creation) | dind-authz-remap (dind-authz + userns-remap - not the
+      # default, see docs/tips/dind.md's "추가 경화" section before opting in:
+      # LXC-hosted Docker compatibility concerns, and /code bind-mount writes
+      # need extra chown/named-volume handling). A build-stage choice rather
+      # than a runtime toggle so an unwanted stage's code/config isn't even
+      # present in the image - see .claude/backlog/dind-authz-plan.md for why.
       target: "${DIND_TARGET:-dind-authz}"
     privileged: true
     restart: unless-stopped

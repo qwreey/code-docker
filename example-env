@@ -76,8 +76,12 @@
 #     CapAdd, seccomp/apparmor 비활성화, pid/network/ipc/cgroupns=host, 디바이스
 #     패스스루, /code 밖 bind mount 소스를 거부하는 authz 플러그인을 내장.
 #     자세한 설계는 .claude/backlog/dind-authz-plan.md 참고.
-#   dind-authz-remap - 아직 구현되지 않음(계획만 있음) - LXC 등 중첩 가상화
-#     호스트에서 호환성 문제가 생길 수 있어 별도 스테이지로 분리해뒀습니다.
+#   dind-authz-remap - dind-authz에 더해 userns-remap까지 적용 (dind가 만드는
+#     컨테이너의 root가 호스트에서는 비특권 UID로 매핑). 기본값 아님 - LXC 등
+#     중첩 가상화 호스트와 궁합이 안 좋을 수 있고, /code 아래 bind mount
+#     쓰기가 기본적으로 막힙니다(named volume을 쓰거나 대상 디렉토리를
+#     `docker exec code-docker-dind chown -R 165536:165536 <path>`로 미리
+#     소유권을 옮겨야 함) - docs/tips/dind.md의 "추가 경화" 절 참고.
 #DIND_TARGET="dind-authz"
 
 # Set to "false" to disable all tailscale integration (tailscaled +

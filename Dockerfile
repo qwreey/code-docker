@@ -35,6 +35,22 @@ COPY --from=dind-authz-build /dind-authz /usr/local/bin/dind-authz
 # entrypoint time, not baked into the image.
 COPY config/dind-authz/*.default.json /etc/dind-authz-defaults.d/
 
+# dind-authz-remap: on top of dind-authz's request-level filtering, also
+# remap nested-container UID 0 to an unprivileged host UID via Docker's
+# userns-remap, so even a request that slips past dind-authz (a plugin bug,
+# or the class of bug CVE-2026-34040 was) still can't become real host root
+# — the daemon itself independently refuses --privileged once userns-remap
+# is on. docker:dind already ships a deterministic "dockremap" user with a
+# fixed /etc/subuid//etc/subgid range for exactly this purpose, so there's
+# nothing to bake here beyond telling dockerd to use it (see
+# dind-entrypoint.sh). NOT the default DIND_TARGET — LXC-hosted (and other
+# nested-virtualization) Docker installs commonly apply their own UID
+# remapping already, and stacking ours on top has a track record of
+# storage-driver/permission issues on those hosts. See
+# .claude/backlog/dind-authz-plan.md and docs/tips/dind.md before opting in.
+FROM dind-authz AS dind-authz-remap
+ENV DIND_USERNS_REMAP=dockremap
+
 FROM node:24-alpine AS webmanager-frontend
 WORKDIR /src
 COPY webmanager/frontend/package.json webmanager/frontend/package-lock.json ./

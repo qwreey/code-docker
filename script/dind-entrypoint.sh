@@ -60,11 +60,19 @@ if [ -x /usr/local/bin/dind-authz ]; then
 	authz_arg="--authorization-plugin=dind-authz"
 fi
 
-# authz_arg is deliberately unquoted below: it's either empty or a single
-# well-known flag, and dockerd needs it word-split, not passed as one
-# (possibly empty) argument.
+# DIND_USERNS_REMAP is only set (via ENV) on the dind-authz-remap stage -
+# self-detect the same way as dind-authz above.
+userns_arg=""
+if [ -n "${DIND_USERNS_REMAP:-}" ]; then
+	userns_arg="--userns-remap=$DIND_USERNS_REMAP"
+fi
+
+# authz_arg/userns_arg are deliberately unquoted below: each is either
+# empty or a single well-known flag, and dockerd needs them word-split, not
+# passed as one (possibly empty) argument.
 exec /usr/local/bin/dockerd-entrypoint.sh dockerd \
 	--host=unix:///var/run/docker.sock \
 	--host="tcp://$internal_ip:2375" \
 	$authz_arg \
+	$userns_arg \
 	"$@"

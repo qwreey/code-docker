@@ -10,8 +10,13 @@
 - `example-env`, `docs/tips/dind.md` 갱신.
 - 라이브 검증(실제 `code-docker-dind` 테스트 인스턴스, 사용자가 라이브 서비스 아님을 직접 확인해줌 — `/code/Projects` 비어있음, dind 안 컨테이너/볼륨 0개): privileged 거부, 허용 안 된 CapAdd 거부, seccomp/apparmor 우회 거부, pid/network=host 거부, `/code` 밖 마운트 거부(정책 디렉토리 자기 자신 포함), `/code` 안 마운트는 실제 호스트까지 정상 왕복, named volume/허용된 cap/일반 컨테이너 정상 통과 — 전부 실제 클라이언트(`code-docker` 컨테이너, `DOCKER_HOST=tcp://dind:2375`)에서 확인.
 
+**추가로 구현 완료 (2026-08-05, 같은 날 이어서):**
+- `dind-authz-remap` 스테이지 (userns-remap) — 이 기기 호스트는 LXC 등에 중첩돼있지 않아 직접 실험/검증까지 완료. **`DIND_TARGET` 기본값은 여전히 `dind-authz`로 유지** — 계획대로 옵트인, 기본값 아님. 구현 중 발견한 것:
+  - `docker:dind` 베이스 이미지가 이미 `dockremap` 유저 + 고정 subuid/subgid 범위(`165536:65536`)를 갖고 있어서, Dockerfile에서 유저/subuid를 새로 만들 필요가 전혀 없었음 — `dind-authz-remap` 스테이지는 `ENV DIND_USERNS_REMAP=dockremap` 한 줄과 entrypoint의 자기 감지 로직 몇 줄이 전부. 예상보다 훨씬 쉬웠음.
+  - **실사용 제약을 실제로 재현해서 확인함**: `/code`(및 프로젝트 폴더들)가 보통 `root:root 755`라서, remap된 컨테이너의 root(호스트에서는 UID 165536)는 그 안에 쓰기가 안 됨 — `-v /code/myproject/pgdata:/data`류의 흔한 패턴이 Permission Denied로 실패하는 걸 직접 재현. named volume은 Docker가 소유권을 알아서 관리해서 문제 없음(확인함), bind mount를 꼭 써야 하면 `docker exec code-docker-dind chown -R 165536:165536 <path>`(dind 자신에서 실행 — code-docker에서 하려면 host UID로의 chown 권한이 추가로 필요)로 우회 가능함을 확인. `docs/tips/dind.md`의 "추가 경화" 절에 정리.
+  - `docker info`의 `Docker Root Dir: /var/lib/docker/165536.165536`로 remap이 실제 적용됐음을 확인, authz 플러그인과 동시에(`Authorization: dind-authz`) 정상 동작.
+
 **아직 구현 안 됨 (계획만 있음):**
-- `dind-authz-remap` 스테이지 (userns-remap) — 아래 "userns-remap을 dind의 내부 데몬에만 적용" 절 참고. LXC 등 중첩 가상화 호스트 호환성 우려로 기본값에 넣지 않기로 했고, 별도 스테이지로 분리하는 설계까지만 되어 있음.
 - `Sysctls`/`/proc`·`/sys` 마운트 옵션 세부 검사 (v2 이후로 미룸, 아래 표 참고).
 - webmanager의 dind 엔진 버전 업데이트 알림 연계 (아래 "webmanager 버전 관리 기능과의 연계" 절).
 
