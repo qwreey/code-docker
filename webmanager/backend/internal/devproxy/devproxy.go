@@ -37,15 +37,46 @@ var (
 	ErrExposeNotFound = errors.New("expose not found")
 )
 
-// Expose is one dev-proxy entry — a subdomain (Name, under whatever
-// CADDY_ADAPTER_DOMAIN is configured) reverse-proxied to Target, optionally
-// splitting /api/* off to a separate APITarget, optionally required to pass
-// GET /api/auth/verify first (see handlers_auth.go).
+// Expose is one dev-proxy entry — an internal identifier (Name, used only
+// for the managed *.caddy filename and the Caddyfile `@name` matcher token)
+// bound to Host, the full external hostname it responds to (e.g.
+// "dev.example.com", or "*.staging.example.com" for a one-label wildcard —
+// Caddy's own host-matcher wildcard syntax, passed through as-is). There is
+// no shared base domain: the top-level Caddyfile listens for any Host (see
+// config/caddy-adapter.default.sh), so different exposes are free to answer
+// for entirely unrelated domains — the outer reverse proxy deciding what
+// reaches this container is the only thing that actually restricts which
+// hosts show up here. Split into an ordered list of Routes, each
+// reverse-proxied independently. An Expose with no routes yet (just created,
+// no route added) renders as a plain 404 placeholder.
 type Expose struct {
-	Name        string `json:"name"`
-	Target      string `json:"target"`
-	APITarget   string `json:"apiTarget,omitempty"`
-	RequireAuth bool   `json:"requireAuth"`
+	Name   string  `json:"name"`
+	Host   string  `json:"host"`
+	Routes []Route `json:"routes"`
+}
+
+// Route is one path-matched reverse-proxy rule inside an Expose's subdomain
+// block. Path empty means "match everything" (rendered without a matcher
+// argument, Caddy's own way of writing a catch-all handle/route block).
+// Mode picks the wrapping Caddy directive — "route" (unconditional, runs
+// regardless of whether an earlier block in the same handle already matched)
+// vs "handle" (mutually exclusive, first match wins) — the two differ in
+// exactly the way Caddy itself defines them, deliberately exposed as-is
+// rather than reinterpreted, since routing this flexibly is the whole point.
+// StripPrefix/RewritePrefix are free-text and independent of each other:
+// StripPrefix removes a literal prefix from the request path
+// (`uri strip_prefix <value>`) before proxying; RewritePrefix prepends a
+// literal prefix to whatever path remains (`rewrite * <value>{uri}`) — e.g.
+// matching "/api/*", stripping "/api", then rewriting with "/v1/api" turns
+// "/api/foo" into "/v1/api/foo" on the way to Target. RequireAuth gates just
+// this route (not the whole subdomain) behind GET /api/auth/verify.
+type Route struct {
+	Path          string `json:"path,omitempty"`
+	Target        string `json:"target"`
+	StripPrefix   string `json:"stripPrefix,omitempty"`
+	RewritePrefix string `json:"rewritePrefix,omitempty"`
+	Mode          string `json:"mode"`
+	RequireAuth   bool   `json:"requireAuth"`
 }
 
 // Info is what List returns — the raw fragment text always, plus a
@@ -59,13 +90,27 @@ type Info struct {
 
 var nameRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
-// ValidateName checks name is a safe subdomain label — it's used both as a
-// filename component (managedDir/name+".caddy") and as a Caddyfile `host`
-// matcher value, so anything outside a strict RFC1123-label charset is
+// ValidateName checks name is a safe internal identifier — it's used both as
+// a filename component (managedDir/name+".caddy") and as a Caddyfile `@name`
+// matcher token, so anything outside a strict RFC1123-label charset is
 // rejected rather than escaped (same pattern as internal/dind's ValidateID).
+// It is not the external hostname — see ValidateHost for that.
 func ValidateName(name string) error {
 	if !nameRe.MatchString(name) {
-		return errors.New("name must be a lowercase subdomain label (alphanumeric/hyphen, no leading/trailing hyphen)")
+		return errors.New("name must be a lowercase label (alphanumeric/hyphen, no leading/trailing hyphen)")
+	}
+	return nil
+}
+
+var hostRe = regexp.MustCompile(`^[a-zA-Z0-9*.-]+$`)
+
+// ValidateHost checks host is a safe Caddyfile `host` matcher argument — a
+// plain hostname, optionally with a leading "*." wildcard label (Caddy's own
+// host-matcher wildcard syntax). Dots are allowed here (unlike ValidateName)
+// since this is a real external domain, not an internal identifier.
+func ValidateHost(host string) error {
+	if host == "" || !hostRe.MatchString(host) {
+		return errors.New("host must be a plain hostname (letters, digits, dots, hyphens, optional leading \"*.\")")
 	}
 	return nil
 }
@@ -82,41 +127,75 @@ func ValidateTarget(target string) error {
 	return nil
 }
 
+// pathLikeRe covers Path/StripPrefix/RewritePrefix — all three are spliced
+// directly into generated Caddyfile lines (as a matcher argument or a bare
+// directive argument), so the charset is restricted to what Caddy path
+// syntax actually needs, same reasoning as ValidateTarget.
+var pathLikeRe = regexp.MustCompile(`^[a-zA-Z0-9_.\-/*]*$`)
+
+func validatePathLike(field, value string) error {
+	if !pathLikeRe.MatchString(value) {
+		return fmt.Errorf("%s must contain only letters, digits, and . _ - / *", field)
+	}
+	return nil
+}
+
 func path(name string) string {
 	return filepath.Join(ManagedDir, name+".caddy")
 }
 
-// Render produces the Caddyfile fragment text for e, given the base domain
-// (CADDY_ADAPTER_DOMAIN with its leading "*." stripped) and authTarget —
+// Render produces the Caddyfile fragment text for e, given authTarget —
 // webmanager's own bind address (Config.Addr, i.e. WEBMANAGER_ADDR, default
 // "private:81") — not "localhost:81": webmanager binds to the `private`
 // docker-network alias, not loopback, so forward_auth has to target that
 // same address or Caddy gets a connection-refused 502. No preserve_host
 // (`header_up Host {host}`) — deliberately left out, see docs/dev-proxy.md.
-func Render(domain, authTarget string, e Expose) string {
+func Render(authTarget string, e Expose) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "@%s host %s.%s\n", e.Name, e.Name, domain)
+	fmt.Fprintf(&b, "@%s host %s\n", e.Name, e.Host)
 	fmt.Fprintf(&b, "handle @%s {\n", e.Name)
-	if e.RequireAuth {
-		fmt.Fprintf(&b, "\tforward_auth %s {\n\t\turi /api/auth/verify\n\t}\n", authTarget)
+	if len(e.Routes) == 0 {
+		// No routes yet (subdomain just created) — a placeholder response
+		// keeps the fragment valid Caddyfile rather than an empty block.
+		b.WriteString("\trespond 404\n")
 	}
-	if e.APITarget != "" {
-		fmt.Fprintf(&b, "\thandle /api/* {\n\t\treverse_proxy %s\n\t}\n", e.APITarget)
-		fmt.Fprintf(&b, "\thandle {\n\t\treverse_proxy %s\n\t}\n", e.Target)
-	} else {
-		fmt.Fprintf(&b, "\treverse_proxy %s\n", e.Target)
+	for _, rt := range e.Routes {
+		renderRoute(&b, authTarget, rt)
 	}
 	b.WriteString("}\n")
 	return b.String()
 }
 
+func renderRoute(b *strings.Builder, authTarget string, rt Route) {
+	directive := "handle"
+	if rt.Mode == "route" {
+		directive = "route"
+	}
+	if rt.Path != "" {
+		fmt.Fprintf(b, "\t%s %s {\n", directive, rt.Path)
+	} else {
+		fmt.Fprintf(b, "\t%s {\n", directive)
+	}
+	if rt.RequireAuth {
+		fmt.Fprintf(b, "\t\tforward_auth %s {\n\t\t\turi /api/auth/verify\n\t\t}\n", authTarget)
+	}
+	if rt.StripPrefix != "" {
+		fmt.Fprintf(b, "\t\turi strip_prefix %s\n", rt.StripPrefix)
+	}
+	if rt.RewritePrefix != "" {
+		fmt.Fprintf(b, "\t\trewrite * %s{uri}\n", rt.RewritePrefix)
+	}
+	fmt.Fprintf(b, "\t\treverse_proxy %s\n", rt.Target)
+	b.WriteString("\t}\n")
+}
+
 // parseStructured attempts to recover an Expose from a fragment's raw text,
 // by checking it line-for-line against what Render would have produced for
-// some target/apiTarget/requireAuth combination (authTarget must match the
-// value Render was called with — see List). Returns ok=false for anything
-// that doesn't match exactly — a hand-edited fragment (or one written when
-// WEBMANAGER_ADDR held a different value) just loses structured-form
-// editing, it's never rejected or corrected.
+// some route list (authTarget must match the value Render was called with —
+// see List). Returns ok=false for anything that doesn't match exactly — a
+// hand-edited fragment (or one written when WEBMANAGER_ADDR held a different
+// value) just loses structured-form editing, it's never rejected or
+// corrected.
 func parseStructured(name, authTarget, content string) (Expose, bool) {
 	lines := strings.Split(content, "\n")
 	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
@@ -125,10 +204,11 @@ func parseStructured(name, authTarget, content string) (Expose, bool) {
 	if len(lines) < 3 {
 		return Expose{}, false
 	}
-	wantPrefix := fmt.Sprintf("@%s host %s.", name, name)
-	if !strings.HasPrefix(lines[0], wantPrefix) {
+	wantHostPrefix := fmt.Sprintf("@%s host ", name)
+	if !strings.HasPrefix(lines[0], wantHostPrefix) {
 		return Expose{}, false
 	}
+	host := strings.TrimPrefix(lines[0], wantHostPrefix)
 	if lines[1] != fmt.Sprintf("handle @%s {", name) {
 		return Expose{}, false
 	}
@@ -136,37 +216,60 @@ func parseStructured(name, authTarget, content string) (Expose, bool) {
 		return Expose{}, false
 	}
 	body := lines[2 : len(lines)-1]
-	e := Expose{Name: name}
+	if len(body) == 1 && body[0] == "\trespond 404" {
+		return Expose{Name: name, Host: host, Routes: []Route{}}, true
+	}
+	e := Expose{Name: name, Host: host, Routes: []Route{}}
 	i := 0
-	if i < len(body) && body[i] == fmt.Sprintf("\tforward_auth %s {", authTarget) {
-		if i+2 >= len(body) || body[i+1] != "\t\turi /api/auth/verify" || body[i+2] != "\t}" {
+	for i < len(body) {
+		rt, next, ok := parseRoute(body, i, authTarget)
+		if !ok {
 			return Expose{}, false
 		}
-		e.RequireAuth = true
-		i += 3
-	}
-	switch {
-	case i < len(body) && body[i] == "\thandle /api/* {":
-		if i+6 > len(body) {
-			return Expose{}, false
-		}
-		if !strings.HasPrefix(body[i+1], "\t\treverse_proxy ") || body[i+2] != "\t}" || body[i+3] != "\thandle {" ||
-			!strings.HasPrefix(body[i+4], "\t\treverse_proxy ") || body[i+5] != "\t}" {
-			return Expose{}, false
-		}
-		e.APITarget = strings.TrimPrefix(body[i+1], "\t\treverse_proxy ")
-		e.Target = strings.TrimPrefix(body[i+4], "\t\treverse_proxy ")
-		i += 6
-	case i < len(body) && strings.HasPrefix(body[i], "\treverse_proxy "):
-		e.Target = strings.TrimPrefix(body[i], "\treverse_proxy ")
-		i++
-	default:
-		return Expose{}, false
-	}
-	if i != len(body) {
-		return Expose{}, false
+		e.Routes = append(e.Routes, rt)
+		i = next
 	}
 	return e, true
+}
+
+var routeHeaderRe = regexp.MustCompile(`^\t(route|handle)(?: (.+))? \{$`)
+
+// parseRoute recovers one Route starting at body[i] (a "\troute ... {" or
+// "\thandle ... {" line), returning the index just past its closing "\t}".
+func parseRoute(body []string, i int, authTarget string) (Route, int, bool) {
+	if i >= len(body) {
+		return Route{}, i, false
+	}
+	m := routeHeaderRe.FindStringSubmatch(body[i])
+	if m == nil {
+		return Route{}, i, false
+	}
+	rt := Route{Mode: m[1], Path: m[2]}
+	i++
+	if i < len(body) && body[i] == "\t\tforward_auth "+authTarget+" {" {
+		if i+2 >= len(body) || body[i+1] != "\t\t\turi /api/auth/verify" || body[i+2] != "\t\t}" {
+			return Route{}, i, false
+		}
+		rt.RequireAuth = true
+		i += 3
+	}
+	if i < len(body) && strings.HasPrefix(body[i], "\t\turi strip_prefix ") {
+		rt.StripPrefix = strings.TrimPrefix(body[i], "\t\turi strip_prefix ")
+		i++
+	}
+	if i < len(body) && strings.HasPrefix(body[i], "\t\trewrite * ") && strings.HasSuffix(body[i], "{uri}") {
+		rt.RewritePrefix = strings.TrimSuffix(strings.TrimPrefix(body[i], "\t\trewrite * "), "{uri}")
+		i++
+	}
+	if i >= len(body) || !strings.HasPrefix(body[i], "\t\treverse_proxy ") {
+		return Route{}, i, false
+	}
+	rt.Target = strings.TrimPrefix(body[i], "\t\treverse_proxy ")
+	i++
+	if i >= len(body) || body[i] != "\t}" {
+		return Route{}, i, false
+	}
+	return rt, i + 1, true
 }
 
 // List returns every managed expose, each with its raw text and (when it
@@ -256,43 +359,69 @@ func validateExpose(e Expose) error {
 	if err := ValidateName(e.Name); err != nil {
 		return err
 	}
-	if err := ValidateTarget(e.Target); err != nil {
+	if err := ValidateHost(e.Host); err != nil {
 		return err
 	}
-	if e.APITarget != "" {
-		if err := ValidateTarget(e.APITarget); err != nil {
+	for _, rt := range e.Routes {
+		if err := validatePathLike("path", rt.Path); err != nil {
 			return err
+		}
+		if err := ValidateTarget(rt.Target); err != nil {
+			return err
+		}
+		if err := validatePathLike("stripPrefix", rt.StripPrefix); err != nil {
+			return err
+		}
+		if err := validatePathLike("rewritePrefix", rt.RewritePrefix); err != nil {
+			return err
+		}
+		if rt.Mode != "route" && rt.Mode != "handle" {
+			return errors.New("route mode must be \"route\" or \"handle\"")
 		}
 	}
 	return nil
 }
 
-// Create adds a new expose. domain is CADDY_ADAPTER_DOMAIN with its leading
-// "*." stripped, authTarget is webmanager's own bind address (see Render).
-func Create(ctx context.Context, domain, authTarget string, e Expose) error {
+// Create adds a new expose. authTarget is webmanager's own bind address (see
+// Render).
+func Create(ctx context.Context, authTarget string, e Expose) error {
 	if err := validateExpose(e); err != nil {
 		return err
 	}
 	if _, err := os.Stat(path(e.Name)); err == nil {
 		return ErrExposeExists
 	}
-	if err := writeAndValidate(ctx, e.Name, Render(domain, authTarget, e)); err != nil {
+	if err := writeAndValidate(ctx, e.Name, Render(authTarget, e)); err != nil {
 		return err
 	}
 	return Reload(ctx)
 }
 
-// UpdateStructured overwrites name's fragment with a freshly rendered
-// structured template.
-func UpdateStructured(ctx context.Context, domain, authTarget string, e Expose) error {
+// UpdateStructured overwrites oldName's fragment with a freshly rendered
+// structured template for e. If e.Name differs from oldName this also
+// renames the expose (new filename, new Caddyfile @matcher token): the new
+// file is written and validated first, and only removes oldName's file
+// after that succeeds — so a bad rename never leaves the expose missing.
+func UpdateStructured(ctx context.Context, authTarget, oldName string, e Expose) error {
 	if err := validateExpose(e); err != nil {
 		return err
 	}
-	if _, err := os.Stat(path(e.Name)); err != nil {
+	if _, err := os.Stat(path(oldName)); err != nil {
 		return ErrExposeNotFound
 	}
-	if err := writeAndValidate(ctx, e.Name, Render(domain, authTarget, e)); err != nil {
+	renaming := e.Name != oldName
+	if renaming {
+		if _, err := os.Stat(path(e.Name)); err == nil {
+			return ErrExposeExists
+		}
+	}
+	if err := writeAndValidate(ctx, e.Name, Render(authTarget, e)); err != nil {
 		return err
+	}
+	if renaming {
+		if err := os.Remove(path(oldName)); err != nil {
+			return err
+		}
 	}
 	return Reload(ctx)
 }

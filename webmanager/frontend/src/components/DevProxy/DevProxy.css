@@ -40,3 +40,44 @@
   font-size: 0.9rem;
   cursor: pointer;
 }
+
+.dev-proxy-routes-panel {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Route dialog fields stack vertically (no .form-grid auto-fit columns) —
+   the dialog is narrow on mobile and horizontal fields there are cramped. */
+.dev-proxy-route-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dev-proxy-route-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.dev-proxy-host-line {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.dev-proxy-host-line input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.5rem;
+  font-size: 0.88rem;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}

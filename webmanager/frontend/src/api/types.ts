@@ -629,12 +629,28 @@ export interface OpenSession {
   closeRequested: boolean
 }
 
-// Mirrors internal/devproxy.Expose/Info — GET /api/dev-proxy/exposes.
+// Mirrors internal/devproxy.Route — one path-matched reverse-proxy rule
+// inside a subdomain. path empty = catch-all (no matcher). mode is the
+// wrapping Caddy directive ("route" = unconditional, "handle" = mutually
+// exclusive first-match-wins).
+export interface DevProxyRoute {
+  path?: string
+  target: string
+  stripPrefix?: string
+  rewritePrefix?: string
+  mode: 'route' | 'handle'
+  requireAuth: boolean
+}
+
+// Mirrors internal/devproxy.Expose/Info — GET /api/dev-proxy/exposes. name
+// is only an internal identifier (filename + Caddyfile @matcher token, no
+// dots allowed); host is the actual external hostname this expose answers
+// for (e.g. "dev.example.com" or "*.staging.example.com") — there's no
+// shared base domain, each expose's host is fully independent.
 export interface DevProxyExpose {
   name: string
-  target: string
-  apiTarget?: string
-  requireAuth: boolean
+  host: string
+  routes: DevProxyRoute[]
 }
 
 export interface DevProxyInfo {

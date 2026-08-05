@@ -58,11 +58,12 @@ services:
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
       TAILSCALE_LOG_LEVEL: "${TAILSCALE_LOG_LEVEL:-errors}"
       WEBMANAGER_ENV_TEMPLATE_PATH: "${WEBMANAGER_ENV_TEMPLATE_PATH:-/etc/code-docker/webmanager/example-env.webmanager}"
-      # Internal Caddy instance for exposing dev servers via a wildcard
-      # subdomain - see docs/dev-proxy.md. CADDY_ADAPTER_DOMAIN is empty by
-      # default (feature inert until set, e.g. "*.dev.example.com").
+      # Internal Caddy instance for exposing dev servers - see
+      # docs/dev-proxy.md. Each expose carries its own full hostname
+      # (set per-expose in webmanager's Dev Proxy tab), so no domain env var
+      # is needed here - CADDY_ADAPTER_ENABLED just opts the whole feature
+      # in/out.
       CADDY_ADAPTER_ENABLED: "${CADDY_ADAPTER_ENABLED:-true}"
-      CADDY_ADAPTER_DOMAIN: "${CADDY_ADAPTER_DOMAIN:-}"
       CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-8082}"
     # webmanager(admin panel, port 81) settings all live in .env.webmanager,
     # not here - copy example-env.webmanager to .env.webmanager and uncomment

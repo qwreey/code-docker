@@ -37,12 +37,17 @@ status --json`의 `CurAddr` 유무로 판별 — 비어있으면 릴레이 경�
 
 ### Dev Proxy
 
-`/code/.caddy-adapter/managed/*.caddy` 항목(expose) 조회/추가/삭제 — 이름(서브도메인),
-target(`host:port`), `/api/*` 경로 분리, expose별 인증 요구 여부를 구조화 폼으로
-편집하고, 저장 시 `caddy adapt`로 검증 후 `caddy reload`로 무중단 반영합니다(검증
-실패 시 반영 없이 에러만 표시). 폼이 못 다루는 케이스는 같은 화면에서 `.caddy`
-파일 자체를 원본 편집할 수 있습니다. 자세한 내용은
-[dev 서버 노출 문서](dev-proxy.md)를 확인하세요.
+`/code/.caddy-adapter/managed/*.caddy` 항목(expose) 조회/추가/삭제 — 이름(내부 식별자, 파일명 +
+Caddyfile matcher 토큰으로만 쓰임)과 host(실제로 노출할 전체 도메인, 예: `dev.example.com`이나
+`*.staging.example.com`)로 먼저 expose를 만들고, 그 아래에 라우트(매치 path, target
+`host:port`, strip prefix, 리버스프록시 path, `route`/`handle` 매칭 방식, 라우트별 인증 요구)를
+원하는 만큼 추가하는 구조화 폼입니다. 공유 base 도메인은 없으므로 expose마다 완전히 다른 도메인을
+쓸 수 있습니다. 목록에는 host, 라우트 수, 인증 요구 여부(전체 라우트가 요구하면 "요구", 일부만
+이면 "부분", 없으면 "없음")가 표시되고, 행을 펼치면 그 expose의 라우트 목록이 같은 화면
+아래에 나타납니다(다이얼로그 아님) — 라우트 추가/편집만 별도 다이얼로그로 열립니다. 저장 시
+`caddy adapt`로 검증 후 `caddy reload`로 무중단 반영합니다(검증 실패 시 반영 없이 에러만
+표시). 폼이 못 다루는 케이스는 같은 화면에서 `.caddy` 파일 자체를 원본 편집할 수 있습니다.
+자세한 내용은 [dev 서버 노출 문서](dev-proxy.md)를 확인하세요.
 
 ### Logs
 

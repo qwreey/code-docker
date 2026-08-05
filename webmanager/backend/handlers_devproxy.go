@@ -4,16 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 
 	"webmanager/internal/devproxy"
 )
-
-// devProxyDomain is CADDY_ADAPTER_DOMAIN with its leading "*." stripped —
-// see internal/devproxy.Render.
-func (s *Server) devProxyDomain() string {
-	return strings.TrimPrefix(s.cfg.CaddyAdapterDomain, "*.")
-}
 
 func (s *Server) handleListDevProxyExposes(w http.ResponseWriter, r *http.Request) {
 	list, err := devproxy.List(s.cfg.Addr)
@@ -30,7 +23,7 @@ func (s *Server) handleCreateDevProxyExpose(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if err := devproxy.Create(r.Context(), s.devProxyDomain(), s.cfg.Addr, body); err != nil {
+	if err := devproxy.Create(r.Context(), s.cfg.Addr, body); err != nil {
 		writeDevProxyError(w, err)
 		return
 	}
@@ -38,12 +31,12 @@ func (s *Server) handleCreateDevProxyExpose(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *Server) handleUpdateDevProxyExpose(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("name")
+	oldName := r.PathValue("name")
 	var body struct {
-		Raw         *string `json:"raw,omitempty"`
-		Target      string  `json:"target"`
-		APITarget   string  `json:"apiTarget"`
-		RequireAuth bool    `json:"requireAuth"`
+		Raw    *string          `json:"raw,omitempty"`
+		Name   string           `json:"name,omitempty"` // present + different from oldName = rename
+		Host   string           `json:"host"`
+		Routes []devproxy.Route `json:"routes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -52,13 +45,16 @@ func (s *Server) handleUpdateDevProxyExpose(w http.ResponseWriter, r *http.Reque
 
 	var err error
 	if body.Raw != nil {
-		err = devproxy.UpdateRaw(r.Context(), name, *body.Raw)
+		err = devproxy.UpdateRaw(r.Context(), oldName, *body.Raw)
 	} else {
-		err = devproxy.UpdateStructured(r.Context(), s.devProxyDomain(), s.cfg.Addr, devproxy.Expose{
-			Name:        name,
-			Target:      body.Target,
-			APITarget:   body.APITarget,
-			RequireAuth: body.RequireAuth,
+		newName := body.Name
+		if newName == "" {
+			newName = oldName
+		}
+		err = devproxy.UpdateStructured(r.Context(), s.cfg.Addr, oldName, devproxy.Expose{
+			Name:   newName,
+			Host:   body.Host,
+			Routes: body.Routes,
 		})
 	}
 	if err != nil {

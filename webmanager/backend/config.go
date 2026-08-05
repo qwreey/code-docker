@@ -63,12 +63,6 @@ type Config struct {
 	// same cookie is checked there via Gate.UnlockedForForwardAuth.
 	AuthCookieDomain string
 
-	// CaddyAdapterDomain mirrors CADDY_ADAPTER_DOMAIN (docker-compose.yml,
-	// e.g. "*.dev.example.com") — internal/devproxy strips the leading "*."
-	// to build each expose's full host. Empty means the feature isn't
-	// configured yet (see config/caddy-adapter.default.sh).
-	CaddyAdapterDomain string
-
 	// FilesRoot defaults to /code rather than / — narrower, safer default;
 	// an operator who wants full-container browsing can widen it.
 	FilesRoot           string
@@ -196,8 +190,6 @@ func loadConfig() Config {
 
 		AuthPasswordHash: getenv("WEBMANAGER_AUTH_PASSWORD_HASH", ""),
 		AuthCookieDomain: getenv("WEBMANAGER_AUTH_COOKIE_DOMAIN", ""),
-
-		CaddyAdapterDomain: getenv("CADDY_ADAPTER_DOMAIN", ""),
 
 		FilesRoot:           getenv("WEBMANAGER_FILES_ROOT", "/code"),
 		FilesMaxUploadBytes: getenv("WEBMANAGER_FILES_MAX_UPLOAD_BYTES", "2147483648"),

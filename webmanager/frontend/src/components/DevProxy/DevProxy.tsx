@@ -1,29 +1,26 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
-import type { DevProxyInfo } from '../../api/types'
+import type { DevProxyInfo, DevProxyRoute } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { ExpandableEditor } from '../common/ExpandableEditor'
 import { Skeleton } from '../common/Skeleton'
+import { RouteDialog } from './RouteDialog'
 import { withViewTransition } from '../../utils/viewTransition'
 import './DevProxy.css'
 
-// Editing a fragment that didn't parse back out of Render (info.structured
-// is undefined - see internal/devproxy.parseStructured) only offers raw
-// text editing; switching it to the structured form would silently
-// overwrite whatever custom Caddyfile syntax made it unparseable.
-function EditPanel({
-  info,
-  onSaved,
-  onCancel,
-}: {
-  info: DevProxyInfo
-  onSaved: () => void
-  onCancel: () => void
-}) {
-  const [mode, setMode] = useState<'structured' | 'raw'>(info.structured ? 'structured' : 'raw')
-  const [target, setTarget] = useState(info.structured?.target ?? '')
-  const [apiTarget, setApiTarget] = useState(info.structured?.apiTarget ?? '')
-  const [requireAuth, setRequireAuth] = useState(info.structured?.requireAuth ?? false)
+function authSummary(routes: DevProxyRoute[]): string {
+  if (routes.length === 0) return '-'
+  const required = routes.filter((r) => r.requireAuth).length
+  if (required === 0) return '없음'
+  if (required === routes.length) return '요구'
+  return '부분'
+}
+
+// Raw-fragment fallback editor — the whole *.caddy file as text, for
+// exposes whose content doesn't round-trip through Render (hand-edited,
+// or written under an older schema) and as an escape hatch when the
+// structured route form can't express something.
+function RawPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: () => void }) {
   const [raw, setRaw] = useState(info.raw)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -32,15 +29,7 @@ function EditPanel({
     setSubmitting(true)
     setError(null)
     try {
-      if (mode === 'structured') {
-        await api.put(`/dev-proxy/exposes/${encodeURIComponent(info.name)}`, {
-          target,
-          apiTarget: apiTarget || undefined,
-          requireAuth,
-        })
-      } else {
-        await api.put(`/dev-proxy/exposes/${encodeURIComponent(info.name)}`, { raw })
-      }
+      await api.put(`/dev-proxy/exposes/${encodeURIComponent(info.name)}`, { raw })
       onSaved()
     } catch (e) {
       setError(errorMessage(e))
@@ -51,67 +40,219 @@ function EditPanel({
 
   return (
     <div className="dev-proxy-edit-panel">
-      {info.structured && (
-        <div className="dev-proxy-edit-toggle">
-          <button
-            type="button"
-            className={mode === 'structured' ? 'btn btn-small btn-primary' : 'btn btn-small'}
-            onClick={() => setMode('structured')}
-          >
-            구조화 편집
-          </button>
-          <button
-            type="button"
-            className={mode === 'raw' ? 'btn btn-small btn-primary' : 'btn btn-small'}
-            onClick={() => setMode('raw')}
-          >
-            원본 편집
-          </button>
-        </div>
-      )}
-
-      {mode === 'structured' ? (
-        <div className="form-grid">
-          <div className="form-field">
-            <label htmlFor={`dp-edit-target-${info.name}`}>target (host:port)</label>
-            <input
-              id={`dp-edit-target-${info.name}`}
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-field">
-            <label htmlFor={`dp-edit-api-target-${info.name}`}>/api/* target (선택)</label>
-            <input
-              id={`dp-edit-api-target-${info.name}`}
-              value={apiTarget}
-              onChange={(e) => setApiTarget(e.target.value)}
-              placeholder="비워두면 위 target 사용"
-            />
-          </div>
-          <label className="dev-proxy-checkbox-option">
-            <input
-              type="checkbox"
-              checked={requireAuth}
-              onChange={(e) => setRequireAuth(e.target.checked)}
-            />
-            인증 요구 (webmanager 비밀번호)
-          </label>
-        </div>
-      ) : (
-        <ExpandableEditor value={raw} onChange={setRaw} language="plain" readOnly={false} triggerLabel="원본 편집" />
-      )}
-
+      <ExpandableEditor value={raw} onChange={setRaw} language="plain" readOnly={false} triggerLabel="원본 편집" />
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <div className="dev-proxy-edit-toggle">
         <button type="button" className="btn btn-primary btn-small" disabled={submitting} onClick={handleSave}>
           {submitting ? '저장하는 중...' : '저장'}
         </button>
-        <button type="button" className="btn btn-small" disabled={submitting} onClick={onCancel}>
-          취소
+      </div>
+    </div>
+  )
+}
+
+// A single identity field (name or host) edited inline with its own
+// save/cancel — not a dialog, since it's one field at a time. onSave does
+// the actual PUT (name-rename and host-edit send different bodies, see
+// RoutesPanel below) and throws on failure; value only reverts on cancel.
+function InlineFieldEditor({
+  label,
+  value: initialValue,
+  onSave,
+}: {
+  label: string
+  value: string
+  onSave: (value: string) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(initialValue)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSave() {
+    if (value === initialValue) {
+      setEditing(false)
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+    try {
+      await onSave(value)
+      setEditing(false)
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (!editing) {
+    return (
+      <p className="dev-proxy-host-line">
+        {label}: <code>{initialValue}</code>{' '}
+        <button type="button" className="btn btn-small" onClick={() => setEditing(true)}>
+          편집
+        </button>
+      </p>
+    )
+  }
+
+  return (
+    <div className="dev-proxy-host-line">
+      <input value={value} onChange={(e) => setValue(e.target.value)} disabled={submitting} />{' '}
+      <button type="button" className="btn btn-primary btn-small" disabled={submitting} onClick={handleSave}>
+        {submitting ? '저장하는 중...' : '저장'}
+      </button>{' '}
+      <button
+        type="button"
+        className="btn btn-small"
+        disabled={submitting}
+        onClick={() => {
+          setValue(initialValue)
+          setEditing(false)
+        }}
+      >
+        취소
+      </button>
+      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+    </div>
+  )
+}
+
+// Routes belonging to one expanded expose — small list + add/edit/delete,
+// each change PUTs the whole route array back (same whole-fragment-overwrite
+// contract UpdateStructured already had). host/name are carried along
+// unchanged on every route-only save, since the backend re-renders the whole
+// fragment. onSaved is called with the expose's new name when it was
+// renamed, so the parent can keep it expanded under its new identity.
+function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?: string) => void }) {
+  const host = info.structured?.host ?? ''
+  const routes = info.structured?.routes ?? []
+  const [dialog, setDialog] = useState<{ index: number | null } | null>(null)
+  const [dialogError, setDialogError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [deletingIndex, setDeletingIndex] = useState<number | null>(null)
+  const [showRaw, setShowRaw] = useState(false)
+
+  async function putRoutes(next: DevProxyRoute[]) {
+    await api.put(`/dev-proxy/exposes/${encodeURIComponent(info.name)}`, { host, routes: next })
+  }
+
+  async function handleSaveRoute(route: DevProxyRoute) {
+    setSubmitting(true)
+    setDialogError(null)
+    try {
+      const next = [...routes]
+      if (dialog?.index != null) {
+        next[dialog.index] = route
+      } else {
+        next.push(route)
+      }
+      await putRoutes(next)
+      setDialog(null)
+      onSaved()
+    } catch (e) {
+      setDialogError(errorMessage(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleDeleteRoute(index: number) {
+    if (!window.confirm('이 라우트를 삭제하시겠습니까?')) return
+    setDeletingIndex(index)
+    try {
+      await putRoutes(routes.filter((_, i) => i !== index))
+      onSaved()
+    } finally {
+      setDeletingIndex(null)
+    }
+  }
+
+  if (showRaw) {
+    return <RawPanel info={info} onSaved={onSaved} />
+  }
+
+  return (
+    <div className="dev-proxy-routes-panel">
+      <InlineFieldEditor
+        label="이름"
+        value={info.name}
+        onSave={async (newName) => {
+          await api.put(`/dev-proxy/exposes/${encodeURIComponent(info.name)}`, { name: newName, host, routes })
+          onSaved(newName)
+        }}
+      />
+      <InlineFieldEditor
+        label="host"
+        value={host}
+        onSave={async (newHost) => {
+          await api.put(`/dev-proxy/exposes/${encodeURIComponent(info.name)}`, { host: newHost, routes })
+          onSaved()
+        }}
+      />
+      {routes.length === 0 ? (
+        <p className="empty-state">라우트가 없습니다. 아래에서 추가하세요.</p>
+      ) : (
+        <div className="table-wrapper">
+          <table className="dev-proxy-table">
+            <thead>
+              <tr>
+                <th>path</th>
+                <th>target</th>
+                <th>strip</th>
+                <th>rewrite</th>
+                <th>방식</th>
+                <th>인증</th>
+                <th aria-label="동작" />
+              </tr>
+            </thead>
+            <tbody>
+              {routes.map((rt, i) => (
+                <tr key={i}>
+                  <td>{rt.path || <em>전체</em>}</td>
+                  <td>{rt.target}</td>
+                  <td>{rt.stripPrefix || '-'}</td>
+                  <td>{rt.rewritePrefix || '-'}</td>
+                  <td>{rt.mode}</td>
+                  <td>{rt.requireAuth ? '요구' : '없음'}</td>
+                  <td>
+                    <button type="button" className="btn btn-small" onClick={() => setDialog({ index: i })}>
+                      편집
+                    </button>{' '}
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-small"
+                      disabled={deletingIndex === i}
+                      onClick={() => handleDeleteRoute(i)}
+                    >
+                      삭제
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="dev-proxy-edit-toggle">
+        <button type="button" className="btn btn-primary btn-small" onClick={() => setDialog({ index: null })}>
+          라우트 추가
+        </button>
+        <button type="button" className="btn btn-small" onClick={() => setShowRaw(true)}>
+          원본 편집
         </button>
       </div>
+
+      {dialog && (
+        <RouteDialog
+          route={dialog.index != null ? routes[dialog.index] : null}
+          submitting={submitting}
+          error={dialogError}
+          onCancel={() => setDialog(null)}
+          onSave={handleSaveRoute}
+        />
+      )}
     </div>
   )
 }
@@ -123,12 +264,10 @@ export function DevProxy() {
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [name, setName] = useState('')
-  const [target, setTarget] = useState('')
-  const [apiTarget, setApiTarget] = useState('')
-  const [requireAuth, setRequireAuth] = useState(true)
+  const [host, setHost] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
-  const [editingName, setEditingName] = useState<string | null>(null)
+  const [expandedName, setExpandedName] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -146,6 +285,11 @@ export function DevProxy() {
     load()
   }, [load])
 
+  async function handleExposeSaved(newName?: string) {
+    if (newName) setExpandedName(newName)
+    await load()
+  }
+
   function showNotice() {
     setNotice('저장됨 (caddy-adapter에 반영됨)')
     setTimeout(() => setNotice(null), 2500)
@@ -156,16 +300,10 @@ export function DevProxy() {
     setSubmitting(true)
     setFormError(null)
     try {
-      await api.post('/dev-proxy/exposes', {
-        name,
-        target,
-        apiTarget: apiTarget || undefined,
-        requireAuth,
-      })
+      await api.post('/dev-proxy/exposes', { name, host, routes: [] })
+      setExpandedName(name)
       setName('')
-      setTarget('')
-      setApiTarget('')
-      setRequireAuth(true)
+      setHost('')
       await load()
       showNotice()
     } catch (e) {
@@ -180,6 +318,7 @@ export function DevProxy() {
     setDeleting(exposeName)
     try {
       await api.del(`/dev-proxy/exposes/${encodeURIComponent(exposeName)}`)
+      if (expandedName === exposeName) setExpandedName(null)
       await load()
       showNotice()
     } catch (e) {
@@ -193,19 +332,28 @@ export function DevProxy() {
     <div className="card">
       <h2>Dev Proxy</h2>
       <p className="section-description">
-        컨테이너 안에서 뜬 dev 서버(예: <code>npm run dev</code>)를 와일드카드 서브도메인으로 노출합니다.
+        컨테이너 안에서 뜬 dev 서버(예: <code>npm run dev</code>)를 도메인으로 노출합니다. expose마다 완전히 다른
+        도메인을 써도 됩니다 — 공유 base 도메인 같은 건 없습니다.
       </p>
       <div className="info-note">
         <span aria-hidden="true">ℹ</span>
         <span>
-          바깥 리버스 프록시는 <code>CADDY_ADAPTER_DOMAIN</code>에 설정한 와일드카드 도메인을 이 컨테이너의{' '}
-          <code>CADDY_ADAPTER_PORT</code>(기본 8082)로 통째로 넘기면 됩니다. 인증을 쓰려면{' '}
+          바깥 리버스 프록시가 원하는 도메인(들)을 이 컨테이너의 <code>CADDY_ADAPTER_PORT</code>(기본 8082)로
+          넘기면, 그 안에서는 각 expose의 host 값과 실제 Host 헤더가 일치하는지로 분배합니다. 인증을 쓰려면{' '}
           <code>WEBMANAGER_CODE_SERVER_URL</code>과 <code>WEBMANAGER_AUTH_COOKIE_DOMAIN</code>도 설정해야 합니다 —
           자세한 내용은{' '}
           <a href="https://github.com/qwreey/code-docker/blob/master/docs/dev-proxy.md" target="_blank" rel="noreferrer">
             docs/dev-proxy.md
           </a>
           를 확인하세요.
+        </span>
+      </div>
+      <div className="info-note">
+        <span aria-hidden="true">ℹ</span>
+        <span>
+          라우트의 target을 <code>127.0.0.1</code>이나 <code>0.0.0.0</code>에 바인드하면 tailscale이 tailnet
+          전체에 자동으로 재노출할 수 있습니다 — dev 서버는 <code>private</code> 호스트네임(예:{' '}
+          <code>private:5173</code>)에 바인드하는 걸 권장합니다.
         </span>
       </div>
 
@@ -222,8 +370,8 @@ export function DevProxy() {
             <thead>
               <tr>
                 <th>이름</th>
-                <th>target</th>
-                <th>/api/*</th>
+                <th>host</th>
+                <th>라우트</th>
                 <th>인증</th>
                 <th aria-label="동작" />
               </tr>
@@ -233,16 +381,16 @@ export function DevProxy() {
                 <Fragment key={info.name}>
                   <tr>
                     <td>{info.name}</td>
-                    <td>{info.structured?.target ?? <em>raw</em>}</td>
-                    <td>{info.structured?.apiTarget ?? '-'}</td>
-                    <td>{info.structured ? (info.structured.requireAuth ? '요구' : '없음') : '-'}</td>
+                    <td>{info.structured?.host ?? <em>raw</em>}</td>
+                    <td>{info.structured ? `${(info.structured.routes ?? []).length}개` : <em>raw</em>}</td>
+                    <td>{info.structured ? authSummary(info.structured.routes ?? []) : '-'}</td>
                     <td>
                       <button
                         type="button"
                         className="btn btn-small"
-                        onClick={() => setEditingName(editingName === info.name ? null : info.name)}
+                        onClick={() => setExpandedName(expandedName === info.name ? null : info.name)}
                       >
-                        {editingName === info.name ? '닫기' : '편집'}
+                        {expandedName === info.name ? '닫기' : '펼치기'}
                       </button>{' '}
                       <button
                         type="button"
@@ -254,18 +402,14 @@ export function DevProxy() {
                       </button>
                     </td>
                   </tr>
-                  {editingName === info.name && (
+                  {expandedName === info.name && (
                     <tr className="dev-proxy-edit-row">
                       <td colSpan={5}>
-                        <EditPanel
-                          info={info}
-                          onCancel={() => setEditingName(null)}
-                          onSaved={async () => {
-                            setEditingName(null)
-                            await load()
-                            showNotice()
-                          }}
-                        />
+                        {info.structured ? (
+                          <RoutesPanel info={info} onSaved={handleExposeSaved} />
+                        ) : (
+                          <RawPanel info={info} onSaved={load} />
+                        )}
                       </td>
                     </tr>
                   )}
@@ -279,7 +423,7 @@ export function DevProxy() {
       <form onSubmit={handleSubmit} className="form-grid-inline">
         <div className="form-grid">
           <div className="form-field">
-            <label htmlFor="dp-name">이름 (서브도메인)</label>
+            <label htmlFor="dp-name">이름 (내부 식별자)</label>
             <input
               id="dp-name"
               value={name}
@@ -290,28 +434,15 @@ export function DevProxy() {
             />
           </div>
           <div className="form-field">
-            <label htmlFor="dp-target">target (host:port)</label>
+            <label htmlFor="dp-host">host (노출할 도메인)</label>
             <input
-              id="dp-target"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              placeholder="127.0.0.1:5173"
+              id="dp-host"
+              value={host}
+              onChange={(e) => setHost(e.target.value)}
+              placeholder="dev.example.com"
               required
             />
           </div>
-          <div className="form-field">
-            <label htmlFor="dp-api-target">/api/* target (선택)</label>
-            <input
-              id="dp-api-target"
-              value={apiTarget}
-              onChange={(e) => setApiTarget(e.target.value)}
-              placeholder="비워두면 위 target 사용"
-            />
-          </div>
-          <label className="dev-proxy-checkbox-option">
-            <input type="checkbox" checked={requireAuth} onChange={(e) => setRequireAuth(e.target.checked)} />
-            인증 요구 (webmanager 비밀번호)
-          </label>
         </div>
         {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}
         <button type="submit" className="btn btn-primary" disabled={submitting}>
