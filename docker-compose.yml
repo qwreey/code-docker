@@ -66,6 +66,11 @@ services:
       # in/out.
       CADDY_ADAPTER_ENABLED: "${CADDY_ADAPTER_ENABLED:-true}"
       CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-8082}"
+      # Egress lockdown (see .claude/backlog/egress-netgate-plan.md) - "false"
+      # skips entrypoint.sh's default-route wait gate. Does NOT restore
+      # code-docker-external/ports below - those are static compose topology
+      # and can't be conditioned on a runtime env var, see example-env.
+      NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
     # webmanager(admin panel, port 81) settings all live in .env.webmanager,
     # not here - copy example-env.webmanager to .env.webmanager and uncomment
     # only what you need (every value already has a sane default). See the
@@ -74,7 +79,14 @@ services:
       - path: .env.webmanager
         required: false
     networks:
-      code-docker-external: {}
+      # code-docker-external deliberately NOT attached here anymore (see
+      # .claude/backlog/egress-netgate-plan.md's "정정" section) - code-docker
+      # must have no interface with a route to the internet of its own, or
+      # code-docker-netinit setting the default route below wouldn't be a
+      # real chokepoint (an agent could just... use the other interface).
+      # All outbound now transits the code-docker-netgate service (below)
+      # via the route code-docker-netinit continuously (re)plants in this
+      # netns.
       code-docker-internal:
         # Self-IP alias for the tailscale `publish:` feature (config.yaml's
         # `tailscale serve` targets). tailscaled auto re-exposes anything
@@ -90,32 +102,37 @@ services:
         # and publish:.
         aliases:
           - forward
-    ports:
-      # Expose port 80 (HTTP) externally through a reverse proxy,
-      # or expose it directly, but be mindful of security settings.
-      # It's recommended to use a reverse proxy with forward proxy auth
-      # where possible, e.g. a web server like Caddy combined with an
-      # authentication tool like Authentik.
-      # An in-container nginx (see config/nginx.default.conf) now splits this
-      # single port between code-server (/) and webmanager (/manager) - no
-      # separate port needed for webmanager anymore.
-      - 80:80
-      # - 22:22
-      # webmanager no longer needs its own published port - it's reachable at
-      # /manager on port 80 above (nginx strips the prefix internally).
-      # Uncomment this (and set WEBMANAGER_ADDR=:81 in .env.webmanager) only
-      # if you want to bypass nginx and reach it directly on its own port.
-      # - 81:81
-      # Internal Caddy dev-proxy listener (see docs/dev-proxy.md). The
-      # recommended default is to NOT publish this at all - your outer
-      # reverse proxy instead rewrites dev-proxy requests to prepend
-      # /exports/ and sends them to port 80 above, so this container only
-      # ever needs one published port total. Uncomment this only if you
-      # specifically want the older direct-subdomain-to-8082 routing
-      # instead (a second port, but no path-rewrite step on your outer
-      # proxy) - see "바깥 리버스 프록시 연결하기" in docs/dev-proxy.md for
-      # both options.
-      # - 8082:8082
+    # ports: block left entirely commented out on purpose - Compose rejects
+    # a `ports:` key with zero array items, so the key itself has to go too,
+    # not just its entries.
+    #
+    # ports:
+    #   code-docker is no longer attached to code-docker-external (see the
+    #   networks: comment above), so publishing a host port directly on
+    #   this service doesn't work anymore - Compose docs: networks with
+    #   internal: true "are created without any connection to the host's
+    #   network interfaces". Port 80 lives on the code-docker-netgate
+    #   service instead now, which DNATs it back to code-docker:80 from
+    #   inside its own netns (see config/netgate/config.default.yaml's
+    #   `forwards:` and .claude/backlog/egress-netgate-plan.md's "인바운드"
+    #   section). This container has NO published port of its own and is
+    #   unreachable from the host except through that forward.
+    #   - 22:22
+    #   webmanager no longer needs its own published port - it's reachable at
+    #   /manager on port 80 above (nginx strips the prefix internally).
+    #   Uncomment this (and set WEBMANAGER_ADDR=:81 in .env.webmanager) only
+    #   if you want to bypass nginx and reach it directly on its own port.
+    #   - 81:81
+    #   Internal Caddy dev-proxy listener (see docs/dev-proxy.md). The
+    #   recommended default is to NOT publish this at all - your outer
+    #   reverse proxy instead rewrites dev-proxy requests to prepend
+    #   /exports/ and sends them to port 80 above, so this container only
+    #   ever needs one published port total. Uncomment this only if you
+    #   specifically want the older direct-subdomain-to-8082 routing
+    #   instead (a second port, but no path-rewrite step on your outer
+    #   proxy) - see "바깥 리버스 프록시 연결하기" in docs/dev-proxy.md for
+    #   both options.
+    #   - 8082:8082
     volumes:
       - "${HOME_VOLUME:-./code}:/code"
       - "${SSHD_VOLUME:-./sshd}:/etc/ssh"
@@ -142,12 +159,38 @@ services:
     #  - video
     #  - render
 
+  # Phase 1 of egress-netgate-plan.md's outbound lockdown. Owns no network
+  # attachment of its own - network_mode below makes it share code-docker's
+  # netns entirely (same interfaces/IP/routing table), and it uses the
+  # NET_ADMIN code-docker itself deliberately never gets to keep code-docker's
+  # default route pointed at netgate. See the plan doc for why code-docker
+  # stays the netns owner instead of the other way around ("왜 code-docker가
+  # 계속 소유주여야 하는가").
+  code-docker-netinit:
+    container_name: "${PREFIX:-}code-docker-netinit"
+    build:
+      context: "${BUILD_CONTEXT:-.}"
+      network: host
+      target: netinit
+    network_mode: "service:code-docker"
+    cap_add:
+      - NET_ADMIN
+    environment:
+      NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
+    depends_on:
+      code-docker:
+        condition: service_started
+    restart: unless-stopped
+
   # Create docker in docker daemon. for creating dev dockers (redis, postgres, ...)
   # WARNING: this daemon is privileged and has no auth/TLS on its socket.
   # Anyone who can reach it can create privileged containers and effectively
   # gain root on the host. dind-entrypoint.sh binds it to code-docker-internal
-  # only (not code-docker-external, see below), but treat code-docker-internal
-  # itself as fully trusted.
+  # only, and (egress-netgate-plan.md) it's not attached to
+  # code-docker-external anymore either - it manages its own default route
+  # toward code-docker-netgate the same way code-docker-netinit does for
+  # code-docker (see below). Still, treat code-docker-internal itself as
+  # fully trusted.
   code-docker-dind:
     container_name: "${PREFIX:-}code-docker-dind"
     hostname: code-docker-dind
@@ -169,6 +212,12 @@ services:
     restart: unless-stopped
     environment:
       DOCKER_TLS_CERTDIR: ""
+      # Egress lockdown (see .claude/backlog/egress-netgate-plan.md) -
+      # dind-entrypoint.sh's own default-route loop, same opt-out as
+      # code-docker's NETGATE_ENABLED above. Does NOT restore
+      # code-docker-external below - static compose topology, see
+      # example-env.
+      NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
     volumes:
       # Persist pulled images/containers across restarts
       - "${DIND_VOLUME:-./dind}:/var/lib/docker"
@@ -186,13 +235,79 @@ services:
       # access to the docker host's filesystem can edit this.
       - "${DIND_AUTHZ_VOLUME:-./dind-authz}:/etc/dind-authz.d"
     networks:
+      # code-docker-external deliberately NOT attached here either
+      # (egress-netgate-plan.md - same reasoning as code-docker's own
+      # networks: comment above). `docker pull` etc. now goes through
+      # code-docker-netgate via the route dind-entrypoint.sh's loop keeps
+      # planting here, same mechanism as code-docker-netinit uses for
+      # code-docker.
       code-docker-internal:
         # Extra name that only resolves on this network, so code-docker
-        # (which is also on code-docker-external) can reach this daemon
-        # unambiguously - see DOCKER_HOST above.
+        # can reach this daemon unambiguously - see DOCKER_HOST above.
         aliases:
           - dind
-      # code-docker-internal has no route to the internet, so this is
-      # needed for `docker pull` to work.
-      code-docker-external: {}
     command: ["--log-level=warn"]
+
+  # Phase 2 of egress-netgate-plan.md's outbound lockdown: the actual
+  # filtering/forwarding chokepoint code-docker-netinit's and dind's own
+  # routing loops (above) point their default route at, via the `netgate`
+  # alias below. Squid content-blocklist, RFC1918/CIDR FORWARD filtering,
+  # and inbound port-forwarding (DNAT) all live in this one container - see
+  # the plan doc and docs/egress-netgate.md for the full design/reasoning,
+  # and CLAUDE.md's "egress lockdown (netgate)" section for the short
+  # version.
+  code-docker-netgate:
+    container_name: "${PREFIX:-}code-docker-netgate"
+    hostname: code-docker-netgate
+    build:
+      context: "${BUILD_CONTEXT:-.}"
+      network: host
+      target: netgate
+    restart: unless-stopped
+    environment:
+      # Same behavioral opt-out as code-docker/dind's own NETGATE_ENABLED
+      # above - "false" idles this service too instead of applying any
+      # firewall/proxy rules (nothing would ever reach it anyway once
+      # code-docker/dind's own loops are idle - see example-env).
+      NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
+    cap_add:
+      # NET_ADMIN only - no privileged: true, no SYS_MODULE or anything
+      # else. This container is meaningfully more trusted than code-docker
+      # (same "국경을 넘는 컨테이너" framing as dind - see the plan doc's
+      # "위험 패턴 경고" / "솔직한 한계"), so it gets exactly the one
+      # capability its job (iptables/ip_forward/routing, all scoped to its
+      # own netns) actually needs and nothing more.
+      - NET_ADMIN
+    sysctls:
+      # Declared here (not via a runtime `sysctl -w` in
+      # config/netgate/firewall.default.sh) because Docker keeps /proc/sys
+      # read-only for non-privileged containers regardless of NET_ADMIN -
+      # `sysctl -w` at runtime fails with "permission denied" even though
+      # this exact key is one of the "namespaced" sysctls Docker allows
+      # setting declaratively at container-creation time. Confirmed by
+      # testing: without this, the key still happened to already read 1 in
+      # one test environment (so forwarding "worked" anyway) but a runtime
+      # `sysctl -w` attempt failed outright - relying on that coincidence
+      # would silently break forwarding on any host where it defaults to 0.
+      - net.ipv4.ip_forward=1
+    networks:
+      code-docker-internal:
+        # code-docker-netinit's and dind-entrypoint.sh's own routing loops
+        # both resolve this exact name - see script/netinit-entrypoint.sh
+        # and script/dind-entrypoint.sh.
+        aliases:
+          - netgate
+      code-docker-external: {}
+    ports:
+      # Moved here from code-docker (see that service's own ports: comment
+      # above) - code-docker-netgate is the only container with a real
+      # route to the host's network, so this is the only place a host port
+      # can be published from. DNAT'd back to code-docker:80 by
+      # config/netgate/firewall.default.sh, driven by
+      # config/netgate/config.default.yaml's `forwards:` list.
+      - "80:80"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

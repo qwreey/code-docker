@@ -62,12 +62,13 @@
 # (see build.*.sh override), which this image doesn't do by default.
 #LANG=""
 
-# Add docker in docker host. Uses the internal-only alias (not the
-# plain "code-docker-dind" service name) because code-docker sits on
-# both networks - resolving the bare name is ambiguous between the
-# two, and dind only actually listens on its code-docker-internal IP.
-# Only change this if you want code-docker to talk to a different (or
-# external) docker daemon instead of the bundled dind sidecar.
+# Add docker in docker host. Uses the internal-only alias (not the plain
+# "code-docker-dind" service name) - dind only actually listens on its
+# code-docker-internal IP, and if you ever restore code-docker-external on
+# code-docker (see NETGATE_ENABLED above) the bare service name becomes
+# ambiguous again (registered in both networks' DNS zones). Only change
+# this if you want code-docker to talk to a different (or external) docker
+# daemon instead of the bundled dind sidecar.
 #DOCKER_HOST="tcp://dind:2375"
 
 # dind가 실제로 빌드/실행할 Dockerfile 스테이지입니다.
@@ -191,3 +192,25 @@
 # `volumes:` section for the code-docker service:
 #   - ./custom-example-env.webmanager:/etc/code-docker/webmanager/example-env.webmanager:ro
 #WEBMANAGER_ENV_TEMPLATE_PATH="/etc/code-docker/webmanager/example-env.webmanager"
+
+# 아웃바운드 네트워크 격리(egress lockdown) 관련 설정입니다. 자세한 설계는
+# .claude/backlog/egress-netgate-plan.md, 사용자 문서는 docs/egress-netgate.md
+# 참고. code-docker/dind는 code-docker-external에 더 이상 직접 붙지 않고,
+# code-docker-netinit(및 dind 자신)이 계속 심어주는 기본 라우트를 통해
+# code-docker-netgate 서비스(실제 필터링/포트포워딩을 담당)를 거쳐서만 나갈 수
+# 있습니다.
+#
+# "false"로 끄면 code-docker-netinit/dind의 라우팅 루프, code-docker의
+# entrypoint 대기 가드, code-docker-netgate 자신의 방화벽/squid 적용이 전부
+# 아무것도 안 하고 idle 상태가 됩니다(기존 TAILSCALE_ENABLED와 같은 패턴) - 단,
+# 이건 이 기능의 "동작"만 끄는 것이지 networks:의 code-docker-external 제거
+# 자체나 ports:의 위치(code-docker가 아니라 code-docker-netgate에 있음)를
+# 되돌리지는 않습니다. Compose는 네트워크 attachment/포트 퍼블리시 여부를
+# 런타임 환경변수로 조건부 처리할 수 없어서, 완전히 예전(제한 없음) 토폴로지로
+# 되돌리려면 docker-compose.yml의 code-docker / code-docker-dind 두 서비스의
+# networks:에 `code-docker-external: {}`를 직접 다시 추가하고, code-docker의
+# ports:도 복구해야 합니다(`- 80:80`, `- 22:22`) - dind-authz를 완전히 끄고
+# 싶을 때 DIND_TARGET=dind로 명시적으로 바꾸는 것과 같은 성격의, 의도적으로
+# 눈에 띄는 수동 작업입니다. docs/egress-netgate.md의 "당장 인터넷이
+# 필요하다면" 절에 정확한 절차가 있습니다.
+#NETGATE_ENABLED="true"

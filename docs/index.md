@@ -89,6 +89,12 @@ vscord 확장으로 Discord Rich Presence를 연동하고, ssh 소켓 포워딩�
 
 자세한 내용은 [tips/dind.md](tips/dind.md)를 확인하세요.
 
+## 아웃바운드 네트워크 격리 (netgate)
+
+code-docker/dind가 `code-docker-netinit`(및 dind 자신)이 계속 심어주는 라우트를 통해서만 아웃바운드로 나갈 수 있도록 강제하고, `code-docker-netgate` 서비스가 실제 국경(사설 대역 차단, squid 블록리스트, 인바운드 포트포워딩)을 담당하는 기능입니다 - 컨테이너 안 AI 에이전트가 임의로 인터넷/사설망에 접근하는 걸 막기 위한 것입니다. `docker compose up`만으로 바로 동작합니다.
+
+자세한 내용은 [egress-netgate.md](egress-netgate.md)를 확인하세요 - 기능 자체를 끄고 싶다면 [당장 인터넷이 필요하다면](egress-netgate.md#당장-인터넷이-필요하다면-기능-자체를-끄기) 절을 먼저 보세요.
+
 ## 환경 변수 설정 (.env)
 
 `PWA_NAME`, `TZ`, `LANG`, 마운트할 볼륨 경로(`HOME_VOLUME`/`SSHD_VOLUME`/`DIND_VOLUME`), tailscale 관련 값, 로그 상세도 등 `docker-compose.yml`이 읽는 값들은 모두 `example-env`에 설명과 함께 정리되어 있습니다. `example-env`를 `.env`로 복사한 뒤 필요한 값만 주석을 풀어 쓰세요 - 전부 합리적인 기본값이 있어 이 파일이 없어도 정상 동작합니다. 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다.

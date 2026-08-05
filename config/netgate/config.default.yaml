@@ -1,0 +1,54 @@
+# netgate's own firewall rules - see .claude/backlog/egress-netgate-plan.md
+# and docs/egress-netgate.md for the full design. Read by
+# config/netgate/firewall.default.sh (via yq) every reapply cycle - no
+# rebuild needed to change this file if you're using
+# config/netgate/config.override.yaml (a full container recreate of
+# code-docker-netgate is still required, same as any other config change -
+# see CLAUDE.md's override pattern).
+
+# Ordered outbound allow/block CIDR rules for FORWARD traffic (i.e.
+# everything code-docker/dind send through netgate as their default
+# gateway). iptables chains are first-match-wins, so this list is applied
+# top to bottom in order, not as a flat set - a specific ACCEPT exception
+# must be listed BEFORE the broader block it carves an exception out of, or
+# it never gets reached. See the plan doc's "순서 있는 allow/block 레이어".
+#
+# No exception entry is needed for code-docker-internal's own subnet
+# (code-docker<->dind, code-docker<->netgate) - same-subnet traffic uses the
+# connected route and never enters the FORWARD chain at all, verified in
+# this phase's own testing (see docs/egress-netgate.md).
+#
+# Default: block RFC1918 private ranges + link-local + loopback. Everything
+# else (the public internet) falls through to the implicit ACCEPT at the
+# end of the chain (no catch-all rule needed - this is a blocklist, not a
+# whitelist, see the plan doc's "결정됨" #2).
+outbound:
+  - action: block
+    cidr: 10.0.0.0/8
+  - action: block
+    cidr: 172.16.0.0/12
+  - action: block
+    cidr: 192.168.0.0/16
+  - action: block
+    cidr: 169.254.0.0/16
+  - action: block
+    cidr: 127.0.0.0/8
+
+# Inbound port forwards: host <host_port> -> <target_host>:<target_port>,
+# where target_host is any hostname resolvable on code-docker-internal
+# (compose service name or network alias, e.g. "code-docker" or "dind").
+# Generalized on purpose - not hardcoded to code-docker - so this is a
+# home-router-style forwarding table, not a single special case. The
+# generated FORWARD ACCEPT rule for each entry is always inserted before the
+# outbound: block rules above (target_host's own IP is typically itself in
+# RFC1918 range, so ordering here matters exactly the way it does for
+# outbound: - see the plan doc's "인바운드" section).
+#
+# forwards:
+#   - host_port: 8443
+#     target_host: some-other-container
+#     target_port: 443
+forwards:
+  - host_port: 80
+    target_host: code-docker
+    target_port: 80

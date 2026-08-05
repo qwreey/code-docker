@@ -67,10 +67,49 @@ if [ -n "${DIND_USERNS_REMAP:-}" ]; then
 	userns_arg="--userns-remap=$DIND_USERNS_REMAP"
 fi
 
+# Phase 1 of egress-netgate-plan.md's outbound lockdown (see the plan doc's
+# dind section). dind already has NET_ADMIN via `privileged: true`, so
+# unlike code-docker it manages its own default route directly instead of
+# needing a netinit sidecar - same defensive loop as
+# script/netinit-entrypoint.sh, just running against dind's own netns.
+if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
+	(
+		trap 'exit 0' TERM INT
+		while true; do
+			gw_ip="$(getent hosts netgate 2>/dev/null | awk '{ print $1; exit }')"
+			if [ -n "$gw_ip" ]; then
+				ip route replace default via "$gw_ip" 2>/dev/null
+			fi
+
+			default_routes="$(ip -4 route show default 2>/dev/null)"
+			line_count=$(printf '%s\n' "$default_routes" | grep -c '^default')
+			unexpected=0
+			if [ "$line_count" -gt 1 ]; then
+				unexpected=1
+			elif [ -n "$gw_ip" ] && [ -n "$default_routes" ] && ! printf '%s\n' "$default_routes" | grep -q "via $gw_ip"; then
+				unexpected=1
+			fi
+			if [ "$unexpected" -eq 1 ]; then
+				echo "dind-entrypoint: WARNING unexpected default route(s), expected only netgate ($gw_ip):" >&2
+				printf '%s\n' "$default_routes" >&2
+			fi
+
+			sleep 5
+		done
+	) &
+fi
+
 # authz_arg/userns_arg are deliberately unquoted below: each is either
 # empty or a single well-known flag, and dockerd needs them word-split, not
 # passed as one (possibly empty) argument.
-exec /usr/local/bin/dockerd-entrypoint.sh dockerd \
+#
+# tini (not a bare exec of dockerd-entrypoint.sh) because dockerd becomes
+# PID 1 the moment this exec happens - PID 1 must reap reparented zombies,
+# and the routing loop backgrounded above forks `ip`/`getent` every 5s
+# forever. dockerd itself doesn't do that reaping, tini does (and still
+# forwards signals correctly, so `docker compose stop`'s SIGTERM reaches
+# dockerd exactly as before).
+exec tini -- /usr/local/bin/dockerd-entrypoint.sh dockerd \
 	--host=unix:///var/run/docker.sock \
 	--host="tcp://$internal_ip:2375" \
 	$authz_arg \

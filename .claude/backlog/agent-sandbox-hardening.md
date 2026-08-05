@@ -25,7 +25,7 @@ AI 코딩 에이전트(Claude Code 등)가 프롬프트 인젝션, 버그, 혹�
 |---|---|---|---|---|
 | 1 | dind 소켓 접근을 에이전트 세션에서 기본 차단 | 최우선 (Critical) | 쉬움 | 부분적 (망 분리는 있음, 세션 단위 차단은 없음) |
 | 2 | 앞단 forward-auth 상시 유지 + webmanager authgate 이중화 | 최우선 (Critical) | 쉬움 | 있음 (권장 사항으로, 강제는 아님) |
-| 3 | 아웃바운드 LAN(사설망) 격리 | 높음 (High) | 보통 | 없음 (호스트에서 직접 해야 함) |
+| 3 | 아웃바운드 LAN(사설망) 격리 | 높음 (High) | 보통 | **구현됨** (`.claude/backlog/egress-netgate-plan.md`, `docs/egress-netgate.md` - 레포 내부(순수 docker-compose)로 구현, 호스트 조작 불필요) |
 | 4 | 에이전트 전용 git 계정 + fork 워크플로우 | 높음 (High) | 쉬움 | 없음 (운영 습관) |
 | 5 | cap_add 최소화 재검토 (`SYS_PTRACE`, `IPC_LOCK`) | 중간 (Medium) | 쉬움 | 이미 켜져 있음, 재검토 필요 |
 | 6 | 시크릿 노출 경로 주의 (`code-patch/`, `.git-credentials`, `.env*`) | 중간 (Medium) | 쉬움 | 부분 경고만 있음 |
@@ -91,7 +91,29 @@ privileged 컨테이너는 호스트와 같은 커널을 공유하므로, dind �
 
 ---
 
-## 3. 아웃바운드 LAN(사설망) 격리 — 높음, 호스트에서 직접 해야 함
+## 3. 아웃바운드 LAN(사설망) 격리 — 구현됨
+
+**2026-08-05, `netgate` Phase 1+2 구현으로 해소됨.** 이 항목의 원안(아래 옛 내용 참고)은
+"호스트에서 직접 해야 함"이라고 적었지만, 논의 끝에 `network_mode: service:code-docker`
+(netns 공유) + 별도 라우터 컨테이너(`code-docker-netgate`) 조합으로 **순수
+docker-compose만으로**(호스트 iptables/eBPF 등 손대지 않고) 구현 가능함을 확인하고 실제로
+구현/실측 검증까지 완료했다. 전체 설계와 검토했다가 기각한 대안(호스트 방화벽 `DOCKER-USER`
+체인 접근 포함)은 `.claude/backlog/egress-netgate-plan.md`, 사용자 문서는
+`docs/egress-netgate.md` 참고. 요약:
+
+- code-docker/dind는 `code-docker-external`(인터넷 방향 네트워크)에 더 이상 직접 붙지
+  않고, `code-docker-netinit`(및 dind 자신)이 지속적으로 심어주는 라우트를 통해서만
+  `code-docker-netgate`를 거쳐 나갈 수 있다 — code-docker 자신은 `NET_ADMIN`이 없어
+  이 경로를 스스로 바꿀 수 없다(요구사항 1 충족, "호스트에서 직접"이 아니라 컨테이너
+  네임스페이스 공유로 달성).
+- `code-docker-netgate`가 RFC1918 등 사설 대역을 차단하고(요구사항 2), squid로
+  HTTP(S) 도메인 블록리스트를 적용한다(요구사항 4, best-effort).
+- 아래 완화책의 옵션 2(화이트리스트 프록시)는 채택하지 않고 blocklist 방향으로
+  통일했다(`egress-netgate-plan.md`의 "결정됨" 참고) — 원하는 사용자는 규칙을 뒤집어
+  whitelist처럼 쓸 수 있다.
+
+<details>
+<summary>옛 내용 (구현 전 초안 - 참고용, 더 이상 최신 권고 아님)</summary>
 
 `code-docker-external`은 `internal: false`라서, 도커 기본 브리지 동작상 **컨테이너가
 호스트가 라우팅 가능한 어디로든(인터넷 + 호스트가 속한 사설 LAN 전부) 아웃바운드로
@@ -112,6 +134,8 @@ privileged 컨테이너는 호스트와 같은 커널을 공유하므로, dind �
 3. **별도 VLAN/서브넷으로 물리적 분리** — 가장 근본적이지만 홈랩 규모에서는 라우터/
    스위치 설정까지 손대야 해서 비용이 크다. 여러 신뢰 안 되는 워크로드를 계속 돌릴
    계획이 아니면 우선순위 낮음.
+
+</details>
 
 ---
 
