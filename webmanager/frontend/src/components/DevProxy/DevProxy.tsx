@@ -87,6 +87,7 @@ function EditPanel({
               id={`dp-edit-api-target-${info.name}`}
               value={apiTarget}
               onChange={(e) => setApiTarget(e.target.value)}
+              placeholder="비워두면 위 target 사용"
             />
           </div>
           <label className="dev-proxy-checkbox-option">
@@ -304,7 +305,7 @@ export function DevProxy() {
               id="dp-api-target"
               value={apiTarget}
               onChange={(e) => setApiTarget(e.target.value)}
-              placeholder="127.0.0.1:5174"
+              placeholder="비워두면 위 target 사용"
             />
           </div>
           <label className="dev-proxy-checkbox-option">
