@@ -12,12 +12,12 @@ fi
 
 # See tailscale.md at the repo root for why userspace networking (no
 # NET_ADMIN/tun) is used, and how inbound/outbound forwarding work without it.
-mkdir -p /code/.tailscale/state
+mkdir -p /code/.local/share/code-docker/tailscale/state
 
 /usr/bin/tailscaled \
     --tun=userspace-networking \
     --socks5-server=localhost:1055 \
-    --state=/code/.tailscale/state/tailscaled.state &
+    --state=/code/.local/share/code-docker/tailscale/state/tailscaled.state &
 tailscaled_pid=$!
 
 # supervisord only signals this script's own PID, not its process group, so
@@ -63,9 +63,10 @@ done
 # ("로그인 시도하기") or the code-server sign-in banner's link to it - see
 # tailscale-notify.default.js and webmanager's /api/tailscale/login/start.
 # The marker lives inside state/ (not a sibling) so the documented "wipe
-# /code/.tailscale/state and restart" procedure for changing login servers
+# /code/.local/share/code-docker/tailscale/state and restart" procedure for
+# changing login servers
 # naturally re-arms this auto-attempt too, with no extra doc to keep in sync.
-LOGIN_ATTEMPTED_MARKER=/code/.tailscale/state/.login-attempted
+LOGIN_ATTEMPTED_MARKER=/code/.local/share/code-docker/tailscale/state/.login-attempted
 backend_state=$(tailscale status --json | yq -r '.BackendState')
 if [ "$backend_state" != "Running" ]; then
     if [ -e "$LOGIN_ATTEMPTED_MARKER" ]; then

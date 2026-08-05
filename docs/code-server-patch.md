@@ -1,6 +1,6 @@
 # 코드 서버 패치
 
-폰트나 css, js 를 커스텀으로 로드하고 싶은 경우 `/code/.server/patch` 폴더를 만들어 안에 css, js 를 만들어줄 수 있습니다.
+폰트나 css, js 를 커스텀으로 로드하고 싶은 경우 `/code/.local/share/code-docker/code/patch` 폴더를 만들어 안에 css, js 를 만들어줄 수 있습니다.
 
 ![image](https://github.com/user-attachments/assets/1cd9f7ad-d510-4d89-aa64-15524f68b4c5)
 
@@ -28,7 +28,7 @@ css, js 를 변경한 경우 코드 터미널에서 `restart` 를 입력하고, 
 ffmpeg 를 통해 특정 이미지를 크기를 변경하여 아이콘으로 적용하려면 다음을 수행하세요
 ```sh
 IMAGE=./myimage.png
-PATCH_FOLDER=/code/.server/patch
+PATCH_FOLDER=/code/.local/share/code-docker/code/patch
 
 mkdir -p "$PATCH_FOLDER/icons"
 ffmpeg -i "$IMAGE" -vf scale=512:512 "$PATCH_FOLDER/icons/pwa-icon-512.png"

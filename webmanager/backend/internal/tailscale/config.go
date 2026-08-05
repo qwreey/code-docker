@@ -1,4 +1,5 @@
-// Package tailscale reads and writes /code/.tailscale/config.yaml — the
+// Package tailscale reads and writes
+// /code/.local/share/code-docker/tailscale/config.yaml — the
 // forwards/publish config consumed by config/tailscale-forward.default.sh at
 // program start (see repo root CLAUDE.md's "tailscale" section). Every write
 // helper here only rewrites the fields it owns and leaves the rest of the

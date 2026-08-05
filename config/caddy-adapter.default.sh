@@ -9,7 +9,7 @@ if [ "${CADDY_ADAPTER_ENABLED:-true}" = "false" ]; then
     exec sleep infinity
 fi
 
-ADAPTER_DIR=/code/.caddy-adapter
+ADAPTER_DIR=/code/.local/share/code-docker/caddy-adapter
 mkdir -p "$ADAPTER_DIR/managed" "$ADAPTER_DIR/custom"
 
 # The top-level Caddyfile is entirely generated from env vars (just the

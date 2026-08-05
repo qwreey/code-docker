@@ -81,7 +81,7 @@ git 서버 자체)에 있어야 의미가 있음.
 ### 3. code-docker 기존 인프라와의 접점
 
 - **vector 파이프라인 재사용**: 이미 모든 supervisord program의
-  `stdout.log`를 태깅해서 `/code/.vector/logs/<date>.jsonl`로 만들고
+  `stdout.log`를 태깅해서 `/code/.local/share/code-docker/vector/logs/<date>.jsonl`로 만들고
   webmanager Logs 페이지가 그대로 읽음(루트 `CLAUDE.md` 참고). override
   패턴 그대로 새 supervisord program(예: `config/claude-audit-service.
   default.sh`)을 하나 추가해서 세션 트랜스크립트나 훅 출력을 정규화해

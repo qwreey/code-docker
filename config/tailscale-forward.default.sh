@@ -6,8 +6,8 @@ set -eu
 # loopback would get swept up by tailscaled's automatic same-port fallback
 # and re-exposed to the whole tailnet regardless of tailnet ACLs.
 
-CONFIG=/code/.tailscale/config.yaml
-mkdir -p /code/.tailscale
+CONFIG=/code/.local/share/code-docker/tailscale/config.yaml
+mkdir -p /code/.local/share/code-docker/tailscale
 if [ ! -e "$CONFIG" ]; then
     if [ -e /etc/code-docker/tailscale-config.override.yaml ]; then
         cp /etc/code-docker/tailscale-config.override.yaml "$CONFIG"

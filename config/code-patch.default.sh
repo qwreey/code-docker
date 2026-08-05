@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Seed /etc/code-docker/code-patch/*.default.* (each with an optional
-# matching *.override.*) into /code/.server/patch/<name>.* - code-server-
+# matching *.override.*) into
+# /code/.local/share/code-docker/code/patch/<name>.* - code-server-
 # autoinstall injects every top-level patch/*.js as a <script> on the
 # workbench page (see README's "코드 서버 패치").
 #
@@ -22,12 +23,13 @@
 # no prior hash on record for it yet, so the first run after upgrading just
 # starts tracking from whatever is live).
 #
-# Runs from code-service.default.sh, after install.sh, so /code/.server
-# (and its patch/ folder) actually exists by the time this runs.
+# Runs from code-service.default.sh, after install.sh, so
+# /code/.local/share/code-docker/code (and its patch/ folder) actually
+# exists by the time this runs.
 
 SOURCE_DIR=/etc/code-docker/code-patch
-TARGET_DIR=/code/.server/patch
-MANIFEST=/code/.server/.code-patch-manifest
+TARGET_DIR=/code/.local/share/code-docker/code/patch
+MANIFEST=/code/.local/share/code-docker/code/.code-patch-manifest
 mkdir -p "$TARGET_DIR"
 
 # Manifest format: one "<name>\t<hash>" per line (hash = sha1sum of the

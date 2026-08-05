@@ -26,7 +26,7 @@ supervisord 프로그램 목록 조회 및 start/stop/restart, 표준출력/표�
 
 ### Tailscale
 
-`/code/.tailscale/config.yaml`의 `forwards`/`publish` 항목 조회/추가/삭제
+`/code/.local/share/code-docker/tailscale/config.yaml`의 `forwards`/`publish` 항목 조회/추가/삭제
 (저장 시 `tailscale-forward` 자동 재시작 — `forward-reload`와 동일 효과). 로그인
 상태(URL/`backendState`, 피어 목록)를 읽기 전용으로 보여주고, 아직 로그인 시도가
 없는 상태라면 "로그인 시도하기" 버튼으로 `tailscale up`을 온디맨드로 트리거할 수
@@ -37,7 +37,7 @@ status --json`의 `CurAddr` 유무로 판별 — 비어있으면 릴레이 경�
 
 ### Dev Proxy
 
-`/code/.caddy-adapter/managed/*.caddy` 항목(expose) 조회/추가/삭제 — 이름(내부 식별자, 파일명 +
+`/code/.local/share/code-docker/caddy-adapter/managed/*.caddy` 항목(expose) 조회/추가/삭제 — 이름(내부 식별자, 파일명 +
 Caddyfile matcher 토큰으로만 쓰임)과 host(실제로 노출할 전체 도메인, 예: `dev.example.com`이나
 `*.staging.example.com`)로 먼저 expose를 만들고, 그 아래에 라우트(매치 path, target
 `host:port`, strip prefix, 리버스프록시 path, `route`/`handle` 매칭 방식, 라우트별 인증 요구)를
@@ -78,7 +78,8 @@ clamp됨)로 필터링해서 조회, 커서 기반 페이지네이션, 실시간
 
 ### Projects
 
-`$HOME/Projects` 아래 프로젝트별 용량, `node_modules`/`target` 등
+`$HOME/Projects`(`user-init`이 매 부팅마다 없으면 자동으로 만듭니다) 아래
+프로젝트별 용량, `node_modules`/`target` 등
 재생성 가능한 폴더 브레이크다운, 오래된 프로젝트 표시, 최근 편집순 정렬, 프로젝트별
 mise 사용 도구 목록, code-server로 바로 열기(같은 origin이면 자동으로 알아내고,
 `WEBMANAGER_CODE_SERVER_URL`을 설정하면 그 값을 우선함), 재생성 가능한 폴더
@@ -132,7 +133,7 @@ Supervisor의 프로그램별 로그 조회는 조회까지 통째로 게이트�
 `[프로그램명] ...` 형태로 라벨링해서 컨테이너 stdout으로 다시 흘려보냅니다 — 따라서
 `docker compose logs` 로도 이제 어느 program의 로그인지 구분됩니다([`vector.*.toml`](build-customization.md#vectortoml-vector-로그-파이프라인-설정)
 참고). webmanager의 로그 뷰어(Logs 페이지)도 vector가 함께 쓰는 구조화 로그
-(`/code/.vector/logs/*.jsonl`)를 읽어 실제 데이터를 보여줍니다(이전엔 목업 데이터였습니다).
+(`/code/.local/share/code-docker/vector/logs/*.jsonl`)를 읽어 실제 데이터를 보여줍니다(이전엔 목업 데이터였습니다).
 
 ## 보안: 자체 로그인 없음
 

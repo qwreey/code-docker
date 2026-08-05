@@ -5,9 +5,10 @@
 #     other program's stdout_logfile points at a real file instead of
 #     /dev/fd/1 - see supervisord.default.conf)
 #   - additionally write a structured JSONL copy per day under
-#     /code/.vector/logs/ for webmanager's Logs page to read directly
+#     /code/.local/share/code-docker/vector/logs/ for webmanager's Logs page
+#     to read directly
 
-data_dir = "/code/.vector/state"
+data_dir = "/code/.local/share/code-docker/vector/state"
 
 [sources.app_logs]
 type = "file"
@@ -36,10 +37,10 @@ include = ["/var/log/*/stdout.log*", "/var/log/*/stderr.log*"]
 fingerprint.strategy = "device_and_inode"
 
 # Extracts app_name from the tailed file's path, e.g.
-# "/var/log/code-server/stdout.log" (or a rotated "...stdout.log.1") ->
-# "code-server". Using the second-to-last path segment (rather than a fixed
-# index) keeps this correct regardless of rotation suffix and independent of
-# whether the path is absolute.
+# "/var/log/code/stdout.log" (or a rotated "...stdout.log.1") -> "code".
+# Using the second-to-last path segment (rather than a fixed index) keeps
+# this correct regardless of rotation suffix and independent of whether the
+# path is absolute.
 [transforms.tag_app_name]
 type = "remap"
 inputs = ["app_logs"]
@@ -157,6 +158,6 @@ encoding.codec = "text"
 [sinks.webmanager_logs]
 type = "file"
 inputs = ["filter_tailscaled"]
-path = "/code/.vector/logs/%Y-%m-%d.jsonl"
+path = "/code/.local/share/code-docker/vector/logs/%Y-%m-%d.jsonl"
 encoding.codec = "json"
 encoding.only_fields = ["timestamp", "app_name", "level", "message"]

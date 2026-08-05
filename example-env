@@ -144,8 +144,8 @@
 # file-watch chatter - "Loading configs", "Vector has started",
 # "Starting file server", "Loaded checkpoint data", etc). Doesn't
 # touch the actual log pipeline data it carries (other programs'
-# re-emitted stdout, /code/.vector/logs/*.jsonl) - see
-# vector.default.toml for that. "warn" mirrors nginx's own
+# re-emitted stdout, /code/.local/share/code-docker/vector/logs/*.jsonl) -
+# see vector.default.toml for that. "warn" mirrors nginx's own
 # `error_log ... warn;` above. Use "error" for even quieter, or
 # "info"/"debug" to restore the old chatter.
 #VECTOR_LOG_LEVEL="warn"

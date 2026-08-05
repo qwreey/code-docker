@@ -169,7 +169,7 @@ webmanager 자체 비밀번호 게이트를 켜는 방법과, 이미지를 업�
 
 # 코드 서버 패치
 
-폰트나 css, js 를 커스텀으로 로드하고 싶은 경우 `/code/.server/patch` 폴더를 만들어 안에 css, js 를 만들어줄 수 있습니다. PWA 이름/아이콘, 타이틀바 아이콘 변경 방법도 포함됩니다.
+폰트나 css, js 를 커스텀으로 로드하고 싶은 경우 `/code/.local/share/code-docker/code/patch` 폴더를 만들어 안에 css, js 를 만들어줄 수 있습니다. PWA 이름/아이콘, 타이틀바 아이콘 변경 방법도 포함됩니다.
 
 자세한 내용은 [code-server-patch.md](code-server-patch.md)를 확인하세요.
 

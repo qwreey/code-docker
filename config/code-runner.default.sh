@@ -23,4 +23,4 @@ case "$CODE_SERVER_BIND_ADDR" in
 esac
 
 eval $($HOME/.local/bin/mise env --shell bash)
-TARGET="/code/.server" exec /etc/code-docker/code-server-autoinstall/start.sh --bind-addr="$CODE_SERVER_BIND_ADDR"
+TARGET="/code/.local/share/code-docker/code" exec /etc/code-docker/code-server-autoinstall/start.sh --bind-addr="$CODE_SERVER_BIND_ADDR"

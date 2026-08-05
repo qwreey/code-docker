@@ -93,8 +93,8 @@ Terminal, mise)과 일관성 맞춤. **탭 이름/`<h1>` 제목만** 바꿨고, 
   경고를 계속 냄(CodeMirror/xterm.js는 이미 지연 로딩으로 분리됨, 주 번들
   자체가 기능이 늘면서 커짐). 에러 아니고 기능 지장도 없음 — 계속 커지면 탭
   단위 `React.lazy` 확대를 고려할 시점이 옴.
-- `/code/.vector/logs/*.jsonl` 보존기간(retention) 정책 없음 — 계속 쌓이기만
-  함, 오래전부터 알려진 갭.
+- `/code/.local/share/code-docker/vector/logs/*.jsonl` 보존기간(retention)
+  정책 없음 — 계속 쌓이기만 함, 오래전부터 알려진 갭.
 
 ## 검증 관련
 

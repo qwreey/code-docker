@@ -1,6 +1,7 @@
 // Package devproxy manages per-expose Caddyfile fragments under
-// /code/.caddy-adapter/managed/ — the "managed" half of the internal Caddy
-// instance config/caddy-adapter.default.sh starts (see docs/dev-proxy.md).
+// /code/.local/share/code-docker/caddy-adapter/managed/ — the "managed" half
+// of the internal Caddy instance config/caddy-adapter.default.sh starts (see
+// docs/dev-proxy.md).
 // One expose (a dev server reverse-proxied out to a wildcard subdomain) is
 // one *.caddy file, generated from a small structured template. Raw text
 // edits are also supported (the CodeEditor fallback in the frontend) — this
@@ -27,8 +28,8 @@ import (
 )
 
 const (
-	ManagedDir    = "/code/.caddy-adapter/managed"
-	CaddyfilePath = "/code/.caddy-adapter/Caddyfile"
+	ManagedDir    = "/code/.local/share/code-docker/caddy-adapter/managed"
+	CaddyfilePath = "/code/.local/share/code-docker/caddy-adapter/Caddyfile"
 	AdminAddr     = "localhost:2019"
 )
 

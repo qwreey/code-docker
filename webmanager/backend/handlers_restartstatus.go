@@ -9,7 +9,7 @@ import (
 )
 
 // currentCodeServerProc fetches code-server's live (pid, start) from
-// supervisord (the program is named "code-server" in
+// supervisord (the program is named "code" in
 // config/supervisord.default.conf). ok is false if supervisord can't be
 // reached or the process isn't known/running (Pid is 0 while stopped) —
 // either way, "we can't confirm it's still the same instance", which
@@ -21,7 +21,7 @@ func (s *Server) currentCodeServerProc(ctx context.Context) (pid int64, start in
 		return 0, 0, false
 	}
 	for _, p := range procs {
-		if p.Name == "code-server" {
+		if p.Name == "code" {
 			return p.Pid, p.Start, p.Pid != 0
 		}
 	}

@@ -91,20 +91,20 @@ shell out to `git`/`ssh-keygen`.
 | `SSH_CLIENT_CONFIG` | `/code/.ssh/config` | ssh client config (Host blocks) |
 | `SSH_KEYS_DIR` | `/code/.ssh/keys` | generated per-host ed25519 keypairs |
 | `GIT_CREDENTIALS_PATH` | `/code/.git-credentials` | HTTPS credential store file |
-| `TAILSCALE_CONFIG_PATH` | `/code/.tailscale/config.yaml` | tailscale forwards/publish config, read by `config/tailscale-forward.default.sh` |
+| `TAILSCALE_CONFIG_PATH` | `/code/.local/share/code-docker/tailscale/config.yaml` | tailscale forwards/publish config, read by `config/tailscale-forward.default.sh` |
 | `SSH_SIGNING_KEY_PATH` | `/code/.ssh/signing_key` | dedicated ed25519 keypair generated for git SSH commit signing |
-| `VECTOR_LOG_DIR` | `/code/.vector/logs` | directory of day-partitioned `<YYYY-MM-DD>.jsonl` log files written by the `vector` pipeline (see `.claude/archive/vector-logs-plan-done.md`) |
+| `VECTOR_LOG_DIR` | `/code/.local/share/code-docker/vector/logs` | directory of day-partitioned `<YYYY-MM-DD>.jsonl` log files written by the `vector` pipeline (see `.claude/archive/vector-logs-plan-done.md`) |
 | `SYSTEM_DISK_PATH` | `/code` | path `GET /api/system/resources` runs `statfs` on to report disk usage — `/code` is the bind-mounted volume (`./code:/code`), so this reflects real host disk usage for that mount |
 | `SYSTEM_DISK_BREAKDOWN_ROOT` | `/` | root path `GET /api/system/disk-breakdown` breaks down by top-level directory (see `internal/diskusage`) — deliberately `/` (the container's own root filesystem), not `SYSTEM_DISK_PATH` |
-| `WEBMANAGER_DISK_BREAKDOWN_CACHE_PATH` | `/code/.webmanager/disk-breakdown-cache.json` | cache file for the disk breakdown scan (only recomputed on `POST .../scan`, same convention as `WEBMANAGER_PROJECTS_CACHE_PATH`) |
+| `WEBMANAGER_DISK_BREAKDOWN_CACHE_PATH` | `/code/.local/share/code-docker/webmanager/disk-breakdown-cache.json` | cache file for the disk breakdown scan (only recomputed on `POST .../scan`, same convention as `WEBMANAGER_PROJECTS_CACHE_PATH`) |
 | `WEBMANAGER_STATIC_DIR` | `./static` | pre-built frontend assets (see below) |
 | `WEBMANAGER_CLAUDE_BINPATH` | *(none)* | absolute path to the `claude` (Claude Code CLI) binary; if unset, falls back to a `claude` lookup on `PATH`. Neither found means "not installed" — a normal state, not an error |
 | `CLAUDE_CONFIG_DIR` | `/code/.claude` | Claude Code's own standard env var for relocating `~/.claude`; webmanager reads `stats-cache.json` from directly under this directory and does not invent a separate `WEBMANAGER_`-prefixed equivalent |
-| `WEBMANAGER_CLAUDE_PREFS_PATH` | `/code/.webmanager/claude-prefs.json` | persisted `{hideVersionCheck}` toggle for the Claude tab's mise version-check banner (`internal/claudecode/prefs.go`) |
+| `WEBMANAGER_CLAUDE_PREFS_PATH` | `/code/.local/share/code-docker/webmanager/claude-prefs.json` | persisted `{hideVersionCheck}` toggle for the Claude tab's mise version-check banner (`internal/claudecode/prefs.go`) |
 | `WEBMANAGER_TAILSCALE_BINPATH` | *(none)* | absolute path to the `tailscale` binary; if unset, falls back to a `tailscale` lookup on `PATH`, same convention as `WEBMANAGER_CLAUDE_BINPATH` |
 | `WEBMANAGER_ENV_TEMPLATE_PATH` | `/etc/code-docker/webmanager/example-env.webmanager` | the `example-env.webmanager` template `--env-migrate` and the startup version check read — deliberately not `go:embed`'d so an operator running multiple instances can bind-mount their own org-customized template over this path instead of rebuilding the image. Set via `docker-compose.yml`, not `.env.webmanager` itself (see its comment there for why) |
 | `WEBMANAGER_ENV_VERSION` | *(none)* | `.env.webmanager`'s own `WEBMANAGER_ENV_VERSION` (set via `env_file`, not meant to be hand-edited — `--env-migrate` manages it). Compared at startup against the template's current version; a mismatch logs a warning and is surfaced by `GET /api/system/env-version` |
-| `WEBMANAGER_ENV_VERSION_DISMISS_PATH` | `/code/.webmanager/env-version-dismiss.json` | persisted "user has acknowledged this version's mismatch banner" flag (`internal/envversionprefs`) |
+| `WEBMANAGER_ENV_VERSION_DISMISS_PATH` | `/code/.local/share/code-docker/webmanager/env-version-dismiss.json` | persisted "user has acknowledged this version's mismatch banner" flag (`internal/envversionprefs`) |
 
 GPG-backed endpoints (`/api/git/gpg-keys*`) additionally depend on the `gpg`
 binary being on `PATH` (installed via `gnupg` in `config/build.default.sh`);

@@ -85,7 +85,7 @@ NAT면 이 변경은 의미 없음 — 먼저 확인 필요).
 2. **익스텐션 검색/URL 설치**(마켓플레이스 URL 붙여넣기 → open-vsx 교차 조회 →
    vsix 직접 설치 폴백) — 설계 완료, 미착수. `.claude/extension-search-plan.md`
 3. code-server 설정(settings.json 등) 편집 UI — 후순위, 타당성 재검토 필요(`ideas.md`)
-4. `/code/.vector/logs/*.jsonl` 보존기간(retention) 정책 없음 — 알려진 갭
+4. `/code/.local/share/code-docker/vector/logs/*.jsonl` 보존기간(retention) 정책 없음 — 알려진 갭
    (`.claude/archive/webmanager-review.md` (레포 루트) 참고), 문서 없음
 5. code-docker 도움말/가이드를 webmanager에 임베드 — 아이디어 단계, 착수 전
    질문 정리 완료. `.claude/research/guide-plan.md`

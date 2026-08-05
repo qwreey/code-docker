@@ -51,11 +51,11 @@ code-server 서비스 엔트리포인트입니다. code-server 의 업데이트/
 
 ### `code-config.*.yaml` (code-server 기본 설정)
 
-code-server 설정 파일입니다. **매 시작마다 `/code/.server/config.yaml`로 무조건 덮어써집니다** — 다른 override 패턴 파일들과 마찬가지로 완전히 파생된(derived) 파일이라, `/code/.server/config.yaml`을 직접 편집해도 다음 재시작에 사라집니다. 커스터마이징하려면 `code-config.override.yaml`을 만들고 재빌드하세요.
+code-server 설정 파일입니다. **매 시작마다 `/code/.local/share/code-docker/code/config.yaml`로 무조건 덮어써집니다** — 다른 override 패턴 파일들과 마찬가지로 완전히 파생된(derived) 파일이라, `/code/.local/share/code-docker/code/config.yaml`을 직접 편집해도 다음 재시작에 사라집니다. 커스터마이징하려면 `code-config.override.yaml`을 만들고 재빌드하세요.
 
 **`bind-addr`는 여기 넣지 마세요 — 넣어도 무시됩니다.** `code-runner.default.sh`가 항상 `--bind-addr` CLI 인자를 붙여서 실행하는데, code-server는 CLI 인자를 config.yaml 값보다 우선하므로 여기(default든 override든)에 뭘 적어도 그 값이 이깁니다. 실제 바인드 주소를 바꾸고 싶으면 `docker-compose.yml`의 `CODE_SERVER_BIND_ADDR`(기본값 `private:8080`, 전용 tailscale IP)을 바꾸세요 — nginx의 upstream 대상도 같은 값을 따라가므로(`nginx-service.default.sh`) 라우팅이 어긋날 걱정 없이 이거 하나만 바꾸면 됩니다. `127.0.0.1`/`0.0.0.0` 대신 `private`가 기본인 이유는 [tailscale 문서의 보안 절](tailscale.md#보안-tailnet-acl-설정) 참고 — loopback에 바인드하면 tailscaled가 같은 포트로 tailnet 전체에 자동 노출해버립니다.
 
-여기의 각 요소는 /code/.server/code-server/bin/code-server --help 를 통해 확인해볼 수 있습니다. 각각의 인자 `--some=value` 는 `some: value` 로 작성할 수 있습니다.
+여기의 각 요소는 /code/.local/share/code-docker/code/code-server/bin/code-server --help 를 통해 확인해볼 수 있습니다. 각각의 인자 `--some=value` 는 `some: value` 로 작성할 수 있습니다.
 
 ### `recommendations.*.yaml` (추천 목록)
 
@@ -107,29 +107,29 @@ sshd 를 설정하고 실행합니다. 기본적으로 `/etc/ssh`는 적절한 �
 
 ### `tailscale-service.*.sh` (tailscaled 서비스)
 
-`tailscaled` 를 설정하고 실행합니다 (userspace networking 모드). 로그인 세션은 `/code/.tailscale/state` 에 영속되므로, `sshd-service.*.sh` 와 유사하게 재작성할 수 있습니다.
+`tailscaled` 를 설정하고 실행합니다 (userspace networking 모드). 로그인 세션은 `/code/.local/share/code-docker/tailscale/state` 에 영속되므로, `sshd-service.*.sh` 와 유사하게 재작성할 수 있습니다.
 
 ### `tailscale-forward.*.sh` (포트 포워딩)
 
-`/code/.tailscale/config.yaml` 을 읽어 `forwards`(socat + SOCKS5)/`publish`(`tailscale serve`) 를 구성하는 스크립트입니다. `tailscaled`/`tailscale-status` 와 별도 supervisord program 으로 등록되어 있어, 이 스크립트만 (`forward-reload` 로) 재시작해도 `tailscaled` 의 로그인 세션에는 영향을 주지 않습니다.
+`/code/.local/share/code-docker/tailscale/config.yaml` 을 읽어 `forwards`(socat + SOCKS5)/`publish`(`tailscale serve`) 를 구성하는 스크립트입니다. `tailscaled`/`tailscale-status` 와 별도 supervisord program 으로 등록되어 있어, 이 스크립트만 (`forward-reload` 로) 재시작해도 `tailscaled` 의 로그인 세션에는 영향을 주지 않습니다.
 
 ### `tailscale-status.*.sh` (로그인 상태 감시)
 
-`tailscale status --json` 를 주기적으로 확인해 로그인 필요 여부/URL을 `/code/.server/patch/tailscale/status.json` 에 기록하는 스크립트입니다 (`tailscale-notify.js` 가 폴링하는 대상). `tailscaled`/`tailscale-forward` 와도 별도 supervisord program 이라, 로그인이나 포워딩 상태와 무관하게 항상 동작합니다.
+`tailscale status --json` 를 주기적으로 확인해 로그인 필요 여부/URL을 `/code/.local/share/code-docker/code/patch/tailscale/status.json` 에 기록하는 스크립트입니다 (`tailscale-notify.js` 가 폴링하는 대상). `tailscaled`/`tailscale-forward` 와도 별도 supervisord program 이라, 로그인이나 포워딩 상태와 무관하게 항상 동작합니다.
 
 ### `tailscale-config.*.yaml` (tailscale 기본 설정)
 
-`/code/.tailscale/config.yaml` 이 아직 없을 때(최초 실행 시) 복사되는 기본값입니다. 이미 생성된 경우 `/code/.tailscale/config.yaml` 을 직접 수정하세요.
+`/code/.local/share/code-docker/tailscale/config.yaml` 이 아직 없을 때(최초 실행 시) 복사되는 기본값입니다. 이미 생성된 경우 `/code/.local/share/code-docker/tailscale/config.yaml` 을 직접 수정하세요.
 
 ### `code-patch.*.sh` (code-patch 심기 스크립트)
 
-`code-patch/` 폴더(아래 참고)의 내용을 `/code/.server/patch/` 로 심는 스크립트입니다. `user-init` 과 마찬가지로 매 부팅마다 항상 실행되지만, `user-init` 과는 별도로 `code-service.*.sh` 에서 (`install.sh` 로 실제 `/code/.server` 가 만들어진 *이후에*) 실행됩니다 - `user-init` 은 fish 설정 등 홈 폴더/셸 초기화를 위한 곳이라, code-server 내부(`/code/.server`)를 다루는 이 로직과는 관심사를 분리했습니다.
+`code-patch/` 폴더(아래 참고)의 내용을 `/code/.local/share/code-docker/code/patch/` 로 심는 스크립트입니다. `user-init` 과 마찬가지로 매 부팅마다 항상 실행되지만, `user-init` 과는 별도로 `code-service.*.sh` 에서 (`install.sh` 로 실제 `/code/.local/share/code-docker/code` 가 만들어진 *이후에*) 실행됩니다 - `user-init` 은 fish 설정 등 홈 폴더/셸 초기화를 위한 곳이라, code-server 내부(`/code/.local/share/code-docker/code`)를 다루는 이 로직과는 관심사를 분리했습니다.
 
 ### `code-patch/` (기본 제공 브라우저 패치 모음)
 
-code-docker 자체가 기본으로 제공하는 브라우저 패치들(현재는 tailscale 알림용 `tailscale-notify.js`/`cd-dialog.js`) 을 모아두는 폴더입니다. 이 폴더 안의 `<이름>.default.<확장자>` 파일은 각각 `/code/.server/patch/<이름>.<확장자>` 로 - 이미 그 이름의 파일이 없을 때만 - 복사됩니다 (`code-patch.*.sh` 가 매 부팅마다 확인). 같은 폴더에 `<이름>.override.<확장자>` 를 두면(다른 곳의 `*.override.*` 와 동일하게 gitignore 되어 커밋되지 않음) default 대신 그 파일이 복사됩니다. 이미 유저가 오버라이드해서 쓸 수 있는 파일들이라 폴더 이름에는 "default" 를 붙이지 않았습니다.
+code-docker 자체가 기본으로 제공하는 브라우저 패치들(현재는 tailscale 알림용 `tailscale-notify.js`/`cd-dialog.js`) 을 모아두는 폴더입니다. 이 폴더 안의 `<이름>.default.<확장자>` 파일은 각각 `/code/.local/share/code-docker/code/patch/<이름>.<확장자>` 로 - 이미 그 이름의 파일이 없을 때만 - 복사됩니다 (`code-patch.*.sh` 가 매 부팅마다 확인). 같은 폴더에 `<이름>.override.<확장자>` 를 두면(다른 곳의 `*.override.*` 와 동일하게 gitignore 되어 커밋되지 않음) default 대신 그 파일이 복사됩니다. 이미 유저가 오버라이드해서 쓸 수 있는 파일들이라 폴더 이름에는 "default" 를 붙이지 않았습니다.
 
-한 번 `/code/.server/patch/` 에 복사된 뒤에는 직접 수정해도 다음 부팅에 덮어써지지 않습니다 (다른 [코드 서버 패치](code-server-patch.md) 파일과 동일). 다만 이후 code-docker 버전에서 해당 `.default.` 파일이 아예 없어지면, 이전에 심어졌던 사본도 함께 삭제됩니다(`/code/.server/.code-patch-manifest` 로 추적).
+한 번 `/code/.local/share/code-docker/code/patch/` 에 복사된 뒤에는 직접 수정해도 다음 부팅에 덮어써지지 않습니다 (다른 [코드 서버 패치](code-server-patch.md) 파일과 동일). 다만 이후 code-docker 버전에서 해당 `.default.` 파일이 아예 없어지면, 이전에 심어졌던 사본도 함께 삭제됩니다(`/code/.local/share/code-docker/code/.code-patch-manifest` 로 추적).
 
 ### `shell.*` (기본 셸 지정)
 
@@ -156,8 +156,8 @@ webmanager 자체 비밀번호 게이트를 켜는 법도 별도로 정리되어
 
 ### `vector-service.*.sh` (vector 실행)
 
-`vector` 를 실행합니다. `vector.*.toml` 을 선택해 넘겨주는 것 외에는 `/code/.vector/state`
-(체크포인트), `/code/.vector/logs`(구조화 로그) 디렉토리를 미리 만드는 역할만 합니다.
+`vector` 를 실행합니다. `vector.*.toml` 을 선택해 넘겨주는 것 외에는 `/code/.local/share/code-docker/vector/state`
+(체크포인트), `/code/.local/share/code-docker/vector/logs`(구조화 로그) 디렉토리를 미리 만드는 역할만 합니다.
 
 vector 자신의 내부 진단 로그(설정 로드, 헬스체크, 파일 워처 시작/재개, 체크포인트
 로드, "Vector has started" 배너 등 — 아무 `[app_name]` 태그 없이 stdout에 그대로
@@ -165,7 +165,7 @@ vector 자신의 내부 진단 로그(설정 로드, 헬스체크, 파일 워처
 `warn`은 nginx의 `error_log ... warn;`과 같은 레벨로 맞춘 것으로, 위 잡음은 대부분
 사라지고 실제 파이프라인 문제(WARN 이상)만 남습니다. 이 값은 다른 프로그램들의
 로그를 실어나르는 파이프라인 데이터 자체(`console` sink 재출력,
-`/code/.vector/logs/*.jsonl`)와는 무관합니다 — 더 조용하게 하려면 `error`, 옛날
+`/code/.local/share/code-docker/vector/logs/*.jsonl`)와는 무관합니다 — 더 조용하게 하려면 `error`, 옛날
 동작으로 되돌리려면 `info`나 `debug`로 설정하세요.
 
 ### `vector.*.toml` (vector 로그 파이프라인 설정)
@@ -175,10 +175,10 @@ vector 자신의 내부 진단 로그(설정 로드, 헬스체크, 파일 워처
 이름(`app_name`)을 뽑아내고 메시지 내용으로 대략적인 로그 레벨(`level`)을 추정한 뒤 두 곳으로
 내보냅니다 — 라벨링된 형태(`[app_name] message`)로 다시 컨테이너 stdout에 재출력(`console`
 sink, `docker compose logs` 에서 프로그램 구분이 되도록 함)하고, 동시에
-`/code/.vector/logs/YYYY-MM-DD.jsonl` 로 하루 단위 구조화 로그 파일을 씁니다(`file` sink,
+`/code/.local/share/code-docker/vector/logs/YYYY-MM-DD.jsonl` 로 하루 단위 구조화 로그 파일을 씁니다(`file` sink,
 `{"timestamp","app_name","level","message"}` 4개 필드만 담은 JSON 한 줄 — webmanager의 로그
 뷰어가 여기서 직접 읽습니다). 로그 레벨은 메시지에 `error`/`warn` 등의 문자열이 포함되는지
-보는 대략적인 추정치일 뿐이라 정확한 파싱은 아닙니다. `/code/.vector/logs` 는 별도 보존 기간
+보는 대략적인 추정치일 뿐이라 정확한 파싱은 아닙니다. `/code/.local/share/code-docker/vector/logs` 는 별도 보존 기간
 정책 없이 계속 쌓이므로 필요하면 직접 정리하세요.
 
 `tailscaled`는 다른 프로그램들과 비교해 유독 시끄럽습니다 — 재시작 한 번에 DNS

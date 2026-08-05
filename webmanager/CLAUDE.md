@@ -297,7 +297,7 @@ decision).
   persistence for these, they're per-browser by design. Contrast with
   settings that should follow the user across devices or that another
   feature reads (e.g. terminal keybindings/themes), which go through a
-  backend-persisted JSON file under `/code/.webmanager/` instead (see
+  backend-persisted JSON file under `/code/.local/share/code-docker/webmanager/` instead (see
   `internal/terminalsettings` for the pattern: whole-document GET/PUT,
   atomic write via temp-file+rename).
 - **First-load skeleton**: any tab/panel's "no data yet" state should render

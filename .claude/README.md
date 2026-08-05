@@ -23,6 +23,11 @@
     각 기능의 `webmanager/.claude/*-plan-done.md`에 흡수됨. webmanager 전용
     내용이지만, "완료돼서 더 이상 안 바뀌는" archive 성격상 다른 webmanager
     문서들과 달리 여기(레포 루트 archive)에 둠.
+  - `home-structure-plan.md` — `$HOME`(`/code`)에 흩어져 있던 `.tailscale`,
+    `.vector`, `.webmanager`, `.server` 등을 `$HOME/.local/share/code-docker/`
+    단일 umbrella로 정리 + `user-init` 실행 위치/`set -e` 이전 +
+    `code-server` → `code` 네이밍 통일까지 구현 완료 — 현재 상태는 루트
+    `CLAUDE.md`, 판단 과정은 이 문서
 
 - **`backlog/`** — 아직 착수하지 않은 브레인스토밍/아이디어(webmanager에 국한되지
   않는 것). `archive/`와 달리 "완료된 것"이 아니라 "언젠가 할 수도 있는 것" — 실제로

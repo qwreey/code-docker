@@ -1,6 +1,6 @@
 # code-patch 위젯 컴포넌트 아이디어 (구현 전, 브레인스토밍)
 
-`window.CDDialog`(`config/code-patch/cd-dialog.default.js`)를 만들면서 확인한 패턴 - 상태를 `/code/.server/patch/<feature>/status.json` 같은 파일에 기록해두고, 브라우저 패치가 그걸 폴링해서 그려주는 방식 - 을 다른 곳에도 재사용할 수 있을지 아이디어만 정리한 문서. 구현 순서나 착수 여부는 아직 정하지 않음.
+`window.CDDialog`(`config/code-patch/cd-dialog.default.js`)를 만들면서 확인한 패턴 - 상태를 `/code/.local/share/code-docker/code/patch/<feature>/status.json` 같은 파일에 기록해두고, 브라우저 패치가 그걸 폴링해서 그려주는 방식 - 을 다른 곳에도 재사용할 수 있을지 아이디어만 정리한 문서. 구현 순서나 착수 여부는 아직 정하지 않음.
 
 ## 이미 있는 것
 
@@ -45,7 +45,7 @@
 
 ## 데이터 소스 확장 아이디어
 
-지금은 `tailscale-status.default.sh` 하나가 `tailscale/status.json` 하나를 씀. 위 아이디어들을 실제로 만들려면 비슷한 "상태 기록자" supervisord 프로그램이 기능별로 하나씩 더 필요해질 수 있음 (`tailscale-status.default.sh` 를 만들 때 그랬듯, 폴링 대상 프로그램과 상태 기록 책임을 분리하는 편이 나음 - `tailscale-forward`/`tailscale-status` 분리했던 이유와 동일). 각 상태 파일은 `/code/.server/patch/<feature>/status.json` 형태로 두면 패치 스크립트 쪽에서 fetch 경로가 일관됨.
+지금은 `tailscale-status.default.sh` 하나가 `tailscale/status.json` 하나를 씀. 위 아이디어들을 실제로 만들려면 비슷한 "상태 기록자" supervisord 프로그램이 기능별로 하나씩 더 필요해질 수 있음 (`tailscale-status.default.sh` 를 만들 때 그랬듯, 폴링 대상 프로그램과 상태 기록 책임을 분리하는 편이 나음 - `tailscale-forward`/`tailscale-status` 분리했던 이유와 동일). 각 상태 파일은 `/code/.local/share/code-docker/code/patch/<feature>/status.json` 형태로 두면 패치 스크립트 쪽에서 fetch 경로가 일관됨.
 
 ## 우선순위 (제안)
 

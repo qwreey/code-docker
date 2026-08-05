@@ -15,7 +15,7 @@ fi
 # browser notification instead of only appearing in `docker compose logs`.
 # Runs independently of tailscaled's login state and tailscale-forward's
 # forwards/publish setup, so neither has to care about this.
-STATUS_FILE=/code/.server/patch/tailscale/status.json
+STATUS_FILE=/code/.local/share/code-docker/code/patch/tailscale/status.json
 write_status() {
     status=$(tailscale status --json 2>/dev/null) || return 0
     mkdir -p "$(dirname "$STATUS_FILE")"

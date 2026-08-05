@@ -1,28 +1,23 @@
 #!/bin/bash
 
-# Run user init script
-if [ -e /etc/code-docker/user-init.override.sh ]; then
-    /etc/code-docker/user-init.override.sh
-else
-    /etc/code-docker/user-init.default.sh
-fi
-
 # Update code server
-mkdir -p /code/.server
-TARGET="/code/.server" /etc/code-docker/code-server-autoinstall/install.sh
+mkdir -p /code/.local/share/code-docker/code
+TARGET="/code/.local/share/code-docker/code" /etc/code-docker/code-server-autoinstall/install.sh
 
 # Regenerated every start (not just once) - this file is fully derived, same
 # as every other override-pattern file. Customize via
 # code-config.override.yaml + rebuild, never by hand-editing the copy under
-# /code/.server directly (it would just get overwritten on next start).
+# /code/.local/share/code-docker/code directly (it would just get overwritten
+# on next start).
 if [ -e /etc/code-docker/code-config.override.yaml ]; then
-    cp /etc/code-docker/code-config.override.yaml /code/.server/config.yaml
+    cp /etc/code-docker/code-config.override.yaml /code/.local/share/code-docker/code/config.yaml
 else
-    cp /etc/code-docker/code-config.default.yaml  /code/.server/config.yaml
+    cp /etc/code-docker/code-config.default.yaml  /code/.local/share/code-docker/code/config.yaml
 fi
 
 # Seed code-docker's own default browser patches. Runs every start, like
-# user-init, but must come after install.sh so /code/.server/patch exists.
+# user-init, but must come after install.sh so
+# /code/.local/share/code-docker/code/patch exists.
 if [ -e /etc/code-docker/code-patch.override.sh ]; then
     /etc/code-docker/code-patch.override.sh
 else

@@ -148,7 +148,7 @@ func loadConfig() Config {
 		SSHKnownHostsPath:   getenv("WEBMANAGER_SSH_KNOWN_HOSTS_PATH", "/code/.ssh/known_hosts"),
 		GitCredentialsPath:  getenv("GIT_CREDENTIALS_PATH", "/code/.git-credentials"),
 		StaticDir:           getenv("WEBMANAGER_STATIC_DIR", "./static"),
-		TailscaleConfigPath: getenv("TAILSCALE_CONFIG_PATH", "/code/.tailscale/config.yaml"),
+		TailscaleConfigPath: getenv("TAILSCALE_CONFIG_PATH", "/code/.local/share/code-docker/tailscale/config.yaml"),
 		TailscaleBinPath:    getenv("WEBMANAGER_TAILSCALE_BINPATH", ""),
 		// Same env var tailscale-service.default.sh reads, so an on-demand
 		// `tailscale up` triggered from here uses the same login server.
@@ -158,17 +158,17 @@ func loadConfig() Config {
 		// MagicDNS hostname the automatic first-boot attempt would have used.
 		TailscaleHostname:    getenv("TAILSCALE_HOSTNAME", ""),
 		SSHSigningKeyPath:    getenv("SSH_SIGNING_KEY_PATH", "/code/.ssh/signing_key"),
-		VectorLogDir:         getenv("VECTOR_LOG_DIR", "/code/.vector/logs"),
+		VectorLogDir:         getenv("VECTOR_LOG_DIR", "/code/.local/share/code-docker/vector/logs"),
 		SystemDiskPath:       getenv("SYSTEM_DISK_PATH", "/code"),
 		ClaudeBinPath:        getenv("WEBMANAGER_CLAUDE_BINPATH", ""),
 		ClaudeConfigDir:      getenv("CLAUDE_CONFIG_DIR", "/code/.claude"),
-		ClaudePrefsPath:      getenv("WEBMANAGER_CLAUDE_PREFS_PATH", "/code/.webmanager/claude-prefs.json"),
+		ClaudePrefsPath:      getenv("WEBMANAGER_CLAUDE_PREFS_PATH", "/code/.local/share/code-docker/webmanager/claude-prefs.json"),
 		MiseBinPath:          getenv("WEBMANAGER_MISE_BINPATH", ""),
 		ProjectsPaths:        getenv("WEBMANAGER_PROJECTS_PATH", "/code/Projects"),
-		ProjectsCachePath:    getenv("WEBMANAGER_PROJECTS_CACHE_PATH", "/code/.webmanager/projects-cache.json"),
+		ProjectsCachePath:    getenv("WEBMANAGER_PROJECTS_CACHE_PATH", "/code/.local/share/code-docker/webmanager/projects-cache.json"),
 		ProjectsStaleAfter:   getenv("WEBMANAGER_PROJECTS_STALE_AFTER", "1h"),
 		ProjectsOldDays:      getenv("WEBMANAGER_PROJECTS_OLD_DAYS", "90"),
-		ProjectsPatternsPath: getenv("WEBMANAGER_PROJECTS_PATTERNS_PATH", "/code/.webmanager/projects-patterns.yaml"),
+		ProjectsPatternsPath: getenv("WEBMANAGER_PROJECTS_PATTERNS_PATH", "/code/.local/share/code-docker/webmanager/projects-patterns.yaml"),
 		CodeServerURL:        getenv("WEBMANAGER_CODE_SERVER_URL", ""),
 
 		// Defaults to wherever CODE_SERVER_BIND_ADDR (code-runner.default.sh)
@@ -181,9 +181,9 @@ func loadConfig() Config {
 
 		RecommendationsDefaultPath:  getenv("WEBMANAGER_RECOMMENDATIONS_DEFAULT_PATH", "/etc/code-docker/recommendations.default.yaml"),
 		RecommendationsOverridePath: getenv("WEBMANAGER_RECOMMENDATIONS_OVERRIDE_PATH", "/etc/code-docker/recommendations.override.yaml"),
-		CodeServerBinPath:           getenv("WEBMANAGER_CODE_SERVER_BIN", "/code/.server/code-server/bin/code-server"),
-		CodeServerUserDataDir:       getenv("WEBMANAGER_CODE_SERVER_USER_DATA_DIR", "/code/.server/user-data"),
-		CodeServerExtensionsDir:     getenv("WEBMANAGER_CODE_SERVER_EXTENSIONS_DIR", "/code/.server/extensions"),
+		CodeServerBinPath:           getenv("WEBMANAGER_CODE_SERVER_BIN", "/code/.local/share/code-docker/code/code-server/bin/code-server"),
+		CodeServerUserDataDir:       getenv("WEBMANAGER_CODE_SERVER_USER_DATA_DIR", "/code/.local/share/code-docker/code/user-data"),
+		CodeServerExtensionsDir:     getenv("WEBMANAGER_CODE_SERVER_EXTENSIONS_DIR", "/code/.local/share/code-docker/code/extensions"),
 
 		SupervisorMetadataDefaultPath:  getenv("WEBMANAGER_SUPERVISOR_METADATA_DEFAULT_PATH", "/etc/code-docker/supervisor-metadata.default.yaml"),
 		SupervisorMetadataOverridePath: getenv("WEBMANAGER_SUPERVISOR_METADATA_OVERRIDE_PATH", "/etc/code-docker/supervisor-metadata.override.yaml"),
@@ -194,20 +194,20 @@ func loadConfig() Config {
 		FilesRoot:           getenv("WEBMANAGER_FILES_ROOT", "/code"),
 		FilesMaxUploadBytes: getenv("WEBMANAGER_FILES_MAX_UPLOAD_BYTES", "2147483648"),
 
-		TerminalSettingsPath: getenv("WEBMANAGER_TERMINAL_SETTINGS_PATH", "/code/.webmanager/terminal-settings.json"),
-		TerminalProfilesPath: getenv("WEBMANAGER_TERMINAL_PROFILES_PATH", "/code/.webmanager/terminal-profiles.json"),
-		SidebarOrderPath:     getenv("WEBMANAGER_SIDEBAR_ORDER_PATH", "/code/.webmanager/sidebar-order.json"),
+		TerminalSettingsPath: getenv("WEBMANAGER_TERMINAL_SETTINGS_PATH", "/code/.local/share/code-docker/webmanager/terminal-settings.json"),
+		TerminalProfilesPath: getenv("WEBMANAGER_TERMINAL_PROFILES_PATH", "/code/.local/share/code-docker/webmanager/terminal-profiles.json"),
+		SidebarOrderPath:     getenv("WEBMANAGER_SIDEBAR_ORDER_PATH", "/code/.local/share/code-docker/webmanager/sidebar-order.json"),
 
 		DiskBreakdownRoot:      getenv("SYSTEM_DISK_BREAKDOWN_ROOT", "/"),
-		DiskBreakdownCachePath: getenv("WEBMANAGER_DISK_BREAKDOWN_CACHE_PATH", "/code/.webmanager/disk-breakdown-cache.json"),
+		DiskBreakdownCachePath: getenv("WEBMANAGER_DISK_BREAKDOWN_CACHE_PATH", "/code/.local/share/code-docker/webmanager/disk-breakdown-cache.json"),
 
 		TerminalSessionIdleTimeout:     getenv("WEBMANAGER_TERMINAL_SESSION_IDLE_TIMEOUT", "30m"),
 		TerminalSessionScrollbackBytes: getenv("WEBMANAGER_TERMINAL_SESSION_SCROLLBACK_BYTES", "262144"),
 
 		EnvTemplatePath:       getenv("WEBMANAGER_ENV_TEMPLATE_PATH", "/etc/code-docker/webmanager/example-env.webmanager"),
 		EnvVersion:            getenv("WEBMANAGER_ENV_VERSION", ""),
-		EnvVersionDismissPath: getenv("WEBMANAGER_ENV_VERSION_DISMISS_PATH", "/code/.webmanager/env-version-dismiss.json"),
+		EnvVersionDismissPath: getenv("WEBMANAGER_ENV_VERSION_DISMISS_PATH", "/code/.local/share/code-docker/webmanager/env-version-dismiss.json"),
 
-		RestartStatusPath: getenv("WEBMANAGER_RESTART_STATUS_PATH", "/code/.webmanager/restart-status.json"),
+		RestartStatusPath: getenv("WEBMANAGER_RESTART_STATUS_PATH", "/code/.local/share/code-docker/webmanager/restart-status.json"),
 	}
 }
