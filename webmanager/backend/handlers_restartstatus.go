@@ -8,40 +8,43 @@ import (
 	"webmanager/internal/restartstatus"
 )
 
-// currentCodeServerPid fetches code-server's live PID from supervisord (the
-// program is named "code-server" in config/supervisord.default.conf). ok is
-// false if supervisord can't be reached or the process isn't known/running
-// (Pid is 0 while stopped) — either way, "we can't confirm it's still the
-// same instance", which markRestartDirty/handleRestartStatus both treat as
-// "not dirty" rather than risking a stuck-forever banner.
-func (s *Server) currentCodeServerPid(ctx context.Context) (int64, bool) {
+// currentCodeServerProc fetches code-server's live (pid, start) from
+// supervisord (the program is named "code-server" in
+// config/supervisord.default.conf). ok is false if supervisord can't be
+// reached or the process isn't known/running (Pid is 0 while stopped) —
+// either way, "we can't confirm it's still the same instance", which
+// markRestartDirty/handleRestartStatus both treat as "not dirty" rather than
+// risking a stuck-forever banner.
+func (s *Server) currentCodeServerProc(ctx context.Context) (pid int64, start int64, ok bool) {
 	procs, err := s.sup.GetAllProcessInfo(ctx)
 	if err != nil {
-		return 0, false
+		return 0, 0, false
 	}
 	for _, p := range procs {
 		if p.Name == "code-server" {
-			return p.Pid, p.Pid != 0
+			return p.Pid, p.Start, p.Pid != 0
 		}
 	}
-	return 0, false
+	return 0, 0, false
 }
 
-// markRestartDirty records the current code-server PID as "dirty since" —
-// called after a mise tool install/uninstall, a Claude Code install/update,
-// or a code-server extension install/uninstall completes successfully.
-// Deliberately takes no context from the triggering request: mise/claude
-// installs run as background jobs (see mise.JobStore.StartWithCallback)
-// whose completion callback fires well after the original request's context
-// has already been canceled. A failure to determine the current PID or to
-// persist the state is logged, not surfaced — this is a best-effort UX
-// nicety, not something that should ever fail the install/uninstall itself.
+// markRestartDirty records the current code-server (pid, start) as "dirty
+// since" — called after a mise tool install/uninstall, a Claude Code
+// install/update, or a code-server extension install/uninstall completes
+// successfully. Deliberately takes no context from the triggering request:
+// mise/claude installs run as background jobs (see
+// mise.JobStore.StartWithCallback) whose completion callback fires well
+// after the original request's context has already been canceled. A failure
+// to determine the current process info or to persist the state is logged,
+// not surfaced — this is a best-effort UX nicety, not something that should
+// ever fail the install/uninstall itself.
 func (s *Server) markRestartDirty() {
-	pid, ok := s.currentCodeServerPid(context.Background())
+	pid, start, ok := s.currentCodeServerProc(context.Background())
 	if !ok {
 		return
 	}
-	if err := restartstatus.Save(s.cfg.RestartStatusPath, restartstatus.State{DirtySincePid: pid}); err != nil {
+	state := restartstatus.State{DirtySincePid: pid, DirtySinceStart: start}
+	if err := restartstatus.Save(s.cfg.RestartStatusPath, state); err != nil {
 		log.Printf("markRestartDirty: %v", err)
 	}
 }
@@ -71,7 +74,7 @@ func (s *Server) handleRestartStatus(w http.ResponseWriter, r *http.Request) {
 
 	dirty := false
 	if state.DirtySincePid != 0 {
-		if pid, ok := s.currentCodeServerPid(r.Context()); ok && pid == state.DirtySincePid {
+		if pid, start, ok := s.currentCodeServerProc(r.Context()); ok && pid == state.DirtySincePid && start == state.DirtySinceStart {
 			dirty = true
 		}
 	}

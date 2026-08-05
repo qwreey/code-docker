@@ -3,16 +3,27 @@
 // local-state prompt shown right after a mise/extension install finishes
 // (see webmanager/frontend/src/components/Mise/JobPanel.tsx's history).
 //
-// The stored state is just the code-server PID observed at the moment a
-// mutation that affects it (mise tool install/uninstall, Claude Code
-// install/update, code-server extension install/uninstall) completed.
-// GET /api/system/restart-needed (handlers_restartstatus.go) compares that
-// stored PID against code-server's *current* PID (fetched live from
-// supervisord): still equal means code-server hasn't restarted since, so a
-// restart is still needed; different (or code-server can't be found at all)
+// The stored state is the code-server PID *and* its supervisord-reported
+// start time observed at the moment a mutation that affects it (mise tool
+// install/uninstall, Claude Code install/update, code-server extension
+// install/uninstall) completed. GET /api/system/restart-needed
+// (handlers_restartstatus.go) compares that stored (pid, start) pair against
+// code-server's *current* (pid, start) (fetched live from supervisord): both
+// still equal means code-server hasn't restarted since, so a restart is
+// still needed; either differing (or code-server can't be found at all)
 // means it has, so the flag self-clears with no explicit "clear" call
 // needed. This also correctly ignores restarts triggered by something other
 // than webmanager (e.g. `restart` run by hand in a terminal).
+//
+// PID alone isn't enough: a full container restart (`docker compose
+// down/up`, as opposed to a supervisord-scoped `restart`) resets the
+// container's PID namespace, and since config/supervisord.default.conf
+// starts programs in a fixed order every boot, code-server is very likely to
+// be assigned the exact same PID it had before the restart — a stale
+// DirtySincePid from before the reboot would then coincidentally match the
+// brand-new process and wrongly report dirty forever. Pairing PID with
+// supervisord's process start timestamp makes that collision practically
+// impossible.
 package restartstatus
 
 import (
@@ -24,7 +35,8 @@ import (
 // State is the full persisted blob. DirtySincePid is 0 when nothing has
 // marked a restart as needed yet.
 type State struct {
-	DirtySincePid int64 `json:"dirtySincePid"`
+	DirtySincePid   int64 `json:"dirtySincePid"`
+	DirtySinceStart int64 `json:"dirtySinceStart"`
 }
 
 // Load reads state from path. A missing file is not an error — it just
