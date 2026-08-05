@@ -38,6 +38,23 @@ else
 fi
 export NGINX_ALLOWED_HOSTS_MAP="$map_body"
 
+# ALLOWED_EXPORT_HOSTS (docker-compose.yml, comma-separated, empty by
+# default) - same logic as ALLOWED_HOSTS above, but for the /exports/
+# location's own `map $host $code_docker_export_host_allowed { ... }` body
+# (Dev Proxy, see docs/dev-proxy.md).
+if [ -n "${ALLOWED_EXPORT_HOSTS:-}" ]; then
+    export_map_body="default 0;"
+    IFS=',' read -ra allowed_export_hosts <<< "$ALLOWED_EXPORT_HOSTS"
+    for host in "${allowed_export_hosts[@]}"; do
+        host="$(echo "$host" | xargs)"
+        [ -n "$host" ] && export_map_body="$export_map_body
+    \"$host\" 1;"
+    done
+else
+    export_map_body="default 1;"
+fi
+export NGINX_ALLOWED_EXPORT_HOSTS_MAP="$export_map_body"
+
 # NGINX_BLOCK_LOOPBACK (docker-compose.yml, default "true") becomes
 # nginx.*.conf's `map $server_addr $code_docker_loopback_blocked { ... }`
 # body. "true" (default) blocks requests accepted on 127.0.0.1 (tailscale's
@@ -77,12 +94,20 @@ export NGINX_TRUSTED_PROXIES_DIRECTIVES="$directives"
 export NGINX_CODE_SERVER_UPSTREAM="${CODE_SERVER_BIND_ADDR:-private:8080}"
 export NGINX_WEBMANAGER_UPSTREAM="${WEBMANAGER_ADDR:-private:81}"
 
+# caddy-adapter (Dev Proxy, see docs/dev-proxy.md) binds all interfaces
+# inside the container (config/caddy-adapter.default.sh) - nginx and
+# caddy-adapter are the same container, so 127.0.0.1 always reaches it
+# regardless of whether 8082 is also published to the host, unlike
+# CODE_SERVER_BIND_ADDR/WEBMANAGER_ADDR above which need the `private`
+# alias dance for tailscale-loopback-forward reasons.
+export NGINX_CADDY_ADAPTER_UPSTREAM="127.0.0.1:${CADDY_ADAPTER_PORT:-8082}"
+
 # nginx config files don't do their own env-var substitution, so the chosen
 # conf is rendered through envsubst first (gettext, already pulled in by
 # base-devel - see build.default.sh) into a runtime copy. Restricted to just
 # these variable names so nginx's own $status/$loggable/$host/etc. in the
 # template pass through untouched instead of being blanked out.
 generated_config=/run/nginx.generated.conf
-envsubst '${NGINX_ACCESS_LOG_IF} ${NGINX_ALLOWED_HOSTS_MAP} ${NGINX_LOOPBACK_BLOCK_MAP} ${NGINX_TRUSTED_PROXIES_DIRECTIVES} ${NGINX_CODE_SERVER_UPSTREAM} ${NGINX_WEBMANAGER_UPSTREAM}' < "$nginx_config" > "$generated_config"
+envsubst '${NGINX_ACCESS_LOG_IF} ${NGINX_ALLOWED_HOSTS_MAP} ${NGINX_ALLOWED_EXPORT_HOSTS_MAP} ${NGINX_LOOPBACK_BLOCK_MAP} ${NGINX_TRUSTED_PROXIES_DIRECTIVES} ${NGINX_CODE_SERVER_UPSTREAM} ${NGINX_WEBMANAGER_UPSTREAM} ${NGINX_CADDY_ADAPTER_UPSTREAM}' < "$nginx_config" > "$generated_config"
 
 exec nginx -g "daemon off;" -c "$generated_config"

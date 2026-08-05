@@ -28,9 +28,79 @@
 
 ## 바깥 리버스 프록시 연결하기
 
-code-docker 자체는 `CADDY_ADAPTER_PORT`(기본 8082)를 컨테이너 밖에 직접 열어주지 않습니다 (`docker-compose.yml`의 `8082:8082`는 기본 주석 처리) — 80번 포트와 마찬가지로, 바깥 리버스 프록시가 이 포트로 원하는 도메인(들)을 넘겨주는 구성을 권장합니다. caddy-adapter 자신은 Host 값을 가리지 않으므로, expose에 등록해둔 host와 실제로 여기까지 들어오는 요청의 Host 헤더가 일치하기만 하면 됩니다.
+### 기본: nginx의 `/exports/`를 경유 (권장)
 
-Caddy 예시 (도메인 하나):
+code-docker는 이미 80번 포트에서 in-container nginx가 code-server(`/`)와
+webmanager(`/manager`)를 합쳐서 서빙합니다 — Dev Proxy도 별도 포트를 새로
+열기보다 이 80번을 그대로 재사용하는 게 기본 권장 경로입니다. 이렇게 하면
+code-docker 컨테이너 하나가 바깥에 노출해야 하는 포트가 80 하나로 끝나고,
+바깥 방화벽/보안그룹/tailnet ACL도 그 하나만 신경 쓰면 됩니다.
+
+방법은 간단합니다 — 바깥 프록시가 dev-proxy로 보낼 요청의 **path 앞에만
+`/exports`를 붙이고, Host는 그대로 둔 채** 80번 포트로 보내면, 컨테이너 안
+nginx가 `/exports`를 벗겨내고 내부 Caddy(`caddy-adapter`)로 넘깁니다. Host가
+그대로 전달되므로 `caddy-adapter`의 expose별 Host 매칭은 전혀 손댈 필요가
+없고, dev 서버도 `/exports`를 보지 않으므로(nginx가 이미 벗긴 뒤) base
+path를 따로 맞출 필요도 없습니다:
+
+```
+브라우저 → Host: dev.example.com, path: /api
+바깥 Caddy → rewrite로 path 앞에 /exports 추가 (Host는 그대로) → ctip:80
+in-container nginx → /exports 벗김 (Host는 그대로) → caddy-adapter
+caddy-adapter → 기존과 동일하게 Host로 expose를 찾아 dev 서버로 전달
+```
+
+Caddy 예시 (도메인 하나, `containerip:80`은 code-server/webmanager와 동일한
+그 IP·포트입니다):
+
+```caddyfile
+dev.example.com {
+	rewrite / /exports{uri}
+	reverse_proxy http://containerip:80
+}
+```
+
+와일드카드 서브도메인 전체를 넘기고 싶다면(각 expose의 host를
+`이름.dev.example.com` 식으로 등록):
+
+```caddyfile
+*.dev.example.com {
+	rewrite / /exports{uri}
+	reverse_proxy http://containerip:80
+}
+```
+
+nginx를 바깥 프록시로 쓴다면:
+
+```nginx
+server {
+	server_name dev.example.com;
+	location / {
+		rewrite ^ /exports$request_uri break;
+		proxy_pass http://containerip:80;
+		proxy_set_header Host $host;
+	}
+}
+```
+
+`/exports`는 바깥 프록시와 code-docker의 nginx 사이에서만 쓰이는 내부
+표시일 뿐이라 브라우저 URL이나 dev 서버가 받는 경로에는 전혀 나타나지
+않습니다 — expose의 host 필드나 라우트 path/target 설정은 지금까지와
+완전히 동일하게 적으면 됩니다.
+
+`ALLOWED_EXPORT_HOSTS`(`example-env`, 기본 빈 값)로 `/exports/`가 받아들일
+Host를 code-server/webmanager용 `ALLOWED_HOSTS`와 별도로 제한할 수 있습니다
+— dev-proxy 도메인은 code-server 도메인보다 훨씬 자주 바뀌는 편이라 따로
+관리합니다.
+
+### 대안: `CADDY_ADAPTER_PORT`(기본 8082)를 직접 퍼블리시
+
+`docker-compose.yml`의 `8082:8082`(기본 주석 처리)를 열면, `/exports` 리라이트
+없이 예전처럼 caddy-adapter를 바깥에서 바로 볼 수 있습니다 — 컨테이너가
+export하는 포트가 하나 더 늘어나는 대신, 바깥 프록시 설정에 rewrite 한 줄을
+추가할 필요가 없습니다. caddy-adapter 자신은 Host 값을 가리지 않으므로,
+expose에 등록해둔 host와 실제로 여기까지 들어오는 요청의 Host 헤더가
+일치하기만 하면 됩니다.
 
 ```caddyfile
 dev.example.com {
@@ -38,31 +108,10 @@ dev.example.com {
 }
 ```
 
-와일드카드 서브도메인 전체를 이 인스턴스로 넘기고 싶다면(각 expose의 host를 `이름.dev.example.com` 식으로 등록):
+호스트 포트 퍼블리시 대신 같은 도커 네트워크에 바깥 프록시를 조인시켜
+컨테이너 이름으로 바로 붙는 배치도 가능합니다.
 
-```caddyfile
-*.dev.example.com {
-	reverse_proxy http://<container-ip>:8082
-}
-```
-
-서로 다른 도메인을 여러 개 등록했다면 바깥 프록시에도 그만큼의 사이트 블록(또는 nginx `server` 블록)을 추가하면 됩니다 — code-docker 쪽은 도메인 개수에 아무 제약이 없습니다.
-
-nginx 예시:
-
-```nginx
-server {
-	server_name dev.example.com;
-	location / {
-		proxy_pass http://<container-ip>:8082;
-		proxy_set_header Host $host;
-	}
-}
-```
-
-호스트 포트 퍼블리시(`8082:8082` 주석 해제) 대신 같은 도커 네트워크에 바깥 프록시를 조인시켜 컨테이너 이름으로 바로 붙는 배치도 가능합니다 — 어느 쪽이든 code-docker가 강제하지 않는, 여러분의 인프라 배치에 달린 선택입니다.
-
-> 호스트 포트 퍼블리시를 택했다면, [tailscale을 쓰는 경우 자동 노출에 주의하세요](tailscale.md#보안-tailnet-acl-설정) — `0.0.0.0`에 바인드된 포트는 tailscaled가 조건 없이 tailnet에도 재노출합니다. `CADDY_ADAPTER_PORT`도 sshd/code-server와 같은 카테고리이니 tailnet ACL grant에 포함시켜야 합니다.
+> 호스트 포트 퍼블리시를 택했다면, [tailscale을 쓰는 경우 자동 노출에 주의하세요](tailscale.md#보안-tailnet-acl-설정) — `0.0.0.0`에 바인드된 포트는 tailscaled가 조건 없이 tailnet에도 재노출합니다. `CADDY_ADAPTER_PORT`도 sshd/code-server와 같은 카테고리이니 tailnet ACL grant에 포함시켜야 합니다. 반대로 기본(`/exports` 경유) 방식은 caddy-adapter가 호스트에 전혀 퍼블리시되지 않으므로 이 문제 자체가 없습니다.
 
 ## 인증
 

@@ -53,6 +53,7 @@ services:
       NGINX_LOG_LEVEL: "${NGINX_LOG_LEVEL:-errors}"
       CODE_SERVER_BIND_ADDR: "${CODE_SERVER_BIND_ADDR:-private:8080}"
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-}"
+      ALLOWED_EXPORT_HOSTS: "${ALLOWED_EXPORT_HOSTS:-}"
       NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
@@ -105,11 +106,15 @@ services:
       # Uncomment this (and set WEBMANAGER_ADDR=:81 in .env.webmanager) only
       # if you want to bypass nginx and reach it directly on its own port.
       # - 81:81
-      # Internal Caddy dev-proxy listener (see docs/dev-proxy.md) - point
-      # your outer reverse proxy's wildcard subdomain block here instead of
-      # publishing it directly, same "reverse proxy in front" recommendation
-      # as port 80 above. Not published by default since exposure strategy
-      # is up to your own deployment (shared docker network vs host port).
+      # Internal Caddy dev-proxy listener (see docs/dev-proxy.md). The
+      # recommended default is to NOT publish this at all - your outer
+      # reverse proxy instead rewrites dev-proxy requests to prepend
+      # /exports/ and sends them to port 80 above, so this container only
+      # ever needs one published port total. Uncomment this only if you
+      # specifically want the older direct-subdomain-to-8082 routing
+      # instead (a second port, but no path-rewrite step on your outer
+      # proxy) - see "바깥 리버스 프록시 연결하기" in docs/dev-proxy.md for
+      # both options.
       # - 8082:8082
     volumes:
       - "${HOME_VOLUME:-./code}:/code"
