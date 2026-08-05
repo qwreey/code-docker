@@ -23,6 +23,14 @@
 "config에서도 제거" 체크박스 기본 해제, 진행 상황은 폴링 방식,
 `WEBMANAGER_MISE_BINPATH` 추가함.
 
+**mise 도구 검색/버전 선택** (완료, `.claude/archive/mise-search-plan-done.md`):
+검색어 최소 2글자(미만이면 API 호출 없이 안내만), registry 캐시는 파일
+아닌 인메모리 TTL(6시간) — 버전 목록(`ls-remote`)은 캐시 없이 매번 조회,
+버전 목록 UI는 콤보박스 대신 스크롤+필터, 설치 시작 후에는 검색
+다이얼로그를 닫고 mise 탭의 모든 job 액션(추천 설치 포함)이 공유하는
+하나의 top-level 진행 다이얼로그로 통일 — 전부 사용자가 이번 요청에서
+직접 결정.
+
 **파일 매니저** (완료): 업로드 상한 `WEBMANAGER_FILES_MAX_UPLOAD_BYTES` 기본
 2GiB, 디렉토리 zip 다운로드는 범위 밖(파일 단위만, 나중에 `archive/zip`으로
 저비용 추가 가능), 생성 시각 못 읽으면 "정확한 생성 시각 아님" 라벨과 함께

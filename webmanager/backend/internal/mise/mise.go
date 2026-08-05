@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -39,6 +40,13 @@ const defaultHomeDir = "/code"
 // verified that install/uninstall can involve real download time, so they
 // deliberately don't share this timeout.
 const readTimeout = 15 * time.Second
+
+// registryCacheTTL bounds how long a `mise registry --json` snapshot is
+// reused before the CLI is invoked again. The registry (995 entries as of
+// mise 2026.7.15) is effectively static within a run — this exists only so
+// a long-lived webmanager process eventually notices new tools a mise
+// self-update adds, not because the shell-out itself is slow.
+const registryCacheTTL = 6 * time.Hour
 
 // FindBinary resolves the `mise` binary path. override
 // (WEBMANAGER_MISE_BINPATH) takes priority when non-empty; otherwise it
@@ -253,4 +261,122 @@ func GetEnv(ctx context.Context, binPath, path string) (map[string]string, error
 		return nil, err
 	}
 	return env, nil
+}
+
+// RegistryEntry mirrors one `mise registry --json` array entry.
+type RegistryEntry struct {
+	Short       string   `json:"short"`
+	Backends    []string `json:"backends"`
+	Description string   `json:"description"`
+	Aliases     []string `json:"aliases"`
+}
+
+var registryCache struct {
+	mu        sync.Mutex
+	entries   []RegistryEntry
+	fetchedAt time.Time
+}
+
+// getRegistry returns the full `mise registry --json` list, served from
+// registryCache when a fetch happened within registryCacheTTL. Concurrent
+// cache-miss callers may each trigger their own shell-out (no singleflight)
+// — acceptable at this scale, not worth the extra machinery.
+func getRegistry(ctx context.Context, binPath string) ([]RegistryEntry, error) {
+	registryCache.mu.Lock()
+	if registryCache.entries != nil && time.Since(registryCache.fetchedAt) < registryCacheTTL {
+		entries := registryCache.entries
+		registryCache.mu.Unlock()
+		return entries, nil
+	}
+	registryCache.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, binPath, "registry", "--json")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var entries []RegistryEntry
+	if err := json.Unmarshal(out, &entries); err != nil {
+		return nil, err
+	}
+
+	registryCache.mu.Lock()
+	registryCache.entries = entries
+	registryCache.fetchedAt = time.Now()
+	registryCache.mu.Unlock()
+
+	return entries, nil
+}
+
+// SearchRegistry returns every registry entry whose short name, aliases, or
+// description contains query (case-insensitive substring match). Callers
+// are responsible for enforcing their own minimum query length — this
+// function runs the match unconditionally, including for an empty query
+// (which matches everything).
+func SearchRegistry(ctx context.Context, binPath, query string) ([]RegistryEntry, error) {
+	entries, err := getRegistry(ctx, binPath)
+	if err != nil {
+		return nil, err
+	}
+
+	q := strings.ToLower(query)
+	matches := make([]RegistryEntry, 0)
+	for _, e := range entries {
+		if strings.Contains(strings.ToLower(e.Short), q) || strings.Contains(strings.ToLower(e.Description), q) {
+			matches = append(matches, e)
+			continue
+		}
+		for _, alias := range e.Aliases {
+			if strings.Contains(strings.ToLower(alias), q) {
+				matches = append(matches, e)
+				break
+			}
+		}
+	}
+	return matches, nil
+}
+
+// rawRemoteVersion mirrors one `mise ls-remote --json` array entry.
+// created_at is intentionally not kept — doc-verified it's an unreliable
+// placeholder for older versions (many share the exact same timestamp), so
+// it's not fit to show a user; the array's own order (ascending) is the
+// only ordering signal ListRemoteVersions passes on.
+type rawRemoteVersion struct {
+	Version string `json:"version"`
+}
+
+// ListRemoteVersions runs `mise ls-remote <toolID> --json` and returns the
+// available versions in mise's own (ascending) order. Deliberately
+// uncached unlike SearchRegistry's registry snapshot — doc-measured at
+// under 0.3s even cold (mise does its own internal caching, see
+// `mise cache clean`), well inside readTimeout, so there's no latency
+// problem to solve here.
+func ListRemoteVersions(ctx context.Context, binPath, toolID string) ([]string, error) {
+	if err := ValidateToolID(toolID); err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, binPath, "ls-remote", toolID, "--json")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var raw []rawRemoteVersion
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil, err
+	}
+
+	versions := make([]string, len(raw))
+	for i, v := range raw {
+		versions[i] = v.Version
+	}
+	return versions, nil
 }

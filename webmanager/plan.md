@@ -33,7 +33,7 @@ tailscale IP, 레포 루트 `docs/tailscale.md` 참고 - tailnet 자동노출 �
 | Claude Code 상태 탭 M1(퀵 오버뷰)+M2(히트맵/주간그래프/모델별 토큰)+M3(Skills/Plugins) + 설치 버튼(mise 재사용)/mise 버전 확인·업데이트/버전 확인 무시 체크박스(백엔드 영속)/브라우저 내 로그인 자동화(`claude auth login` 서브프로세스 프록시, 파이프만으로 충분함을 실측 확인 — PTY 불필요) | `.claude/archive/claude-plan-done.md` (남은 M4~M5는 `.claude/claude-rework-v2.md`로 분리) |
 | code-server 익스텐션 추천/설치 (카테고리별 그룹핑, open-vsx "더 보기" 링크, 삭제(uninstall) 포함) | `.claude/archive/extensions-plan-done.md` |
 | 프로젝트 스캔/정리 1단계(용량/재생성 가능 폴더 탐지, 최근 편집 런처, mise 도구 표시)+2단계(재생성 가능 폴더 단위 삭제, 확인 다이얼로그 필수, 비밀번호 게이트) | `.claude/archive/projects-plan-done.md` |
-| mise 관리(install/use/uninstall, 설치된 도구 목록, env 미리보기, 추천 목록, 설정에서만 제거하고 바이너리는 유지하는 비활성화/재활성화 토글) | `.claude/archive/mise-plan-done.md` |
+| mise 관리(install/use/uninstall, 설치된 도구 목록, env 미리보기, 추천 목록, 설정에서만 제거하고 바이너리는 유지하는 비활성화/재활성화 토글) + 도구 검색(`mise registry --json`)/원격 버전 선택(`mise ls-remote --json`) 후 설치, mise 탭 모든 job 액션을 top-level 다이얼로그로 통일 | `.claude/archive/mise-plan-done.md` (도구 검색+버전 선택은 `.claude/archive/mise-search-plan-done.md`) |
 | 웹쉘(터미널) M1(임시 세션, xterm.js+PTY/WebSocket, 비밀번호 게이트 소급 적용됨) + M2(named 영속 세션, `internal/termsession`, 탭 UI/유지 토글/유휴 자동정리) + 모바일 레이아웃 재설계(키보드 추적, 엣지투엣지, 테마 동화 색상) | `.claude/archive/terminal-plan-done.md` |
 | 터미널 홈 탭(항상 열려있는 첫 탭 — 세션 목록 전환 + 시작 위치/실행 명령을 저장하는 프로파일 CRUD, 세션 생성 시 cwd/초기 명령 지원하도록 `internal/termsession` 확장, 데스크탑 가로 분할/카드형 목록/드래그앤드롭 정렬) | `.claude/archive/terminal-home-plan-done.md` |
 | 공용 비밀번호 게이트(`internal/authgate`, argon2id + ENV 전용 저장, 읽기 열림/쓰기 게이트 원칙으로 Git/SSH/Tailscale/Supervisor/Logs까지 확장, 터미널도 `RequiresUnlock`으로 완전히 감싸짐) | `.claude/archive/authgate-plan-done.md` |

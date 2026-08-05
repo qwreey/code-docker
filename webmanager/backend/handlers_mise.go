@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
+	"unicode/utf8"
 
 	"webmanager/internal/mise"
 )
@@ -210,6 +212,75 @@ func (s *Server) handleMiseEnv(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, miseEnvResponse{Env: env})
+}
+
+// minRegistryQueryLen is the shortest search query handleMiseRegistrySearch
+// accepts. Below this, a substring match against 995 registry entries'
+// short names/aliases/descriptions returns too much noise to be useful
+// (and a few real tool ids are exactly 2 characters — `jq`, `gh`, `go` —
+// so 1 is too short to ever usefully anchor a search). The frontend
+// enforces the same minimum before ever issuing the request; this is the
+// server-side backstop.
+const minRegistryQueryLen = 2
+
+// miseRegistrySearchResponse is GET /api/mise/registry/search's body.
+type miseRegistrySearchResponse struct {
+	Entries []mise.RegistryEntry `json:"entries"`
+}
+
+// handleMiseRegistrySearch searches `mise registry --json` (cached, see
+// internal/mise.SearchRegistry) for tools whose short name, aliases, or
+// description match q. mise not being installed degrades to an empty
+// result, matching handleListMiseTools/handleMiseEnv's convention.
+func (s *Server) handleMiseRegistrySearch(w http.ResponseWriter, r *http.Request) {
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if utf8.RuneCountInString(query) < minRegistryQueryLen {
+		writeError(w, http.StatusBadRequest, "query must be at least 2 characters")
+		return
+	}
+
+	binPath, ok := mise.FindBinary(s.cfg.MiseBinPath)
+	if !ok {
+		writeJSON(w, http.StatusOK, miseRegistrySearchResponse{Entries: []mise.RegistryEntry{}})
+		return
+	}
+
+	entries, err := mise.SearchRegistry(r.Context(), binPath, query)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, miseRegistrySearchResponse{Entries: entries})
+}
+
+// miseVersionsResponse is GET /api/mise/versions's body.
+type miseVersionsResponse struct {
+	Versions []string `json:"versions"`
+}
+
+// handleMiseVersions reports every remotely installable version of one
+// tool (`mise ls-remote <id> --json`), for the search dialog's version
+// picker. Uncached — see internal/mise.ListRemoteVersions's doc comment for
+// why that's fine.
+func (s *Server) handleMiseVersions(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if err := mise.ValidateToolID(id); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	binPath, ok := mise.FindBinary(s.cfg.MiseBinPath)
+	if !ok {
+		writeJSON(w, http.StatusOK, miseVersionsResponse{Versions: []string{}})
+		return
+	}
+
+	versions, err := mise.ListRemoteVersions(r.Context(), binPath, id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, miseVersionsResponse{Versions: versions})
 }
 
 // handleMiseJobStatus reports a background mise job's accumulated progress

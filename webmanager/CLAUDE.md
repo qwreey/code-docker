@@ -56,7 +56,19 @@ directory container disk breakdown in Task Manager (`internal/diskusage`,
 collapsible, installed-list section, an open-vsx "더 보기" link, a
 show/hide-recommendations toggle persisted in localStorage), Projects tab
 phase 1, mise management (same collapsible/toggle treatment as extensions,
-defaults inverted — mise categories start collapsed), web terminal M1+M2
+defaults inverted — mise categories start collapsed) plus a tool-search
+dialog (`Mise/ToolSearchDialog.tsx` — `GET /api/mise/registry/search`, a
+6h-TTL in-memory cache over `mise registry --json`'s ~1000 entries, explicit
+search-button/Enter trigger rather than debounce-as-you-type, min 2-char
+query; each result offers a quick one-click `latest` install or "버전 보기"
+into a scrollable/filterable `mise ls-remote --json` version picker,
+deliberately uncached since even a cold call is sub-second) and a shared
+top-level `Mise/JobDialog.tsx` wrapper so every mise-tab job action
+(recommend install, search install, delete, deactivate, reactivate)
+presents through the same pinned-near-top modal instead of `JobPanel`
+rendering inline — `.claude/archive/mise-search-plan-done.md`,
+ClaudeCode.tsx's own `JobPanel` usage deliberately
+untouched since it already has its own full-tab overlay, web terminal M1+M2
 (ephemeral PTY session, on-screen mobile controls with sticky modifiers,
 customizable keybindings, 10 built-in + custom color themes, named
 persistent sessions with a real tab bar/pin-toggle backed by

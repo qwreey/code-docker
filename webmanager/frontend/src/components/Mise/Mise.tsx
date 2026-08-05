@@ -15,7 +15,9 @@ import { ErrorBanner } from '../common/ErrorBanner'
 import { RestartNeededBanner } from '../common/RestartNeededBanner'
 import { Skeleton } from '../common/Skeleton'
 import '../common/common.css'
+import { JobDialog } from './JobDialog'
 import { JobPanel } from './JobPanel'
+import { ToolSearchDialog } from './ToolSearchDialog'
 import './Mise.css'
 import { withViewTransition } from '../../utils/viewTransition'
 
@@ -67,6 +69,7 @@ export function Mise() {
   const [showRecommendations, setShowRecommendations] = useState(loadShowRecommendations)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; tool: MiseToolEntry } | null>(null)
   const [deactivateTarget, setDeactivateTarget] = useState<{ id: string; tool: MiseToolEntry } | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   const loadingRef = useRef(false)
 
@@ -125,15 +128,25 @@ export function Mise() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.jobId, job?.status?.running])
 
-  async function handleInstall(tool: MiseRecommendedTool) {
-    if (busy) return
-    setError(null)
-    try {
-      const res = await api.post<MiseJob>('/mise/tools', { id: tool.id, version: 'latest', global: true })
-      setJob({ jobId: res.jobId, kind: 'install', toolId: tool.id, toolLabel: tool.label || tool.id, status: null })
-    } catch (e) {
-      setError(errorMessage(e))
-    }
+  // Shared by the recommendation list's install button and
+  // ToolSearchDialog's quick-install/version-picker install buttons - both
+  // just resolve an id+version and hand off to the same job machinery.
+  const installTool = useCallback(
+    async (id: string, version: string, label: string) => {
+      if (busy) return
+      setError(null)
+      try {
+        const res = await api.post<MiseJob>('/mise/tools', { id, version, global: true })
+        setJob({ jobId: res.jobId, kind: 'install', toolId: id, toolLabel: label, status: null })
+      } catch (e) {
+        setError(errorMessage(e))
+      }
+    },
+    [busy],
+  )
+
+  function handleInstall(tool: MiseRecommendedTool) {
+    installTool(tool.id, 'latest', tool.label || tool.id)
   }
 
   function handleDelete(id: string, tool: MiseToolEntry) {
@@ -241,26 +254,39 @@ export function Mise() {
             />
             추천 표시
           </label>
+          <button type="button" className="btn btn-secondary btn-small" onClick={() => setSearchOpen(true)}>
+            도구 검색
+          </button>
           <button type="button" className="btn btn-secondary btn-small" onClick={load} disabled={loading}>
             {loading ? '불러오는 중...' : '새로고침'}
           </button>
         </div>
       </div>
       <p className="section-description">
-        mise로 관리하는 전역(global) 런타임/도구를 추천 목록에서 설치하거나 설치된 버전을 확인하고 삭제할 수 있습니다.
+        mise로 관리하는 전역(global) 런타임/도구를 추천 목록에서 설치하거나, 도구 검색으로 임의 도구/버전을 찾아
+        설치할 수 있습니다. 설치된 버전은 확인하고 삭제할 수 있습니다.
       </p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <RestartNeededBanner refreshToken={job ? `${job.jobId}:${job.status?.running}` : undefined} />
 
       {job && (
-        <JobPanel
-          kind={job.kind}
-          toolLabel={job.toolLabel}
-          status={job.status}
-          onClose={() => setJob(null)}
-          actionLabel={job.action === 'deactivate' ? '비활성화' : job.action === 'reactivate' ? '재활성화' : undefined}
-        />
+        <JobDialog>
+          <JobPanel
+            kind={job.kind}
+            toolLabel={job.toolLabel}
+            status={job.status}
+            onClose={() => setJob(null)}
+            actionLabel={job.action === 'deactivate' ? '비활성화' : job.action === 'reactivate' ? '재활성화' : undefined}
+          />
+        </JobDialog>
       )}
+
+      <ToolSearchDialog
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        installedTools={tools}
+        onInstall={installTool}
+      />
 
       {showRecommendations && (
         <div className="mise-section">

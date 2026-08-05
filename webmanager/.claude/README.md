@@ -74,6 +74,7 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 | `archive/session-viewer-plan.md` | (대체 기록용) code-server 자체 연결 API를 조회하는 "세션" 개념의 원래 아이디어 — 실제 구현은 `archive/session-heartbeat-plan-done.md`가 5번째 방식(heartbeat)으로 우회해서 대체함, 이 문서는 미조사 옵션 기록으로만 보존 |
 | `archive/projects-plan-done.md` | 프로젝트 스캔/정리 1단계(용량/재생성 가능 폴더 탐지, 최근 편집 런처, mise 도구 표시)+2단계(재생성 가능 폴더 단위 삭제, 확인 다이얼로그, 비밀번호 게이트) |
 | `archive/mise-plan-done.md` | mise 관리(install/use/uninstall, 설치된 도구 목록, env 미리보기, 추천 목록) + 설정에서만 제거하고 바이너리는 유지하는 비활성화/재활성화 토글 |
+| `archive/mise-search-plan-done.md` | mise 도구 검색(`mise registry --json`, TTL 캐시) + 원격 버전 선택(`mise ls-remote --json`, 스크롤+필터) 후 설치 — 검색 결과 행의 "버전 보기"/"설치" 버튼, mise 탭의 모든 job 액션(추천 설치/검색 설치/삭제/비활성화/재활성화)을 하나의 top-level `JobDialog`로 통일 |
 | `archive/expose-plan-done.md` | code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일 origin 통합 |
 | `archive/env-migration-plan-done.md` | `.env.webmanager` 마이그레이션 도구(`webmanager --env-migrate`) — 키 추가/삭제 반영, 유저 코멘트 보존, `#!important`/`#!` 마커, 경로 기반 템플릿, 웹 UI 경고 배너(백업 안내 + 명령어 인라인 코드 표기 포함) |
 

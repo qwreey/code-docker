@@ -268,6 +268,8 @@ func main() {
 	mux.Handle("POST /api/mise/tools", gate.RequirePassword(http.HandlerFunc(s.handleCreateMiseTool)))
 	mux.Handle("DELETE /api/mise/tools", gate.RequirePassword(http.HandlerFunc(s.handleDeleteMiseTool)))
 	mux.HandleFunc("GET /api/mise/env", s.handleMiseEnv)
+	mux.HandleFunc("GET /api/mise/registry/search", s.handleMiseRegistrySearch)
+	mux.HandleFunc("GET /api/mise/versions", s.handleMiseVersions)
 	mux.HandleFunc("GET /api/mise/jobs/{id}", s.handleMiseJobStatus)
 
 	// Boolean, no sensitive content — same open-read tier as the rest.

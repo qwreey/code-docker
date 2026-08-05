@@ -188,3 +188,136 @@
   word-break: break-all;
   white-space: pre-wrap;
 }
+
+.mise-job-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 26, 0.45);
+  display: flex;
+  justify-content: center;
+  z-index: 1150;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.mise-job-dialog-position {
+  width: 100%;
+  max-width: 640px;
+  margin-top: 3vh;
+}
+
+.mise-job-dialog-position .mise-job-panel {
+  margin-bottom: 0;
+}
+
+.mise-search-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 26, 0.45);
+  display: flex;
+  justify-content: center;
+  z-index: 1120;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.mise-search-dialog-card {
+  width: 100%;
+  max-width: 640px;
+  margin-top: 3vh;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.mise-search-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.mise-search-dialog-header h2 {
+  margin: 0;
+}
+
+.mise-search-form {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+
+.mise-search-form input {
+  flex: 1;
+}
+
+.mise-search-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: -0.4rem 0 0.9rem;
+}
+
+.mise-search-results {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.mise-search-result-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 0.75rem 0.95rem;
+}
+
+.mise-search-result-backends {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+}
+
+.mise-search-result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.mise-version-back {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.mise-version-back h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.mise-version-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.mise-version-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0.5rem 0.85rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}

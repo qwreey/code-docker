@@ -514,6 +514,21 @@ export interface MiseEnvResponse {
   env: Record<string, string>
 }
 
+export interface MiseRegistryEntry {
+  short: string
+  backends: string[]
+  description: string
+  aliases: string[]
+}
+
+export interface MiseRegistrySearchResponse {
+  entries: MiseRegistryEntry[]
+}
+
+export interface MiseVersionsResponse {
+  versions: string[]
+}
+
 // GET /api/system/restart-needed's body - true as long as code-server's
 // live PID still matches whatever was recorded when a mise/extension/Claude
 // Code install or uninstall last completed (see backend's
