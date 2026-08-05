@@ -33,12 +33,12 @@ type ClaudeSubTab = 'status' | 'analytics' | 'sessions' | 'management'
 
 const JOB_POLL_INTERVAL_MS = 800
 
-// Only the NotInstalled flow persists its job id (see useClaudeInstallJob's
-// `persist` param) - that's the one that traps the user behind a modal
-// overlay, so it's the one that needs to survive a tab switch/remount.
-// The InstalledView update banner is a small inline banner, not a blocking
-// overlay, so losing track of an in-flight update job on tab switch is a
-// pre-existing, lower-stakes gap left alone here.
+// Both NotInstalled and InstalledView's update flow persist their job id
+// (see useClaudeInstallJob's `persist` param) - both trap the user behind a
+// blocking overlay while a mise install/update job is running, so both need
+// to survive a tab switch/remount rather than silently losing track of it.
+// They share this one storage key safely since the two flows are mutually
+// exclusive (status.installed picks one or the other, see ClaudeCode()).
 const CLAUDE_INSTALL_JOB_STORAGE_KEY = 'webmanager.claude.installJobId'
 
 function loadPersistedInstallJobId(): string | null {
@@ -249,28 +249,25 @@ function PluginsTable({ plugins }: { plugins: ClaudePlugin[] }) {
 }
 
 // UpdateBanner only renders when a mise-managed claude-code install is
-// outdated - the up-to-date/hidden states show nothing here at all, per the
-// "banner only when there's actually an update" redesign (the up-to-date
-// case is instead a small tag next to the page title, see ClaudeVersionTag).
+// outdated and no update job is currently running - the up-to-date/hidden
+// states show nothing here at all, per the "banner only when there's
+// actually an update" redesign (the up-to-date case is instead a small tag
+// next to the page title, see ClaudeVersionTag). Once a job starts,
+// InstalledView swaps this out for a full-tab overlay instead (see
+// .claude-install-overlay below) - a small flex-wrap banner isn't wide
+// enough for JobPanel's log box, and an update running in the background
+// isn't something the rest of this view should stay interactive during.
 function UpdateBanner({
   miseVersion,
   onUpdate,
-  updateJob,
   updateBusy,
-  updateSucceeded,
   updateError,
-  onCloseUpdateJob,
-  onReloadUpdateJob,
   onDismissUpdateError,
 }: {
   miseVersion: ClaudeMiseVersionInfo
   onUpdate: () => void
-  updateJob: InstallJobState | null
   updateBusy: boolean
-  updateSucceeded: boolean
   updateError: string | null
-  onCloseUpdateJob: () => void
-  onReloadUpdateJob: () => void
   onDismissUpdateError: () => void
 }) {
   return (
@@ -279,20 +276,9 @@ function UpdateBanner({
         Claude Code 업데이트 가능: {miseVersion.current} → {miseVersion.latest}
       </div>
       {updateError && <ErrorBanner message={updateError} onDismiss={onDismissUpdateError} />}
-      {updateJob ? (
-        <>
-          <JobPanel kind="install" toolLabel="Claude Code" status={updateJob.status} onClose={onCloseUpdateJob} />
-          {updateSucceeded && (
-            <button type="button" className="btn btn-primary btn-small" onClick={onReloadUpdateJob}>
-              다시 로드
-            </button>
-          )}
-        </>
-      ) : (
-        <button type="button" className="btn btn-primary btn-small" onClick={onUpdate} disabled={updateBusy}>
-          지금 업데이트
-        </button>
-      )}
+      <button type="button" className="btn btn-primary btn-small" onClick={onUpdate} disabled={updateBusy}>
+        지금 업데이트
+      </button>
     </div>
   )
 }
@@ -318,6 +304,9 @@ function InstalledView({
 }) {
   const auth = status.auth ?? null
   const stats = status.stats ?? null
+  // persist=true - an update is exactly the kind of in-flight job you
+  // shouldn't lose track of by switching sub-tabs or the sidebar, same
+  // reasoning as NotInstalled's install job below.
   const {
     job: updateJob,
     busy: updateBusy,
@@ -327,22 +316,34 @@ function InstalledView({
     close: closeUpdateJob,
     reload: reloadUpdateJob,
     clearError: clearUpdateError,
-  } = useClaudeInstallJob(onUpdated)
+  } = useClaudeInstallJob(onUpdated, true)
 
   return (
-    <>
-      {miseVersion?.outdated && (
+    <div className="claude-installed-wrap">
+      {miseVersion?.outdated && !updateJob && (
         <UpdateBanner
           miseVersion={miseVersion}
           onUpdate={startUpdate}
-          updateJob={updateJob}
           updateBusy={updateBusy}
-          updateSucceeded={updateSucceeded}
           updateError={updateError}
-          onCloseUpdateJob={closeUpdateJob}
-          onReloadUpdateJob={reloadUpdateJob}
           onDismissUpdateError={clearUpdateError}
         />
+      )}
+      {updateJob && (
+        <div className="claude-install-overlay">
+          <div className="claude-install-message">
+            <p>
+              Claude Code 업데이트 중
+              {miseVersion && `: ${miseVersion.current} → ${miseVersion.latest}`}
+            </p>
+            <JobPanel kind="install" toolLabel="Claude Code" status={updateJob.status} onClose={closeUpdateJob} />
+            {updateSucceeded && (
+              <button type="button" className="btn btn-primary claude-install-reload" onClick={reloadUpdateJob}>
+                다시 로드
+              </button>
+            )}
+          </div>
+        </div>
       )}
       <div className="claude-cards">
       <div className="claude-card">
@@ -402,7 +403,7 @@ function InstalledView({
         )}
       </div>
       </div>
-    </>
+    </div>
   )
 }
 
