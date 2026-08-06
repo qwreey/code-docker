@@ -32,11 +32,13 @@ router 안의 한 기능 영역(egress/DNAT) 이름으로 유지 — 컨테이�
 | Dev Proxy(Caddy) + tinyauth forward-auth | 이식 완료. `internal/devproxy`가 tinyauth를 타겟으로 렌더링하도록 변경(webmanager의 `/api/auth/verify` 대신), `code-docker-tinyauth` 서비스(공식 이미지, 소스 빌드 아님 — pnpm 프론트엔드 빌드가 필수라 dind-authz 패턴과 안 맞음) 신설. 실제 request → Caddy → tinyauth → 401+로그인 리다이렉트 체인까지 검증됨 |
 | code-docker 컷오버 | 완료. code-docker에서 tailscale/caddy-adapter 완전 제거(프로세스 0개, 바이너리도 없음), nginx `/tailscale/`(router-manager readonly API)·`/exports/`(Dev Proxy) 라우트를 router로 배선, `tailscale-notify.default.js`가 새 엔드포인트를 폴링하도록 변경. 이제부터 code-docker는 tailscale/Dev Proxy에 대해 아무것도 모른다 |
 | webmanager 통합 | 완료. `router/frontend` 신설(npm workspace), Dev Proxy 탭을 webmanager가 그 패키지에서 import — 실제 브라우저로 expose 생성까지 검증됨(라우팅 버그 하나 발견해서 즉시 수정: `/dev-proxy/` nginx 라우트가 빠져있었음). webmanager의 옛 Dev Proxy/Tailscale 백엔드·프론트엔드 코드 전부 삭제, DevAuth도 tinyauth로 대체되어 삭제 |
+| 문서 정리 | 완료. `docs/router.md` 신설, `docs/tailscale.md`/`dev-proxy.md`/`egress-netgate.md`/`webmanager.md`/`webmanager-config.md`/`build-customization.md`/`index.md`/`tips/adb.md`와 레포 루트 `CLAUDE.md`를 새 구조에 맞게 갱신. 부수적으로 발견한 회귀도 하나 고침 — `bin/forward-reload`가 Phase 2 이후 조용히 깨져 있었음(code-docker 안에서 더 이상 존재하지 않는 supervisord 프로그램을 재시작하려 시도) |
 
-## 할 일
+## netgate → router 마이그레이션 — 완료
 
-`.claude/backlog/functional-router-plan.md`에 확정된 설계 중 이번 마이그레이션(Phase
-1~5) 범위는 전부 완료. 남은 건:
+`.claude/backlog/functional-router-plan.md`에 확정된 설계에 따른 6단계 마이그레이션(골격
+이전 → tailscale → Dev Proxy+tinyauth → code-docker 컷오버 → webmanager 통합 → 문서)이
+전부 완료됨. 남은 건 이 마이그레이션 자체가 아니라 그 결과로 명확해진 후속 작업들:
 
 1. **router-frontend에 Tailscale UI 추가** — 지금 router-manager 백엔드는
    `GET /api/tailscale/state`(읽기전용) 하나뿐이라, webmanager가 예전에 갖고 있던
