@@ -129,14 +129,16 @@ COPY example-env.webmanager /etc/code-docker/webmanager/example-env.webmanager
 # Log directories for per-program rotated log files (read by vector).
 # tailscaled/tailscale-forward/tailscale-status/caddy-adapter moved to
 # router (see .claude/backlog/functional-router-plan.md) - no longer
-# programs in this image.
-RUN mkdir -p /var/log/code /var/log/sshd /var/log/webmanager /var/log/nginx
+# programs in this image. resolv-writer is new - see
+# .claude/backlog/router-dns-plan.md.
+RUN mkdir -p /var/log/code /var/log/sshd /var/log/webmanager /var/log/nginx \
+    /var/log/resolv-writer
 
 # Copy config & static files
 COPY --chown=root:root \
     config script/entrypoint.sh script/code-service.sh \
     script/user-init.sh script/get-user-shell.sh script/sshd-service.sh \
-    script/webmanager.sh \
+    script/webmanager.sh script/resolv-writer.sh \
     script/vector-service.sh script/nginx-service.sh /etc/code-docker/
 COPY --chown=root:root code-server-autoinstall/*.sh \
     /etc/code-docker/code-server-autoinstall/

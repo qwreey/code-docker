@@ -44,24 +44,30 @@ FROM archlinux
 # caddy: Dev Proxy's internal instance (see
 # router/config/caddy-adapter/caddy-adapter.default.sh, moved here from
 # code-docker the same way).
+# dnsmasq: DNS forwarder+cache for code-docker/dind (see
+# .claude/backlog/router-dns-plan.md) - code-docker-internal being
+# `internal: true` means Docker's own embedded DNS refuses to forward
+# queries externally for anything attached to it, so code-docker/dind need
+# a real resolver to point at instead.
 RUN pacman -Suy --noconfirm --needed \
         iptables iproute2 squid supervisor yq gettext curl openssl \
-        tailscale socat caddy && \
+        tailscale socat caddy dnsmasq && \
     pacman -Scc --noconfirm
 RUN mkdir -p /var/log/netgate-firewall /var/log/squid /var/cache/squid \
         /var/log/tailscaled /var/log/tailscale-forward /var/log/tailscale-publish \
-        /var/log/router-manager /var/log/caddy-adapter \
-        /etc/code-docker/netgate /etc/code-docker/supervisord.d \
+        /var/log/router-manager /var/log/caddy-adapter /var/log/dns \
+        /etc/code-docker/netgate /etc/code-docker/dns /etc/code-docker/supervisord.d \
         /var/lib/code-docker-router && \
     chown -R proxy:proxy /var/cache/squid
 COPY --chown=root:root config/netgate /etc/code-docker/netgate
+COPY --chown=root:root config/dns /etc/code-docker/dns
 COPY --chown=root:root config/supervisord.d /etc/code-docker/supervisord.d
 COPY --chown=root:root config/tailscale/tailscale-config.default.yaml \
     /etc/code-docker/tailscale-config.default.yaml
 COPY --chown=root:root script/netgate-entrypoint.sh script/netgate-firewall.sh \
     script/netgate-squid.sh script/netgate-blocklist.sh \
     script/tailscale-service.sh script/tailscale-forward.sh \
-    script/tailscale-publish.sh script/caddy-adapter.sh /etc/code-docker/
+    script/tailscale-publish.sh script/caddy-adapter.sh script/dns.sh /etc/code-docker/
 COPY --chown=root:root config/tailscale/tailscale-service.default.sh \
     config/tailscale/tailscale-forward.default.sh \
     config/tailscale/tailscale-publish.default.sh \

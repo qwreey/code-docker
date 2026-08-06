@@ -13,3 +13,4 @@ config/supervisord/*.conf
 router/config/netgate/*.override.*
 router/config/netgate/supervisord/*.conf
 router/config/tailscale/*.override.*
+router/config/dns/*.override.*

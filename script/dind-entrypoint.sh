@@ -71,7 +71,13 @@ fi
 # dind section). dind already has NET_ADMIN via `privileged: true`, so
 # unlike code-docker it manages its own default route directly instead of
 # needing a netinit sidecar - same defensive loop as
-# script/netinit-entrypoint.sh, just running against dind's own netns.
+# script/netinit-entrypoint.sh, just running against dind's own netns. Also
+# keeps dind's own /etc/resolv.conf pointed at router's DNS forwarder for the
+# same reason code-docker's resolv-writer program does (see
+# .claude/backlog/router-dns-plan.md) - code-docker-internal being
+# `internal: true` blocks Docker's own embedded DNS from forwarding
+# externally, and dind needs real DNS too (pulling images by registry
+# hostname).
 if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
 	(
 		trap 'exit 0' TERM INT
@@ -79,6 +85,14 @@ if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
 			gw_ip="$(getent hosts router 2>/dev/null | awk '{ print $1; exit }')"
 			if [ -n "$gw_ip" ]; then
 				ip route replace default via "$gw_ip" 2>/dev/null
+
+				# Direct redirect (truncate-in-place), not tmp-file+mv - see
+				# config/resolv-writer.default.sh's comment on why: `mv`
+				# onto the bind-mounted /etc/resolv.conf fails with
+				# "Resource busy".
+				if ! grep -q "^nameserver $gw_ip\$" /etc/resolv.conf 2>/dev/null; then
+					printf 'nameserver 127.0.0.11\nnameserver %s\noptions ndots:0\n' "$gw_ip" > /etc/resolv.conf
+				fi
 			fi
 
 			default_routes="$(ip -4 route show default 2>/dev/null)"
