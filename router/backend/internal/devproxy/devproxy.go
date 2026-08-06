@@ -27,6 +27,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,7 +39,16 @@ import (
 const (
 	ManagedDir    = "/var/lib/code-docker-router/caddy-adapter/managed"
 	CaddyfilePath = "/var/lib/code-docker-router/caddy-adapter/Caddyfile"
-	AdminAddr     = "localhost:2019"
+	// AdminAddr is Caddy's own admin API address, moved off its TCP default
+	// (localhost:2019) onto a unix socket in caddy-adapter.default.sh's
+	// generated Caddyfile (`admin unix//run/caddy-admin.sock`) - see
+	// router/.claude/router-nginx-hardening-plan.md, Finding 1: a Dev Proxy
+	// route's target used to be able to address the TCP admin port
+	// directly (target=localhost:2019), letting an attacker hijack Caddy's
+	// entire running config via its own reverse_proxy. ValidateTarget's
+	// charset doesn't permit "/", so a unix socket path is structurally
+	// unaddressable as a route target - this isn't just moved, it's closed.
+	AdminAddr = "unix//run/caddy-admin.sock"
 
 	// tinyauth's own compose service/alias + the forward_auth verify path
 	// its Caddy integration docs specify - see docker-compose.yml's
@@ -132,12 +142,59 @@ func ValidateHost(host string) error {
 
 var targetRe = regexp.MustCompile(`^[a-zA-Z0-9_.:\[\]-]+$`)
 
+// allowedTargetHosts is the compose-service allowlist ValidateTarget
+// enforces by default - every documented Dev Proxy use case targets one of
+// these (docs/dev-proxy.md's own examples are all code-docker:<port>). See
+// router/.claude/router-nginx-hardening-plan.md, Finding 1: an
+// unrestricted target let a route reach arbitrary RFC1918/LAN addresses,
+// defeating netgate's whole purpose from inside what's supposed to be the
+// lowest-trust container's own admin surface.
+var allowedTargetHosts = map[string]bool{
+	"code-docker": true,
+	"dind":        true,
+}
+
+// selfHosts can never be a route target, even with
+// DEVPROXY_ALLOW_EXTERNAL_TARGETS set - Caddy runs inside this same
+// container, so a route targeting itself is always a same-host SSRF
+// attempt (e.g. the old localhost:2019 admin-API takeover), never a
+// legitimate Dev Proxy use case. Caddy's admin API itself also moved to a
+// unix socket (see AdminAddr) that these host:port-shaped targets can't
+// address at all anymore, but this check stays as a second, independent
+// layer - defense in depth the user explicitly asked for.
+var selfHosts = map[string]bool{
+	"localhost": true,
+	"127.0.0.1": true,
+	"::1":       true,
+	"router":    true,
+	"forward":   true,
+}
+
 // ValidateTarget checks target is a plain host:port with no whitespace or
 // Caddyfile syntax characters (braces, newlines) that could break out of
-// the generated fragment.
+// the generated fragment, that it never points back at router itself, and
+// (unless DEVPROXY_ALLOW_EXTERNAL_TARGETS=true) that its host is a known
+// code-docker-internal service.
 func ValidateTarget(target string) error {
 	if target == "" || !targetRe.MatchString(target) {
 		return errors.New("target must be a plain host:port with no spaces or special characters")
+	}
+
+	host := target
+	if h, _, err := net.SplitHostPort(target); err == nil {
+		host = h
+	}
+	host = strings.ToLower(host)
+
+	if selfHosts[host] {
+		return fmt.Errorf("target %q would point back at router itself - not a valid Dev Proxy target", target)
+	}
+
+	if os.Getenv("DEVPROXY_ALLOW_EXTERNAL_TARGETS") == "true" {
+		return nil
+	}
+	if !allowedTargetHosts[host] {
+		return fmt.Errorf("target host %q is not a known code-docker-internal service (allowed: code-docker, dind) - set DEVPROXY_ALLOW_EXTERNAL_TARGETS=true to allow other targets", host)
 	}
 	return nil
 }

@@ -29,6 +29,7 @@ router 안의 한 기능 영역(egress/DNAT) 이름으로 유지 — 컨테이�
 
 | 기능 | 상태 |
 |---|---|
+| router 자체 nginx(host:80 직접 종단) + router-manager/Caddy admin 유닉스 소켓화 + Dev Proxy target 검증(기본 code-docker-internal만 허용) + router-manager 인앱 비밀번호 설정/변경 | 구현 완료·실컨테이너 검증 완료. 보안 감사에서 나온 두 CRITICAL 발견(target 미검증 SSRF, router-manager 무인증+직접 도달 가능)이 계기 — 자세한 내용: `.claude/router-nginx-hardening-plan.md` |
 | netgate(iptables 아웃바운드 필터링, 인바운드 DNAT) | `code-docker-netgate`에서 이 컨테이너로 순수 이전 완료 — 동작 변화 없음 |
 | DNS 포워딩(dnsmasq) — code-docker-internal이 `internal: true`라 Docker 내장 DNS가 외부 포워딩을 거부하는 문제 해결 | 구현 완료·커밋됨(`00bba1a`). 자세한 내용: `.claude/router-dns-plan.md` |
 | squid 제거 + DNS 레벨 블록리스트(dnsmasq `addn-hosts`)로 교체 | 구현 완료. squid의 ssl-bump anti-spoofing이 CDN형 도메인(예: `registry-1.docker.io`)을 오탐해 `docker pull`을 깨뜨리는 버그가 계기 — 자세한 내용: `.claude/router-dns-plan.md`의 "2부" |
@@ -84,6 +85,8 @@ router 안의 한 기능 영역(egress/DNAT) 이름으로 유지 — 컨테이�
 
 - `.claude/functional-router-plan.md` — 전체 비전/결정 사항
 - `.claude/router-dns-plan.md` — DNS 포워딩 + squid→dnsmasq 블록리스트 교체 설계
+- `.claude/router-nginx-hardening-plan.md` — router 자체 nginx + 소켓화 + Dev Proxy
+  target 검증 + router-manager 인증 강제 설계(진행 중, 보안 감사 발견 사항이 계기)
 - `.claude/archive/tailscale-design.md` — code-docker 안에서 tailscale을 돌리던 시절의
   원래 설계(이 컨테이너의 tailscale 기능으로 완전히 대체됨, 역사 기록용)
 - `.claude/backlog/egress-netgate-plan.md` (레포 루트) — netgate 기능의 원 설계, code-docker/dind

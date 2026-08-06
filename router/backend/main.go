@@ -1,16 +1,18 @@
 // router-manager: the Go backend for router (see router/plan.md for scope).
 // Mirrors webmanager's own backend pattern (stdlib net/http, no framework).
-// Deliberately private-only regardless of the auth gate below (no host port
-// published for this service in docker-compose.yml, so it's only reachable
-// from other code-docker-internal containers, e.g. code-docker's nginx via
-// its /tailscale/, /dev-proxy/, /router-auth/ proxy routes - see
-// .claude/functional-router-plan.md's "tailscale readonly API 노출
-// 정책").
+// Structurally private by default: binds a unix socket
+// (ROUTER_MANAGER_SOCK, default /run/router-manager.sock) rather than a TCP
+// port, so there is no address for another container to reach at all -
+// only router's own nginx (same container/netns) proxies to it. See
+// router/.claude/router-nginx-hardening-plan.md for why the previous
+// ":8091 on all interfaces, reachable directly from code-docker" setup was
+// a real gap despite doc comments describing it as "private by design".
 package main
 
 import (
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
 	"os"
 
@@ -33,11 +35,6 @@ func main() {
 		os.Exit(hashPasswordCmd())
 	}
 
-	addr := os.Getenv("ROUTER_MANAGER_ADDR")
-	if addr == "" {
-		addr = ":8091"
-	}
-
 	// Cross-check against /etc/environment: storing this hash only in a
 	// process-start-time env var is the point (changing it needs host-side
 	// docker-compose.yml/.env access, not just container shell access) - if
@@ -50,11 +47,18 @@ func main() {
 		log.Printf("main: REFUSING to honor ROUTER_MANAGER_AUTH_PASSWORD_HASH because it's also set in /etc/environment - this could mean it was tampered with from inside the container")
 		authPasswordHash = ""
 	}
-	gate = authgate.New(authPasswordHash)
+	authStorePath := os.Getenv("ROUTER_MANAGER_AUTH_STORE_PATH")
+	if authStorePath == "" {
+		authStorePath = "/var/lib/code-docker-router/auth-hash.json"
+	}
+	gate = authgate.New(authPasswordHash, authStorePath)
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", handleRouterUI)
 	mux.HandleFunc("POST /api/auth/unlock", handleAuthUnlock)
 	mux.HandleFunc("GET /api/auth/status", handleAuthStatus)
+	mux.HandleFunc("POST /api/auth/setup", handleAuthSetup)
+	mux.HandleFunc("POST /api/auth/change", handleAuthChange)
 
 	mux.HandleFunc("GET /api/tailscale/state", handleTailscaleState)
 	mux.HandleFunc("GET /api/tailscale/config", handleGetTailscaleConfig)
@@ -74,10 +78,42 @@ func main() {
 	mux.Handle("DELETE /api/dev-proxy/exposes/{name}", gate.RequirePassword(http.HandlerFunc(handleDeleteDevProxyExpose)))
 	mux.Handle("POST /api/dev-proxy/reload", gate.RequirePassword(http.HandlerFunc(handleReloadDevProxy)))
 
-	log.Printf("router-manager listening on %s (auth gate configured: %v)", addr, gate.Configured())
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	listener, err := listen()
+	if err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("router-manager listening on %s (auth gate configured: %v, source: %s)", listener.Addr(), gate.Configured(), gate.Source())
+	if err := http.Serve(listener, mux); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// listen binds a unix socket by default (ROUTER_MANAGER_SOCK, default
+// /run/router-manager.sock - /run is container-local tmpfs, so there's
+// never a stale socket to clean up across restarts). Setting
+// ROUTER_MANAGER_ADDR is an explicit opt-in to bind TCP instead - useful
+// for local development outside a container, where nothing else in
+// router's own netns would otherwise reach a unix socket anyway.
+func listen() (net.Listener, error) {
+	if addr := os.Getenv("ROUTER_MANAGER_ADDR"); addr != "" {
+		return net.Listen("tcp", addr)
+	}
+	sockPath := os.Getenv("ROUTER_MANAGER_SOCK")
+	if sockPath == "" {
+		sockPath = "/run/router-manager.sock"
+	}
+	l, err := net.Listen("unix", sockPath)
+	if err != nil {
+		return nil, err
+	}
+	// 0o660: readable/writable by the socket's owner and group (router's
+	// own nginx runs in the same container, typically as root like every
+	// other supervisord program here - see router/config/supervisord.d/).
+	if err := os.Chmod(sockPath, 0o660); err != nil {
+		l.Close()
+		return nil, err
+	}
+	return l, nil
 }
 
 func handleTailscaleState(w http.ResponseWriter, r *http.Request) {

@@ -38,23 +38,6 @@ else
 fi
 export NGINX_ALLOWED_HOSTS_MAP="$map_body"
 
-# ALLOWED_EXPORT_HOSTS (docker-compose.yml, comma-separated, empty by
-# default) - same logic as ALLOWED_HOSTS above, but for the /exports/
-# location's own `map $host $code_docker_export_host_allowed { ... }` body
-# (Dev Proxy, see docs/dev-proxy.md).
-if [ -n "${ALLOWED_EXPORT_HOSTS:-}" ]; then
-    export_map_body="default 0;"
-    IFS=',' read -ra allowed_export_hosts <<< "$ALLOWED_EXPORT_HOSTS"
-    for host in "${allowed_export_hosts[@]}"; do
-        host="$(echo "$host" | xargs)"
-        [ -n "$host" ] && export_map_body="$export_map_body
-    \"$host\" 1;"
-    done
-else
-    export_map_body="default 1;"
-fi
-export NGINX_ALLOWED_EXPORT_HOSTS_MAP="$export_map_body"
-
 # NGINX_BLOCK_LOOPBACK (docker-compose.yml, default "true") becomes
 # nginx.*.conf's `map $server_addr $code_docker_loopback_blocked { ... }`
 # body. "true" (default) blocks requests accepted on 127.0.0.1 (tailscale's
@@ -94,21 +77,11 @@ export NGINX_TRUSTED_PROXIES_DIRECTIVES="$directives"
 export NGINX_CODE_SERVER_UPSTREAM="${CODE_SERVER_BIND_ADDR:-private:8080}"
 export NGINX_WEBMANAGER_UPSTREAM="${WEBMANAGER_ADDR:-private:81}"
 
-# caddy-adapter (Dev Proxy) moved to router (see
-# router/.claude/functional-router-plan.md's "Dev Proxy Caddy도 router로
-# 이관") - no longer the same container as nginx, so this now crosses
-# code-docker-internal via the `router` alias instead of loopback.
-# CADDY_ADAPTER_PORT must match router's own copy of this setting
-# (docker-compose.yml passes the same value to both services).
-export NGINX_CADDY_ADAPTER_UPSTREAM="router:${CADDY_ADAPTER_PORT:-8082}"
-
-# router-manager's read-only tailscale-state API (see nginx.*.conf's
-# /tailscale/ location) - router-manager listens on all interfaces inside
-# router, reached the same way as caddy-adapter above. Port 8091 is fixed
-# (router-manager's own default, not currently exposed as an env var on
-# either side - same "exactly one correct value" reasoning as
-# router/backend/internal/devproxy's AdminAddr).
-export NGINX_ROUTER_UPSTREAM="router:8091"
+# Dev Proxy (/exports/) and router-manager's admin API used to be proxied
+# through from here too (caddy-adapter/router-manager upstreams) - router
+# now terminates host:80 directly and handles both itself, see
+# router/.claude/router-nginx-hardening-plan.md. This nginx only ever
+# serves code-server/webmanager now.
 
 # nginx config files don't do their own env-var substitution, so the chosen
 # conf is rendered through envsubst first (gettext, already pulled in by
@@ -116,6 +89,6 @@ export NGINX_ROUTER_UPSTREAM="router:8091"
 # these variable names so nginx's own $status/$loggable/$host/etc. in the
 # template pass through untouched instead of being blanked out.
 generated_config=/run/nginx.generated.conf
-envsubst '${NGINX_ACCESS_LOG_IF} ${NGINX_ALLOWED_HOSTS_MAP} ${NGINX_ALLOWED_EXPORT_HOSTS_MAP} ${NGINX_LOOPBACK_BLOCK_MAP} ${NGINX_TRUSTED_PROXIES_DIRECTIVES} ${NGINX_CODE_SERVER_UPSTREAM} ${NGINX_WEBMANAGER_UPSTREAM} ${NGINX_CADDY_ADAPTER_UPSTREAM} ${NGINX_ROUTER_UPSTREAM}' < "$nginx_config" > "$generated_config"
+envsubst '${NGINX_ACCESS_LOG_IF} ${NGINX_ALLOWED_HOSTS_MAP} ${NGINX_LOOPBACK_BLOCK_MAP} ${NGINX_TRUSTED_PROXIES_DIRECTIVES} ${NGINX_CODE_SERVER_UPSTREAM} ${NGINX_WEBMANAGER_UPSTREAM}' < "$nginx_config" > "$generated_config"
 
 exec nginx -g "daemon off;" -c "$generated_config"

@@ -44,11 +44,16 @@ outbound:
 # RFC1918 range, so ordering here matters exactly the way it does for
 # outbound: - see the plan doc's "인바운드" section).
 #
+# Empty by default now - host port 80 used to DNAT to code-docker:80 here,
+# but router's own nginx listens on 80 directly as of
+# router/.claude/router-nginx-hardening-plan.md, and a local listener
+# always wins over PREROUTING DNAT for the same port - that entry would
+# never have fired again, so it was removed rather than left as dead
+# config. Add entries here for any OTHER host port you want forwarded to a
+# code-docker-internal container:
+#
 # forwards:
 #   - host_port: 8443
 #     target_host: some-other-container
 #     target_port: 443
-forwards:
-  - host_port: 80
-    target_host: code-docker
-    target_port: 80
+forwards: []

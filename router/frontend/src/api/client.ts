@@ -36,19 +36,23 @@ export function errorMessage(err: unknown): string {
   return String(err)
 }
 
-// createApiClient binds an api/apiUrl pair to prefix - one router-manager
-// feature area's own nginx location (e.g. `/dev-proxy/`, `/tailscale/`, see
-// config/nginx.default.conf), each proxied straight to router-manager's
-// matching `/api/<prefix>/` route. Deliberately NOT
+// createApiClient binds an api/apiUrl pair to prefix - a path under
+// router's own single `/router/` nginx location (see
+// router/config/nginx/nginx.default.conf), which strips just that `/router`
+// segment and forwards the rest straight through to router-manager's
+// matching route (e.g. `/router/api/dev-proxy/exposes` -> router-manager's
+// `POST /api/dev-proxy/exposes`) - one unix-socket-backed location handles
+// every feature area now, no more per-feature nginx remapping. Deliberately
+// NOT
 // import.meta.env.BASE_URL-relative (unlike webmanager's own client.ts) -
 // router-manager is a genuinely separate backend service, not part of
 // whichever app happens to import these components, so its API routes
 // shouldn't be coupled to the consuming app's own base path.
 //
 // skipUnlockRetry opts a client out of the 401→prompt→retry dance -
-// used only by the `/router-auth` client itself (see below), since a
-// wrong-password 401 from the unlock endpoint must surface directly to its
-// own form instead of re-triggering the prompter (which would recurse).
+// used only by the auth client itself (see below), since a wrong-password
+// 401 from the unlock endpoint must surface directly to its own form
+// instead of re-triggering the prompter (which would recurse).
 export function createApiClient(prefix: string, opts: { skipUnlockRetry?: boolean } = {}) {
   function apiUrl(path: string): string {
     return `/${prefix}${path}`
@@ -110,9 +114,8 @@ export function createApiClient(prefix: string, opts: { skipUnlockRetry?: boolea
 
 // Dev Proxy's own bound client - the original, pre-generalization call
 // site (RouteDialog/DevProxy.tsx import these two directly).
-export const { api, apiUrl } = createApiClient('dev-proxy')
+export const { api, apiUrl } = createApiClient('router/api/dev-proxy')
 
-// router-manager's auth endpoints (/api/auth/unlock, /api/auth/status),
-// proxied at /router-auth/ - see config/nginx.default.conf. Used by
-// UnlockModal.tsx.
-export const { api: authApi } = createApiClient('router-auth', { skipUnlockRetry: true })
+// router-manager's auth endpoints (/api/auth/unlock, /api/auth/status,
+// /api/auth/setup, /api/auth/change). Used by UnlockModal.tsx.
+export const { api: authApi } = createApiClient('router/api/auth', { skipUnlockRetry: true })

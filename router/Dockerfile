@@ -37,6 +37,7 @@ COPY backend/hashpassword.go ./
 COPY backend/handlers_auth.go ./
 COPY backend/handlers_devproxy.go ./
 COPY backend/handlers_tailscale.go ./
+COPY backend/handlers_ui.go ./
 COPY backend/internal ./internal
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /router-manager .
 
@@ -56,13 +57,16 @@ FROM archlinux
 # `internal: true` means Docker's own embedded DNS refuses to forward
 # queries externally for anything attached to it, so code-docker/dind need
 # a real resolver to point at instead.
+# nginx: router's own front door (see
+# router/.claude/router-nginx-hardening-plan.md) - terminates host:80
+# directly now instead of the old DNAT-back-to-code-docker double hop.
 RUN pacman -Suy --noconfirm --needed \
         iptables iproute2 supervisor yq gettext curl \
-        tailscale socat caddy dnsmasq && \
+        tailscale socat caddy dnsmasq nginx && \
     pacman -Scc --noconfirm
 RUN mkdir -p /var/log/netgate-firewall \
         /var/log/tailscaled /var/log/tailscale-forward /var/log/tailscale-publish \
-        /var/log/router-manager /var/log/caddy-adapter /var/log/dns \
+        /var/log/router-manager /var/log/caddy-adapter /var/log/dns /var/log/nginx \
         /etc/code-docker/netgate /etc/code-docker/dns /etc/code-docker/supervisord.d \
         /var/lib/code-docker-router
 COPY --chown=root:root config/netgate /etc/code-docker/netgate
@@ -72,11 +76,13 @@ COPY --chown=root:root config/tailscale/tailscale-config.default.yaml \
     /etc/code-docker/tailscale-config.default.yaml
 COPY --chown=root:root script/netgate-entrypoint.sh script/netgate-firewall.sh \
     script/tailscale-service.sh script/tailscale-forward.sh \
-    script/tailscale-publish.sh script/caddy-adapter.sh script/dns.sh /etc/code-docker/
+    script/tailscale-publish.sh script/caddy-adapter.sh script/dns.sh \
+    script/nginx-service.sh /etc/code-docker/
 COPY --chown=root:root config/tailscale/tailscale-service.default.sh \
     config/tailscale/tailscale-forward.default.sh \
     config/tailscale/tailscale-publish.default.sh \
-    config/caddy-adapter/caddy-adapter.default.sh /etc/code-docker/
+    config/caddy-adapter/caddy-adapter.default.sh \
+    config/nginx/nginx.default.conf config/nginx/nginx-service.default.sh /etc/code-docker/
 COPY --from=router-manager-build /router-manager /usr/local/bin/router-manager
 # Baked-in default blocklist (StevenBlack/hosts - a standard, generic list
 # is sufficient per the plan doc, no prompt-injection-specific list

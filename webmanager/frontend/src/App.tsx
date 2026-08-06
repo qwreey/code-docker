@@ -4,7 +4,7 @@ import type { SectionId } from './components/Layout/sections'
 import { Supervisor } from './components/Supervisor/Supervisor'
 import { SshKeys } from './components/SshKeys/SshKeys'
 import { GitConfig } from './components/GitConfig/GitConfig'
-import { DevProxy, Tailscale, RouterUnlockModalHost } from '@code-docker/router-frontend'
+import { DevProxy, Tailscale, RouterUnlockModalHost, RouterAuthSetupBanner } from '@code-docker/router-frontend'
 import { Logs } from './components/Logs/Logs'
 import { Processes } from './components/Processes/Processes'
 import { Projects } from './components/Projects/Projects'
@@ -63,6 +63,7 @@ function App() {
           reach, for every tab, not just Terminal. */}
       <div className="app-main">
         <EnvVersionBanner />
+        <RouterAuthSetupBanner />
         <main className="app-content">
           {active === 'supervisor' && <Supervisor />}
           {active === 'ssh-keys' && <SshKeys />}

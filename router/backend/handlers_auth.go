@@ -2,8 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
+
+	"router/internal/authgate"
 )
 
 // handleAuthUnlock verifies a submitted password against the configured
@@ -34,7 +37,12 @@ func handleAuthUnlock(w http.ResponseWriter, r *http.Request) {
 }
 
 type authStatusResponse struct {
-	Required      bool    `json:"required"`
+	Required bool `json:"required"`
+	// Source is "env" (ROUTER_MANAGER_AUTH_PASSWORD_HASH pins it, /change
+	// will refuse), "file" (set via /setup, changeable via /change), or
+	// "unset" (nothing configured - frontend should show first-time setup,
+	// not a change-password form).
+	Source        string  `json:"source"`
 	Unlocked      bool    `json:"unlocked"`
 	UnlockedUntil *string `json:"unlockedUntil,omitempty"` // RFC3339, only set when Unlocked
 }
@@ -43,11 +51,65 @@ type authStatusResponse struct {
 // prompt at all, and if so whether the current session already satisfies
 // it.
 func handleAuthStatus(w http.ResponseWriter, r *http.Request) {
-	resp := authStatusResponse{Required: gate.Configured()}
+	resp := authStatusResponse{Required: gate.Configured(), Source: gate.Source()}
 	if until, ok := gate.UnlockedUntil(r); ok {
 		resp.Unlocked = true
 		formatted := until.UTC().Format(time.RFC3339)
 		resp.UnlockedUntil = &formatted
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleAuthSetup sets the initial password - only works when nothing is
+// configured yet (gate.Source() == "unset"). Never gated by
+// RequirePassword, same reasoning as handleAuthUnlock: there's nothing to
+// authenticate against until this succeeds once.
+func handleAuthSetup(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Password == "" {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := gate.SetupPassword(body.Password); err != nil {
+		if errors.Is(err, authgate.ErrAlreadyConfigured) {
+			writeError(w, http.StatusConflict, "password already configured - use /api/auth/change instead")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// handleAuthChange replaces an already-configured password, requiring the
+// current one. Not wrapped in RequirePassword either - it does its own
+// explicit current-password check, the same self-contained pattern as
+// handleAuthUnlock.
+func handleAuthChange(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		CurrentPassword string `json:"currentPassword"`
+		NewPassword     string `json:"newPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.NewPassword == "" {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := gate.ChangePassword(body.CurrentPassword, body.NewPassword); err != nil {
+		switch {
+		case errors.Is(err, authgate.ErrEnvPinned):
+			writeError(w, http.StatusConflict, "password is set via ROUTER_MANAGER_AUTH_PASSWORD_HASH and can't be changed here")
+		case errors.Is(err, authgate.ErrNotConfigured):
+			writeError(w, http.StatusConflict, "no password configured yet - use /api/auth/setup instead")
+		case errors.Is(err, authgate.ErrWrongPassword):
+			writeError(w, http.StatusUnauthorized, "incorrect current password")
+		default:
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

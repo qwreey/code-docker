@@ -4,3 +4,4 @@
 export { DevProxy } from './components/DevProxy/DevProxy'
 export { Tailscale } from './components/Tailscale/Tailscale'
 export { RouterUnlockModalHost } from './components/common/UnlockModal'
+export { RouterAuthSetupBanner } from './components/common/RouterAuthSetupBanner'

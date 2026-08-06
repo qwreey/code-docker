@@ -5,6 +5,14 @@ networks:
     # Requires ipv6 support enabled in the docker engine daemon.json - see
     # example-env before enabling.
     enable_ipv6: ${ENABLE_IPV6:-false}
+    # Pinned (rather than Docker's usual auto-assigned subnet) so router's
+    # own nginx has a stable CIDR to reference for its /exports/
+    # internal-source deny (see CODE_DOCKER_INTERNAL_SUBNET below and
+    # router/.claude/router-nginx-hardening-plan.md) - without this the
+    # subnet could differ across recreations, silently breaking that ACL.
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
   code-docker-external:
     name: "${PREFIX:-}code-docker-external"
     internal: false
@@ -38,17 +46,10 @@ services:
       NGINX_LOG_LEVEL: "${NGINX_LOG_LEVEL:-errors}"
       CODE_SERVER_BIND_ADDR: "${CODE_SERVER_BIND_ADDR:-private:8080}"
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-}"
-      ALLOWED_EXPORT_HOSTS: "${ALLOWED_EXPORT_HOSTS:-}"
       NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
       WEBMANAGER_ENV_TEMPLATE_PATH: "${WEBMANAGER_ENV_TEMPLATE_PATH:-/etc/code-docker/webmanager/example-env.webmanager}"
-      # nginx's own /exports/ proxy target - Dev Proxy's Caddy instance now
-      # lives on router (see router/.claude/functional-router-plan.md's
-      # "Dev Proxy Caddy도 router로 이관"), so code-docker just needs to know
-      # which port to reach it on over code-docker-internal - must match
-      # code-docker-router's own CADDY_ADAPTER_PORT below.
-      CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-8082}"
       # Egress lockdown (see .claude/backlog/egress-netgate-plan.md) - "false"
       # skips entrypoint.sh's default-route wait gate. Does NOT restore
       # code-docker-external/ports below - those are static compose topology
@@ -95,27 +96,18 @@ services:
     #   this service doesn't work anymore - Compose docs: networks with
     #   internal: true "are created without any connection to the host's
     #   network interfaces". Port 80 lives on the code-docker-router
-    #   service instead now, which DNATs it back to code-docker:80 from
-    #   inside its own netns (see router/config/netgate/config.default.yaml's
-    #   `forwards:` and .claude/backlog/egress-netgate-plan.md's "인바운드"
-    #   section). This container has NO published port of its own and is
-    #   unreachable from the host except through that forward.
+    #   service instead now, which terminates it directly via its own
+    #   nginx and reverse-proxies everything but /exports/ and /router/
+    #   back to code-docker:80 (see router/.claude/router-nginx-hardening-plan.md
+    #   and router's own ports: comment below). This container has NO
+    #   published port of its own and is unreachable from the host except
+    #   through that hop.
     #   - 22:22
     #   webmanager no longer needs its own published port - it's reachable at
     #   /manager on port 80 above (nginx strips the prefix internally).
     #   Uncomment this (and set WEBMANAGER_ADDR=:81 in .env.webmanager) only
     #   if you want to bypass nginx and reach it directly on its own port.
     #   - 81:81
-    #   Internal Caddy dev-proxy listener (see docs/dev-proxy.md). The
-    #   recommended default is to NOT publish this at all - your outer
-    #   reverse proxy instead rewrites dev-proxy requests to prepend
-    #   /exports/ and sends them to port 80 above, so this container only
-    #   ever needs one published port total. Uncomment this only if you
-    #   specifically want the older direct-subdomain-to-8082 routing
-    #   instead (a second port, but no path-rewrite step on your outer
-    #   proxy) - see "바깥 리버스 프록시 연결하기" in docs/dev-proxy.md for
-    #   both options.
-    #   - 8082:8082
     volumes:
       - "${HOME_VOLUME:-./code}:/code"
       - "${SSHD_VOLUME:-./sshd}:/etc/ssh"
@@ -269,18 +261,46 @@ services:
       TAILSCALE_HOSTNAME: "${TAILSCALE_HOSTNAME:-}"
       # Dev Proxy's internal Caddy instance (see
       # router/.claude/functional-router-plan.md's "Dev Proxy Caddy도
-      # router로 이관") - moved from code-docker the same way.
-      # CADDY_ADAPTER_PORT is shared with code-docker's own environment
-      # below (its nginx needs to know the same port to proxy /exports/ to)
-      # - keep both in sync if you override this.
+      # router로 이관"). CADDY_ADAPTER_PORT is only relevant if you opt into
+      # the direct-publish alternative in docs/dev-proxy.md - router's own
+      # nginx talks to Caddy over a unix socket by default now (see
+      # router/.claude/router-nginx-hardening-plan.md Phase 4).
       CADDY_ADAPTER_ENABLED: "${CADDY_ADAPTER_ENABLED:-true}"
       CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-8082}"
-      # router-manager's own admin-API password gate (see example-env's
-      # ROUTER_MANAGER_AUTH_PASSWORD_HASH comment) - protects the mutating
-      # tailscale/dev-proxy routes proxied in by code-docker's nginx below,
-      # separate from tinyauth (which protects exposed dev-server routes).
-      # Empty (default) leaves the gate off, same as today.
+      # Dev Proxy route targets are restricted to known code-docker-internal
+      # services (code-docker, dind) by default - "true" lifts that for LAN/
+      # tailscale-forward targets some setups genuinely need. router itself
+      # is always rejected as a target regardless of this setting (see
+      # router/.claude/router-nginx-hardening-plan.md, Finding 1).
+      DEVPROXY_ALLOW_EXTERNAL_TARGETS: "${DEVPROXY_ALLOW_EXTERNAL_TARGETS:-false}"
+      # router-manager's own admin-API password gate. Optional now - the
+      # recommended default is setting it up in-app at /router/ on first
+      # boot (see router/.claude/router-nginx-hardening-plan.md Phase 1),
+      # which persists to router's own volume and can be changed from the
+      # same page. Setting this env var instead pins the hash at
+      # container-start (infra-as-code), taking priority over whatever's
+      # stored in-app and making it non-changeable from /router/.
       ROUTER_MANAGER_AUTH_PASSWORD_HASH: "${ROUTER_MANAGER_AUTH_PASSWORD_HASH:-}"
+      # router is now the actual internet-facing hop (see
+      # router/.claude/router-nginx-hardening-plan.md) - its own nginx
+      # reuses the same ALLOWED_HOSTS/NGINX_BLOCK_LOOPBACK/TRUSTED_PROXIES/
+      # NGINX_LOG_LEVEL values as code-docker's copy above (same .env
+      # source, shared across both services' environment: blocks, same
+      # pattern CADDY_ADAPTER_PORT already used). ALLOWED_EXPORT_HOSTS
+      # moved here entirely (was code-docker's before /exports/ itself
+      # moved) - code-docker no longer has any use for it.
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-}"
+      ALLOWED_EXPORT_HOSTS: "${ALLOWED_EXPORT_HOSTS:-}"
+      NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
+      TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
+      NGINX_LOG_LEVEL: "${NGINX_LOG_LEVEL:-errors}"
+      # Denies code-docker-internal source addresses from reaching
+      # /exports/ directly (genuine external Dev Proxy traffic has no
+      # reason to originate from inside that network) - "false" disables
+      # the check. Uses the subnet pinned above on code-docker-internal's
+      # own network definition.
+      ROUTER_NGINX_DENY_INTERNAL_EXPORTS: "${ROUTER_NGINX_DENY_INTERNAL_EXPORTS:-true}"
+      CODE_DOCKER_INTERNAL_SUBNET: "172.30.0.0/24"
     volumes:
       # Persistent state for router's own features (tailscale login
       # state/config.yaml, caddy-adapter's managed/custom Caddyfile
@@ -328,13 +348,21 @@ services:
           - forward
       code-docker-external: {}
     ports:
-      # Moved here from code-docker (see that service's own ports: comment
-      # above) - code-docker-router is the only container with a real
-      # route to the host's network, so this is the only place a host port
-      # can be published from. DNAT'd back to code-docker:80 by
-      # router/config/netgate/firewall.default.sh, driven by
-      # router/config/netgate/config.default.yaml's `forwards:` list.
+      # code-docker-router is the only container with a real route to the
+      # host's network, so this is the only place a host port can be
+      # published from. router's own nginx (see
+      # router/.claude/router-nginx-hardening-plan.md) terminates this
+      # directly now - /exports/ and /router/ are handled here, everything
+      # else reverse-proxies on to code-docker:80 unchanged. This replaced
+      # an earlier netgate DNAT-back-to-code-docker forward for the same
+      # port; that `forwards:` entry was removed since a local listener
+      # always wins over PREROUTING DNAT for the same port anyway.
       - "80:80"
+      # Uncomment (and see docs/dev-proxy.md's "바깥 리버스 프록시 연결하기"
+      # for both options) only if you want the older direct-subdomain-to-8082
+      # routing instead of the /exports/ prefix trick above - a second
+      # published port, but no path-rewrite step needed on your outer proxy.
+      # - "8082:8082"
     logging:
       driver: "json-file"
       options:
