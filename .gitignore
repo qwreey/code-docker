@@ -4,6 +4,7 @@ sshd/
 /router-data/
 /tinyauth-data/
 /node_modules
+.allow-test
 .env
 .env.webmanager
 config/*-override*

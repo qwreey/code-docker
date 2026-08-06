@@ -16,6 +16,8 @@ docker compose build code-docker && docker compose up -d   # after editing a con
 
 There are no automated tests or linters in this repo. Validate changes by building the image and, when practical, exercising the affected service through `docker compose up` (e.g. checking `docker compose logs`, opening the code-server URL, `ssh`-ing in).
 
+If a repo-root `.allow-test` file exists (gitignored — `touch .allow-test` to create it), the running `docker compose` stack in this checkout is a disposable test environment, not someone's live/in-use instance — building, restarting, and exercising services freely (without asking first) is fine. Without it, treat the stack as potentially live and confirm before rebuilding/restarting.
+
 ## Architecture
 
 ### The override pattern
