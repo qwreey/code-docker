@@ -29,6 +29,7 @@ Go 없음/Node 없음, 순수 supervisord + 셸스크립트로 시작(오늘의 
 |---|---|
 | netgate(iptables 아웃바운드 필터링, squid 블록리스트, 인바운드 DNAT) | `code-docker-netgate`에서 이 컨테이너로 순수 이전 완료 — 동작 변화 없음 |
 | tailscale 전체(데몬+로그인+forwards+publish) + router-manager 백엔드(읽기전용 `GET /api/tailscale/state`) | 이식 완료. code-docker의 기존 tailscale은 Phase 4까지 병행 유지(원격 접근 단절 방지) — `forward` alias는 이미 이 컨테이너로 이동, `private`/bind-addr 기본값은 아직 code-docker 쪽(Phase 4에서 정리) |
+| Dev Proxy(Caddy) + tinyauth forward-auth | 이식 완료. `internal/devproxy`가 tinyauth를 타겟으로 렌더링하도록 변경(webmanager의 `/api/auth/verify` 대신), `code-docker-tinyauth` 서비스(공식 이미지, 소스 빌드 아님 — pnpm 프론트엔드 빌드가 필수라 dind-authz 패턴과 안 맞음) 신설. 실제 request → Caddy → tinyauth → 401+로그인 리다이렉트 체인까지 검증됨 |
 
 ## 할 일
 
@@ -36,14 +37,15 @@ Go 없음/Node 없음, 순수 supervisord + 셸스크립트로 시작(오늘의 
 계획은 세션 내 plan 파일 참고, 완료되면 이 문서에 반영):
 
 1. ~~tailscale 전체(데몬+로그인+forwards+publish) 이관, 읽기전용 상태 API~~ — 완료
-2. Dev Proxy(Caddy) 이관 + tinyauth 신설
+2. ~~Dev Proxy(Caddy) 이관 + tinyauth 신설~~ — 완료
 3. code-docker 쪽 대응 기능 제거, nginx `/tailscale` 라우트 배선
 4. webmanager가 이 컨테이너의 페이지 컴포넌트를 import하도록 통합(router/frontend
-   신설도 이 단계에서 — 지금은 소비자가 없어 미룸)
+   신설도 이 단계에서 — 지금은 소비자가 없어 미룸). router-manager 자체 admin API의
+   인증(개별 노출 라우트가 아니라 CRUD API 자체 보호)도 이 단계로 미룸 — 아직 UI가
+   없어 지금 만들면 검증 불가능한 선작업이 됨
 
-실제 tailscale 로그인(authUrl 접속) 및 forwards:/publish: 실사용 트래픽 검증은 사용자의
-직접 인터랙션이 필요해 아직 안 됨 — `router-manager`가 `NeedsLogin` 상태와 `authUrl`을
-정상 반환하는 것까지는 확인됨.
+실제 tailscale 로그인(authUrl 접속) 및 forwards:/publish: 실사용 트래픽 검증, tinyauth
+실제 로그인 성공 경로(거부 경로만 검증됨)는 사용자의 직접 인터랙션이 필요해 아직 안 됨.
 
 ## 참고 문서
 
