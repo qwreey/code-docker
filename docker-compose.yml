@@ -79,26 +79,28 @@ services:
       # via the route code-docker-netinit continuously (re)plants in this
       # netns.
       code-docker-internal:
-        # `private` still serves code-docker's OWN (not-yet-removed - see
-        # Phase 4 of .claude/backlog/functional-router-plan.md's migration)
-        # tailscaled instance's `publish:` targets, and is still
-        # CODE_SERVER_BIND_ADDR/WEBMANAGER_ADDR's default bind address
-        # regardless of tailscale - kept as-is until that default itself
-        # changes in Phase 4, once code-docker's own tailscaled is gone and
-        # this loopback-exposure reasoning no longer applies to code-docker.
+        # `private` is CODE_SERVER_BIND_ADDR/WEBMANAGER_ADDR's default bind
+        # address (a dedicated non-loopback IP, see docs/tailscale.md) -
+        # historically this existed so code-docker's own tailscaled could
+        # publish these ports without an automatic loopback-exposure
+        # workaround. Phase 4 of functional-router-plan.md's migration is
+        # now complete (see docs/router.md's "보안" section) - code-docker
+        # runs no tailscaled at all anymore, so that original reasoning no
+        # longer applies. Left as the default anyway since it still works
+        # and nothing forces a change; revisit only if there's a concrete
+        # reason to (e.g. simplifying to a loopback bind now that nginx is
+        # the only thing that needs to reach it, and nginx lives in this
+        # same container).
         aliases:
           - private
       code-docker-forwards:
-        # Still attached (dind/webmanager-style internal service discovery),
-        # but no longer aliased `forward` here - that alias moved to
-        # code-docker-router below, since router now owns the tailscale
-        # `forwards:` feature (socat listeners) entirely. `forward:<port>`
-        # still resolves from inside code-docker, just to router's IP now
-        # instead of code-docker's own. NOTE: code-docker's own (not yet
-        # removed - Phase 4) tailscale-forward program still tries to
-        # resolve this alias for itself and will fail/restart-loop
-        # harmlessly until Phase 4 deletes that program - see the Phase 2
-        # migration commit for the full explanation.
+        # Client-only attachment (no alias needed here) so `forward:<port>`
+        # resolves from inside code-docker - the alias itself now lives on
+        # code-docker-router below, since router owns the tailscale
+        # `forwards:` feature (socat listeners) entirely as of Phase 4's
+        # completed migration (functional-router-plan.md). code-docker
+        # itself runs no tailscale-forward program of its own anymore -
+        # this network is purely for reaching router's listener.
         {}
     # ports: block left entirely commented out on purpose - Compose rejects
     # a `ports:` key with zero array items, so the key itself has to go too,
