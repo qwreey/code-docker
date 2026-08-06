@@ -31,8 +31,10 @@
 FROM golang:1.25-alpine AS router-manager-build
 WORKDIR /src
 COPY backend/go.mod ./
+COPY backend/go.sum ./
 COPY backend/main.go ./
 COPY backend/handlers_devproxy.go ./
+COPY backend/handlers_tailscale.go ./
 COPY backend/internal ./internal
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /router-manager .
 

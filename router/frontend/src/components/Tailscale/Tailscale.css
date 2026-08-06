@@ -1,0 +1,106 @@
+/* Top-right tab group in .section-header - same visual language as
+   webmanager's Task Manager .processes-tabs (border-inclusive pill, active
+   tab filled with --accent), just not shared cross-folder CSS since the two
+   features don't otherwise depend on each other. */
+.tailscale-tabs {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  flex: none;
+  height: 2.15rem;
+}
+
+.tailscale-tab {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  border: none;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.4rem 1.1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tailscale-tab-active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.tailscale-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.tailscale-table th,
+.tailscale-table td {
+  text-align: left;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tailscale-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.form-grid-inline {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+.tailscale-status-note {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.tailscale-login-link {
+  margin-top: 0.5rem;
+  text-decoration: none;
+}
+
+/* Stacked, not side-by-side - "내 정보" is a narrow key-value list but "피어
+   목록" is a 5-column table that needs full width to stay readable; a
+   side-by-side auto-fit grid squeezed the peer table into half the page. */
+.tailscale-status-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tailscale-status-grid .card {
+  margin-top: 0;
+}
+
+.tailscale-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.tailscale-info-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.tailscale-info-list dt {
+  color: var(--text-muted);
+}
+
+.tailscale-info-list dd {
+  margin: 0;
+  font-family: var(--mono);
+  text-align: right;
+  word-break: break-word;
+}
+
+.tailscale-status-disclaimer {
+  margin: 1rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}

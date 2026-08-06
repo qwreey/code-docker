@@ -42,19 +42,25 @@ router 안의 한 기능 영역(egress/DNAT) 이름으로 유지 — 컨테이�
 이전 → tailscale → Dev Proxy+tinyauth → code-docker 컷오버 → webmanager 통합 → 문서)이
 전부 완료됨. 남은 건 이 마이그레이션 자체가 아니라 그 결과로 명확해진 후속 작업들:
 
-1. **router-frontend에 Tailscale UI 추가** — 지금 router-manager 백엔드는
-   `GET /api/tailscale/state`(읽기전용) 하나뿐이라, webmanager가 예전에 갖고 있던
-   forwards/publish CRUD + 로그인 트리거 UI는 이번에 포팅하지 않고 통째로 뺐음(가짜로
-   "이식 완료"라고 하지 않기 위한 의도적 선택 — 프론트만 옮기면 존재하지 않는 백엔드를
-   호출하는 깨진 UI가 됨). 실제로 하려면 router-manager에 `internal/tailscale`
-   패키지(webmanager가 쓰던 것과 비슷한 config/forwards/publish/login 관리)를 먼저
-   새로 만들어야 함 — "파일 이동"이 아니라 "새 기능 구현"에 가까운 별도 작업.
+1. **router-frontend에 Tailscale UI 추가** — 완료. `router/backend/internal/tailscale`에
+   webmanager가 쓰던 것과 같은 config.go(YAML load/save, ConfigPath를
+   `/var/lib/code-docker-router/tailscale/config.yaml`로 고정)/login.go(`tailscale up`
+   detached 실행, binpath override는 제거하고 state.go와 같이 PATH의 `tailscale` 사용)/
+   status.go(`tailscale status --json` 파싱)를 새로 포팅, `router/backend/internal/supervisor`
+   (webmanager 것 그대로, 같은 `/run/supervisor.sock`)도 함께 이식. `handlers_tailscale.go`가
+   GET/PUT `/api/tailscale/config`, GET/POST/DELETE `/api/tailscale/forwards[/{name}]`,
+   GET/POST/DELETE `/api/tailscale/publish[/{name}]`, GET `/api/tailscale/status`,
+   POST `/api/tailscale/login/{start,cancel}`를 등록 — mutation마다 해당 supervisord
+   프로그램(`tailscale-forward`/`tailscale-publish`)을 재시작. `router/frontend/src/api/client.ts`를
+   `createApiClient(prefix)` 팩토리로 일반화해서(Dev Proxy는 기존 `/dev-proxy` 그대로,
+   Tailscale은 `/tailscale` 바인딩) `Tailscale`/`Status`/`GlobalSettings`/`Forwards`/`Publish`
+   컴포넌트를 webmanager 옛 코드에서 포팅, webmanager `App.tsx`에 새 탭으로 연결. sshd(22)
+   자동 노출 경고 문구는 tailscaled가 이제 router에만 있고 code-docker엔 없다는 현재
+   아키텍처에 맞게 다시 씀(예전 문구는 tailscaled가 code-docker 안에 있던 시절 얘기라 더 이상
+   맞지 않았음).
 2. **router-manager 자체 admin API 인증** — 지금 `/api/dev-proxy/*`, `/api/tailscale/*`는
    host 포트가 안 열려 있다는 것만 믿고 인증 없이 열려 있음(Phase 2/3와 동일 논리). UI가
-   생겼으니 이제 tinyauth 등으로 이 API 자체를 보호할지 결정 필요.
-3. **shared UI kit** — router/frontend가 webmanager의 공통 컴포넌트(ErrorBanner 등)를
-   지금은 각자 따로 들고 있음(의도적 단순화, functional-router-plan.md 참고). 세 번째
-   패키지 소비자가 생기면 그때 진짜 공유 패키지로 뽑는 걸 고려.
+   생겼으니 이제 tinyauth 등으로 이 API 자체를 보호할지 결정 필요 — 아직 미정, 보류 중.
 
 실제 tailscale 로그인(authUrl 접속) 및 forwards:/publish: 실사용 트래픽 검증, tinyauth
 실제 로그인 성공 경로(거부 경로만 검증됨)는 사용자의 직접 인터랙션이 필요해 아직 안 됨.

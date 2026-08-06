@@ -34,3 +34,55 @@ export interface TailscaleState {
   backendState: string
   authUrl?: string | null
 }
+
+// Mirrors router/backend/internal/tailscale.GlobalConfig.
+export interface TailscaleGlobalConfig {
+  socksAddress: string
+  retryInterval: number
+}
+
+// Mirrors router/backend/internal/tailscale.Forward.
+export interface TailscaleForward {
+  name: string
+  localPort: number
+  remoteHost: string
+  remotePort: number
+  retryInterval: number
+}
+
+// Mirrors router/backend/internal/tailscale.PeerInfo.
+export interface TailscalePeerInfo {
+  hostName: string
+  dnsName: string
+  tailscaleIPs: string[]
+  relay: string
+  direct: boolean
+  online: boolean
+  tags: string[]
+  os: string
+}
+
+// Mirrors router/backend/internal/tailscale.Status.
+export interface TailscaleStatus {
+  backendState: string
+  authUrl: string
+  tailnetName: string
+  self: TailscalePeerInfo | null
+  peers: TailscalePeerInfo[]
+}
+
+// Mirrors GET /api/tailscale/status's response body.
+export interface TailscaleStatusResponse {
+  available: boolean
+  status?: TailscaleStatus
+}
+
+export type TailscalePublishMode = 'tcp' | 'tls-terminated-tcp'
+
+// Mirrors router/backend/internal/tailscale.Publish.
+export interface TailscalePublish {
+  name: string
+  tailscalePort: number
+  localPort: number
+  mode: TailscalePublishMode
+}

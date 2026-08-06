@@ -4,7 +4,7 @@ import type { SectionId } from './components/Layout/sections'
 import { Supervisor } from './components/Supervisor/Supervisor'
 import { SshKeys } from './components/SshKeys/SshKeys'
 import { GitConfig } from './components/GitConfig/GitConfig'
-import { DevProxy } from '@code-docker/router-frontend'
+import { DevProxy, Tailscale } from '@code-docker/router-frontend'
 import { Logs } from './components/Logs/Logs'
 import { Processes } from './components/Processes/Processes'
 import { Projects } from './components/Projects/Projects'
@@ -68,6 +68,7 @@ function App() {
           {active === 'ssh-keys' && <SshKeys />}
           {active === 'git-config' && <GitConfig />}
           {active === 'dev-proxy' && <DevProxy />}
+          {active === 'tailscale' && <Tailscale />}
           {active === 'logs' && (
             <RequiresUnlock>
               <Logs />

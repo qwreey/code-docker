@@ -178,3 +178,72 @@
   font-size: 0.85rem;
   margin: 0.75rem 0;
 }
+
+/* Added for the Tailscale tab port (webmanager/frontend's own common.css has
+   these already - kept in sync by hand, see plan.md's note on why a real
+   shared package isn't worth it yet at just two consumers). */
+.warning-note {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--color-yellow-bg);
+  color: var(--color-yellow-fg);
+  border: 1px solid var(--color-yellow-border);
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.section-header h1 {
+  margin: 0;
+}
+
+.mono-cell {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15em 0.6em;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.badge-green {
+  background: var(--color-green-bg);
+  color: var(--color-green-fg);
+  border-color: var(--color-green-border);
+}
+
+.badge-red {
+  background: var(--color-red-bg);
+  color: var(--color-red-fg);
+  border-color: var(--color-red-border);
+}
+
+.badge-yellow {
+  background: var(--color-yellow-bg);
+  color: var(--color-yellow-fg);
+  border-color: var(--color-yellow-border);
+}
+
+.badge-gray {
+  background: var(--color-gray-bg);
+  color: var(--color-gray-fg);
+  border-color: var(--color-gray-border);
+}

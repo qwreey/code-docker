@@ -14,6 +14,7 @@ import {
   Server,
   Terminal,
   Users,
+  Waypoints,
   Wrench,
 } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
@@ -31,6 +32,7 @@ const SECTION_ICON: Record<SectionId, typeof Server> = {
   'ssh-keys': KeyRound,
   'git-config': GitBranch,
   'dev-proxy': Route,
+  tailscale: Waypoints,
   logs: FileText,
   processes: Activity,
   projects: Folder,
