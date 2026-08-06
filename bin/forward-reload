@@ -1,2 +1,18 @@
 #!/bin/sh
-setsid supervisorctl restart tailscale-forward &
+# tailscale (daemon+forwards+publish) moved to the router container - see
+# docs/router.md and .claude/backlog/functional-router-plan.md. This script
+# used to restart code-docker's own tailscale-forward program via the local
+# supervisorctl socket; that program doesn't exist here anymore, so this now
+# just explains the new procedure instead of silently doing nothing.
+cat <<'EOF'
+forward-reload: tailscale (forwards/publish) now runs on the router
+container, not code-docker - this command can't reach it from here anymore.
+
+Edit the config on the host at ${ROUTER_VOLUME:-./router-data}/tailscale/config.yaml,
+then reload from the host (not from inside code-docker) with:
+
+  docker compose exec code-docker-router supervisorctl restart tailscale-forward tailscale-publish
+
+See docs/router.md for details.
+EOF
+exit 1

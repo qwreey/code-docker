@@ -50,10 +50,11 @@ cat .env.webmanager | docker compose exec -T code-docker \
 
 > **주의: webmanager는 자체 비밀번호 게이트를 지원합니다(선택 사항, 기본은 꺼짐).**
 > `WEBMANAGER_AUTH_PASSWORD_HASH` 환경변수에 argon2id로 해시한 비밀번호를 설정하면
-> `/api/auth/unlock`으로 풀기 전까진 접근할 수 없는 라우트가 생깁니다. 해제 후 다시
-> 안 물어보는 기간은 컨텍스트마다 다릅니다 — webmanager 자체의 쓰기 작업 재확인은
-> 10분, [Dev Proxy 인증](dev-proxy.md#인증)(Caddy `forward_auth` 경유)은 24시간(같은
-> 잠금 토큰을 서로 다른 기준으로 검사하는 구조입니다). **해시는 컨테이너가 이미 떠 있는 상태에서 아래 명령으로 직접
+> `/api/auth/unlock`으로 풀기 전까진 접근할 수 없는 라우트가 생깁니다(쓰기 작업 재확인
+> 기준 10분). [Dev Proxy 인증](dev-proxy.md#인증)은 이제 별개의 도구
+> ([tinyauth](router.md#tinyauth), router 컨테이너)가 담당하므로 이 잠금과는 완전히
+> 무관합니다 — 예전엔 같은 토큰을 공유했지만, Dev Proxy가 router로 옮겨가면서 분리됐습니다.
+> **해시는 컨테이너가 이미 떠 있는 상태에서 아래 명령으로 직접
 > 생성합니다**(비밀번호를 두 번 입력받아 오타를 확인하고, 화면엔 안 보이며, 결과로
 > `$argon2id$...`로 시작하는 해시 한 줄만 출력됨 — 이 값을 그대로 `.env.webmanager`
 > 파일([환경 변수](#환경-변수) 참고,
@@ -73,8 +74,11 @@ cat .env.webmanager | docker compose exec -T code-docker \
 > ```
 >
 > 원칙은 **조회(읽기)는 그대로 열어두고, 변경(쓰기)만 게이트** —
-> Supervisor의 start/stop/restart, Git Config/Tailscale/Dev Proxy의 모든 추가·수정·삭제, SSH
-> Keys 추가·삭제 등이 여기 해당합니다. 예외로 **Terminal, 파일 탭, Logs, Supervisor의
+> Supervisor의 start/stop/restart, Git Config의 모든 추가·수정·삭제, SSH
+> Keys 추가·삭제 등이 여기 해당합니다. Dev Proxy는 이제 router 컨테이너의 자체 API를
+> 호출하므로 이 게이트 대상이 아닙니다(개별 라우트의 "인증 요구"는 대신
+> [tinyauth](router.md#tinyauth)가 담당) — 아직 그 API 자체의 인증은 없습니다
+> ([router.md](router.md#아직-없는-것) 참고). 예외로 **Terminal, 파일 탭, Logs, Supervisor의
 > 프로그램별 로그 조회는 조회까지 통째로 게이트**됩니다(각각 root 쉘/임의 파일
 > 접근/로그 속 시크릿 노출 위험 때문). 값은 반드시 환경변수로만 주입해야 하며(설정
 > 파일에 저장하면 컨테이너 안에서 프로세스를 재시작해 우회할 수 있어 일부러 지원하지

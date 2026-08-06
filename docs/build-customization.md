@@ -17,12 +17,6 @@
 - [`recommendations.*.yaml`](#recommendationsyaml-추천-목록)
 - [`shell.*`](#shell-기본-셸-지정)
 
-**tailscale**
-- [`tailscale-service.*.sh`](#tailscale-servicesh-tailscaled-서비스)
-- [`tailscale-forward.*.sh`](#tailscale-forwardsh-포트-포워딩)
-- [`tailscale-status.*.sh`](#tailscale-statussh-로그인-상태-감시)
-- [`tailscale-config.*.yaml`](#tailscale-configyaml-tailscale-기본-설정)
-
 **webmanager**
 - [`webmanager.*.sh`](#webmanagersh-webmanager-실행)
 - [`supervisor-metadata.*.yaml`](#supervisor-metadatayaml-supervisor-탭-메타데이터)
@@ -53,7 +47,7 @@ code-server 서비스 엔트리포인트입니다. code-server 의 업데이트/
 
 code-server 설정 파일입니다. **매 시작마다 `/code/.local/share/code-docker/code/config.yaml`로 무조건 덮어써집니다** — 다른 override 패턴 파일들과 마찬가지로 완전히 파생된(derived) 파일이라, `/code/.local/share/code-docker/code/config.yaml`을 직접 편집해도 다음 재시작에 사라집니다. 커스터마이징하려면 `code-config.override.yaml`을 만들고 재빌드하세요.
 
-**`bind-addr`는 여기 넣지 마세요 — 넣어도 무시됩니다.** `code-runner.default.sh`가 항상 `--bind-addr` CLI 인자를 붙여서 실행하는데, code-server는 CLI 인자를 config.yaml 값보다 우선하므로 여기(default든 override든)에 뭘 적어도 그 값이 이깁니다. 실제 바인드 주소를 바꾸고 싶으면 `docker-compose.yml`의 `CODE_SERVER_BIND_ADDR`(기본값 `private:8080`, 전용 tailscale IP)을 바꾸세요 — nginx의 upstream 대상도 같은 값을 따라가므로(`nginx-service.default.sh`) 라우팅이 어긋날 걱정 없이 이거 하나만 바꾸면 됩니다. `127.0.0.1`/`0.0.0.0` 대신 `private`가 기본인 이유는 [tailscale 문서의 보안 절](tailscale.md#보안-tailnet-acl-설정) 참고 — loopback에 바인드하면 tailscaled가 같은 포트로 tailnet 전체에 자동 노출해버립니다.
+**`bind-addr`는 여기 넣지 마세요 — 넣어도 무시됩니다.** `code-runner.default.sh`가 항상 `--bind-addr` CLI 인자를 붙여서 실행하는데, code-server는 CLI 인자를 config.yaml 값보다 우선하므로 여기(default든 override든)에 뭘 적어도 그 값이 이깁니다. 실제 바인드 주소를 바꾸고 싶으면 `docker-compose.yml`의 `CODE_SERVER_BIND_ADDR`(기본값 `private:8080`)을 바꾸세요 — nginx의 upstream 대상도 같은 값을 따라가므로(`nginx-service.default.sh`) 라우팅이 어긋날 걱정 없이 이거 하나만 바꾸면 됩니다. `private`는 `code-docker-internal` 네트워크 alias일 뿐(전용 tailscale IP가 아닙니다 — tailscale은 이제 [router 컨테이너](router.md)에서 실행되고, code-docker 자신은 tailscaled를 갖고 있지 않습니다), loopback 대신 이 alias에 바인드해야 할 필수적인 이유는 더 이상 없지만 기본값은 그대로 유지하고 있습니다.
 
 여기의 각 요소는 /code/.local/share/code-docker/code/code-server/bin/code-server --help 를 통해 확인해볼 수 있습니다. 각각의 인자 `--some=value` 는 `some: value` 로 작성할 수 있습니다.
 
@@ -105,21 +99,11 @@ supervisord 에 사용될 설정파일입니다.
 
 sshd 를 설정하고 실행합니다. 기본적으로 `/etc/ssh`는 적절한 마운트가 있어 유지됩니다. 따라서 `user-init` 과 유사하게 작성할 수 있습니다.
 
-### `tailscale-service.*.sh` (tailscaled 서비스)
-
-`tailscaled` 를 설정하고 실행합니다 (userspace networking 모드). 로그인 세션은 `/code/.local/share/code-docker/tailscale/state` 에 영속되므로, `sshd-service.*.sh` 와 유사하게 재작성할 수 있습니다.
-
-### `tailscale-forward.*.sh` (포트 포워딩)
-
-`/code/.local/share/code-docker/tailscale/config.yaml` 을 읽어 `forwards`(socat + SOCKS5)/`publish`(`tailscale serve`) 를 구성하는 스크립트입니다. `tailscaled`/`tailscale-status` 와 별도 supervisord program 으로 등록되어 있어, 이 스크립트만 (`forward-reload` 로) 재시작해도 `tailscaled` 의 로그인 세션에는 영향을 주지 않습니다.
-
-### `tailscale-status.*.sh` (로그인 상태 감시)
-
-`tailscale status --json` 를 주기적으로 확인해 로그인 필요 여부/URL을 `/code/.local/share/code-docker/code/patch/tailscale/status.json` 에 기록하는 스크립트입니다 (`tailscale-notify.js` 가 폴링하는 대상). `tailscaled`/`tailscale-forward` 와도 별도 supervisord program 이라, 로그인이나 포워딩 상태와 무관하게 항상 동작합니다.
-
-### `tailscale-config.*.yaml` (tailscale 기본 설정)
-
-`/code/.local/share/code-docker/tailscale/config.yaml` 이 아직 없을 때(최초 실행 시) 복사되는 기본값입니다. 이미 생성된 경우 `/code/.local/share/code-docker/tailscale/config.yaml` 을 직접 수정하세요.
+tailscale 관련 override 파일(`tailscale-service.*.sh`, `tailscale-forward.*.sh`,
+`tailscale-publish.*.sh`, `tailscale-config.*.yaml`)은 이제 code-docker가 아니라
+**router** 컨테이너(`router/config/tailscale/`)에 있습니다 — 같은 override 패턴이지만
+재빌드 대상이 `code-docker-router` 서비스입니다. 자세한 내용은 [router.md](router.md)를
+확인하세요.
 
 ### `code-patch.*.sh` (code-patch 심기 스크립트)
 
@@ -218,9 +202,11 @@ webmanager는 지금처럼 `/api/...`를 그대로 받습니다. access/error �
 자신의 stdout/stderr로 나가서 다른 프로그램들과 동일하게 supervisord가 파일로
 캡처합니다(`vector`가 그 파일을 다시 tail). tailscale의 자동 loopback 포워딩
 경로(`127.0.0.1`로 들어온 요청)만 따로 거부하는 조건(`NGINX_BLOCK_LOOPBACK`,
-기본 켜짐)과, `ALLOWED_HOSTS`로 조절하는 Host 헤더 화이트리스트도 이 파일에
-있습니다 — 둘 다 [tailscale 문서의 보안 절](tailscale.md#보안-tailnet-acl-설정)
-참고. `TRUSTED_PROXIES`(외부 리버스 프록시의 IP/CIDR를 알려주면 `$remote_addr`가
+기본 켜짐 — router가 code-docker를 향해 publish하는 경로는 아니지만, router가
+사용자 대신 tailnet peer로부터 받은 트래픽이 우회 경로로 들어올 가능성에 대한
+방어 차원으로 유지)과, `ALLOWED_HOSTS`로 조절하는 Host 헤더 화이트리스트도 이
+파일에 있습니다. `/tailscale/`·`/dev-proxy/` 위치도 여기서 router로 프록시됩니다 —
+자세한 내용은 [router.md](router.md) 참고. `TRUSTED_PROXIES`(외부 리버스 프록시의 IP/CIDR를 알려주면 `$remote_addr`가
 그 프록시의 X-Forwarded-For를 신뢰해서 실제 클라이언트 IP로 채워짐, 기본 빈 값)도
 같이 있습니다.
 

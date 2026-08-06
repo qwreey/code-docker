@@ -89,9 +89,17 @@ vscord 확장으로 Discord Rich Presence를 연동하고, ssh 소켓 포워딩�
 
 자세한 내용은 [tips/dind.md](tips/dind.md)를 확인하세요.
 
-## 아웃바운드 네트워크 격리 (netgate)
+## router (네트워크 경계 컨테이너)
 
-code-docker/dind가 `code-docker-netinit`(및 dind 자신)이 계속 심어주는 라우트를 통해서만 아웃바운드로 나갈 수 있도록 강제하고, `code-docker-netgate` 서비스가 실제 국경(사설 대역 차단, squid 블록리스트, 인바운드 포트포워딩)을 담당하는 기능입니다 - 컨테이너 안 AI 에이전트가 임의로 인터넷/사설망에 접근하는 걸 막기 위한 것입니다. `docker compose up`만으로 바로 동작합니다.
+code-docker보다 신뢰 수준이 높은 별도 컨테이너(`code-docker-router`)가 code-docker의
+네트워크 경계와 관련된 기능을 전담합니다 — 아웃바운드 격리(netgate), tailscale, Dev
+Proxy(내부 Caddy), tinyauth(Dev Proxy 라우트별 인증) 네 가지입니다.
+
+자세한 내용은 [router.md](router.md)를 확인하세요.
+
+### 아웃바운드 네트워크 격리 (netgate)
+
+code-docker/dind가 `code-docker-netinit`(및 dind 자신)이 계속 심어주는 라우트를 통해서만 아웃바운드로 나갈 수 있도록 강제하고, router 컨테이너가 실제 국경(사설 대역 차단, squid 블록리스트, 인바운드 포트포워딩)을 담당하는 기능입니다 - 컨테이너 안 AI 에이전트가 임의로 인터넷/사설망에 접근하는 걸 막기 위한 것입니다. `docker compose up`만으로 바로 동작합니다.
 
 자세한 내용은 [egress-netgate.md](egress-netgate.md)를 확인하세요 - 기능 자체를 끄고 싶다면 [당장 인터넷이 필요하다면](egress-netgate.md#당장-인터넷이-필요하다면-기능-자체를-끄기) 절을 먼저 보세요.
 
@@ -109,28 +117,24 @@ cp example-env .env
 
 ## tailscale 연결
 
-code-docker 가 고유한 tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열거나 `ssh -R` 로 소켓을 전송하지 않고도 tailnet 안 어디서든 code-docker 에 접근하거나, 반대로 code-docker 에서 다른 tailnet 기기의 포트를 가져올 수 있습니다.
+router 컨테이너(code-docker 자신이 아님, [router.md](router.md) 참고)가 고유한
+tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열거나 `ssh -R` 로 소켓을
+전송하지 않고도 tailnet 안 어디서든 code-docker 에 접근하거나, 반대로 code-docker 에서
+다른 tailnet 기기의 포트를 가져올 수 있습니다.
 
-자세한 내용은 [tailscale.md](tailscale.md)를 확인하세요.
-
-- [켜고 끄기](tailscale.md#켜고-끄기)
-- [최초 로그인과 상태 배너](tailscale.md#최초-로그인과-상태-배너)
-- [자체 호스팅 로그인 서버 (Headscale)](tailscale.md#자체-호스팅-로그인-서버-headscale)
-- [호스트네임 지정 (MagicDNS)](tailscale.md#호스트네임-지정-magicdns)
-- [포트 가져오기 (forwards)](tailscale.md#포트-가져오기-forwards)
-- [포트 내보내기 (publish)](tailscale.md#포트-내보내기-publish)
-- [보안: tailnet ACL 설정](tailscale.md#보안-tailnet-acl-설정) — 놓치기 쉬운 필수 설정입니다
+자세한 내용은 [router.md의 tailscale 절](router.md#tailscale)을 확인하세요 — 이
+문서(`tailscale.md`)는 이제 짧은 안내 페이지입니다.
 
 ## dev 서버 노출 (Dev Proxy)
 
-컨테이너 안에서 뜬 dev 서버(`npm run dev` 등)를 와일드카드 서브도메인으로 바깥에 노출하는 기능입니다. 내부 Caddy 인스턴스가 서브도메인별로 로컬 포트로 프록시하고, [webmanager의 Dev Proxy 탭](webmanager.md)에서 항목을 관리합니다.
+컨테이너 안에서 뜬 dev 서버(`npm run dev` 등)를 와일드카드 서브도메인으로 바깥에 노출하는 기능입니다. router 컨테이너의 내부 Caddy 인스턴스가 서브도메인별로 로컬 포트로 프록시하고, [webmanager의 Dev Proxy 탭](webmanager.md)에서 항목을 관리합니다(router가 제공하는 페이지 컴포넌트를 webmanager가 그대로 가져와 보여줍니다).
 
 자세한 내용은 [dev-proxy.md](dev-proxy.md)를 확인하세요.
 
 - [켜고 끄기 / 기본 설정](dev-proxy.md#켜고-끄기--기본-설정)
 - [expose 추가하기](dev-proxy.md#expose-추가하기)
 - [바깥 리버스 프록시 연결하기](dev-proxy.md#바깥-리버스-프록시-연결하기)
-- [인증](dev-proxy.md#인증) — 켜려면 `WEBMANAGER_CODE_SERVER_URL`/`WEBMANAGER_AUTH_COOKIE_DOMAIN` 둘 다 필요합니다, 놓치기 쉬운 필수 설정입니다
+- [인증](dev-proxy.md#인증) — [router의 tinyauth](router.md#tinyauth)에 최소 한 명의 사용자가 등록되어 있어야 합니다, 놓치기 쉬운 필수 설정입니다
 
 ## webmanager (관리자 패널)
 
@@ -141,7 +145,7 @@ code-docker 가 고유한 tailscale IP를 가지도록 하여, ssh/adb 를 위�
 - [Supervisor](webmanager.md#supervisor)
 - [SSH Keys](webmanager.md#ssh-keys)
 - [Git Config](webmanager.md#git-config)
-- [Tailscale](webmanager.md#tailscale)
+- [Dev Proxy](webmanager.md#dev-proxy)
 - [Logs](webmanager.md#logs)
 - [Task Manager](webmanager.md#task-manager)
 - [Claude Code](webmanager.md#claude-code)
@@ -169,9 +173,12 @@ webmanager 자체 비밀번호 게이트를 켜는 방법과, 이미지를 업�
 
 - **빌드**: `build.*.sh`
 - **code-server**: `code-service.*.sh`, `code-config.*.yaml`, `code-env.*.sh`, `code-runner.*.sh`, `recommendations.*.yaml`, `shell.*`
-- **tailscale**: `tailscale-service.*.sh`, `tailscale-forward.*.sh`, `tailscale-status.*.sh`, `tailscale-config.*.yaml`
 - **webmanager**: `webmanager.*.sh`, `supervisor-metadata.*.yaml`, `example-env.webmanager`(런타임 환경변수 템플릿, 저장소 루트)
-- **기타**: `supervisord.*.conf`, `supervisord/*.conf`, `user-init.*.sh`, `sshd-service.*.sh`, `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`(`TAILSCALE_LOG_LEVEL`로 유독 시끄러운 tailscaled 로그를 로그인/상태전환/fatal 에러만 남도록 필터링), `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅, `NGINX_LOG_LEVEL`로 access_log 상세도 조절), `nginx-error.*.html`(code-server가 아직 안 떴을 때 502 대신 보여주는 자동 재시도 페이지)
+- **기타**: `supervisord.*.conf`, `supervisord/*.conf`, `user-init.*.sh`, `sshd-service.*.sh`, `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`, `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅 + router로 가는 `/tailscale/`·`/dev-proxy/`·`/exports/` 프록시, `NGINX_LOG_LEVEL`로 access_log 상세도 조절), `nginx-error.*.html`(code-server가 아직 안 떴을 때 502 대신 보여주는 자동 재시도 페이지)
+
+router 컨테이너(`router/` 서브트리) 자체의 override 파일 목록은 [router.md](router.md)를
+확인하세요 — `router/config/netgate/`, `router/config/tailscale/`,
+`router/config/caddy-adapter/`에 나뉘어 있습니다.
 
 # 코드 서버 패치
 

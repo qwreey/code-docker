@@ -1,76 +1,15 @@
 # tailscale 연결
 
-`docker-compose.yml` 의 `TAILSCALE_ENABLED` 를 `"false"` 로 설정하면 tailscale 관련 기능이 전부 꺼집니다 (`tailscaled`/`tailscale-forward` 두 프로그램은 그대로 떠있지만 아무 것도 하지 않습니다). 기본값은 `"true"` 입니다.
+tailscale(데몬+로그인+포트 가져오기/내보내기)은 code-docker가 아니라 **router**
+컨테이너에서 실행됩니다 — code-docker보다 신뢰 수준이 높은 국경 컨테이너에 네트워크
+관련 기능을 모으는 설계입니다
+([`.claude/backlog/functional-router-plan.md`](../.claude/backlog/functional-router-plan.md)
+참고). code-docker 자신은 tailscale 프로세스를 하나도 갖고 있지 않습니다.
 
-code-docker 가 고유한 tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열거나 `ssh -R` 로 소켓을 전송하지 않고도 tailnet 안 어디서든 code-docker 에 접근하거나, 반대로 code-docker 에서 다른 tailnet 기기(예: 랩탑의 adb 서버)의 포트를 가져올 수 있습니다. `NET_ADMIN`/커널 tun 디바이스 없이 tailscaled 의 userspace networking 모드만으로 동작합니다.
+**자세한 내용, 설정 방법, forwards/publish, 보안은 모두 [router.md](router.md#tailscale)로
+옮겼습니다.**
 
-## 켜고 끄기
-
-`docker-compose.yml` 의 `TAILSCALE_ENABLED` 를 `"false"` 로 설정하면 됩니다 (위 참고). 다시 켜려면 `"true"` 로 되돌리고 `docker compose up -d` 하세요.
-
-## 최초 로그인과 상태 배너
-
-**자동 로그인 시도는 컨테이너 생애주기 동안 딱 한 번만 일어납니다** (`state/.login-attempted` 마커로 추적). 로그인을 완료하지 않은 채 컨테이너를 껐다 켰다 하면 매 재부팅마다 새 인증 요청이 tailscale 컨트롤 서버에 등록되는 문제가 있었어서(일종의 self-DDoS), 이후 재시도는 사람이 명시적으로 트리거해야만 일어나도록 바뀌었습니다. 로그인 서버(`TAILSCALE_LOGIN_SERVER`)를 바꾸려고 `/code/.local/share/code-docker/tailscale/state` 를 지우고 재시작하는 절차([아래](#자체-호스팅-로그인-서버-headscale) 참고)를 밟으면 이 마커도 같이 지워지므로 자동 시도가 다시 한 번 살아납니다 - 별도로 신경 쓸 필요 없습니다.
-
-최초 실행 시 `docker compose logs -f code-docker` 로 로그를 확인하면 `tailscaled` 프로그램 쪽에 인증 URL이 출력됩니다. 이 URL을 브라우저로 한 번 열어 로그인하면 됩니다 (auth key 대신 인터랙티브 로그인 방식). 로그인 상태는 `/code/.local/share/code-docker/tailscale/state` 에 영속되므로 컨테이너를 재생성해도 다시 로그인할 필요가 없습니다.
-
-자동 시도를 놓쳤거나(이미 재부팅을 몇 번 했다거나) 이미 소진된 상태라면, [webmanager의 Tailscale 탭](webmanager.md#tailscale)에서 "로그인 시도하기" 버튼으로 로그인을 다시 트리거할 수 있습니다 - 컨테이너를 재시작할 필요가 없습니다.
-
-로그를 뒤질 필요 없이, code-server 화면 자체에도 로그인이 필요할 때 우측 상단에 배너로 뜹니다 (URL이 있으면 로그인 링크를, 아직 없으면 webmanager로 가는 링크를 보여줍니다 - 현재 상태 문자열도 그대로 표시됩니다). 배너의 "Ignore"를 누르면 같은 상태에 대해서는 다시 뜨지 않습니다(브라우저 `localStorage`에 저장, 상태가 실제로 바뀌면 한 번은 다시 뜹니다). 배너에는 tailscale을 아예 쓰지 않을 거라면 [`TAILSCALE_ENABLED=false`](#켜고-끄기)로 끌 수 있다는 안내도 함께 표시됩니다. 로그인이 완료되면 별도로 "Tailscale connected" 토스트도 뜹니다. 이미 브라우저 알림 권한을 허용해둔 상태라면 OS 알림도 함께 뜹니다. `code-patch` 가 기본으로 심어주는 `/code/.local/share/code-docker/code/patch/tailscale-notify.js`(폴링 + 표시할 내용 + ignore 상태) 와 `/code/.local/share/code-docker/code/patch/cd-dialog.js`(배너/토스트/알림을 그리는 재사용 가능한 `window.CDDialog` 모듈) 두 파일로 구성되며, [빌드 커스터마이징 문서의 `code-patch/`](build-customization.md) 를 통해 관리됩니다 - `patch/*.js` 자체는 [코드 서버 패치](code-server-patch.md)와 동일하게 동작하는 파일이라 직접 편집/교체 가능합니다.
-
-## 자체 호스팅 로그인 서버 (Headscale)
-
-기본적으로 공식 tailscale.com 컨트롤 서버에 로그인합니다. Headscale 등 자체 호스팅 서버를 쓰고싶다면 `docker-compose.yml` 의 `TAILSCALE_LOGIN_SERVER` 환경변수를 원하는 URL로 설정하세요 (`tailscale up --login-server=` 로 전달됩니다). 이미 로그인된 상태에서 이 값을 바꾼 경우, `/code/.local/share/code-docker/tailscale/state` 를 지우고 컨테이너를 재시작해야 새 서버로 다시 로그인합니다.
-
-## 호스트네임 지정 (MagicDNS)
-
-기본적으로 tailscaled 는 이 컨테이너의 `hostname:code-docker` 를 그대로 tailnet 호스트네임으로 등록합니다 (MagicDNS로 `https://code-docker.your-tailnet.ts.net` 형태로 접근 가능). 이 값은 `docker-compose.yml` 에 고정되어 있고 [`PREFIX`](build-customization.md)로 인스턴스별로 분리되지 않으므로, 같은 tailnet 에 여러 code-docker 인스턴스를 올리면 이름이 충돌합니다.
-
-`docker-compose.yml` 의 `TAILSCALE_HOSTNAME` 환경변수를 원하는 이름으로 설정하면 (아직 로그인 전이라면) 최초 자동 로그인 시도나 webmanager의 "로그인 시도하기" 버튼이 이 값을 `tailscale up --hostname=` 으로 전달합니다.
-
-이미 로그인되어 있는 상태에서 이 값을 바꾸는 경우, 자동 재시도는 `BackendState`가 이미 `Running`이면 아예 스킵되므로 `docker compose up -d`만으로는 반영되지 않습니다 - [웹 터미널](webmanager.md#terminal)에서 `tailscale up --hostname=원하는이름` 을 직접 한 번 실행하면 재로그인 없이 즉시 이름이 바뀝니다 (또는 `/code/.local/share/code-docker/tailscale/state`를 지우고 재시작해 처음부터 다시 로그인해도 됩니다).
-
-## 설정 파일
-
-수신/발신 설정은 `/code/.local/share/code-docker/tailscale/config.yaml` 을 편집합니다 (최초 실행 시 기본값이 자동 생성됩니다).
-
-```yaml
-forwards:
-  - name: adb                    # 로그/디버깅용 이름표
-    local_port: 5037
-    remote_host: laptop          # tailscale hostname 또는 IP
-    remote_port: 5037
-
-publish:
-  - name: dev-server
-    tailscale_port: 80
-    local_port: 3000
-    mode: tcp                    # tcp | tls-terminated-tcp
-```
-
-## 포트 가져오기 (forwards)
-
-다른 tailnet 기기의 포트를 code-docker 로 가져옵니다. 컨테이너 안에서는 `forward` 라는 hostname 으로 접근하세요 (예: [adb 연결](tips/adb.md)은 `ANDROID_ADB_SERVER_ADDRESS=forward` 로 설정하는 방식 - 기존 `ssh -R` 방식의 대안입니다). 편집 후에는 `forward-reload` 명령으로 반영합니다 (`tailscale-forward` 서비스만 재시작하며, 로그인 세션은 그대로 유지됩니다).
-
-## 포트 내보내기 (publish)
-
-code-docker 의 로컬 포트를 tailscale IP에 명시적으로 게시합니다 (포트 리매핑, 또는 `mode: tls-terminated-tcp` 로 무료 HTTPS 종단). 게시하려는 서비스는 `0.0.0.0`/`localhost` 가 아니라 `private` hostname(자기 자신의 tailscale용 전용 IP)에 bind 되어 있어야 합니다 — `0.0.0.0`/`localhost` 에 바인드된 서비스는 `tailscale serve` 규칙이 없어도 같은 포트 번호로 tailnet 전체에 자동 노출되기 때문에([아래](#보안-tailnet-acl-설정) 참고), 여기서 명시적으로 게시하기 전까지는 노출되지 않게 하려면 `private` 에 바인드해야 합니다. 편집 후에는 `forwards` 와 마찬가지로 `forward-reload` 로 반영합니다.
-
-## 보안: tailnet ACL 설정
-
-> tailscaled 는 `tailscale serve` 규칙이 없는 포트도 같은 번호로 `127.0.0.1`/`0.0.0.0` 에 떠있는 서비스에 자동으로 연결해주기 때문에, 이 자동 노출 대상이 되는 포트가 아예 없어야 ACL 없이도 안전합니다. **sshd(22)만은 여기서 피할 방법이 없습니다** — 호스트 포트 퍼블리시 때문에 `0.0.0.0` 에 바인드되어야 하기 때문인데, 키 인증만 통과하면 접근 가능해서(비밀번호 로그인 없음) 위험도는 낮게 보고 있습니다.
->
-> code-server(내부 포트 8080)/webmanager(내부 포트 81)는 이제 `0.0.0.0`/`127.0.0.1` 대신 `private` hostname(전용 tailscale IP, [위 "포트 내보내기" 절](#포트-내보내기-publish) 참고)에 바인드되어 있어서 이 자동 노출 대상이 아닙니다. 이 둘을 대신 물려주는 in-container nginx(포트 80, 컨테이너 밖 리버스 프록시에 물리는 지점)는 host 포트 퍼블리시 때문에 여전히 `0.0.0.0` 에 있어야 하지만, `127.0.0.1` 으로 들어오는 연결(정확히 tailscaled 의 자동 포워딩 경로)만 403 으로 거부하는 조건이 있어서(`config/nginx.default.conf`, [`NGINX_BLOCK_LOOPBACK`](../example-env)으로 켜고 끔 - 기본 켜짐), tailnet 을 통한 접근은 여기서도 막힙니다. 로컬에서 직접 loopback 으로 nginx 앞단에 프록시(stunnel/socat 등)를 두는 특수한 구성이 있다면 `NGINX_BLOCK_LOOPBACK=false`로 꺼야 하는데, 그러면 이 문단이 설명하는 자동노출 문제가 다시 열리니 신중하게 판단하세요. 추가로 [`ALLOWED_HOSTS`](../example-env)(nginx Host 헤더 화이트리스트)를 설정하면 리버스 프록시를 거치지 않고 퍼블리시된 포트 80에 직접 접근하는 경우도 걸러낼 수 있습니다 — 다만 Host 헤더는 클라이언트가 마음대로 정할 수 있으므로 스푸핑 방지는 아니고, 우발적 접근(스캐너 등)을 줄이는 보조 수단입니다.
->
-> **그래도 sshd(22)에 대한 백스톱으로 tailnet 관리 콘솔(ACL)에서 code-docker 태그로 접근 가능한 포트를 제한하는 걸 권장합니다.** 예:
-> ```json
-> {
->   "tagOwners": { "tag:code-docker": ["autogroup:admin"] },
->   "grants": [
->     { "src": ["autogroup:member"], "dst": ["tag:code-docker"], "ip": ["tcp:22", "tcp:80"] }
->   ]
-> }
-> ```
-> 이게 없으면 sshd 는 항상 tailnet 전체에 열려있는 상태입니다 (포트 80도 위 방어 계층을 신뢰하지 못하겠다면 같이 막아도 무방).
->
-> `forwards`/`publish` 도 같은 이유로 안전합니다 — 이미 전용 네트워크의 자기 자신 IP(`private`/`forward`)에만 바인드되므로, 자동 노출에 걸리지 않습니다. private 하게 유지하고 싶은, 직접 띄운 서비스(dev 서버 등)는 `0.0.0.0`/`localhost` 대신 `private` 에 bind 하고 필요할 때만 `publish:` 에 추가하세요. `forwards:` 로 가져온 것들은 `forward` hostname 으로만 접근 가능하니 혼동하지 마세요.
+code-docker 쪽에 남아있는 것은 로그인 필요 시 code-server 화면에 뜨는 배너뿐입니다 —
+`config/code-patch/tailscale-notify.default.js`가 router의 읽기전용 상태 API를
+(code-docker의 nginx가 `/tailscale/` 경로로 프록시) 4초마다 폴링합니다. 배너 자체의
+Ignore/알림 동작은 이전과 동일합니다.

@@ -4,7 +4,11 @@ code-docker 안에서 실행되는 AI 코딩 에이전트(Claude Code 등)가 �
 버그로 인해 컨테이너 바깥(인터넷, 특히 같은 네트워크 위 공유기/NAS 같은 사설망 장비)에
 임의로 접근하지 못하게 막는 기능입니다. 전체 설계와 검토했다가 기각한 대안들은
 [`.claude/backlog/egress-netgate-plan.md`](../.claude/backlog/egress-netgate-plan.md)에
-정리되어 있습니다.
+정리되어 있습니다. 이 기능은 지금 **router** 컨테이너 안 한 기능 영역으로 통합되어
+있습니다(`code-docker-router` 서비스, 예전 이름은 `code-docker-netgate`) — router의
+다른 역할(tailscale, Dev Proxy 등)은 [router.md](router.md)를 확인하세요. 이 문서
+안에서 "netgate"는 그 기능 영역 자체(iptables 필터링+squid+DNAT)를 가리키는 이름으로
+계속 씁니다.
 
 **현재 상태: 1단계(라우팅 강제)와 2단계(`netgate`의 실제 필터링)가 모두 구현되어
 있습니다.** `docker compose up`만으로 code-docker/dind의 아웃바운드가 실제로
@@ -14,15 +18,15 @@ code-docker 안에서 실행되는 AI 코딩 에이전트(Claude Code 등)가 �
 
 - code-docker/dind는 `code-docker-external`(인터넷으로 나가는 네트워크)에 직접 붙어있지
   않습니다. 대신 `code-docker-netinit`이라는 작은 사이드카가 code-docker의 네트워크 설정
-  안에 계속 "기본 게이트웨이는 `netgate`다"라는 라우트를 심어둡니다. code-docker 자신은
+  안에 계속 "기본 게이트웨이는 `router`다"라는 라우트를 심어둡니다. code-docker 자신은
   이 설정을 바꿀 권한(`NET_ADMIN`)이 없으므로, 프롬프트 인젝션으로 오염된 에이전트가 셸
   명령을 마음대로 실행해도 이 라우트를 스스로 바꿀 수 없습니다.
-- `code-docker-netgate` 컨테이너가 실제 국경(border) 역할을 합니다 - `code-docker-internal`
+- `code-docker-router` 컨테이너가 실제 국경(border) 역할을 합니다 - `code-docker-internal`
   과 `code-docker-external` 양쪽에 다리를 걸치고, 사설 대역(RFC1918)으로 나가는 트래픽을
   차단하고, HTTP(S)는 squid로 도메인 블록리스트를 적용하고, 호스트의 포트 80을
   code-docker로 전달(포트포워딩)합니다.
 - **차단은 목적지 IP 기준입니다.** 같은 네트워크(`code-docker-internal`)에 붙어있는 다른
-  컨테이너(dind, netgate 자신 등)로 가는 트래픽은 애초에 `netgate`를 거치지 않고
+  컨테이너(dind, router 자신 등)로 가는 트래픽은 애초에 netgate 필터링을 거치지 않고
   바로 갑니다 - "그냥 아무 IP나 다 막아준다"는 뜻이 아닙니다.
 
 ### "같은 서브넷은 게이트웨이를 거치지 않는다"는 게 무슨 뜻인가요
@@ -30,9 +34,9 @@ code-docker 안에서 실행되는 AI 코딩 에이전트(Claude Code 등)가 �
 일반적인 라우팅에서, 목적지가 **나와 같은 네트워크 대역(서브넷) 안**에 있으면 컴퓨터는
 게이트웨이(라우터)에게 물어보지 않고 그 목적지에 바로 패킷을 보냅니다 - 마치 같은 건물
 안 옆방에 갈 때 건물 정문 경비원을 거치지 않는 것과 같습니다. `code-docker`,
-`code-docker-dind`, `code-docker-netgate`는 모두 `code-docker-internal`이라는 같은
+`code-docker-dind`, `code-docker-router`는 모두 `code-docker-internal`이라는 같은
 서브넷 위에 있으므로, 이들끼리 주고받는 트래픽(`code-docker → dind`,
-`code-docker → netgate` 등)은 애초에 netgate의 필터링 로직을 거치지 않습니다 - 라우팅의
+`code-docker → router` 등)은 애초에 netgate의 필터링 로직을 거치지 않습니다 - 라우팅의
 기본 동작(connected route)이 게이트웨이를 자동으로 우회시키기 때문입니다. netgate의
 RFC1918 차단 규칙이 `code-docker-internal` 자신의 대역(예: `172.22.0.0/16`)까지
 막아버리는 게 아닌가 걱정할 필요는 없습니다 - 애초에 그 트래픽은 규칙이 적용되는 지점
@@ -44,22 +48,22 @@ RFC1918 차단 규칙이 `code-docker-internal` 자신의 대역(예: `172.22.0.
 
 ```
 code-docker (code-docker-internal 전용, NET_ADMIN 없음)
-   │  code-docker-netinit이 지속적으로 심어주는 라우트로 default gw = netgate
+   │  code-docker-netinit이 지속적으로 심어주는 라우트로 default gw = router
    ▼
-code-docker-netgate (code-docker-internal + code-docker-external 양쪽)
+code-docker-router (code-docker-internal + code-docker-external 양쪽)
    │  - ip_forward + MASQUERADE + FORWARD 순서 있는 allow/block 룰(RFC1918 등)
    │  - squid REDIRECT 가로채기 (dstdomain/SNI 블록리스트, HTTP(S))
    ▼
 code-docker-external → 인터넷
 
-호스트:80 → code-docker-netgate (PREROUTING DNAT) → code-docker:80 (nginx)
+호스트:80 → code-docker-router (PREROUTING DNAT) → code-docker:80 (nginx)
 
 code-docker-netinit (network_mode: service:code-docker + NET_ADMIN, 방어적 루프로
    code-docker의 netns 안에 기본 라우트를 지속적으로 재적용)
 ```
 
-- `config/netgate/config.default.yaml` - CIDR allow/block 순서 리스트(`outbound:`)와
-  포트포워딩(`forwards:`)을 선언하는 설정 파일. `config/netgate/firewall.default.sh`가
+- `router/config/netgate/config.default.yaml` - CIDR allow/block 순서 리스트(`outbound:`)와
+  포트포워딩(`forwards:`)을 선언하는 설정 파일. `router/config/netgate/firewall.default.sh`가
   30초마다 이 파일을 읽어 iptables 규칙으로 변환합니다. 순서가 중요합니다 - iptables
   체인은 first-match-wins이므로, 구체적인 예외를 넓은 차단보다 먼저 배치해야 합니다.
 - 기본 `outbound:` 값은 RFC1918(`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) +
@@ -76,11 +80,11 @@ code-docker-netinit (network_mode: service:code-docker + NET_ADMIN, 방어적 �
 ## 위험한 패턴 - 새 브리징 컨테이너를 즉흥적으로 추가하지 마세요
 
 `code-docker-internal`과 `code-docker-external`(또는 호스트) 양쪽에 붙는 컨테이너는 그
-자체로 `netgate`/dind와 동급의 신뢰 레벨을 가집니다. "외부 Caddy가 code-docker에 못
+자체로 `router`/dind와 동급의 신뢰 레벨을 가집니다. "외부 Caddy가 code-docker에 못
 닿으니 중간에 프록시 컨테이너 하나 두자"는 식으로 `(외부 Caddy) → (새 브리징 컨테이너)
 → code-docker` 패턴을 즉흥적으로 추가하면, 이 락다운을 완전히 우회하는 새 구멍(그
 브리징 컨테이너를 통해 나가는 길)이 생길 수 있습니다. **이런 요구가 생기면 netgate
-자체를 확장하거나(예: `config/netgate/config.default.yaml`에 forwards 항목 추가) 기존
+자체를 확장하거나(예: `router/config/netgate/config.default.yaml`에 forwards 항목 추가) 기존
 nginx/[Dev Proxy](dev-proxy.md) 메커니즘을 쓰세요 - 새 브리징 컨테이너를 추가하지
 마세요.**
 
@@ -126,11 +130,11 @@ code-docker 컨테이너 자체가 재시작되면(단순히 안의 프로세스
 ## 당장 인터넷이 필요하다면 (기능 자체를 끄기)
 
 `NETGATE_ENABLED="false"`(`.env`)로 끄면 `code-docker-netinit`/dind의 라우팅 루프,
-code-docker 시작 시의 라우트 대기 가드, `code-docker-netgate` 자신의 방화벽/squid 적용이
+code-docker 시작 시의 라우트 대기 가드, `code-docker-router` 자신의 방화벽/squid 적용이
 전부 아무것도 안 하고 idle 상태가 됩니다 - `TAILSCALE_ENABLED`와 같은 패턴입니다. **다만
 이것만으로는 예전(제한 없음) 토폴로지로 완전히 돌아가지는 않습니다** -
 `code-docker-external`이 이미 code-docker/dind의 `networks:`에서 빠져 있고, `ports:
-- 80:80`도 code-docker가 아니라 netgate 서비스에 있어서, `NETGATE_ENABLED=false`만으로는
+- 80:80`도 code-docker가 아니라 router 서비스에 있어서, `NETGATE_ENABLED=false`만으로는
 code-docker 자신이 여전히 인터넷/호스트에 직접 나갈 인터페이스가 없습니다. Compose는
 네트워크 attachment/포트 퍼블리시 여부를 런타임 환경변수로 조건부 처리할 수 없기 때문에,
 완전히 예전 토폴로지로 되돌리려면 `docker-compose.yml`을 직접 수정해야 합니다:
@@ -138,22 +142,23 @@ code-docker 자신이 여전히 인터넷/호스트에 직접 나갈 인터페�
 - `code-docker`, `code-docker-dind` 두 서비스의 `networks:`에
   `code-docker-external: {}`를 다시 추가하세요.
 - `code-docker`의 `ports:`에서 주석 처리된 `- 22:22`를 다시 살리고, `- 80:80`도
-  추가하세요(원래 code-docker에 있던 포트입니다 - 지금은 `code-docker-netgate`
+  추가하세요(원래 code-docker에 있던 포트입니다 - 지금은 `code-docker-router`
   서비스의 `ports:`에 있습니다, 그건 그대로 둬도 되고 지워도 됩니다).
 - `NETGATE_ENABLED="false"`도 같이 설정해 두면 `code-docker-netinit`/dind가 굳이
-  존재하는 `netgate`를 거칠 필요 없이 바로 나갈 수 있습니다(netgate 자체를 compose에서
-  완전히 빼는 것도 가능하지만, 그건 이 문서 범위 밖의 더 큰 수술입니다).
+  존재하는 `router`를 거칠 필요 없이 바로 나갈 수 있습니다(router 자체를 compose에서
+  완전히 빼는 것도 가능하지만, 그건 tailscale/Dev Proxy까지 같이 잃는다는 뜻이라 이
+  문서 범위 밖의 더 큰 수술입니다 - router.md 참고).
 
 이건 `DIND_TARGET=dind`로 dind-authz 보호를 완전히 끄는 것과 같은 성격의, 의도적으로
 눈에 띄는 수동 작업입니다.
 
 ## 설정 커스터마이징
 
-`config/netgate/config.default.yaml`을 참고해서 `config/netgate/config.override.yaml`을
-만들면(override 패턴, `docker compose build code-docker-netgate && docker compose up -d`
+`router/config/netgate/config.default.yaml`을 참고해서 `router/config/netgate/config.override.yaml`을
+만들면(override 패턴, `docker compose build code-docker-router && docker compose up -d`
 필요) `outbound:`(CIDR allow/block 순서 리스트)와 `forwards:`(포트포워딩)를 원하는 대로
 바꿀 수 있습니다. squid 블록리스트도 같은 패턴으로
-`config/netgate/blocklist.override.acl`(도메인 한 줄에 하나, squid `dstdomain` 형식)을
+`router/config/netgate/blocklist.override.acl`(도메인 한 줄에 하나, squid `dstdomain` 형식)을
 두면 기본 StevenBlack/hosts 기반 블록리스트 대신 사용됩니다 - 다른 hosts 포맷 소스에서
 변환하려면 이미지 안의 `/etc/code-docker/netgate-blocklist.sh <입력> <출력>`(레포 안에서는
-`script/netgate-blocklist.sh`)을 쓰세요.
+`router/script/netgate-blocklist.sh`)을 쓰세요.

@@ -24,30 +24,28 @@ supervisord 프로그램 목록 조회 및 start/stop/restart, 표준출력/표�
 (`~/.git-credentials`, 평문 저장), `~/.ssh/known_hosts` 관리, `git lfs install` 실행,
 `.gitconfig` 원본 직접 편집(저장 전 문법 검증)
 
-### Tailscale
-
-`/code/.local/share/code-docker/tailscale/config.yaml`의 `forwards`/`publish` 항목 조회/추가/삭제
-(저장 시 `tailscale-forward` 자동 재시작 — `forward-reload`와 동일 효과). 로그인
-상태(URL/`backendState`, 피어 목록)를 읽기 전용으로 보여주고, 아직 로그인 시도가
-없는 상태라면 "로그인 시도하기" 버튼으로 `tailscale up`을 온디맨드로 트리거할 수
-있습니다 — [tailscale 연결](tailscale.md#최초-로그인과-상태-배너)의 자동 시도가
-컨테이너 생애주기 동안 한 번만 일어나도록 바뀐 것과 짝을 이루는 재시도 경로입니다.
-피어 목록의 "연결" 열은 직접(P2P) 연결인지 DERP 릴레이 경유인지 표시합니다(`tailscale
-status --json`의 `CurAddr` 유무로 판별 — 비어있으면 릴레이 경유)
-
 ### Dev Proxy
 
-`/code/.local/share/code-docker/caddy-adapter/managed/*.caddy` 항목(expose) 조회/추가/삭제 — 이름(내부 식별자, 파일명 +
-Caddyfile matcher 토큰으로만 쓰임)과 host(실제로 노출할 전체 도메인, 예: `dev.example.com`이나
-`*.staging.example.com`)로 먼저 expose를 만들고, 그 아래에 라우트(매치 path, target
-`host:port`, strip prefix, 리버스프록시 path, `route`/`handle` 매칭 방식, 라우트별 인증 요구)를
-원하는 만큼 추가하는 구조화 폼입니다. 공유 base 도메인은 없으므로 expose마다 완전히 다른 도메인을
-쓸 수 있습니다. 목록에는 host, 라우트 수, 인증 요구 여부(전체 라우트가 요구하면 "요구", 일부만
-이면 "부분", 없으면 "없음")가 표시되고, 행을 펼치면 그 expose의 라우트 목록이 같은 화면
-아래에 나타납니다(다이얼로그 아님) — 라우트 추가/편집만 별도 다이얼로그로 열립니다. 저장 시
-`caddy adapt`로 검증 후 `caddy reload`로 무중단 반영합니다(검증 실패 시 반영 없이 에러만
-표시). 폼이 못 다루는 케이스는 같은 화면에서 `.caddy` 파일 자체를 원본 편집할 수 있습니다.
-자세한 내용은 [dev 서버 노출 문서](dev-proxy.md)를 확인하세요.
+`router` 컨테이너 안 `caddy-adapter`가 관리하는 `.caddy` 항목(expose) 조회/추가/삭제 —
+이 탭 자체는 router가 소유한 페이지 컴포넌트를 webmanager가 그대로 가져와 보여주는
+것입니다([router.md](router.md) 참고, `@code-docker/router-frontend` 패키지). 이름(내부
+식별자, 파일명 + Caddyfile matcher 토큰으로만 쓰임)과 host(실제로 노출할 전체 도메인,
+예: `dev.example.com`이나 `*.staging.example.com`)로 먼저 expose를 만들고, 그 아래에
+라우트(매치 path, target `host:port`, strip prefix, 리버스프록시 path, `route`/`handle`
+매칭 방식, 라우트별 인증 요구)를 원하는 만큼 추가하는 구조화 폼입니다. 공유 base
+도메인은 없으므로 expose마다 완전히 다른 도메인을 쓸 수 있습니다. 목록에는 host, 라우트
+수, 인증 요구 여부(전체 라우트가 요구하면 "요구", 일부만이면 "부분", 없으면 "없음")가
+표시되고, 행을 펼치면 그 expose의 라우트 목록이 같은 화면 아래에 나타납니다(다이얼로그
+아님) — 라우트 추가/편집만 별도 다이얼로그로 열립니다. 저장 시 `caddy adapt`로 검증 후
+`caddy reload`로 무중단 반영합니다(검증 실패 시 반영 없이 에러만 표시). 폼이 못 다루는
+케이스는 같은 화면에서 `.caddy` 파일 자체를 원본 편집할 수 있습니다(간단한 텍스트 영역 —
+webmanager의 다른 곳에서 쓰는 CodeMirror 에디터는 아닙니다). 자세한 내용은
+[dev 서버 노출 문서](dev-proxy.md)를 확인하세요.
+
+tailscale 관리 탭은 더 이상 webmanager에 없습니다 — tailscale 자체가 router 컨테이너로
+옮겨갔고, router는 아직 forwards/publish를 관리하는 UI를 제공하지 않습니다(읽기전용 상태
+API만 있음). 자세한 내용과 현재 설정 방법은 [router.md](router.md#tailscale)를
+확인하세요.
 
 ### Logs
 

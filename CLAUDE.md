@@ -42,7 +42,7 @@ Multi-stage: `docker:latest` is used only as a source to `COPY --from=docker-bin
 
 ### docker-compose topology
 
-Three user-defined networks: `code-docker-external` (has internet/host access), `code-docker-internal` (`internal: true`, no outside route), and `code-docker-forwards` (also `internal: true`, dedicated to the tailscale `forwards:` feature below). As of the egress lockdown (see "egress lockdown (netgate)" below), neither `code-docker` nor `code-docker-dind` (the `docker:dind` sidecar, used so `docker`/`docker compose`/`docker buildx` work *inside* code-docker via `DOCKER_HOST=tcp://dind:2375`) is attached to `code-docker-external` anymore — both live on `code-docker-internal` only, and reach the internet exclusively through the default route their respective netinit-style loop keeps planting, pointed at the `code-docker-netgate` service, the only container attached to both networks. All service/network names are prefixed with `${PREFIX:-}` to let multiple instances coexist on one host without name collisions (set `PREFIX` in `.env`).
+Three user-defined networks: `code-docker-external` (has internet/host access), `code-docker-internal` (`internal: true`, no outside route), and `code-docker-forwards` (also `internal: true`, dedicated to router's tailscale `forwards:` feature — see "router" below). As of the egress lockdown (see "router" below), neither `code-docker` nor `code-docker-dind` (the `docker:dind` sidecar, used so `docker`/`docker compose`/`docker buildx` work *inside* code-docker via `DOCKER_HOST=tcp://dind:2375`) is attached to `code-docker-external` anymore — both live on `code-docker-internal` only, and reach the internet exclusively through the default route their respective netinit-style loop keeps planting, pointed at the `code-docker-router` service, the only container attached to both networks. All service/network names are prefixed with `${PREFIX:-}` to let multiple instances coexist on one host without name collisions (set `PREFIX` in `.env`).
 
 `code-docker-dind` doesn't use the stock `docker:dind` entrypoint directly — the `dind` stage in the root `Dockerfile` (`FROM docker:dind`) `COPY`s in `script/dind-entrypoint.sh` as its `ENTRYPOINT`, and `code-docker-dind` builds that stage (`build: {context: ., target: dind}`) instead of using `image: docker:dind`, so the daemon binds only to its `code-docker-internal` IP instead of the image's hardcoded `0.0.0.0:2375` (it picks that IP dynamically at startup, by finding the interface with no default route — `code-docker-internal` being the only network without one — rather than hardcoding an address). Baking it in at build time (rather than bind-mounting the script at runtime) means it isn't tied to the compose file's on-disk location — same `context:` override as the main `code-docker` service covers both.
 
@@ -54,35 +54,151 @@ Three user-defined networks: `code-docker-external` (has internet/host access), 
 - `cap_add: SYS_PTRACE` (debuggers like gdb/btop that trace other processes) and `IPC_LOCK` (avoids IPC-related perf bottlenecks — IDEs/LSPs do a lot of IPC) are added by default.
 - Containers created *inside* `code-docker-dind` (e.g. `docker run postgres` from within code-docker) live in the inner daemon's own private network — they are **not** reachable by name on `code-docker-internal`; reach them via `dind:<published-port>`. This is inherent to nested Docker-in-Docker (separate daemon, separate netns/network store) and was deliberately not "fixed" by switching to Docker-outside-of-Docker (host socket mount), since that would remove the one layer of isolation the nested daemon currently provides.
 
-### egress lockdown (netgate)
+### router
 
-Both phases implemented: netinit-style routing enforcement (Phase 1) and the `code-docker-netgate` service itself — squid content filtering, RFC1918/CIDR blocking, inbound port-forwarding (Phase 2). Full design, every rejected alternative, and the reasoning behind each decision: `.claude/backlog/egress-netgate-plan.md` — read it before touching anything in this area. User-facing docs: `docs/egress-netgate.md`.
+A separate container (`code-docker-router`, `router/` — its own subtree with its own
+`CLAUDE.md`/`plan.md`) that owns everything about code-docker's network boundary — it has
+meaningfully higher trust than code-docker, the same "국경을 넘는 컨테이너" framing as
+dind-authz. It grew from a pure egress-filtering sidecar (originally named
+`code-docker-netgate`) into the full boundary container described here across a staged
+migration; see `.claude/backlog/functional-router-plan.md` for the vision/every decision
+and `.claude/backlog/egress-netgate-plan.md` for the original egress design router's
+netgate feature area is still built on. User-facing docs: `docs/router.md`,
+`docs/egress-netgate.md`, `docs/dev-proxy.md`, `docs/tailscale.md` (now a short pointer
+into `docs/router.md`).
 
-- `code-docker-netinit` is a small sidecar built from the `netinit` Dockerfile stage. It runs with `network_mode: service:code-docker` (shares code-docker's netns entirely — same interfaces/IP/routing table, not a separate IP) and `cap_add: [NET_ADMIN]`, a capability code-docker itself never gets. `script/netinit-entrypoint.sh` loops every 5s doing `ip route replace default via <netgate's resolved IP>`, defensively (never exits non-zero, tolerates `netgate` not resolving) — this is what keeps code-docker's default route pointed at netgate without code-docker ever being able to undo it.
-- `code-docker-dind` needs no separate sidecar for the same mechanism — it's already `privileged: true`, so `script/dind-entrypoint.sh` runs the identical loop itself (backgrounded before its final `exec`, wrapped in `tini` so dockerd-as-PID-1 doesn't accumulate zombies from the loop's repeated `ip`/`getent` forks).
-- `script/entrypoint.sh` gates everything network-sensitive (starting with `user-init.sh`'s qwreey-fish curl) behind a bounded poll (60s timeout) for `ip route show default` to be non-empty — this is what code-docker waits on for netinit to have planted a route, without a compose-level `depends_on` cycle (route *reads* need no capability, only *writes* do).
-- `code-docker-netgate` is the only container attached to both `code-docker-internal` and `code-docker-external`, `cap_add: [NET_ADMIN]` only (no `privileged: true`). Built supervisord-based from the start (`config/netgate/supervisord.default.conf`, same `[include] files = .../supervisord/*.conf` auto-include idiom as the main image) even though it only runs two programs today — so a future "router" feature (tailscale/Caddy/tinyauth, see `.claude/backlog/functional-router-plan.md`, not implemented) can add more `[program:...]` sections without a rewrite.
-  - `[program:netgate-firewall]` (`config/netgate/firewall.default.sh`) loops every 30s reading `config/netgate/config.default.yaml` (override pattern) via `yq -r` and translating it into iptables: an ordered `outbound:` allow/block CIDR list (first-match-wins, specific exceptions before broad blocks — default blocks RFC1918 + link-local + loopback) and a `forwards:` port-forwarding list (default: host `80` → `code-docker:80`, generalized to any `code-docker-internal` hostname, not hardcoded). A forward's ACCEPT rule always lands before the CIDR blocks, since the target's own IP is itself in RFC1918 range. A stateful `ESTABLISHED,RELATED` ACCEPT rule comes first of all — without it, return traffic for an already-permitted connection (e.g. the port-80 DNAT's reply) gets re-evaluated against the block rules and dropped, since Docker's own bridge subnets are themselves RFC1918 addresses. `net.ipv4.ip_forward=1` is set via this service's own `sysctls:` in docker-compose.yml, not a runtime `sysctl -w` — Docker keeps `/proc/sys` read-only for non-privileged containers regardless of `NET_ADMIN`, so a runtime write silently fails with permission denied. Same-subnet traffic (code-docker↔dind, code-docker↔netgate) never reaches this chain at all — connected-route traffic bypasses the gateway entirely, so no RFC1918 exception is needed for `code-docker-internal`'s own CIDR.
-  - `[program:squid]` (`config/netgate/squid.default.sh` + `config/netgate/squid.default.conf`) is reached via `netgate-firewall`'s `REDIRECT` rules on port 80/443 traffic arriving from `code-docker-internal` (intercept mode, not `http_proxy=` — code-docker never configures a proxy, it just has no other way out). HTTP is filtered by `dstdomain`; HTTPS is filtered by SNI at `ssl_bump peek step1` → `terminate` on a blocklist match → `splice` otherwise (no MITM, no cert ever presented to the client — the `cert=` on `https_port` is a syntactic requirement of `ssl-bump`, not actually used). The blocklist (`config/netgate/blocklist.default.acl`, StevenBlack/hosts converted via `script/netgate-blocklist.sh` at build time; override with `config/netgate/blocklist.override.acl`) is block-only, no whitelist mode.
-- `NETGATE_ENABLED` (env, default `true`) is a **behavioral** opt-out only (mirrors `TAILSCALE_ENABLED`'s pattern) — `false` makes the netinit/dind/netgate loops idle and skips entrypoint.sh's wait gate. It does **not** restore `code-docker-external`/`ports: - 80:80` on code-docker or dind — Compose can't conditionally attach a network or publish a port based on a runtime env var, so a full topology rollback is a deliberate manual edit to docker-compose.yml (same spirit as `DIND_TARGET=dind` to fully disable dind-authz) — see example-env's `NETGATE_ENABLED` comment for the exact steps. `profiles:` was considered for this opt-out and rejected: Compose profiles are opt-in by nature (a profiled service only starts when its profile is explicitly activated), which can't express "on by default even with zero `.env` file" — a hard requirement here per this repo's "works with no `.env` at all" philosophy.
+Four feature areas, each its own supervisord programs (`router/config/supervisord.d/*.conf`,
+git-tracked built-in program definitions — see `router/config/netgate/supervisord.default.conf`'s
+own comment on the two `[include]` globs, one git-tracked for built-ins, one gitignored for
+user overrides, same auto-include idiom as the main image's `config/supervisord.default.conf`):
 
-### tailscale
+- **netgate (egress lockdown)** — netinit-style routing enforcement (code-docker/dind side)
+  plus router's own filtering (squid content filtering, RFC1918/CIDR blocking, inbound
+  port-forwarding). `code-docker-netinit` is a small sidecar built from the `netinit`
+  Dockerfile stage. It runs with `network_mode: service:code-docker` (shares code-docker's
+  netns entirely — same interfaces/IP/routing table, not a separate IP) and
+  `cap_add: [NET_ADMIN]`, a capability code-docker itself never gets. `script/netinit-entrypoint.sh`
+  loops every 5s doing `ip route replace default via <router's resolved IP>`, defensively
+  (never exits non-zero, tolerates `router` not resolving) — this is what keeps code-docker's
+  default route pointed at router without code-docker ever being able to undo it.
+  `code-docker-dind` needs no separate sidecar for the same mechanism — it's already
+  `privileged: true`, so `script/dind-entrypoint.sh` runs the identical loop itself
+  (backgrounded before its final `exec`, wrapped in `tini` so dockerd-as-PID-1 doesn't
+  accumulate zombies from the loop's repeated `ip`/`getent` forks). `script/entrypoint.sh`
+  gates everything network-sensitive (starting with `user-init.sh`'s qwreey-fish curl)
+  behind a bounded poll (60s timeout) for `ip route show default` to be non-empty — this is
+  what code-docker waits on for netinit to have planted a route, without a compose-level
+  `depends_on` cycle (route *reads* need no capability, only *writes* do). `router` is the
+  only container attached to both `code-docker-internal` and `code-docker-external`,
+  `cap_add: [NET_ADMIN]` only (no `privileged: true`).
+  - `[program:netgate-firewall]` (`router/config/netgate/firewall.default.sh`) loops every
+    30s reading `router/config/netgate/config.default.yaml` (override pattern) via `yq -r`
+    and translating it into iptables: an ordered `outbound:` allow/block CIDR list
+    (first-match-wins, specific exceptions before broad blocks — default blocks RFC1918 +
+    link-local + loopback) and a `forwards:` port-forwarding list (default: host `80` →
+    `code-docker:80`, generalized to any `code-docker-internal` hostname, not hardcoded). A
+    forward's ACCEPT rule always lands before the CIDR blocks, since the target's own IP is
+    itself in RFC1918 range. A stateful `ESTABLISHED,RELATED` ACCEPT rule comes first of all
+    — without it, return traffic for an already-permitted connection (e.g. the port-80
+    DNAT's reply) gets re-evaluated against the block rules and dropped, since Docker's own
+    bridge subnets are themselves RFC1918 addresses. `net.ipv4.ip_forward=1` is set via this
+    service's own `sysctls:` in docker-compose.yml, not a runtime `sysctl -w` — Docker keeps
+    `/proc/sys` read-only for non-privileged containers regardless of `NET_ADMIN`, so a
+    runtime write silently fails with permission denied. Same-subnet traffic (code-docker↔dind,
+    code-docker↔router) never reaches this chain at all — connected-route traffic bypasses
+    the gateway entirely, so no RFC1918 exception is needed for `code-docker-internal`'s own
+    CIDR.
+  - `[program:squid]` (`router/config/netgate/squid.default.sh` +
+    `router/config/netgate/squid.default.conf`) is reached via `netgate-firewall`'s
+    `REDIRECT` rules on port 80/443 traffic arriving from `code-docker-internal` (intercept
+    mode, not `http_proxy=` — code-docker never configures a proxy, it just has no other way
+    out). HTTP is filtered by `dstdomain`; HTTPS is filtered by SNI at `ssl_bump peek step1`
+    → `terminate` on a blocklist match → `splice` otherwise (no MITM, no cert ever presented
+    to the client — the `cert=` on `https_port` is a syntactic requirement of `ssl-bump`, not
+    actually used). The blocklist (`router/config/netgate/blocklist.default.acl`,
+    StevenBlack/hosts converted via `router/script/netgate-blocklist.sh` at build time;
+    override with `router/config/netgate/blocklist.override.acl`) is block-only, no
+    whitelist mode.
+  - `NETGATE_ENABLED` (env, default `true`) is a **behavioral** opt-out only — `false`
+    makes the netinit/dind/router loops idle and skips entrypoint.sh's wait gate. It does
+    **not** restore `code-docker-external`/`ports: - 80:80` on code-docker or dind —
+    Compose can't conditionally attach a network or publish a port based on a runtime env
+    var, so a full topology rollback is a deliberate manual edit to docker-compose.yml (same
+    spirit as `DIND_TARGET=dind` to fully disable dind-authz) — see example-env's
+    `NETGATE_ENABLED` comment for the exact steps. `profiles:` was considered for this
+    opt-out and rejected: Compose profiles are opt-in by nature (a profiled service only
+    starts when its profile is explicitly activated), which can't express "on by default
+    even with zero `.env` file" — a hard requirement here per this repo's "works with no
+    `.env` at all" philosophy.
+- **tailscale** — `tailscaled`, `tailscale-forward`, and `tailscale-publish` run as three
+  separate, single-responsibility supervisord programs (`router/config/tailscale/*.default.sh`),
+  deliberately kept apart so e.g. editing `config.yaml` and restarting `tailscale-forward`
+  never touches the `tailscaled` login session or `tailscale-publish`. Moved here from
+  code-docker in full (daemon+login+forwards+publish, not partial) — code-docker itself has
+  zero tailscale processes/packages now. `TAILSCALE_ENABLED`/`TAILSCALE_LOGIN_SERVER`/
+  `TAILSCALE_HOSTNAME` (docker-compose env, same names as before the move) configure it.
+  Inbound: `tailscaled`'s netstack auto-forwards any tailnet connection to the same port on
+  `127.0.0.1`, unconditionally, for any port with no `tailscale serve` rule (core
+  `tailscaled` behavior) — since code-docker no longer runs tailscaled at all, this only
+  matters for router's own ports now, not code-docker's. Outbound (forwards): `socat` piped
+  through `tailscaled`'s local SOCKS5 proxy, listening on router's own `forward` alias
+  (moved from code-docker's `code-docker-forwards` attachment to router's) so
+  `forward:<port>` still resolves from inside code-docker, now pointing at router.
+  `${ROUTER_VOLUME:-./router-data}/tailscale/config.yaml` (seeded from
+  `router/config/tailscale/tailscale-config.default.yaml`) drives `forwards:`/`publish:` —
+  MagicDNS names are deliberately never used as forward/publish targets (too dynamic,
+  can even point at something outside the tailnet on self-hosted control servers), only
+  tailscale hostnames/IPs. `publish:` targets code-docker directly by its plain compose
+  service hostname now (no alias dance needed — that was only ever about dodging
+  code-docker's *own* tailscaled's auto-exposure, moot once tailscaled isn't there).
+  router-manager (below) replaces the old status-polling shell script with a real read-only
+  HTTP endpoint. `bin/forward-reload` (in code-docker's PATH) no longer works from inside
+  code-docker — it now just prints the `docker compose exec code-docker-router
+  supervisorctl restart ...` command needed instead, since it can't reach router's
+  supervisorctl socket from a different container.
+- **Dev Proxy** — an internal Caddy instance (`caddy-adapter` program,
+  `router/config/caddy-adapter/caddy-adapter.default.sh`) exposing dev servers on wildcard
+  subdomains, managed via router-manager's API (`router/backend/internal/devproxy`,
+  `CADDY_ADAPTER_ENABLED`/`CADDY_ADAPTER_PORT` env, same names as before the move — also
+  read by code-docker's nginx to build its `/exports/` proxy target). Moved here from
+  code-docker in full, same reasoning as tailscale.
+- **tinyauth** — router's own forward-auth (`ghcr.io/tinyauthapp/tinyauth`, a separate
+  `code-docker-tinyauth` compose service using the official image — not built from source
+  like dind-authz, since tinyauth's Dockerfile requires a mandatory pnpm/Vue frontend build
+  ahead of its Go build, unlike a plain single-binary build). Protects individual Dev Proxy
+  routes that opt into "require auth" (Caddy `forward_auth` → tinyauth's
+  `/api/auth/caddy`) — a separate, lighter tool from webmanager's own `internal/authgate`,
+  which stays exactly as-is, scoped only to webmanager's own Terminal/File Manager/Logs.
+  `TINYAUTH_AUTH_USERS` (docker-compose env) is empty by default — no one can log in until
+  set (`docker run --rm ghcr.io/tinyauthapp/tinyauth:v5 user create --username <u>
+  --password <p> --docker` generates the value).
 
-Implemented — `tailscaled`, a `tailscale-forward` manager, and a `tailscale-status` reporter run as three separate, single-responsibility supervisord programs (`config/tailscale-service.default.sh`, `config/tailscale-forward.default.sh`, `config/tailscale-status.default.sh`), deliberately kept apart so e.g. editing `config.yaml` and restarting `tailscale-forward` never touches the `tailscaled` login session or the status reporter. User-facing docs are the "tailscale 연결" section of `docs/index.md`; `.claude/archive/tailscale-design.md` is the original design investigation (kept for rationale/history, not authoritative for current naming — see below).
+router-manager is router's own Go backend (`router/backend`, mirrors webmanager's own
+backend pattern) — currently just two things, both proxied in by code-docker's nginx
+(`config/nginx.default.conf`'s `/tailscale/`/`/dev-proxy/` locations, private-by-default —
+no host-published port on router-manager itself): a read-only `GET /api/tailscale/state`
+(`{backendState, authUrl}`, same shape the old status-polling script wrote — code-server's
+sign-in banner, `config/code-patch/tailscale-notify.default.js`, polls this now instead of
+a static file) and the Dev Proxy expose CRUD webmanager's Dev Proxy tab calls. `/exports/`
+(actual end-user traffic to an exposed dev server) is a separate nginx location from
+`/dev-proxy/` (the admin API) — don't confuse the two.
 
-- `TAILSCALE_ENABLED` (docker-compose env, default `true`) opts out: both programs print a message and idle on `sleep infinity` instead of doing anything.
-- `TAILSCALE_LOGIN_SERVER` (docker-compose env) sets `tailscale up --login-server=` for self-hosted control servers (e.g. Headscale); empty uses the official tailscale.com server.
-- Inbound: `tailscaled`'s netstack auto-forwards any tailnet connection to the same port on `127.0.0.1`, unconditionally, for any port with no `tailscale serve` rule (core `tailscaled` behavior, verified via `wgengine/netstack/netstack.go`). Outbound: `socat` piped through `tailscaled`'s local SOCKS5 proxy.
-- `/code/.local/share/code-docker/tailscale/config.yaml` (seeded from `config/tailscale-config.default.yaml`) drives two lists — `forwards:` (pull a remote tailnet peer's port in) and `publish:` (explicitly expose a local port out via `tailscale serve`).
-- Anything bound to loopback/`0.0.0.0` gets swept into that same auto-forward and re-exposed to the whole tailnet regardless of ACLs — so `forwards:`'s `socat` listeners and `publish:`'s targets must bind to dedicated non-loopback addresses instead. Two docker-compose network aliases provide those: `private` (on `code-docker-internal`, for `publish:`) and `forward` (on the dedicated `code-docker-forwards` network, for `forwards:` — kept separate so the two features' local ports can't collide).
-- sshd/code-server can't use that trick (they must stay on `0.0.0.0` for host port publishing), so a tailnet ACL grant scoped to `code-docker` is the only backstop for those two — documented as a required step in README, not optional.
-- Pending sign-in surfaces inside code-server itself, not just container logs: `tailscale-status.default.sh` (its own supervisord program, independent of login/forwarding state so it can't be blocked by either) polls `tailscale status --json` every 2s and writes `{backendState, authUrl}` to `/code/.local/share/code-docker/code/patch/tailscale/status.json`. `config/code-patch/tailscale-notify.default.js` polls that same-origin JSON file and renders via `config/code-patch/cd-dialog.default.js`'s `window.CDDialog` (a generic reusable banner/toast/`Notification` module, not tailscale-specific — the polling script is intentionally kept separate from the rendering module).
-- `config/code-patch/` is a generic mechanism, not tailscale-specific: any `<name>.default.<ext>` there (with an optional matching gitignored `<name>.override.<ext>`) gets seeded by `code-patch.default.sh` into `/code/.local/share/code-docker/code/patch/<name>.<ext>` — code-server-autoinstall auto-injects every top-level `patch/*.js` as a `<script>` tag on every start (see "코드 서버 패치" in README). Re-seeded on *every* boot, but only when the live target's content still hashes to what was seeded last time (`/code/.local/share/code-docker/code/.code-patch-manifest` now tracks `<name>\t<hash>` pairs, not just names) — i.e. a bundled `.default.`/`.override.` fix actually reaches an already-running container instead of the old "only copy if missing" behavior silently freezing the target at whatever was first seeded forever. If the live file's hash doesn't match (user edited it directly, or there's no recorded hash yet — e.g. a target that predates this hash-tracking), it's left alone; a `.default.` file removed in a later code-docker version still gets its old target removed too instead of orphaned forever. Because there's no historical hash for anything seeded before this behavior shipped, upgrading alone won't retroactively re-apply a fixed default to an already-seeded file that was never otherwise touched — delete the file under `/code/.local/share/code-docker/code/patch/` once to force a fresh reseed with hash-tracking from then on. `code-patch.default.sh` is invoked from `code-service.default.sh` (not `user-init.default.sh` — that one's scoped to home-folder/shell setup like fish config, not code-server internals), deliberately *after* `install.sh` so `/code/.local/share/code-docker/code` actually exists by the time it runs.
+router's own frontend (`router/frontend`, `@code-docker/router-frontend` — an npm workspace
+package, root `package.json`'s `workspaces:`) owns the actual page components; webmanager's
+`App.tsx` imports them directly (`import { DevProxy } from '@code-docker/router-frontend'`)
+rather than owning that UI itself — see "webmanager" below and
+`.claude/backlog/functional-router-plan.md`'s "router ↔ webmanager 프론트 통합 방식".
+Only Dev Proxy has been ported this way so far — router-manager never grew the
+forwards/publish/login CRUD webmanager's old Tailscale tab needed, so that tab was removed
+rather than shipped broken; see `router/plan.md`'s TODO list for the real follow-up
+(building that backend, then porting the UI).
+
+`config/code-patch/` is a generic mechanism, not tailscale-specific: any `<name>.default.<ext>` there (with an optional matching gitignored `<name>.override.<ext>`) gets seeded by `code-patch.default.sh` into `/code/.local/share/code-docker/code/patch/<name>.<ext>` — code-server-autoinstall auto-injects every top-level `patch/*.js` as a `<script>` tag on every start (see "코드 서버 패치" in README). Re-seeded on *every* boot, but only when the live target's content still hashes to what was seeded last time (`/code/.local/share/code-docker/code/.code-patch-manifest` now tracks `<name>\t<hash>` pairs, not just names) — i.e. a bundled `.default.`/`.override.` fix actually reaches an already-running container instead of the old "only copy if missing" behavior silently freezing the target at whatever was first seeded forever. If the live file's hash doesn't match (user edited it directly, or there's no recorded hash yet — e.g. a target that predates this hash-tracking), it's left alone; a `.default.` file removed in a later code-docker version still gets its old target removed too instead of orphaned forever. Because there's no historical hash for anything seeded before this behavior shipped, upgrading alone won't retroactively re-apply a fixed default to an already-seeded file that was never otherwise touched — delete the file under `/code/.local/share/code-docker/code/patch/` once to force a fresh reseed with hash-tracking from then on. `code-patch.default.sh` is invoked from `code-service.default.sh` (not `user-init.default.sh` — that one's scoped to home-folder/shell setup like fish config, not code-server internals), deliberately *after* `install.sh` so `/code/.local/share/code-docker/code` actually exists by the time it runs.
 
 ### webmanager
 
-A browser admin panel (Go backend + Vite/React frontend, `webmanager/` — its own subtree, with its own `CLAUDE.md`/`plan.md`) running alongside code-server as another supervisord program, on port 81. Well beyond its original scope now: supervisord process management, SSH `authorized_keys`/`known_hosts`, git config (commit signing/GPG, git-lfs, raw `.gitconfig` editing), tailscale forwards/publish, the vector-backed logs pipeline described above, an OS-level process/port viewer with resource-history graphs, a Projects-folder browser with a per-project git status panel, code-server extension and mise tool management, a Claude Code status tab, Docker/dind management, a Dev Proxy tab (internal Caddy instance exposing dev servers on wildcard subdomains), a web terminal (ephemeral PTY sessions), and a full file manager — see `webmanager/plan.md` for the up-to-date implemented/TODO split. Most of it still has no login of its own and relies entirely on the same reverse-proxy forward-auth as code-server; an opt-in shared password gate (`internal/authgate`, off by default) additionally protects the Terminal/File Manager tabs entirely and gates write actions elsewhere (see `webmanager/.claude/archive/authgate-plan-done.md`).
+A browser admin panel (Go backend + Vite/React frontend, `webmanager/` — its own subtree, with its own `CLAUDE.md`/`plan.md`) running alongside code-server as another supervisord program, on port 81. Well beyond its original scope now: supervisord process management, SSH `authorized_keys`/`known_hosts`, git config (commit signing/GPG, git-lfs, raw `.gitconfig` editing), the vector-backed logs pipeline described above, an OS-level process/port viewer with resource-history graphs, a Projects-folder browser with a per-project git status panel, code-server extension and mise tool management, a Claude Code status tab, Docker/dind management, a Dev Proxy tab (imported from `@code-docker/router-frontend` — see "router" above, the actual Caddy instance/backend live on the router container, not here), a web terminal (ephemeral PTY sessions), and a full file manager — see `webmanager/plan.md` for the up-to-date implemented/TODO split. Most of it still has no login of its own and relies entirely on the same reverse-proxy forward-auth as code-server; an opt-in shared password gate (`internal/authgate`, off by default) additionally protects the Terminal/File Manager tabs entirely and gates write actions elsewhere (see `webmanager/.claude/archive/authgate-plan-done.md`) — note this gate no longer covers Dev Proxy at all (that moved to router-manager's own API, currently ungated) or Tailscale (that tab was removed, not ported — see "router" above).
 
 ## Documentation
 
-`README.md` is now just a short intro (screenshot + one paragraph + a pointer into `docs/`) — as of 2026-08-05 the actual user-facing content that used to live there (setup, the override customization system mirroring the "override pattern" above but from a user's perspective, and a "tips" section per integration: ssh, adb, Discord presence, dind, clipboard, multi-instance via `PREFIX`) moved to `docs/index.md`, with per-topic detail pages alongside it (`docs/build-customization.md`, `docs/tailscale.md`, `docs/dev-proxy.md`, `docs/webmanager.md`, `docs/webmanager-config.md`, `docs/security-login.md`, `docs/code-server-patch.md`, `docs/tips/*.md`). This was done anticipating that `docs/` gets bundled/rendered inside webmanager itself someday (see `webmanager/.claude/research/guide-plan.md`) — keeping it as its own directory rather than scattered across the repo root makes that easier. When adding a new customizable file or a new environment trick, add a matching entry to `docs/index.md` (or the relevant `docs/*.md` page) in the same style as the existing ones — not `README.md`. A revamp plan for the now-short `README.md` itself (badges, a tighter intro) is tracked in `.claude/backlog/readme-revamp-plan.md`.
+`README.md` is now just a short intro (screenshot + one paragraph + a pointer into `docs/`) — as of 2026-08-05 the actual user-facing content that used to live there (setup, the override customization system mirroring the "override pattern" above but from a user's perspective, and a "tips" section per integration: ssh, adb, Discord presence, dind, clipboard, multi-instance via `PREFIX`) moved to `docs/index.md`, with per-topic detail pages alongside it (`docs/build-customization.md`, `docs/router.md` (the router container's own doc — tailscale/Dev Proxy/tinyauth), `docs/tailscale.md` (now just a short pointer into `docs/router.md`), `docs/dev-proxy.md`, `docs/egress-netgate.md`, `docs/webmanager.md`, `docs/webmanager-config.md`, `docs/security-login.md`, `docs/code-server-patch.md`, `docs/tips/*.md`). This was done anticipating that `docs/` gets bundled/rendered inside webmanager itself someday (see `webmanager/.claude/research/guide-plan.md`) — keeping it as its own directory rather than scattered across the repo root makes that easier. When adding a new customizable file or a new environment trick, add a matching entry to `docs/index.md` (or the relevant `docs/*.md` page) in the same style as the existing ones — not `README.md`. A revamp plan for the now-short `README.md` itself (badges, a tighter intro) is tracked in `.claude/backlog/readme-revamp-plan.md`.
