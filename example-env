@@ -86,9 +86,12 @@
 #     소유권을 옮겨야 함) - docs/tips/dind.md의 "추가 경화" 절 참고.
 #DIND_TARGET="dind-authz"
 
-# Set to "false" to disable all tailscale integration (tailscaled +
-# forwards/publish) - the two supervisord programs stay up but do
-# nothing.
+# tailscale (daemon+login+forwards+publish) now runs on the router
+# container, not code-docker (see
+# .claude/backlog/functional-router-plan.md's "tailscale 전체 이관") - these
+# still configure it, just read by code-docker-router instead. Set to
+# "false" to disable all tailscale integration - the three supervisord
+# programs stay up but do nothing.
 #TAILSCALE_ENABLED="true"
 
 # Self-hosted control server (e.g. Headscale) for `tailscale up
@@ -97,33 +100,24 @@
 #TAILSCALE_LOGIN_SERVER="" # ex: https://tail.qwreey.moe
 
 # Tailnet hostname registered by `tailscale up --hostname=` (this is what
-# shows up in MagicDNS, e.g. https://code-docker.your-tailnet.ts.net).
+# shows up in MagicDNS, e.g. https://code-docker-router.your-tailnet.ts.net).
 # Leave unset/empty and tailscaled falls back to its own os.Hostname()
-# default, which is this container's `hostname:` in docker-compose.yml -
-# fixed to "code-docker" and NOT PREFIX-namespaced, so running multiple
-# instances on the same tailnet collide on this name unless you set it
-# explicitly per instance. Only applied by the automatic first-boot login
-# attempt - see docs/tailscale.md#호스트네임-지정-magicdns for how to change
-# it after you've already logged in once.
-#TAILSCALE_HOSTNAME="" # ex: code-docker
+# default, which is the router container's `hostname:` in
+# docker-compose.yml - fixed to "code-docker-router" and NOT
+# PREFIX-namespaced, so running multiple instances on the same tailnet
+# collide on this name unless you set it explicitly per instance. Only
+# applied by the automatic first-boot login attempt - see
+# docs/tailscale.md#호스트네임-지정-magicdns for how to change it after
+# you've already logged in once.
+#TAILSCALE_HOSTNAME="" # ex: code-docker-router
 
-# Transitional, migration-only: tailscale itself is moving from code-docker
-# to router (see .claude/backlog/functional-router-plan.md) - during the
-# coexistence window (until that migration's Phase 4 removes code-docker's
-# own TAILSCALE_* above), router reads these instead of TAILSCALE_ENABLED/
-# TAILSCALE_HOSTNAME directly, so you can run both at once with distinct
-# identities while testing. TAILSCALE_LOGIN_SERVER above is shared as-is
-# (same control server for both makes sense either way). Once Phase 4 lands,
-# these fold back into the plain TAILSCALE_* names above.
-#ROUTER_TAILSCALE_ENABLED="true"
-#ROUTER_TAILSCALE_HOSTNAME="" # ex: code-docker-router
-
-# Same transitional pattern for Dev Proxy's internal Caddy instance, also
-# moving to router (see .claude/backlog/functional-router-plan.md's "Dev
-# Proxy Caddy도 router로 이관") - folds back into a plain CADDY_ADAPTER_*
-# name once Phase 4 removes code-docker's own copy.
-#ROUTER_CADDY_ADAPTER_ENABLED="true"
-#ROUTER_CADDY_ADAPTER_PORT="8082"
+# Dev Proxy's internal Caddy instance also now runs on router (see
+# .claude/backlog/functional-router-plan.md's "Dev Proxy Caddy도 router로
+# 이관") - same env vars, code-docker's nginx reads CADDY_ADAPTER_PORT too
+# (to know where to proxy /exports/ to), so keep both containers in sync -
+# docker-compose.yml already passes the same value to both.
+#CADDY_ADAPTER_ENABLED="true"
+#CADDY_ADAPTER_PORT="8082"
 
 # router's own forward-auth (tinyauth) - protects individual Dev Proxy
 # exposes that opt into RequireAuth, see docs/dev-proxy.md once it's
@@ -205,14 +199,6 @@
 # `error_log ... warn;` above. Use "error" for even quieter, or
 # "info"/"debug" to restore the old chatter.
 #VECTOR_LOG_LEVEL="warn"
-
-# tailscaled's own output (not vector's) is uniquely chatty - a single
-# restart logs dozens of internal-plumbing lines. See
-# vector.default.toml for details.
-#   errors (default) - vector allowlists tailscaled down to
-#     login/auth-URL lines, ipn state transitions, and fatal errors.
-#   all - unfiltered, tailscaled's full output passes through.
-#TAILSCALE_LOG_LEVEL="errors"
 
 # Path `webmanager --env-migrate`/the startup version-mismatch check read
 # the current example-env.webmanager template from. Left unset to use the

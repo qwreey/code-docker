@@ -71,10 +71,9 @@ if contains(msg_lower, "error") || contains(msg_lower, "fatal") || contains(msg_
 # completely empty stdout line - once format_console below prepends
 # "[app_name] ", these turn into a bare "[app_name] " with nothing after it:
 # pure noise in `docker compose logs`/the webmanager Logs page, carrying no
-# information. Filtered generically (blank/whitespace-only message) rather
-# than program-specific like filter_tailscaled below, since this isn't a
-# code-server quirk specifically - any program's stdout can end up with a
-# stray blank line.
+# information. Filtered generically (blank/whitespace-only message) since
+# this isn't a code-server quirk specifically - any program's stdout can end
+# up with a stray blank line.
 [transforms.filter_blank_lines]
 type = "filter"
 inputs = ["tag_level"]
@@ -82,55 +81,18 @@ condition = '''
 strip_whitespace(to_string!(.message)) != ""
 '''
 
-# tailscaled is uniquely chatty compared to every other program here - a
-# single restart alone logs dozens of internal-plumbing lines (DNS mode
-# selection, WireGuard device setup, control-plane routine tracing, etc.),
-# none of which carry decision-relevant information, and steady-state
-# runtime chatter (magicsock/netcheck/derp/route-monitor lines) can run into
-# the hundreds of thousands of lines a day even when idle (measured on this
-# project's own host: journalctl -u tailscaled had 393,830 lines, of which
-# only 403 were an actual ipn-state-transition/auth-URL/fatal-error signal).
-# This isn't specific to this project or a container artifact - it's a
-# long-standing, widely-reported upstream issue tailscale's own team
-# acknowledged and never actually fixed (they don't use log levels, so their
-# own suggested workaround is external filtering, same idea as this
-# transform): https://github.com/tailscale/tailscale/issues/282 (real-world
-# reports there include 200GB of accumulated tailscaled logs, and the same
-# "magicsock: derp-N does not know about peer [...], removing route" line
-# repeating every 2-3 seconds for months).
-#
-# Unlike nginx's NGINX_LOG_LEVEL, tailscaled has no status-code-like field to
-# filter on, so this is an allowlist of substrings (safer than a blocklist -
-# tailscaled's plumbing lines vastly outnumber, and could outlive, any list
-# of patterns we keep in sync) rather than a level check. TAILSCALE_LOG_LEVEL
-# (docker-compose.yml), read live per-event via get_env_var so no
-# envsubst/restart is needed to change it:
-#   errors (default) - only the allowlisted lines below pass through for the
-#     tailscaled program specifically; every other program's events are
-#     untouched.
-#   all - no filtering, tailscaled's full output passes through like every
-#     other program (previous behavior).
-[transforms.filter_tailscaled]
-type = "filter"
-inputs = ["filter_blank_lines"]
-condition = '''
-msg = to_string!(.message)
-.app_name != "tailscaled" ||
-  (get_env_var("TAILSCALE_LOG_LEVEL") ?? "errors") == "all" ||
-  # ipn state transitions (NeedsLogin/Starting/Running/...) - the actual
-  # connectivity narrative, without the internals behind each transition.
-  contains(msg, "Switching ipn state") ||
-  # The login/auth-URL flow (first-time login, or after a key expires) -
-  # "To authenticate, visit:" plus the tab-indented URL line printed right
-  # after it, whichever login server is configured (not just tailscale.com's,
-  # since TAILSCALE_LOGIN_SERVER can point at a self-hosted Headscale).
-  contains(msg, "To authenticate") ||
-  contains(msg, "Received auth URL") ||
-  contains(msg, "AuthURL") ||
-  (starts_with(msg, "\t") && contains(msg, "https://")) ||
-  contains(msg, "Success.") ||
-  contains(msg, "Fatal")
-'''
+# tailscaled used to be uniquely chatty compared to every other program
+# here (a single restart alone logs dozens of internal-plumbing lines, and
+# steady-state runtime chatter could run into the hundreds of thousands of
+# lines a day even when idle - see
+# https://github.com/tailscale/tailscale/issues/282), which is why a
+# dedicated filter_tailscaled transform used to live here. tailscaled itself
+# moved to router (see .claude/backlog/functional-router-plan.md's
+# "tailscale 전체 이관") - code-docker's own vector no longer sees any
+# "tailscaled" app_name at all, so that transform (and TAILSCALE_LOG_LEVEL)
+# were removed rather than left as permanently-inert dead code. If router
+# ever gets its own log pipeline, port this filtering there instead of
+# reintroducing it here.
 
 # console sink's "text" codec only ever prints the `message` field, so the
 # "[app_name] message" label has to be baked into `message` itself. Done in
@@ -138,7 +100,7 @@ msg = to_string!(.message)
 # original message still reaches the webmanager_logs sink below.
 [transforms.format_console]
 type = "remap"
-inputs = ["filter_tailscaled"]
+inputs = ["filter_blank_lines"]
 source = '''
 .message = "[" + string!(.app_name) + "] " + string!(.message)
 '''
@@ -157,7 +119,7 @@ encoding.codec = "text"
 # strips vector's other auto-added fields (file, host, source_type).
 [sinks.webmanager_logs]
 type = "file"
-inputs = ["filter_tailscaled"]
+inputs = ["filter_blank_lines"]
 path = "/code/.local/share/code-docker/vector/logs/%Y-%m-%d.jsonl"
 encoding.codec = "json"
 encoding.only_fields = ["timestamp", "app_name", "level", "message"]

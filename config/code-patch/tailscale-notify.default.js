@@ -1,8 +1,14 @@
 (() => {
-    const script = document.currentScript;
-    if (!script || !script.src) return;
-
-    const statusUrl = new URL("tailscale/status.json", script.src);
+    // Now backed by router's own read-only tailscale-state API, proxied
+    // same-origin via nginx's /tailscale/ location (see
+    // config/nginx.default.conf and .claude/backlog/functional-router-plan.md's
+    // "tailscale readonly API 노출 정책") - replaces the old static
+    // tailscale/status.json file tailscale-status.default.sh used to write,
+    // since tailscale itself (and that script) moved to router. No longer
+    // needs document.currentScript to build a relative URL - this endpoint
+    // is a fixed same-origin path regardless of where this script itself is
+    // served from.
+    const statusUrl = `${location.origin}/tailscale/state`;
     const BANNER_ID = "tailscale-signin";
     const MANAGER_URL = `${location.origin}/manager/`;
 

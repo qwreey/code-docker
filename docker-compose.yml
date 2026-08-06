@@ -43,13 +43,6 @@ services:
       # Default matches the "dind" alias below - see example-env before
       # overriding.
       DOCKER_HOST: "${DOCKER_HOST:-tcp://dind:2375}"
-      TAILSCALE_ENABLED: "${TAILSCALE_ENABLED:-true}"
-      TAILSCALE_LOGIN_SERVER: "${TAILSCALE_LOGIN_SERVER:-}"
-      # Empty falls back to tailscaled's own os.Hostname() default, which is
-      # this container's `hostname:` below - fixed to "code-docker" and NOT
-      # PREFIX-namespaced, so multiple instances on one tailnet collide on
-      # MagicDNS name unless set explicitly per instance. See example-env.
-      TAILSCALE_HOSTNAME: "${TAILSCALE_HOSTNAME:-}"
       NGINX_LOG_LEVEL: "${NGINX_LOG_LEVEL:-errors}"
       CODE_SERVER_BIND_ADDR: "${CODE_SERVER_BIND_ADDR:-private:8080}"
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-}"
@@ -57,14 +50,12 @@ services:
       NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
-      TAILSCALE_LOG_LEVEL: "${TAILSCALE_LOG_LEVEL:-errors}"
       WEBMANAGER_ENV_TEMPLATE_PATH: "${WEBMANAGER_ENV_TEMPLATE_PATH:-/etc/code-docker/webmanager/example-env.webmanager}"
-      # Internal Caddy instance for exposing dev servers - see
-      # docs/dev-proxy.md. Each expose carries its own full hostname
-      # (set per-expose in webmanager's Dev Proxy tab), so no domain env var
-      # is needed here - CADDY_ADAPTER_ENABLED just opts the whole feature
-      # in/out.
-      CADDY_ADAPTER_ENABLED: "${CADDY_ADAPTER_ENABLED:-true}"
+      # nginx's own /exports/ proxy target - Dev Proxy's Caddy instance now
+      # lives on router (see .claude/backlog/functional-router-plan.md's
+      # "Dev Proxy Caddy도 router로 이관"), so code-docker just needs to know
+      # which port to reach it on over code-docker-internal - must match
+      # code-docker-router's own CADDY_ADAPTER_PORT below.
       CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-8082}"
       # Egress lockdown (see .claude/backlog/egress-netgate-plan.md) - "false"
       # skips entrypoint.sh's default-route wait gate. Does NOT restore
@@ -284,27 +275,21 @@ services:
       # firewall/proxy rules (nothing would ever reach it anyway once
       # code-docker/dind's own loops are idle - see example-env).
       NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
-      # tailscale daemon+forwards+publish now live here (see
+      # tailscale daemon+forwards+publish (see
       # .claude/backlog/functional-router-plan.md's "tailscale 전체 이관") -
-      # same env vars/semantics code-docker's own tailscale used to read,
-      # just moved. code-docker's own copies of these (above) are still
-      # present too during this migration's coexistence window (removed in
-      # Phase 4) - if both are set, you now have two tailscale identities
-      # trying to register, so give this one a distinct
-      # ROUTER_TAILSCALE_HOSTNAME below if testing both at once.
-      TAILSCALE_ENABLED: "${ROUTER_TAILSCALE_ENABLED:-true}"
+      # moved from code-docker, which no longer has any tailscale env/
+      # processes of its own as of this same migration's Phase 4.
+      TAILSCALE_ENABLED: "${TAILSCALE_ENABLED:-true}"
       TAILSCALE_LOGIN_SERVER: "${TAILSCALE_LOGIN_SERVER:-}"
-      TAILSCALE_HOSTNAME: "${ROUTER_TAILSCALE_HOSTNAME:-}"
-      # Dev Proxy's internal Caddy instance, moved here from code-docker
-      # (see .claude/backlog/functional-router-plan.md's "Dev Proxy Caddy도
-      # router로 이관") - same env vars/semantics, transitional
-      # ROUTER_-prefixed names for the same coexistence-window reason as
-      # tailscale above (code-docker's own CADDY_ADAPTER_* stay active until
-      # Phase 4). This port is internal-only (not published) - reached via
-      # code-docker's nginx `/exports/` proxy (Phase 4) or router's own
-      # Caddy-fronted paths, not directly.
-      CADDY_ADAPTER_ENABLED: "${ROUTER_CADDY_ADAPTER_ENABLED:-true}"
-      CADDY_ADAPTER_PORT: "${ROUTER_CADDY_ADAPTER_PORT:-8082}"
+      TAILSCALE_HOSTNAME: "${TAILSCALE_HOSTNAME:-}"
+      # Dev Proxy's internal Caddy instance (see
+      # .claude/backlog/functional-router-plan.md's "Dev Proxy Caddy도
+      # router로 이관") - moved from code-docker the same way.
+      # CADDY_ADAPTER_PORT is shared with code-docker's own environment
+      # below (its nginx needs to know the same port to proxy /exports/ to)
+      # - keep both in sync if you override this.
+      CADDY_ADAPTER_ENABLED: "${CADDY_ADAPTER_ENABLED:-true}"
+      CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-8082}"
     volumes:
       # Persistent state for router's own features (tailscale login
       # state/config.yaml, caddy-adapter's managed/custom Caddyfile
