@@ -84,7 +84,7 @@ services:
       # must have no interface with a route to the internet of its own, or
       # code-docker-netinit setting the default route below wouldn't be a
       # real chokepoint (an agent could just... use the other interface).
-      # All outbound now transits the code-docker-netgate service (below)
+      # All outbound now transits the code-docker-router service (below)
       # via the route code-docker-netinit continuously (re)plants in this
       # netns.
       code-docker-internal:
@@ -111,9 +111,9 @@ services:
     #   networks: comment above), so publishing a host port directly on
     #   this service doesn't work anymore - Compose docs: networks with
     #   internal: true "are created without any connection to the host's
-    #   network interfaces". Port 80 lives on the code-docker-netgate
+    #   network interfaces". Port 80 lives on the code-docker-router
     #   service instead now, which DNATs it back to code-docker:80 from
-    #   inside its own netns (see config/netgate/config.default.yaml's
+    #   inside its own netns (see router/config/netgate/config.default.yaml's
     #   `forwards:` and .claude/backlog/egress-netgate-plan.md's "인바운드"
     #   section). This container has NO published port of its own and is
     #   unreachable from the host except through that forward.
@@ -163,9 +163,9 @@ services:
   # attachment of its own - network_mode below makes it share code-docker's
   # netns entirely (same interfaces/IP/routing table), and it uses the
   # NET_ADMIN code-docker itself deliberately never gets to keep code-docker's
-  # default route pointed at netgate. See the plan doc for why code-docker
-  # stays the netns owner instead of the other way around ("왜 code-docker가
-  # 계속 소유주여야 하는가").
+  # default route pointed at router (formerly netgate). See the plan doc for
+  # why code-docker stays the netns owner instead of the other way around
+  # ("왜 code-docker가 계속 소유주여야 하는가").
   code-docker-netinit:
     container_name: "${PREFIX:-}code-docker-netinit"
     build:
@@ -188,9 +188,9 @@ services:
   # gain root on the host. dind-entrypoint.sh binds it to code-docker-internal
   # only, and (egress-netgate-plan.md) it's not attached to
   # code-docker-external anymore either - it manages its own default route
-  # toward code-docker-netgate the same way code-docker-netinit does for
-  # code-docker (see below). Still, treat code-docker-internal itself as
-  # fully trusted.
+  # toward code-docker-router (formerly code-docker-netgate) the same way
+  # code-docker-netinit does for code-docker (see below). Still, treat
+  # code-docker-internal itself as fully trusted.
   code-docker-dind:
     container_name: "${PREFIX:-}code-docker-dind"
     hostname: code-docker-dind
@@ -238,7 +238,7 @@ services:
       # code-docker-external deliberately NOT attached here either
       # (egress-netgate-plan.md - same reasoning as code-docker's own
       # networks: comment above). `docker pull` etc. now goes through
-      # code-docker-netgate via the route dind-entrypoint.sh's loop keeps
+      # code-docker-router via the route dind-entrypoint.sh's loop keeps
       # planting here, same mechanism as code-docker-netinit uses for
       # code-docker.
       code-docker-internal:
@@ -248,21 +248,28 @@ services:
           - dind
     command: ["--log-level=warn"]
 
-  # Phase 2 of egress-netgate-plan.md's outbound lockdown: the actual
-  # filtering/forwarding chokepoint code-docker-netinit's and dind's own
-  # routing loops (above) point their default route at, via the `netgate`
-  # alias below. Squid content-blocklist, RFC1918/CIDR FORWARD filtering,
-  # and inbound port-forwarding (DNAT) all live in this one container - see
-  # the plan doc and docs/egress-netgate.md for the full design/reasoning,
-  # and CLAUDE.md's "egress lockdown (netgate)" section for the short
-  # version.
-  code-docker-netgate:
-    container_name: "${PREFIX:-}code-docker-netgate"
-    hostname: code-docker-netgate
+  # router - the network-boundary container for code-docker. Started as
+  # Phase 2 of egress-netgate-plan.md's outbound lockdown (service used to
+  # be named code-docker-netgate): the actual filtering/forwarding
+  # chokepoint code-docker-netinit's and dind's own routing loops (above)
+  # point their default route at, via the `router` alias below. Squid
+  # content-blocklist, RFC1918/CIDR FORWARD filtering, and inbound
+  # port-forwarding (DNAT) all live in this one container - see the plan
+  # doc and docs/egress-netgate.md for the full design/reasoning, and
+  # CLAUDE.md's "egress lockdown (netgate)" section for the short version.
+  # functional-router-plan.md is the vision doc for this container's
+  # expanding role (tailscale, Dev Proxy, tinyauth - later phases).
+  code-docker-router:
+    container_name: "${PREFIX:-}code-docker-router"
+    hostname: code-docker-router
     build:
-      context: "${BUILD_CONTEXT:-.}"
+      # See code-docker's own build.context comment above re: BUILD_CONTEXT.
+      # router/ is its own self-contained subtree (own Dockerfile, own
+      # .dockerignore) - context points directly at it rather than the repo
+      # root + dockerfile:, so it doesn't share code-docker's build context/
+      # .dockerignore.
+      context: "${BUILD_CONTEXT:-.}/router"
       network: host
-      target: netgate
     restart: unless-stopped
     environment:
       # Same behavioral opt-out as code-docker/dind's own NETGATE_ENABLED
@@ -280,7 +287,7 @@ services:
       - NET_ADMIN
     sysctls:
       # Declared here (not via a runtime `sysctl -w` in
-      # config/netgate/firewall.default.sh) because Docker keeps /proc/sys
+      # router/config/netgate/firewall.default.sh) because Docker keeps /proc/sys
       # read-only for non-privileged containers regardless of NET_ADMIN -
       # `sysctl -w` at runtime fails with "permission denied" even though
       # this exact key is one of the "namespaced" sysctls Docker allows
@@ -294,17 +301,18 @@ services:
       code-docker-internal:
         # code-docker-netinit's and dind-entrypoint.sh's own routing loops
         # both resolve this exact name - see script/netinit-entrypoint.sh
-        # and script/dind-entrypoint.sh.
+        # and script/dind-entrypoint.sh. Renamed from `netgate` alongside
+        # the service rename.
         aliases:
-          - netgate
+          - router
       code-docker-external: {}
     ports:
       # Moved here from code-docker (see that service's own ports: comment
-      # above) - code-docker-netgate is the only container with a real
+      # above) - code-docker-router is the only container with a real
       # route to the host's network, so this is the only place a host port
       # can be published from. DNAT'd back to code-docker:80 by
-      # config/netgate/firewall.default.sh, driven by
-      # config/netgate/config.default.yaml's `forwards:` list.
+      # router/config/netgate/firewall.default.sh, driven by
+      # router/config/netgate/config.default.yaml's `forwards:` list.
       - "80:80"
     logging:
       driver: "json-file"

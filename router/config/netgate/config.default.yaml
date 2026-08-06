@@ -3,7 +3,7 @@
 # config/netgate/firewall.default.sh (via yq) every reapply cycle - no
 # rebuild needed to change this file if you're using
 # config/netgate/config.override.yaml (a full container recreate of
-# code-docker-netgate is still required, same as any other config change -
+# code-docker-router is still required, same as any other config change -
 # see CLAUDE.md's override pattern).
 
 # Ordered outbound allow/block CIDR rules for FORWARD traffic (i.e.
@@ -14,7 +14,7 @@
 # it never gets reached. See the plan doc's "순서 있는 allow/block 레이어".
 #
 # No exception entry is needed for code-docker-internal's own subnet
-# (code-docker<->dind, code-docker<->netgate) - same-subnet traffic uses the
+# (code-docker<->dind, code-docker<->router) - same-subnet traffic uses the
 # connected route and never enters the FORWARD chain at all, verified in
 # this phase's own testing (see docs/egress-netgate.md).
 #

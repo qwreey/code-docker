@@ -76,7 +76,7 @@ if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
 	(
 		trap 'exit 0' TERM INT
 		while true; do
-			gw_ip="$(getent hosts netgate 2>/dev/null | awk '{ print $1; exit }')"
+			gw_ip="$(getent hosts router 2>/dev/null | awk '{ print $1; exit }')"
 			if [ -n "$gw_ip" ]; then
 				ip route replace default via "$gw_ip" 2>/dev/null
 			fi
@@ -90,7 +90,7 @@ if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
 				unexpected=1
 			fi
 			if [ "$unexpected" -eq 1 ]; then
-				echo "dind-entrypoint: WARNING unexpected default route(s), expected only netgate ($gw_ip):" >&2
+				echo "dind-entrypoint: WARNING unexpected default route(s), expected only router ($gw_ip):" >&2
 				printf '%s\n' "$default_routes" >&2
 			fi
 

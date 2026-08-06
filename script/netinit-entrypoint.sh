@@ -28,10 +28,10 @@ while true; do
 		exit 1
 	fi
 
-	gw_ip="$(getent hosts netgate 2>/dev/null | awk '{ print $1; exit }')"
+	gw_ip="$(getent hosts router 2>/dev/null | awk '{ print $1; exit }')"
 
-	# netgate not resolving is the expected, permanent state throughout
-	# Phase 1 (netgate itself doesn't exist yet - see
+	# router (formerly netgate) not resolving is the expected, permanent
+	# state throughout Phase 1 (router itself doesn't exist yet - see
 	# .claude/backlog/egress-netgate-plan.md). This loop must never treat
 	# that as fatal or exit non-zero - a crash here would tear down
 	# code-docker's own netns setup for no benefit, since this container
@@ -40,7 +40,7 @@ while true; do
 		ip route replace default via "$gw_ip" 2>/dev/null
 	fi
 
-	# Best-effort watch for a second default route/gateway besides netgate.
+	# Best-effort watch for a second default route/gateway besides router.
 	# Can't originate from inside code-docker itself (it has no NET_ADMIN
 	# anywhere in its netns except this sidecar), so this only ever fires
 	# from a deliberate compose/host edit (e.g. code-docker-external
@@ -55,7 +55,7 @@ while true; do
 		unexpected=1
 	fi
 	if [ "$unexpected" -eq 1 ]; then
-		echo "netinit: WARNING unexpected default route(s), expected only netgate ($gw_ip):" >&2
+		echo "netinit: WARNING unexpected default route(s), expected only router ($gw_ip):" >&2
 		printf '%s\n' "$default_routes" >&2
 	fi
 
