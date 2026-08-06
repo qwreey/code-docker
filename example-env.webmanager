@@ -29,7 +29,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=9
+WEBMANAGER_ENV_VERSION=10
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -46,12 +46,6 @@ WEBMANAGER_ENV_VERSION=9
 #. env_file도 $변수 형태로 해석해서, 따옴표 없이 붙이면 해시 안의 $ 뒤 조각들이
 #. 조용히 빈 문자열로 사라져 해시가 깨집니다.
 #WEBMANAGER_AUTH_PASSWORD_HASH=
-#. 위 비밀번호로 발급되는 잠금 쿠키의 Domain 속성. 기본값(비워둠)은 호스트 전용
-#. 쿠키입니다 - 대부분 그대로 두면 됩니다. Dev Proxy 탭의 인증은 더 이상 이
-#. 쿠키를 쓰지 않습니다(router의 tinyauth로 이관됨, docs/dev-proxy.md 참고) -
-#. 지금은 다른 상위 도메인을 공유하는 별도 서브도메인에서 webmanager 자체
-#. 쿠키를 재사용해야 하는 경우에만 의미가 있습니다.
-#WEBMANAGER_AUTH_COOKIE_DOMAIN=
 
 #. --- File Manager ---
 #. 브라우징을 허용할 최상위 경로. 컨테이너 전체를 열어주려면 "/"로.
@@ -76,11 +70,6 @@ WEBMANAGER_ENV_VERSION=9
 #. code-server의 PID가 바뀌면(=재시작되면) 자동으로 사라집니다.
 #WEBMANAGER_RESTART_STATUS_PATH=
 
-#. --- Tailscale 탭 (상태 조회) ---
-#. `tailscale` 바이너리 경로 오버라이드. 이미지에 이미 PATH로 잡혀 있어야 하므로
-#. claudecode/mise와의 일관성을 위해 존재하는 옵션입니다.
-#WEBMANAGER_TAILSCALE_BINPATH=
-
 #. --- Projects 탭 ---
 #. 스캔할 최상위 디렉토리 목록 ($PATH처럼 콜론으로 구분).
 #WEBMANAGER_PROJECTS_PATH=/code/Projects
@@ -94,9 +83,6 @@ WEBMANAGER_ENV_VERSION=9
 #. 포트에서 함께 라우팅)이라 비워두면 접속 중인 페이지의 origin을 그대로
 #. 씁니다. 다른 도메인/포트로 webmanager에 접속하는 경우에만 명시적으로
 #. 설정하세요.
-#. Dev Proxy 탭(docs/dev-proxy.md)의 인증 리다이렉트는 프론트엔드가 아니라
-#. 백엔드에서 절대 URL을 만들어야 해서 이 값에 반드시 의존합니다 - 비워두면
-#. 그쪽 dev-proxy 인증 자체가 동작하지 않습니다(단순 401만 반환).
 #WEBMANAGER_CODE_SERVER_URL=
 
 #. --- PWA manifest shortcuts ---

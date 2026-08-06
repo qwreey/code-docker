@@ -20,47 +20,32 @@ const CookieName = "webmanager_unlock"
 // realistic single sitting.
 const sessionTTL = 10 * time.Minute
 
-// forwardAuthTTL governs UnlockedForForwardAuth (the dev-proxy Caddy
-// forward_auth check) — much longer than sessionTTL since it gates read-only
-// browsing of dev-proxy pages, not destructive webmanager writes. Both TTLs
-// are checked against the *same* token's embedded issue time (see
-// tokenAge) — one unlock covers both, just for different durations.
-const forwardAuthTTL = 24 * time.Hour
-
 // Gate is a stateful password gate: a configured argon2id hash (or none —
 // see New) plus an HMAC secret used to sign/verify self-describing unlock
 // tokens. There is deliberately no server-side session store — a token
-// carries its own issue time (HMAC-signed so it can't be forged), and
-// different callers (Unlocked vs UnlockedForForwardAuth) compare that time
-// against different TTLs.
+// carries its own issue time (HMAC-signed so it can't be forged), checked
+// against sessionTTL in tokenAge.
 type Gate struct {
-	hash         string
-	secret       []byte
-	cookieDomain string
+	hash   string
+	secret []byte
 }
 
 // New creates a Gate. An empty hash means the gate is disabled: Configured
 // returns false and RequirePassword passes every request through
 // unconditionally. This is the default (no env var set) — see package doc.
 //
-// cookieDomain is set as the unlock cookie's Domain attribute; empty (the
-// common case) leaves the cookie host-only, unchanged from prior behavior.
-// A non-empty value (e.g. ".example.com") is what lets a single unlock
-// cover both webmanager's own origin and a dev-proxy wildcard subdomain
-// under the same parent domain.
-//
 // The HMAC secret is freshly random on every call, never persisted — a
 // process restart therefore invalidates every previously issued token, the
 // same "restart re-locks everything" behavior the old in-memory session
 // store had.
-func New(hash string, cookieDomain string) *Gate {
+func New(hash string) *Gate {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		// crypto/rand failing at boot means the process can't safely mint
 		// unforgeable tokens at all — nothing downstream would work either.
 		panic("authgate: failed to generate HMAC secret: " + err.Error())
 	}
-	return &Gate{hash: hash, secret: secret, cookieDomain: cookieDomain}
+	return &Gate{hash: hash, secret: secret}
 }
 
 // Configured reports whether a password hash is set, i.e. whether the gate
@@ -146,18 +131,6 @@ func (g *Gate) UnlockedUntil(r *http.Request) (time.Time, bool) {
 	return time.Now().Add(sessionTTL - age), true
 }
 
-// UnlockedForForwardAuth reports whether the request carries a
-// currently-valid unlock token under the (much longer) forward-auth TTL —
-// used by the dev-proxy Caddy forward_auth endpoint. Reads the same cookie
-// as Unlocked, just against a different threshold.
-func (g *Gate) UnlockedForForwardAuth(r *http.Request) bool {
-	if g == nil {
-		return false
-	}
-	age, ok := g.tokenAge(r)
-	return ok && age <= forwardAuthTTL
-}
-
 // TryUnlock verifies plaintext against the configured hash. On success it
 // mints a new signed token; the caller is responsible for setting it as a
 // cookie via SetCookie. Returns ok=false (no error) for a simple wrong
@@ -179,19 +152,16 @@ func (g *Gate) TryUnlock(plaintext string) (token string, ok bool, err error) {
 
 // SetCookie sets the unlock cookie on w. HttpOnly + SameSite=Strict: it's
 // never read from JS and never sent on cross-site requests, only same-site
-// navigation/XHR (Domain, if set, widens "same-site" to cover a dev-proxy
-// wildcard subdomain under the same parent domain — see New). MaxAge covers
-// forwardAuthTTL (the longer of the two TTLs this same cookie is checked
-// against) so the browser doesn't discard it before either check would.
+// navigation/XHR. MaxAge covers sessionTTL so the browser doesn't discard it
+// before Unlocked's own check would.
 func (g *Gate) SetCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    token,
 		Path:     "/",
-		Domain:   g.cookieDomain,
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
-		MaxAge:   int(forwardAuthTTL.Seconds()),
+		MaxAge:   int(sessionTTL.Seconds()),
 	})
 }
 

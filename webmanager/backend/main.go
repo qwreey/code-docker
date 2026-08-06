@@ -66,7 +66,7 @@ func main() {
 		log.Printf("main: REFUSING to honor WEBMANAGER_AUTH_PASSWORD_HASH because it's also set in /etc/environment — this could mean it was tampered with from inside the container")
 		authPasswordHash = ""
 	}
-	gate := authgate.New(authPasswordHash, cfg.AuthCookieDomain)
+	gate := authgate.New(authPasswordHash)
 
 	historyIntervalSeconds, err := strconv.Atoi(cfg.SystemHistoryIntervalSeconds)
 	if err != nil {
