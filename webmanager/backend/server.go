@@ -13,7 +13,6 @@ import (
 	"webmanager/internal/projects"
 	"webmanager/internal/sessionheartbeat"
 	"webmanager/internal/supervisor"
-	"webmanager/internal/tailscale"
 	"webmanager/internal/termsession"
 )
 
@@ -33,7 +32,6 @@ type Server struct {
 	projectScanner    *projects.Scanner
 	miseJobs          *mise.JobStore
 	loginMgr          *claudecode.LoginManager
-	tailscaleLogin    *tailscale.LoginManager
 	diskUsage         *diskusage.Analyzer
 	termSessions      *termsession.Registry
 	sessionHeartbeats *sessionheartbeat.Store

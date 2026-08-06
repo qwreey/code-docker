@@ -3,6 +3,7 @@ sshd/
 /dind/
 /router-data/
 /tinyauth-data/
+/node_modules
 .env
 .env.webmanager
 config/*-override*

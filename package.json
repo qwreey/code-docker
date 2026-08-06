@@ -1,0 +1,8 @@
+{
+  "name": "code-docker",
+  "private": true,
+  "workspaces": [
+    "router/frontend",
+    "webmanager/frontend"
+  ]
+}

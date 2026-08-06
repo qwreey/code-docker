@@ -21,7 +21,6 @@ import (
 	"webmanager/internal/projects"
 	"webmanager/internal/sessionheartbeat"
 	"webmanager/internal/supervisor"
-	"webmanager/internal/tailscale"
 	"webmanager/internal/termsession"
 )
 
@@ -115,7 +114,6 @@ func main() {
 		),
 		miseJobs:           mise.NewJobStore(),
 		loginMgr:           claudecode.NewLoginManager(),
-		tailscaleLogin:     tailscale.NewLoginManager(),
 		diskUsage:          diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
 		termSessions:       termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
 		sessionHeartbeats:  sessionheartbeat.NewStore(),
@@ -166,26 +164,9 @@ func main() {
 	mux.HandleFunc("GET /api/git/gpg-keys/{keyId}/public", s.handleGetGPGPublicKey)
 	mux.Handle("DELETE /api/git/gpg-keys/{keyId}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteGPGKey)))
 
-	mux.HandleFunc("GET /api/tailscale/config", s.handleGetTailscaleConfig)
-	mux.Handle("PUT /api/tailscale/config", gate.RequirePassword(http.HandlerFunc(s.handlePutTailscaleConfig)))
-	mux.HandleFunc("GET /api/tailscale/forwards", s.handleListTailscaleForwards)
-	mux.Handle("POST /api/tailscale/forwards", gate.RequirePassword(http.HandlerFunc(s.handleAddTailscaleForward)))
-	mux.Handle("DELETE /api/tailscale/forwards/{name}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteTailscaleForward)))
-	mux.HandleFunc("GET /api/tailscale/publish", s.handleListTailscalePublish)
-	mux.Handle("POST /api/tailscale/publish", gate.RequirePassword(http.HandlerFunc(s.handleAddTailscalePublish)))
-	mux.Handle("DELETE /api/tailscale/publish/{name}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteTailscalePublish)))
-	mux.HandleFunc("GET /api/tailscale/status", s.handleTailscaleStatus)
-	mux.Handle("POST /api/tailscale/login/start", gate.RequirePassword(http.HandlerFunc(s.handleTailscaleLoginStart)))
-	mux.Handle("POST /api/tailscale/login/cancel", gate.RequirePassword(http.HandlerFunc(s.handleTailscaleLoginCancel)))
-
-	// internal/devproxy — Caddyfile fragments for the dev-proxy wildcard
-	// subdomain (see docs/dev-proxy.md). Reads open, writes gated, same
-	// convention as tailscale forwards/publish above.
-	mux.HandleFunc("GET /api/dev-proxy/exposes", s.handleListDevProxyExposes)
-	mux.Handle("POST /api/dev-proxy/exposes", gate.RequirePassword(http.HandlerFunc(s.handleCreateDevProxyExpose)))
-	mux.Handle("PUT /api/dev-proxy/exposes/{name}", gate.RequirePassword(http.HandlerFunc(s.handleUpdateDevProxyExpose)))
-	mux.Handle("DELETE /api/dev-proxy/exposes/{name}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteDevProxyExpose)))
-	mux.Handle("POST /api/dev-proxy/reload", gate.RequirePassword(http.HandlerFunc(s.handleReloadDevProxy)))
+	// tailscale + Dev Proxy both moved to router (see
+	// .claude/backlog/functional-router-plan.md) - webmanager no longer
+	// serves any /api/tailscale/* or /api/dev-proxy/* routes itself.
 
 	// Gated entirely (reads included, unlike the rest of webmanager): log
 	// content can leak secrets, so even listing/viewing requires unlock.
@@ -283,9 +264,6 @@ func main() {
 	// frontend render the right prompt state without guessing from a 401.
 	mux.HandleFunc("POST /api/auth/unlock", s.handleAuthUnlock)
 	mux.HandleFunc("GET /api/auth/status", s.handleAuthStatus)
-	// Not wrapped in RequirePassword — it IS the auth check (Caddy
-	// forward_auth upstream for internal/devproxy, see handlers_auth.go).
-	mux.HandleFunc("GET /api/auth/verify", s.handleAuthVerify)
 
 	// session-heartbeat: see webmanager/.claude/qa-request/
 	// session-heartbeat-plan-done.md for why this pair inverts the usual

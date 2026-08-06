@@ -3,13 +3,14 @@ import { Sheet } from '../common/Sheet'
 import { ErrorBanner } from '../common/ErrorBanner'
 import type { DevProxyRoute } from '../../api/types'
 
-// Bind-address nudge: a dev server bound to 127.0.0.1/0.0.0.0 gets swept
-// into tailscaled's automatic loopback-port forwarding (see root CLAUDE.md's
-// tailscale section) and re-exposed to the whole tailnet regardless of ACLs.
-// `private` is the docker-network alias set aside for exactly this.
-function looksExposable(target: string) {
+// Bind-address nudge: router's Caddy (this container) reaches targets over
+// code-docker-internal, not code-docker's own loopback - a target bound to
+// 127.0.0.1/localhost only accepts connections from inside code-docker
+// itself, which router can never reach. Use the compose service hostname
+// (e.g. "code-docker:5173") or a specific network alias instead.
+function looksUnreachable(target: string) {
   const host = target.split(':')[0]
-  return host === '127.0.0.1' || host === 'localhost' || host === '0.0.0.0' || host === ''
+  return host === '127.0.0.1' || host === 'localhost' || host === ''
 }
 
 export function RouteDialog({
@@ -62,13 +63,13 @@ export function RouteDialog({
             id="rt-target"
             value={target}
             onChange={(e) => setTarget(e.target.value)}
-            placeholder="private:5173"
+            placeholder="code-docker:5173"
             required
           />
-          {looksExposable(target) && (
+          {looksUnreachable(target) && (
             <p className="dev-proxy-route-hint">
-              <code>{target || '(비어있음)'}</code>은(는) tailscale에 의해 tailnet 전체로 자동 노출될 수 있습니다 —{' '}
-              <code>private:포트</code> 사용을 권장합니다.
+              <code>{target || '(비어있음)'}</code>은(는) 이 컨테이너(router) 자신을 가리켜, code-docker 안의 dev
+              서버에는 닿지 않습니다 — <code>code-docker:포트</code> 같은 compose 서비스 호스트네임을 쓰세요.
             </p>
           )}
         </div>
@@ -99,7 +100,7 @@ export function RouteDialog({
         </div>
         <label className="dev-proxy-checkbox-option">
           <input type="checkbox" checked={requireAuth} onChange={(e) => setRequireAuth(e.target.checked)} />
-          인증 요구 (webmanager 비밀번호)
+          인증 요구 (tinyauth 로그인)
         </label>
 
         {error && <ErrorBanner message={error} />}

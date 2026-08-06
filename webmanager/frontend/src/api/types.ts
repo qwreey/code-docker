@@ -95,52 +95,6 @@ export interface KnownHostEntry {
   raw: string
 }
 
-export interface TailscaleGlobalConfig {
-  socksAddress: string
-  retryInterval: number
-}
-
-export interface TailscaleForward {
-  name: string
-  localPort: number
-  remoteHost: string
-  remotePort: number
-  retryInterval: number
-}
-
-export interface TailscalePeerInfo {
-  hostName: string
-  dnsName: string
-  tailscaleIPs: string[]
-  relay: string
-  direct: boolean
-  online: boolean
-  tags: string[]
-  os: string
-}
-
-export interface TailscaleStatus {
-  backendState: string
-  authUrl: string
-  tailnetName: string
-  self: TailscalePeerInfo | null
-  peers: TailscalePeerInfo[]
-}
-
-export interface TailscaleStatusResponse {
-  available: boolean
-  status?: TailscaleStatus
-}
-
-export type TailscalePublishMode = 'tcp' | 'tls-terminated-tcp'
-
-export interface TailscalePublish {
-  name: string
-  tailscalePort: number
-  localPort: number
-  mode: TailscalePublishMode
-}
-
 export type GitSigningMode = 'none' | 'ssh' | 'gpg'
 
 export interface GitSigningConfig {
@@ -642,36 +596,6 @@ export interface OpenSession {
   userAgent: string
   lastSeen: string
   closeRequested: boolean
-}
-
-// Mirrors internal/devproxy.Route — one path-matched reverse-proxy rule
-// inside a subdomain. path empty = catch-all (no matcher). mode is the
-// wrapping Caddy directive ("route" = unconditional, "handle" = mutually
-// exclusive first-match-wins).
-export interface DevProxyRoute {
-  path?: string
-  target: string
-  stripPrefix?: string
-  rewritePrefix?: string
-  mode: 'route' | 'handle'
-  requireAuth: boolean
-}
-
-// Mirrors internal/devproxy.Expose/Info — GET /api/dev-proxy/exposes. name
-// is only an internal identifier (filename + Caddyfile @matcher token, no
-// dots allowed); host is the actual external hostname this expose answers
-// for (e.g. "dev.example.com" or "*.staging.example.com") — there's no
-// shared base domain, each expose's host is fully independent.
-export interface DevProxyExpose {
-  name: string
-  host: string
-  routes: DevProxyRoute[]
-}
-
-export interface DevProxyInfo {
-  name: string
-  raw: string
-  structured?: DevProxyExpose
 }
 
 // Mirrors internal/projects' git-status contract (GET /api/projects/git/*).

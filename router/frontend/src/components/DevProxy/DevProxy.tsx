@@ -2,7 +2,6 @@ import { Fragment, useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { DevProxyInfo, DevProxyRoute } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
-import { ExpandableEditor } from '../common/ExpandableEditor'
 import { Skeleton } from '../common/Skeleton'
 import { RouteDialog } from './RouteDialog'
 import { withViewTransition } from '../../utils/viewTransition'
@@ -17,9 +16,12 @@ function authSummary(routes: DevProxyRoute[]): string {
 }
 
 // Raw-fragment fallback editor — the whole *.caddy file as text, for
-// exposes whose content doesn't round-trip through Render (hand-edited,
-// or written under an older schema) and as an escape hatch when the
-// structured route form can't express something.
+// exposes whose content doesn't round-trip through Render (hand-edited, or
+// written under an older schema) and as an escape hatch when the structured
+// route form can't express something. A plain <textarea>, not webmanager's
+// CodeMirror-backed ExpandableEditor — kept this package's dependency
+// footprint small rather than pulling in the whole CodeMirror toolchain for
+// one rarely-used fallback path.
 function RawPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: () => void }) {
   const [raw, setRaw] = useState(info.raw)
   const [submitting, setSubmitting] = useState(false)
@@ -29,7 +31,7 @@ function RawPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: () => void }
     setSubmitting(true)
     setError(null)
     try {
-      await api.put(`/dev-proxy/exposes/${encodeURIComponent(info.name)}`, { raw })
+      await api.put(`/exposes/${encodeURIComponent(info.name)}`, { raw })
       onSaved()
     } catch (e) {
       setError(errorMessage(e))
@@ -40,7 +42,13 @@ function RawPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: () => void }
 
   return (
     <div className="dev-proxy-edit-panel">
-      <ExpandableEditor value={raw} onChange={setRaw} language="plain" readOnly={false} triggerLabel="원본 편집" />
+      <textarea
+        className="dev-proxy-raw-textarea"
+        value={raw}
+        onChange={(e) => setRaw(e.target.value)}
+        spellCheck={false}
+        rows={12}
+      />
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <div className="dev-proxy-edit-toggle">
         <button type="button" className="btn btn-primary btn-small" disabled={submitting} onClick={handleSave}>
@@ -135,7 +143,7 @@ function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?
   const [showRaw, setShowRaw] = useState(false)
 
   async function putRoutes(next: DevProxyRoute[]) {
-    await api.put(`/dev-proxy/exposes/${encodeURIComponent(info.name)}`, { host, routes: next })
+    await api.put(`/exposes/${encodeURIComponent(info.name)}`, { host, routes: next })
   }
 
   async function handleSaveRoute(route: DevProxyRoute) {
@@ -179,7 +187,7 @@ function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?
         label="이름"
         value={info.name}
         onSave={async (newName) => {
-          await api.put(`/dev-proxy/exposes/${encodeURIComponent(info.name)}`, { name: newName, host, routes })
+          await api.put(`/exposes/${encodeURIComponent(info.name)}`, { name: newName, host, routes })
           onSaved(newName)
         }}
       />
@@ -187,7 +195,7 @@ function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?
         label="host"
         value={host}
         onSave={async (newHost) => {
-          await api.put(`/dev-proxy/exposes/${encodeURIComponent(info.name)}`, { host: newHost, routes })
+          await api.put(`/exposes/${encodeURIComponent(info.name)}`, { host: newHost, routes })
           onSaved()
         }}
       />
@@ -271,7 +279,7 @@ export function DevProxy() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api.get<DevProxyInfo[]>('/dev-proxy/exposes')
+      const data = await api.get<DevProxyInfo[]>('/exposes')
       setExposes(data)
       setError(null)
     } catch (e) {
@@ -300,7 +308,7 @@ export function DevProxy() {
     setSubmitting(true)
     setFormError(null)
     try {
-      await api.post('/dev-proxy/exposes', { name, host, routes: [] })
+      await api.post('/exposes', { name, host, routes: [] })
       setExpandedName(name)
       setName('')
       setHost('')
@@ -317,7 +325,7 @@ export function DevProxy() {
     if (!window.confirm(`"${exposeName}" expose를 삭제하시겠습니까?`)) return
     setDeleting(exposeName)
     try {
-      await api.del(`/dev-proxy/exposes/${encodeURIComponent(exposeName)}`)
+      await api.del(`/exposes/${encodeURIComponent(exposeName)}`)
       if (expandedName === exposeName) setExpandedName(null)
       await load()
       showNotice()
@@ -338,22 +346,14 @@ export function DevProxy() {
       <div className="info-note">
         <span aria-hidden="true">ℹ</span>
         <span>
-          바깥 리버스 프록시가 원하는 도메인(들)을 이 컨테이너의 <code>CADDY_ADAPTER_PORT</code>(기본 8082)로
-          넘기면, 그 안에서는 각 expose의 host 값과 실제 Host 헤더가 일치하는지로 분배합니다. 인증을 쓰려면{' '}
-          <code>WEBMANAGER_CODE_SERVER_URL</code>과 <code>WEBMANAGER_AUTH_COOKIE_DOMAIN</code>도 설정해야 합니다 —
+          바깥 리버스 프록시가 원하는 도메인(들)을 이 컨테이너(router)의 <code>CADDY_ADAPTER_PORT</code>(기본
+          8082)로 넘기면, 그 안에서는 각 expose의 host 값과 실제 Host 헤더가 일치하는지로 분배합니다. 인증(라우트별
+          "인증 요구")을 쓰려면 <code>TINYAUTH_APPURL</code>/<code>TINYAUTH_AUTH_USERS</code>도 설정해야 합니다 —
           자세한 내용은{' '}
           <a href="https://github.com/qwreey/code-docker/blob/master/docs/dev-proxy.md" target="_blank" rel="noreferrer">
             docs/dev-proxy.md
           </a>
           를 확인하세요.
-        </span>
-      </div>
-      <div className="info-note">
-        <span aria-hidden="true">ℹ</span>
-        <span>
-          라우트의 target을 <code>127.0.0.1</code>이나 <code>0.0.0.0</code>에 바인드하면 tailscale이 tailnet
-          전체에 자동으로 재노출할 수 있습니다 — dev 서버는 <code>private</code> 호스트네임(예:{' '}
-          <code>private:5173</code>)에 바인드하는 걸 권장합니다.
         </span>
       </div>
 

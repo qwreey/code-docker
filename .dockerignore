@@ -16,6 +16,12 @@ code-server-autoinstall/last-check
 code-server-autoinstall/config.yaml
 code-server-autoinstall/.git/
 dind/
+router-data/
+tinyauth-data/
+node_modules
+router/frontend/node_modules
+router/frontend/dist
 webmanager/frontend/node_modules
 webmanager/frontend/dist
 webmanager/backend/webmanager
+router/backend/router-manager

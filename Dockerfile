@@ -77,12 +77,22 @@ ENTRYPOINT ["/netinit-entrypoint.sh"]
 # 빌드 구조". docker-compose.yml's code-docker-router service now builds
 # from router/ as its own context instead of a stage here.
 
+# webmanager/frontend imports router/frontend as a real package
+# (@code-docker/router-frontend, see .claude/backlog/functional-router-plan.md's
+# "router ↔ webmanager 프론트 통합 방식") via an npm workspace rooted at the
+# repo root (package.json's `workspaces:`) - so this stage needs the whole
+# workspace, not just webmanager/frontend/ in isolation, or `npm ci` would
+# try (and fail) to resolve that package from the public registry instead
+# of linking it locally.
 FROM node:24-alpine AS webmanager-frontend
 WORKDIR /src
-COPY webmanager/frontend/package.json webmanager/frontend/package-lock.json ./
+COPY package.json package-lock.json ./
+COPY router/frontend/package.json router/frontend/package.json
+COPY webmanager/frontend/package.json webmanager/frontend/package.json
 RUN npm ci
-COPY webmanager/frontend/ ./
-RUN npm run build
+COPY router/frontend/ router/frontend/
+COPY webmanager/frontend/ webmanager/frontend/
+RUN npm run build --workspace webmanager/frontend
 
 FROM golang:1.25-alpine AS webmanager-backend
 WORKDIR /src
@@ -113,7 +123,7 @@ COPY --from=docker-bin /usr/local/bin/docker /usr/bin/docker
 # multiple instances can bind-mount their own over this path instead, see
 # webmanager/.claude/env-migration-plan.md).
 COPY --from=webmanager-backend /webmanager /etc/code-docker/webmanager/webmanager
-COPY --from=webmanager-frontend /src/dist /etc/code-docker/webmanager/static
+COPY --from=webmanager-frontend /src/webmanager/frontend/dist /etc/code-docker/webmanager/static
 COPY example-env.webmanager /etc/code-docker/webmanager/example-env.webmanager
 
 # Log directories for per-program rotated log files (read by vector).

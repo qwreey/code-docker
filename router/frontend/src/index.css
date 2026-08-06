@@ -1,0 +1,102 @@
+/* Design tokens - a trimmed copy of webmanager/frontend/src/index.css's
+   token set (just what router/frontend's own components use), since the two
+   packages don't share a build yet (see .claude/backlog/functional-router-plan.md's
+   "프론트엔드 구조" - a real shared package is a possible future
+   simplification, not done here). Two-tier only (light default +
+   prefers-color-scheme dark) - no manual light/dark/system toggle UI here,
+   unlike webmanager's own 3-tier system, since this package has no theme
+   toggle control of its own yet. When these components render inside
+   webmanager (the real integration point, see src/index.ts), webmanager's
+   own index.css tokens take precedence for anything sharing the same
+   selector specificity - this file mainly matters for router/frontend's own
+   standalone dev server. */
+:root {
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-hover: #f0f1f4;
+  --border: #dfe2e7;
+
+  --text: #33394a;
+  --text-heading: #171a21;
+  --text-muted: #6b7280;
+
+  --accent: #2f6feb;
+  --accent-hover: #2558c4;
+  --accent-bg: #eaf1fe;
+  --accent-border: #b9d1fb;
+  --accent-contrast: #ffffff;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  --color-green-bg: #e7f7ee;
+  --color-green-fg: #1a7f4b;
+  --color-green-border: #b9e6cc;
+
+  --color-red-bg: #fdecec;
+  --color-red-fg: #b3261e;
+  --color-red-border: #f5c2c0;
+
+  --color-yellow-bg: #fdf3e0;
+  --color-yellow-fg: #935700;
+  --color-yellow-border: #f3dca6;
+
+  --color-gray-bg: #eceef1;
+  --color-gray-fg: #5a6270;
+  --color-gray-border: #d7dae0;
+
+  color-scheme: light;
+  color: var(--text);
+  background: var(--bg);
+  font: 15px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0f13;
+    --surface: #171a20;
+    --surface-hover: #20242c;
+    --border: #2b3038;
+
+    --text: #c4c9d4;
+    --text-heading: #f2f4f7;
+    --text-muted: #8992a3;
+
+    --accent: #4c8bf5;
+    --accent-hover: #6ba0f7;
+    --accent-bg: #16233c;
+    --accent-border: #2c4f8a;
+    --accent-contrast: #ffffff;
+
+    --color-green-bg: #12301a;
+    --color-green-fg: #3ecf5b;
+    --color-green-border: #1f5c31;
+
+    --color-red-bg: #3a1616;
+    --color-red-fg: #f2726a;
+    --color-red-border: #7a2b26;
+
+    --color-yellow-bg: #3a2c0a;
+    --color-yellow-fg: #e8b23c;
+    --color-yellow-border: #7a5a18;
+
+    --color-gray-bg: #262a31;
+    --color-gray-fg: #a8b0bd;
+    --color-gray-border: #3a4049;
+
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
