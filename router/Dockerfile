@@ -32,6 +32,7 @@ FROM golang:1.25-alpine AS router-manager-build
 WORKDIR /src
 COPY backend/go.mod ./
 COPY backend/main.go ./
+COPY backend/handlers_devproxy.go ./
 COPY backend/internal ./internal
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /router-manager .
 
@@ -40,13 +41,16 @@ FROM archlinux
 # tailscale: the daemon+forwards+publish feature moved here from code-docker
 # (see .claude/backlog/functional-router-plan.md's "tailscale 전체 이관").
 # socat: tailscale-forward.default.sh's forwards implementation.
+# caddy: Dev Proxy's internal instance (see
+# router/config/caddy-adapter/caddy-adapter.default.sh, moved here from
+# code-docker the same way).
 RUN pacman -Suy --noconfirm --needed \
         iptables iproute2 squid supervisor yq gettext curl openssl \
-        tailscale socat && \
+        tailscale socat caddy && \
     pacman -Scc --noconfirm
 RUN mkdir -p /var/log/netgate-firewall /var/log/squid /var/cache/squid \
         /var/log/tailscaled /var/log/tailscale-forward /var/log/tailscale-publish \
-        /var/log/router-manager \
+        /var/log/router-manager /var/log/caddy-adapter \
         /etc/code-docker/netgate /etc/code-docker/supervisord.d \
         /var/lib/code-docker-router && \
     chown -R proxy:proxy /var/cache/squid
@@ -57,10 +61,11 @@ COPY --chown=root:root config/tailscale/tailscale-config.default.yaml \
 COPY --chown=root:root script/netgate-entrypoint.sh script/netgate-firewall.sh \
     script/netgate-squid.sh script/netgate-blocklist.sh \
     script/tailscale-service.sh script/tailscale-forward.sh \
-    script/tailscale-publish.sh /etc/code-docker/
+    script/tailscale-publish.sh script/caddy-adapter.sh /etc/code-docker/
 COPY --chown=root:root config/tailscale/tailscale-service.default.sh \
     config/tailscale/tailscale-forward.default.sh \
-    config/tailscale/tailscale-publish.default.sh /etc/code-docker/
+    config/tailscale/tailscale-publish.default.sh \
+    config/caddy-adapter/caddy-adapter.default.sh /etc/code-docker/
 COPY --from=router-manager-build /router-manager /usr/local/bin/router-manager
 # ssl-bump's https_port directive requires SOME cert configured at
 # parse-time even though this config only ever peeks the SNI and

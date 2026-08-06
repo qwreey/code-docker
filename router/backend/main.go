@@ -25,6 +25,11 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/tailscale/state", handleTailscaleState)
+	mux.HandleFunc("GET /api/dev-proxy/exposes", handleListDevProxyExposes)
+	mux.HandleFunc("POST /api/dev-proxy/exposes", handleCreateDevProxyExpose)
+	mux.HandleFunc("PUT /api/dev-proxy/exposes/{name}", handleUpdateDevProxyExpose)
+	mux.HandleFunc("DELETE /api/dev-proxy/exposes/{name}", handleDeleteDevProxyExpose)
+	mux.HandleFunc("POST /api/dev-proxy/reload", handleReloadDevProxy)
 
 	log.Printf("router-manager listening on %s", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
@@ -38,6 +43,15 @@ func handleTailscaleState(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
+	writeJSON(w, http.StatusOK, state)
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(state)
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
 }

@@ -118,6 +118,28 @@
 #ROUTER_TAILSCALE_ENABLED="true"
 #ROUTER_TAILSCALE_HOSTNAME="" # ex: code-docker-router
 
+# Same transitional pattern for Dev Proxy's internal Caddy instance, also
+# moving to router (see .claude/backlog/functional-router-plan.md's "Dev
+# Proxy Caddy도 router로 이관") - folds back into a plain CADDY_ADAPTER_*
+# name once Phase 4 removes code-docker's own copy.
+#ROUTER_CADDY_ADAPTER_ENABLED="true"
+#ROUTER_CADDY_ADAPTER_PORT="8082"
+
+# router's own forward-auth (tinyauth) - protects individual Dev Proxy
+# exposes that opt into RequireAuth, see docs/dev-proxy.md once it's
+# updated for this migration. Empty TINYAUTH_AUTH_USERS means no one can
+# log in yet, and tinyauth itself refuses to start without TINYAUTH_APPURL
+# set to a real URL - generate a username:bcrypt-hash pair with:
+#   docker run --rm ghcr.io/tinyauthapp/tinyauth:v5 user create \
+#     --username <name> --password <password> --docker
+# (prints an already-escaped TINYAUTH_AUTH_USERS=... line ready to paste
+# below - see tinyauth's own docs at https://tinyauth.app for the current
+# exact command if this changes upstream).
+#TINYAUTH_APPURL="" # ex: https://code-docker.example.com
+#TINYAUTH_AUTH_USERS="" # ex: user:$$2a$$10$$...
+#TINYAUTH_AUTH_TRUSTEDPROXIES="172.16.0.0/12"
+#TINYAUTH_VOLUME="./tinyauth-data"
+
 # In-container nginx (config/nginx.default.conf) access_log verbosity:
 #   errors - only log non-2xx/3xx responses (via an nginx map/if on
 #     $status), so routine traffic doesn't flood `docker compose logs`.
