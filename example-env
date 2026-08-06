@@ -43,6 +43,7 @@
 #DIND_VOLUME="./dind"
 #HOME_VOLUME="./code"
 #SSHD_VOLUME="./sshd"
+#ROUTER_VOLUME="./router-data"
 
 # dind-authz(아래 DIND_TARGET 참고)의 실시간 conf.d 정책 디렉토리입니다. 반드시
 # code-docker(HOME_VOLUME/`/code`)와 다른 경로여야 합니다 - code-docker 자신이
@@ -105,6 +106,17 @@
 # attempt - see docs/tailscale.md#호스트네임-지정-magicdns for how to change
 # it after you've already logged in once.
 #TAILSCALE_HOSTNAME="" # ex: code-docker
+
+# Transitional, migration-only: tailscale itself is moving from code-docker
+# to router (see .claude/backlog/functional-router-plan.md) - during the
+# coexistence window (until that migration's Phase 4 removes code-docker's
+# own TAILSCALE_* above), router reads these instead of TAILSCALE_ENABLED/
+# TAILSCALE_HOSTNAME directly, so you can run both at once with distinct
+# identities while testing. TAILSCALE_LOGIN_SERVER above is shared as-is
+# (same control server for both makes sense either way). Once Phase 4 lands,
+# these fold back into the plain TAILSCALE_* names above.
+#ROUTER_TAILSCALE_ENABLED="true"
+#ROUTER_TAILSCALE_HOSTNAME="" # ex: code-docker-router
 
 # In-container nginx (config/nginx.default.conf) access_log verbosity:
 #   errors - only log non-2xx/3xx responses (via an nginx map/if on

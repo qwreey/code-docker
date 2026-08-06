@@ -20,21 +20,48 @@
 # code-docker at all.
 #
 # Built supervisord-based from the start (not a single monolithic
-# entrypoint script) even though it only runs two programs today, so
-# tailscale/Dev-Proxy/tinyauth (added in later phases - see
-# .claude/backlog/functional-router-plan.md) can each drop in their own
-# [program:...] section without a rewrite - same idiom as the main image's
-# own config/supervisord.default.conf, see root CLAUDE.md's "process model".
+# entrypoint script) even though it only ran two programs originally, so
+# tailscale/Dev-Proxy/tinyauth (see .claude/backlog/functional-router-plan.md)
+# can each drop in their own [program:...] section without a rewrite - same
+# idiom as the main image's own config/supervisord.default.conf, see root
+# CLAUDE.md's "process model". config/supervisord.d/*.conf (this stage's own
+# git-tracked built-in program definitions, one file per feature area) is
+# what makes that possible - see config/netgate/supervisord.default.conf's
+# own comment on the two include globs.
+FROM golang:1.25-alpine AS router-manager-build
+WORKDIR /src
+COPY backend/go.mod ./
+COPY backend/main.go ./
+COPY backend/internal ./internal
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /router-manager .
+
 FROM archlinux
 
+# tailscale: the daemon+forwards+publish feature moved here from code-docker
+# (see .claude/backlog/functional-router-plan.md's "tailscale 전체 이관").
+# socat: tailscale-forward.default.sh's forwards implementation.
 RUN pacman -Suy --noconfirm --needed \
-        iptables iproute2 squid supervisor yq gettext curl openssl && \
+        iptables iproute2 squid supervisor yq gettext curl openssl \
+        tailscale socat && \
     pacman -Scc --noconfirm
-RUN mkdir -p /var/log/netgate-firewall /var/log/squid /var/cache/squid /etc/code-docker/netgate && \
+RUN mkdir -p /var/log/netgate-firewall /var/log/squid /var/cache/squid \
+        /var/log/tailscaled /var/log/tailscale-forward /var/log/tailscale-publish \
+        /var/log/router-manager \
+        /etc/code-docker/netgate /etc/code-docker/supervisord.d \
+        /var/lib/code-docker-router && \
     chown -R proxy:proxy /var/cache/squid
 COPY --chown=root:root config/netgate /etc/code-docker/netgate
+COPY --chown=root:root config/supervisord.d /etc/code-docker/supervisord.d
+COPY --chown=root:root config/tailscale/tailscale-config.default.yaml \
+    /etc/code-docker/tailscale-config.default.yaml
 COPY --chown=root:root script/netgate-entrypoint.sh script/netgate-firewall.sh \
-    script/netgate-squid.sh script/netgate-blocklist.sh /etc/code-docker/
+    script/netgate-squid.sh script/netgate-blocklist.sh \
+    script/tailscale-service.sh script/tailscale-forward.sh \
+    script/tailscale-publish.sh /etc/code-docker/
+COPY --chown=root:root config/tailscale/tailscale-service.default.sh \
+    config/tailscale/tailscale-forward.default.sh \
+    config/tailscale/tailscale-publish.default.sh /etc/code-docker/
+COPY --from=router-manager-build /router-manager /usr/local/bin/router-manager
 # ssl-bump's https_port directive requires SOME cert configured at
 # parse-time even though this config only ever peeks the SNI and
 # splices/terminates (see squid.default.conf's own comment) - never

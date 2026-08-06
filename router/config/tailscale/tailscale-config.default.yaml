@@ -1,0 +1,27 @@
+# See docs/tailscale.md (repo root) for what forwards/publish mean and the
+# security reasoning behind them. This file now lives on router's own
+# volume (moved here from code-docker's /code - see
+# .claude/backlog/functional-router-plan.md's "tailscale 전체 이관").
+
+socks5_address: localhost:1055   # tailscaled's SOCKS5 listen address, usually leave as-is
+retry_intervall: 5               # default retry interval (seconds) for forwards, overridable per-entry
+
+# Pull a remote tailnet peer's port into code-docker (socat + SOCKS5, run
+# from router now). Reach these from inside code-docker via the "forward"
+# hostname, e.g.
+# forwards:
+#   - name: adb
+#     local_port: 5037
+#     remote_host: laptop
+#     remote_port: 5037
+forwards: []
+
+# Explicitly publish a local code-docker port to the tailnet (`tailscale
+# serve`, run from router now - always targets code-docker itself, see
+# tailscale-publish.default.sh).
+# publish:
+#   - name: dev-server
+#     tailscale_port: 80
+#     local_port: 3000
+#     mode: tcp                  # tcp | tls-terminated-tcp
+publish: []

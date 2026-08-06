@@ -88,20 +88,27 @@ services:
       # via the route code-docker-netinit continuously (re)plants in this
       # netns.
       code-docker-internal:
-        # Self-IP alias for the tailscale `publish:` feature (config.yaml's
-        # `tailscale serve` targets). tailscaled auto re-exposes anything
-        # bound to loopback/0.0.0.0 to the whole tailnet regardless of ACLs,
-        # so services meant to be published deliberately (not automatically)
-        # should bind here instead.
+        # `private` still serves code-docker's OWN (not-yet-removed - see
+        # Phase 4 of .claude/backlog/functional-router-plan.md's migration)
+        # tailscaled instance's `publish:` targets, and is still
+        # CODE_SERVER_BIND_ADDR/WEBMANAGER_ADDR's default bind address
+        # regardless of tailscale - kept as-is until that default itself
+        # changes in Phase 4, once code-docker's own tailscaled is gone and
+        # this loopback-exposure reasoning no longer applies to code-docker.
         aliases:
           - private
       code-docker-forwards:
-        # Self-IP alias for the tailscale `forwards:` feature (config.yaml's
-        # socat listeners) - same loopback-avoidance reasoning as `private`,
-        # on its own network so local ports can't collide between forwards:
-        # and publish:.
-        aliases:
-          - forward
+        # Still attached (dind/webmanager-style internal service discovery),
+        # but no longer aliased `forward` here - that alias moved to
+        # code-docker-router below, since router now owns the tailscale
+        # `forwards:` feature (socat listeners) entirely. `forward:<port>`
+        # still resolves from inside code-docker, just to router's IP now
+        # instead of code-docker's own. NOTE: code-docker's own (not yet
+        # removed - Phase 4) tailscale-forward program still tries to
+        # resolve this alias for itself and will fail/restart-loop
+        # harmlessly until Phase 4 deletes that program - see the Phase 2
+        # migration commit for the full explanation.
+        {}
     # ports: block left entirely commented out on purpose - Compose rejects
     # a `ports:` key with zero array items, so the key itself has to go too,
     # not just its entries.
@@ -277,6 +284,23 @@ services:
       # firewall/proxy rules (nothing would ever reach it anyway once
       # code-docker/dind's own loops are idle - see example-env).
       NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
+      # tailscale daemon+forwards+publish now live here (see
+      # .claude/backlog/functional-router-plan.md's "tailscale 전체 이관") -
+      # same env vars/semantics code-docker's own tailscale used to read,
+      # just moved. code-docker's own copies of these (above) are still
+      # present too during this migration's coexistence window (removed in
+      # Phase 4) - if both are set, you now have two tailscale identities
+      # trying to register, so give this one a distinct
+      # ROUTER_TAILSCALE_HOSTNAME below if testing both at once.
+      TAILSCALE_ENABLED: "${ROUTER_TAILSCALE_ENABLED:-true}"
+      TAILSCALE_LOGIN_SERVER: "${TAILSCALE_LOGIN_SERVER:-}"
+      TAILSCALE_HOSTNAME: "${ROUTER_TAILSCALE_HOSTNAME:-}"
+    volumes:
+      # Persistent state for router's own features (tailscale login
+      # state/config.yaml today; caddy-adapter/tinyauth state in later
+      # phases) - router has no /code volume of its own (that's
+      # code-docker's), so this is its equivalent.
+      - "${ROUTER_VOLUME:-./router-data}:/var/lib/code-docker-router"
     cap_add:
       # NET_ADMIN only - no privileged: true, no SYS_MODULE or anything
       # else. This container is meaningfully more trusted than code-docker
@@ -306,6 +330,14 @@ services:
         aliases:
           - router
       code-docker-external: {}
+      code-docker-forwards:
+        # Moved here from code-docker (see that service's own
+        # code-docker-forwards comment above) - router's own
+        # tailscale-forward.default.sh binds its socat listeners here now,
+        # so `forward:<port>` (resolved from inside code-docker) reaches
+        # router instead of code-docker itself.
+        aliases:
+          - forward
     ports:
       # Moved here from code-docker (see that service's own ports: comment
       # above) - code-docker-router is the only container with a real
