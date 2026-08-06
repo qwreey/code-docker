@@ -3,7 +3,7 @@
 tailscale(데몬+로그인+포트 가져오기/내보내기)은 code-docker가 아니라 **router**
 컨테이너에서 실행됩니다 — code-docker보다 신뢰 수준이 높은 국경 컨테이너에 네트워크
 관련 기능을 모으는 설계입니다
-([`.claude/backlog/functional-router-plan.md`](../.claude/backlog/functional-router-plan.md)
+([`router/.claude/functional-router-plan.md`](../router/.claude/functional-router-plan.md)
 참고). code-docker 자신은 tailscale 프로세스를 하나도 갖고 있지 않습니다.
 
 **자세한 내용, 설정 방법, forwards/publish, 보안은 모두 [router.md](router.md#tailscale)로

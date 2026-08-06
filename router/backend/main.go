@@ -4,7 +4,7 @@
 // published for this service in docker-compose.yml, so it's only reachable
 // from other code-docker-internal containers, e.g. code-docker's nginx via
 // its /tailscale/, /dev-proxy/, /router-auth/ proxy routes - see
-// .claude/backlog/functional-router-plan.md's "tailscale readonly API 노출
+// .claude/functional-router-plan.md's "tailscale readonly API 노출
 // 정책").
 package main
 

@@ -58,7 +58,7 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 | 문서 | 기능 |
 |---|---|
 | `archive/supervisor-plan-done.md` | supervisord 프로세스 관리(목록/시작/정지/재시작/로그, 프로그램별 메타데이터로 특정 컨트롤 비활성화, PID 트리 펼침) |
-| `archive/tailscale-plan-done.md` | tailscale forwards/publish 설정 CRUD (webmanager UI 쪽 — tailscaled 인프라 자체는 루트 `.claude/archive/tailscale-design.md`) |
+| `archive/tailscale-plan-done.md` | tailscale forwards/publish 설정 CRUD — webmanager가 직접 구현했던 시절의 기록(이후 이 기능 자체가 router로 완전히 이관되어 webmanager 쪽 코드는 삭제됨, 지금은 `router/frontend`가 이 UI를 소유). tailscaled 인프라 설계 자체는 `router/.claude/archive/tailscale-design.md` |
 | `archive/vector-logs-plan-done.md` | vector 로그 파이프라인 도입 + webmanager Logs 페이지(시간범위 필터, 커서 페이지네이션, 실시간 누적, 비밀번호 게이트) |
 | `archive/processes-plan-done.md` | "작업 관리자" 탭(구 Processes) — 성능/프로세스 서브탭, 코어별 CPU 히트맵(호버 히스토리 스파크라인 포함), 메모리 구성요소별 분해, 프로세스 트리+리스트, 필터/검색, 페이지네이션, 컨테이너 루트 디스크 사용량 분석 |
 | `archive/extensions-plan-done.md` | code-server 확장 추천/설치(카테고리별 그룹핑, 접기, 설치된 목록, 표시 토글, open-vsx "더 보기" 링크, 삭제(uninstall)) |

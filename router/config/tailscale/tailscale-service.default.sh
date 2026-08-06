@@ -13,7 +13,7 @@ fi
 # See docs/tailscale.md at the repo root for why userspace networking (no
 # NET_ADMIN/tun) is used, and how inbound/outbound forwarding work without
 # it. State lives under router's own persistent volume now (moved here from
-# code-docker's /code - see .claude/backlog/functional-router-plan.md's
+# code-docker's /code - see .claude/functional-router-plan.md's
 # "tailscale 전체 이관").
 mkdir -p /var/lib/code-docker-router/tailscale/state
 

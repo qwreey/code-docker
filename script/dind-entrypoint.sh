@@ -74,7 +74,7 @@ fi
 # script/netinit-entrypoint.sh, just running against dind's own netns. Also
 # keeps dind's own /etc/resolv.conf pointed at router's DNS forwarder for the
 # same reason code-docker's resolv-writer program does (see
-# .claude/backlog/router-dns-plan.md) - code-docker-internal being
+# router/.claude/router-dns-plan.md) - code-docker-internal being
 # `internal: true` blocks Docker's own embedded DNS from forwarding
 # externally, and dind needs real DNS too (pulling images by registry
 # hostname).

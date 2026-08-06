@@ -165,7 +165,7 @@ func main() {
 	mux.Handle("DELETE /api/git/gpg-keys/{keyId}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteGPGKey)))
 
 	// tailscale + Dev Proxy both moved to router (see
-	// .claude/backlog/functional-router-plan.md) - webmanager no longer
+	// router/.claude/functional-router-plan.md) - webmanager no longer
 	// serves any /api/tailscale/* or /api/dev-proxy/* routes itself.
 
 	// Gated entirely (reads included, unlike the rest of webmanager): log

@@ -32,7 +32,7 @@
 > - 사용자 문서는 `docs/dev-proxy.md`(신규) + `docs/webmanager.md`의 "Dev Proxy"
 >   절 + README의 "dev 서버 노출" tips 절.
 >
-> 아래 본문은 구현 전 조사 당시 기록 그대로 보존(`../../.claude/archive/tailscale-design.md`와
+> 아래 본문은 구현 전 조사 당시 기록 그대로 보존(`../../../router/.claude/archive/tailscale-design.md`와
 > 동일한 성격) — 위 콜아웃과 배치되는 서술(특히 "인증" 관련)은 위 콜아웃이 우선함.
 
 > 이 저장소의 일반적인 구조/컨벤션(override 패턴, supervisord 프로세스 모델, docker-compose 토폴로지 등)은 저장소 루트의 `CLAUDE.md` 를 참고. `webmanager/` 관련 컨벤션은 `webmanager/CLAUDE.md`, `webmanager/plan.md` 참고.
@@ -224,9 +224,9 @@ dev-expose reload         # 파일 변경 없이 검증 + caddy reload만 다시
 
 README에는 "이 포트를 바깥 프록시에 연결하는 법" 정도의 짧은 절만 추가 — nginx/Caddy 두 가지로 대충 예시 하나씩만 언급해도 충분 (nginx `proxy_pass`, Caddy `reverse_proxy` 한 줄씩). 구현 시 정확한 포트 번호는 다른 내부 포트들(2019 admin API 등)과 안 겹치게 고르기만 하면 됨 — 그 이상의 설계 결정 없음.
 
-### Tailscale과의 상호작용 (보안 주의사항, `../../.claude/archive/tailscale-design.md` 참고) — 호스트 포트 퍼블리시를 택할 경우에만 해당
+### Tailscale과의 상호작용 (보안 주의사항, `../../../router/.claude/archive/tailscale-design.md` 참고) — 호스트 포트 퍼블리시를 택할 경우에만 해당
 
-`../../.claude/archive/tailscale-design.md`에서 확인한 대로, tailscaled의 userspace netstack은 **호스트 포트 퍼블리시를 위해 `0.0.0.0`에 바인드된 모든 포트를 조건 없이 tailnet에도 자동 재노출**함 (sshd/code-server가 이미 이 카테고리). 사용자가 위에서 호스트 포트 퍼블리시 방식을 택하면 이 새 Caddy 인스턴스도 같은 카테고리에 들어감 — 즉 tailnet에 있는 아무 기기나(ACL로 code-docker 접근이 허용된 경우) 도메인 인증 없이 이 포트로 직접 들어와 모든 expose에 접근할 수 있게 됨. (공유 도커 네트워크 방식만 쓰고 호스트 포트를 안 열면 이 문제 자체가 없음.)
+`../../../router/.claude/archive/tailscale-design.md`에서 확인한 대로, tailscaled의 userspace netstack은 **호스트 포트 퍼블리시를 위해 `0.0.0.0`에 바인드된 모든 포트를 조건 없이 tailnet에도 자동 재노출**함 (sshd/code-server가 이미 이 카테고리). 사용자가 위에서 호스트 포트 퍼블리시 방식을 택하면 이 새 Caddy 인스턴스도 같은 카테고리에 들어감 — 즉 tailnet에 있는 아무 기기나(ACL로 code-docker 접근이 허용된 경우) 도메인 인증 없이 이 포트로 직접 들어와 모든 expose에 접근할 수 있게 됨. (공유 도커 네트워크 방식만 쓰고 호스트 포트를 안 열면 이 문제 자체가 없음.)
 
 **대응**: 호스트 포트를 퍼블리시하기로 한 경우, 루트 `CLAUDE.md`/README에 이미 있는 "sshd(22), code-server(80)는 tailnet ACL grant가 유일한 방어선" 목록에 이 포트도 추가해야 함 — README의 tailnet ACL grant 예시(`{ "dst": ["tag:code-docker"], "ip": ["tcp:22", "tcp:80"] }`)에 이 새 포트 번호를 넣어 문서화할 것. README의 새 "dev 서버 노출" 절에서 이 캐비앗을 명시적으로 언급.
 
@@ -282,4 +282,4 @@ README에는 "이 포트를 바깥 프록시에 연결하는 법" 정도의 짧�
 - [Official repositories - ArchWiki](https://wiki.archlinux.org/title/Official_repositories) (Arch `extra`의 `caddy` 패키지 확인)
 - [Configuring Caddy with Wildcard Subdomains](https://sirfitz.medium.com/configuring-caddy-with-wildcard-subdomains-eadcd7ad9cff)
 - [Complexicon/caddyfile-editor](https://github.com/Complexicon/caddyfile-editor), [zackwag/caddy-ui](https://github.com/zackwag/caddy-ui), [makinghappen/caddy-ui](https://github.com/makinghappen/caddy-ui), [Caddy Manager](https://caddymanager.online/) — 기존 Caddyfile 웹 에디터 프로젝트 (UI 패턴 참고용)
-- `../../.claude/archive/tailscale-design.md` (레포 루트) — tailnet 자동 포워딩/ACL grant 배경
+- `../../../router/.claude/archive/tailscale-design.md` (router 서브트리) — tailnet 자동 포워딩/ACL grant 배경

@@ -95,7 +95,7 @@ export NGINX_CODE_SERVER_UPSTREAM="${CODE_SERVER_BIND_ADDR:-private:8080}"
 export NGINX_WEBMANAGER_UPSTREAM="${WEBMANAGER_ADDR:-private:81}"
 
 # caddy-adapter (Dev Proxy) moved to router (see
-# .claude/backlog/functional-router-plan.md's "Dev Proxy Caddy도 router로
+# router/.claude/functional-router-plan.md's "Dev Proxy Caddy도 router로
 # 이관") - no longer the same container as nginx, so this now crosses
 # code-docker-internal via the `router` alias instead of loopback.
 # CADDY_ADAPTER_PORT must match router's own copy of this setting

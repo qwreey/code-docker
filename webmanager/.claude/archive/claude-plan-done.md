@@ -40,7 +40,7 @@ CLI 버전 업데이트로 문구가 바뀌어도 안 깨지도록 일부러 느
 split해서 마켓플레이스 서픽스는 서브텍스트로). `go build`/`go vet`/`gofmt`,
 `npm run build`/`npm run lint` 전부 클린.
 
-> `qa-request/caddy-plan-done.md`/`.claude/archive/tailscale-design.md`(레포 루트)와 같은 성격으로
+> `qa-request/caddy-plan-done.md`/`router/.claude/archive/tailscale-design.md`(router 서브트리)와 같은 성격으로
 > 시작한 문서였으나, 이제 마일스톤까지 정리돼서 **M1은 바로 구현 착수 가능한 상태**.
 > 저장소 일반 컨벤션은 루트 `CLAUDE.md`, webmanager 컨벤션은 `webmanager/CLAUDE.md`,
 > `webmanager/plan.md` 참고.

@@ -44,7 +44,7 @@ Multi-stage: `docker:latest` is used only as a source to `COPY --from=docker-bin
 
 ### docker-compose topology
 
-Three user-defined networks: `code-docker-external` (has internet/host access), `code-docker-internal` (`internal: true`, no outside route), and `code-docker-forwards` (also `internal: true`, dedicated to router's tailscale `forwards:` feature — see "router" below). As of the egress lockdown (see "router" below), neither `code-docker` nor `code-docker-dind` (the `docker:dind` sidecar, used so `docker`/`docker compose`/`docker buildx` work *inside* code-docker via `DOCKER_HOST=tcp://dind:2375`) is attached to `code-docker-external` anymore — both live on `code-docker-internal` only, and reach the internet exclusively through the default route their respective netinit-style loop keeps planting, pointed at the `code-docker-router` service, the only container attached to both networks. All service/network names are prefixed with `${PREFIX:-}` to let multiple instances coexist on one host without name collisions (set `PREFIX` in `.env`).
+Two user-defined networks: `code-docker-external` (has internet/host access) and `code-docker-internal` (`internal: true`, no outside route) — router's tailscale `forwards:` feature (see "router" below) also resolves via a `forward` alias on `code-docker-internal` rather than a dedicated network of its own; there used to be a third `code-docker-forwards` network, dropped once the port-namespace collision it existed to prevent stopped being possible (see the "tailscale" bullet under "router" below). As of the egress lockdown (see "router" below), neither `code-docker` nor `code-docker-dind` (the `docker:dind` sidecar, used so `docker`/`docker compose`/`docker buildx` work *inside* code-docker via `DOCKER_HOST=tcp://dind:2375`) is attached to `code-docker-external` anymore — both live on `code-docker-internal` only, and reach the internet exclusively through the default route their respective netinit-style loop keeps planting, pointed at the `code-docker-router` service, the only container attached to both networks. All service/network names are prefixed with `${PREFIX:-}` to let multiple instances coexist on one host without name collisions (set `PREFIX` in `.env`).
 
 `code-docker-dind` doesn't use the stock `docker:dind` entrypoint directly — the `dind` stage in the root `Dockerfile` (`FROM docker:dind`) `COPY`s in `script/dind-entrypoint.sh` as its `ENTRYPOINT`, and `code-docker-dind` builds that stage (`build: {context: ., target: dind}`) instead of using `image: docker:dind`, so the daemon binds only to its `code-docker-internal` IP instead of the image's hardcoded `0.0.0.0:2375` (it picks that IP dynamically at startup, by finding the interface with no default route — `code-docker-internal` being the only network without one — rather than hardcoding an address). Baking it in at build time (rather than bind-mounting the script at runtime) means it isn't tied to the compose file's on-disk location — same `context:` override as the main `code-docker` service covers both.
 
@@ -63,7 +63,7 @@ A separate container (`code-docker-router`, `router/` — its own subtree with i
 meaningfully higher trust than code-docker, the same "국경을 넘는 컨테이너" framing as
 dind-authz. It grew from a pure egress-filtering sidecar (originally named
 `code-docker-netgate`) into the full boundary container described here across a staged
-migration; see `.claude/backlog/functional-router-plan.md` for the vision/every decision
+migration; see `router/.claude/functional-router-plan.md` for the vision/every decision
 and `.claude/backlog/egress-netgate-plan.md` for the original egress design router's
 netgate feature area is still built on. User-facing docs: `docs/router.md`,
 `docs/egress-netgate.md`, `docs/dev-proxy.md`, `docs/tailscale.md` (now a short pointer
@@ -114,7 +114,7 @@ user overrides, same auto-include idiom as the main image's `config/supervisord.
     `router/config/dns/dnsmasq.default.conf`) is code-docker/dind's DNS resolver —
     `code-docker-internal` being `internal: true` means Docker's own embedded DNS
     (`127.0.0.11`) refuses to forward queries externally, so code-docker/dind point their
-    `/etc/resolv.conf` at router instead (see `.claude/backlog/router-dns-plan.md`), and
+    `/etc/resolv.conf` at router instead (see `router/.claude/router-dns-plan.md`), and
     dnsmasq forwards upstream using router's own (working, non-internal) `/etc/resolv.conf`.
     This also doubles as the content blocklist enforcement point: dnsmasq's
     `addn-hosts=/etc/code-docker/dns/blocklist.default.hosts` answers `0.0.0.0` for any
@@ -149,9 +149,14 @@ user overrides, same auto-include idiom as the main image's `config/supervisord.
   `127.0.0.1`, unconditionally, for any port with no `tailscale serve` rule (core
   `tailscaled` behavior) — since code-docker no longer runs tailscaled at all, this only
   matters for router's own ports now, not code-docker's. Outbound (forwards): `socat` piped
-  through `tailscaled`'s local SOCKS5 proxy, listening on router's own `forward` alias
-  (moved from code-docker's `code-docker-forwards` attachment to router's) so
-  `forward:<port>` still resolves from inside code-docker, now pointing at router.
+  through `tailscaled`'s local SOCKS5 proxy, listening on router's own `forward` alias on
+  `code-docker-internal` (moved from code-docker's own now-removed dedicated
+  `code-docker-forwards` network — forwards/publish sharing a port namespace was only ever
+  a risk while both lived inside code-docker itself; now that forwards' socat and publish's
+  `tailscale serve` both live on router, and publish proxies to a *different* container
+  rather than binding a local port at all, that collision can't happen, so the extra network
+  was dropped) so `forward:<port>` still resolves from inside code-docker, now pointing at
+  router.
   `${ROUTER_VOLUME:-./router-data}/tailscale/config.yaml` (seeded from
   `router/config/tailscale/tailscale-config.default.yaml`) drives `forwards:`/`publish:` —
   MagicDNS names are deliberately never used as forward/publish targets (too dynamic,
@@ -200,7 +205,7 @@ router's own frontend (`router/frontend`, `@code-docker/router-frontend` — an 
 package, root `package.json`'s `workspaces:`) owns the actual page components; webmanager's
 `App.tsx` imports them directly (`import { DevProxy, Tailscale, RouterUnlockModalHost } from
 '@code-docker/router-frontend'`) rather than owning that UI itself — see "webmanager" below and
-`.claude/backlog/functional-router-plan.md`'s "router ↔ webmanager 프론트 통합 방식". Both
+`router/.claude/functional-router-plan.md`'s "router ↔ webmanager 프론트 통합 방식". Both
 Dev Proxy and Tailscale (forwards/publish/login CRUD + status view) are ported this way.
 
 router-manager's own admin-API auth (`router/backend/internal/authgate`, opt-in via

@@ -3,7 +3,7 @@ set -e
 
 # Internal Caddy instance for exposing dev servers (npm run dev etc) - see
 # docs/dev-proxy.md. Moved here from code-docker's config/caddy-adapter.default.sh
-# (see .claude/backlog/functional-router-plan.md's "Dev Proxy Caddy도 router로
+# (see .claude/functional-router-plan.md's "Dev Proxy Caddy도 router로
 # 이관") - state now lives on router's own volume instead of /code.
 # CADDY_ADAPTER_ENABLED opts out entirely, same pattern as TAILSCALE_ENABLED.
 if [ "${CADDY_ADAPTER_ENABLED:-true}" = "false" ]; then

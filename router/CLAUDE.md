@@ -5,28 +5,50 @@ Scoped guidance for anyone (human or agent) working under `router/`. Read
 This subtree follows the same convention as `webmanager/` (see that
 subtree's own `CLAUDE.md` for the fully-grown example): `router/CLAUDE.md` +
 `router/plan.md` at the subtree root, feature-specific design/history docs
-(once they exist) under `router/.claude/`.
+under `router/.claude/` (`router/.claude/functional-router-plan.md` —
+the vision/every-decision doc, mostly implemented now, see `plan.md` —
+and `router/.claude/router-dns-plan.md`; `router/.claude/archive/` holds
+done/superseded design docs, e.g. `tailscale-design.md`, the original
+tailscale-in-code-docker design this container's own tailscale feature
+superseded).
 
 ## What this is
 
 The network-boundary container for code-docker — see
-`.claude/backlog/functional-router-plan.md` (repo root) for the full vision
-and every design decision, and `.claude/backlog/egress-netgate-plan.md`
-(repo root) for the egress/DNAT design this container started from (it was
-`code-docker-netgate` before being promoted to this subtree). Don't
-re-derive decisions already recorded there.
+`router/.claude/functional-router-plan.md` for the full vision and every
+design decision, and `.claude/backlog/egress-netgate-plan.md` (repo root —
+stays there since it also covers code-docker/dind's own netinit-style
+routing loops, not just this container) for the egress/DNAT design this
+container started from (it was `code-docker-netgate` before being promoted
+to this subtree). Don't re-derive decisions already recorded there.
 
 ## Current state
 
-Only the original netgate functionality (outbound CIDR filtering via
-iptables, DNS-level content blocklist via dnsmasq, inbound DNAT) lives here so far, moved
-from `config/netgate/`/`script/netgate-*.sh` at the repo root with no
-behavior change — see `router/config/netgate/` and `router/script/`. The
-`netgate` name is kept as this feature area's own namespace inside the
-container; the container/service itself is `router`/`code-docker-router`.
+The netgate→router migration described in `functional-router-plan.md` is
+complete (see `plan.md`) — every feature area it envisioned now lives here:
 
-tailscale, Dev Proxy (Caddy), and tinyauth have not moved in yet — see
-`plan.md`'s TODO list.
+- **netgate** — outbound CIDR filtering via iptables, DNS-level content
+  blocklist + resolver via dnsmasq, inbound DNAT (`router/config/netgate/`,
+  `router/config/dns/`, `router/script/`).
+- **tailscale** — daemon, login, `forwards:`/`publish:`, and a full
+  router-manager-backed admin API + UI (moved from code-docker in full;
+  code-docker itself runs no tailscale process at all anymore) —
+  `router/config/tailscale/`, `router/backend/internal/tailscale/`,
+  `router/frontend/src/components/Tailscale/`.
+- **Dev Proxy** — an internal Caddy instance exposing dev servers on
+  wildcard subdomains, managed via router-manager — `router/config/caddy-adapter/`,
+  `router/backend/internal/devproxy/`, `router/frontend/src/components/DevProxy/`.
+- **tinyauth** — forward-auth for individual Dev Proxy routes that opt into
+  it (a separate `code-docker-tinyauth` compose service, not built from
+  source here).
+
+router-manager (`router/backend`) is this container's own Go backend
+(mirrors webmanager's pattern) exposing all of the above's mutating/read
+routes, gated by its own opt-in password gate
+(`router/backend/internal/authgate`, `ROUTER_MANAGER_AUTH_PASSWORD_HASH`) —
+separate from webmanager's own gate. `router/frontend`
+(`@code-docker/router-frontend`) is an npm workspace package webmanager
+imports directly rather than owning this UI itself.
 
 ## Ground rules
 

@@ -279,8 +279,8 @@ squid를 언급하는 모든 문서를 dnsmasq 기반 서술로 갱신:
 
 ## 참고
 
-- `.claude/backlog/functional-router-plan.md`, `.claude/backlog/egress-netgate-plan.md` —
-  router의 기존 설계/구현 이력.
+- `.claude/functional-router-plan.md`(같은 디렉토리), 레포 루트
+  `.claude/backlog/egress-netgate-plan.md` — router의 기존 설계/구현 이력.
 - 이 문제를 처음 발견한 세션의 검증 로그: netgate→router 마이그레이션 Phase 1 커밋
   메시지(`refactor(router): promote netgate to its own router/ subtree`)에 "이미 알려진
   샌드박스 제약"으로 잘못 기록되어 있음 — 실제로는 일반적인 Docker `internal: true`

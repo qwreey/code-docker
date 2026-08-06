@@ -82,7 +82,7 @@ code-docker-netinit (network_mode: service:code-docker + NET_ADMIN, 방어적 �
   차단했으나, squid의 anti-spoofing 체크가 IP 풀이 로테이션되는 CDN형 도메인(예:
   `registry-1.docker.io`)에서 오탐해 `docker pull`을 깨뜨리는 문제가 있어 DNS 레벨
   차단으로 교체했습니다 - 자세한 경위는
-  [`.claude/backlog/router-dns-plan.md`](../.claude/backlog/router-dns-plan.md) 참고.)
+  [`router/.claude/router-dns-plan.md`](../router/.claude/router-dns-plan.md) 참고.)
 
 ## 위험한 패턴 - 새 브리징 컨테이너를 즉흥적으로 추가하지 마세요
 

@@ -14,7 +14,7 @@
 
 이렇게 한데 모은 이유(신뢰 경계가 code-docker보다 명확한 지점에 네트워크 관련 정책을
 집중시킨다는 설계)는
-[`.claude/backlog/functional-router-plan.md`](../.claude/backlog/functional-router-plan.md)에
+[`router/.claude/functional-router-plan.md`](../router/.claude/functional-router-plan.md)에
 정리되어 있습니다.
 
 ## tailscale
@@ -82,7 +82,7 @@ docker compose exec code-docker-router supervisorctl restart tailscale-forward t
 이제 router 컨테이너에 적용됩니다(기본 hostname은 `code-docker-router`, `code-docker`가
 아님). MagicDNS 이름은 forwards/publish의 `remote_host` 등에 쓰지 마세요 — 동적으로
 바뀔 수 있어 tailscale hostname/IP만 신뢰합니다
-([functional-router-plan.md](../.claude/backlog/functional-router-plan.md) 참고).
+([functional-router-plan.md](../router/.claude/functional-router-plan.md) 참고).
 
 ### 보안
 

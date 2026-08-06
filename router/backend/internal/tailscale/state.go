@@ -3,7 +3,7 @@
 // tailscale-status.default.sh (which polled `tailscale status --json` and
 // wrote a status.json file for code-server's tailscale-notify.js to poll
 // same-origin) with a real HTTP endpoint instead - see
-// .claude/backlog/functional-router-plan.md's "읽기전용 상태 API".
+// .claude/functional-router-plan.md's "읽기전용 상태 API".
 package tailscale
 
 import (

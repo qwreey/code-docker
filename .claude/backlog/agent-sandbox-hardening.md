@@ -274,6 +274,8 @@ audit 목적상 "무엇을 더 해야 하는가"에 집중했지만, 아래는 �
   이 망에만 바인드하는 설계(`dind-entrypoint.sh`)와 결합해 외부에서의 직접 접근은
   이미 차단됨.
 - tailscaled의 same-port 자동 노출 문제에 대해 `private`/`forward` 전용 alias +
-  `NGINX_BLOCK_LOOPBACK`으로 이미 대응돼 있음 (`docs/tailscale.md` 참고).
-- `code-docker-forwards`를 `code-docker-internal`과 분리해 `forwards:`/`publish:`
-  기능 간 포트 충돌을 막아둔 것도 불필요한 노출 표면을 줄이는 데 기여.
+  `NGINX_BLOCK_LOOPBACK`으로 이미 대응돼 있음 (`docs/tailscale.md` 참고). (이 문서
+  작성 당시엔 `forward`가 `code-docker-forwards`라는 별도 망에 있었으나, tailscale이
+  router로 전부 이관된 뒤 forwards/publish 간 포트 충돌 가능성 자체가 사라져서 그
+  별도 망은 제거되고 지금은 `code-docker-internal`의 alias임 — 노출 표면 축소라는
+  결론 자체는 안 바뀜, `docker-compose.yml`의 `forward` alias 주석 참고.)

@@ -9,14 +9,6 @@ networks:
     name: "${PREFIX:-}code-docker-external"
     internal: false
     enable_ipv6: ${ENABLE_IPV6:-false}
-  code-docker-forwards:
-    # Dedicated network for the tailscale `forwards:` feature (config.yaml's
-    # socat listeners that pull a remote tailnet peer's port in). Kept
-    # separate from code-docker-internal so forwards/publish don't share a
-    # port namespace.
-    name: "${PREFIX:-}code-docker-forwards"
-    internal: true
-    enable_ipv6: ${ENABLE_IPV6:-false}
 
 services:
   code-docker:
@@ -52,7 +44,7 @@ services:
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
       WEBMANAGER_ENV_TEMPLATE_PATH: "${WEBMANAGER_ENV_TEMPLATE_PATH:-/etc/code-docker/webmanager/example-env.webmanager}"
       # nginx's own /exports/ proxy target - Dev Proxy's Caddy instance now
-      # lives on router (see .claude/backlog/functional-router-plan.md's
+      # lives on router (see router/.claude/functional-router-plan.md's
       # "Dev Proxy Caddy도 router로 이관"), so code-docker just needs to know
       # which port to reach it on over code-docker-internal - must match
       # code-docker-router's own CADDY_ADAPTER_PORT below.
@@ -83,7 +75,7 @@ services:
         # address (a dedicated non-loopback IP, see docs/tailscale.md) -
         # historically this existed so code-docker's own tailscaled could
         # publish these ports without an automatic loopback-exposure
-        # workaround. Phase 4 of functional-router-plan.md's migration is
+        # workaround. Phase 4 of router/.claude/functional-router-plan.md's migration is
         # now complete (see docs/router.md's "보안" section) - code-docker
         # runs no tailscaled at all anymore, so that original reasoning no
         # longer applies. Left as the default anyway since it still works
@@ -93,15 +85,6 @@ services:
         # same container).
         aliases:
           - private
-      code-docker-forwards:
-        # Client-only attachment (no alias needed here) so `forward:<port>`
-        # resolves from inside code-docker - the alias itself now lives on
-        # code-docker-router below, since router owns the tailscale
-        # `forwards:` feature (socat listeners) entirely as of Phase 4's
-        # completed migration (functional-router-plan.md). code-docker
-        # itself runs no tailscale-forward program of its own anymore -
-        # this network is purely for reaching router's listener.
-        {}
     # ports: block left entirely commented out on purpose - Compose rejects
     # a `ports:` key with zero array items, so the key itself has to go too,
     # not just its entries.
@@ -257,7 +240,7 @@ services:
   # port-forwarding (DNAT) all live in this one container - see the plan
   # doc and docs/egress-netgate.md for the full design/reasoning, and
   # CLAUDE.md's "egress lockdown (netgate)" section for the short version.
-  # functional-router-plan.md is the vision doc for this container's
+  # router/.claude/functional-router-plan.md is the vision doc for this container's
   # expanding role (tailscale, Dev Proxy, tinyauth - later phases).
   code-docker-router:
     container_name: "${PREFIX:-}code-docker-router"
@@ -278,14 +261,14 @@ services:
       # code-docker/dind's own loops are idle - see example-env).
       NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
       # tailscale daemon+forwards+publish (see
-      # .claude/backlog/functional-router-plan.md's "tailscale 전체 이관") -
+      # router/.claude/functional-router-plan.md's "tailscale 전체 이관") -
       # moved from code-docker, which no longer has any tailscale env/
       # processes of its own as of this same migration's Phase 4.
       TAILSCALE_ENABLED: "${TAILSCALE_ENABLED:-true}"
       TAILSCALE_LOGIN_SERVER: "${TAILSCALE_LOGIN_SERVER:-}"
       TAILSCALE_HOSTNAME: "${TAILSCALE_HOSTNAME:-}"
       # Dev Proxy's internal Caddy instance (see
-      # .claude/backlog/functional-router-plan.md's "Dev Proxy Caddy도
+      # router/.claude/functional-router-plan.md's "Dev Proxy Caddy도
       # router로 이관") - moved from code-docker the same way.
       # CADDY_ADAPTER_PORT is shared with code-docker's own environment
       # below (its nginx needs to know the same port to proxy /exports/ to)
@@ -327,20 +310,23 @@ services:
     networks:
       code-docker-internal:
         # code-docker-netinit's and dind-entrypoint.sh's own routing loops
-        # both resolve this exact name - see script/netinit-entrypoint.sh
-        # and script/dind-entrypoint.sh. Renamed from `netgate` alongside
-        # the service rename.
+        # both resolve `router` - see script/netinit-entrypoint.sh and
+        # script/dind-entrypoint.sh. Renamed from `netgate` alongside the
+        # service rename. `forward` is tailscale-forward.default.sh's own
+        # socat bind target (`forward:<port>`, resolved from inside
+        # code-docker, reaches router's forwards listeners) - it used to
+        # live on a dedicated code-docker-forwards network to keep
+        # forwards/publish from sharing a port namespace, back when both
+        # lived inside code-docker itself. Now that both live entirely on
+        # router (forwards' socat binds router's own IP; publish's
+        # `tailscale serve` proxies to a *different* container - code-docker
+        # - rather than binding a local port at all), that collision can't
+        # happen anymore, so the dedicated network was dropped and `forward`
+        # just aliases router's existing code-docker-internal attachment.
         aliases:
           - router
-      code-docker-external: {}
-      code-docker-forwards:
-        # Moved here from code-docker (see that service's own
-        # code-docker-forwards comment above) - router's own
-        # tailscale-forward.default.sh binds its socat listeners here now,
-        # so `forward:<port>` (resolved from inside code-docker) reaches
-        # router instead of code-docker itself.
-        aliases:
           - forward
+      code-docker-external: {}
     ports:
       # Moved here from code-docker (see that service's own ports: comment
       # above) - code-docker-router is the only container with a real
@@ -358,7 +344,7 @@ services:
       code-docker-tinyauth:
         condition: service_started
 
-  # router's own forward-auth (see .claude/backlog/functional-router-plan.md's
+  # router's own forward-auth (see router/.claude/functional-router-plan.md's
   # "router 전용 forward-auth — tinyauth로 결정") - a separate, lighter tool
   # from webmanager's own internal/authgate (which stays exactly as-is,
   # scoped only to webmanager's Terminal/File Manager/Logs). Runs as its own

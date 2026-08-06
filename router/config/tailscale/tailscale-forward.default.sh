@@ -48,11 +48,13 @@ until tailscale status --json 2>/dev/null | yq -e '.BackendState == "Running"' >
     sleep 1
 done
 
-# router's own IP on the code-docker-forwards network (see
-# docker-compose.yml's `forward` alias, moved here from code-docker in this
-# migration) - code-docker itself stays attached to that same network
-# (unaliased, consumer-only) so `forward:<port>` still resolves to router
-# from inside code-docker.
+# router's own IP on code-docker-internal (see docker-compose.yml's
+# `forward` alias) - code-docker is attached to the same network (no alias
+# of its own needed there) so `forward:<port>` still resolves to router from
+# inside code-docker. Used to be a dedicated code-docker-forwards network,
+# dropped once forwards+publish both ended up on router with no remaining
+# port-namespace collision to guard against - see docker-compose.yml's
+# `forward` alias comment for the full reasoning.
 FORWARD_IP=$(getent hosts forward | awk '{ print $1; exit }')
 
 # Keeps this program alive on its own even when forwards: is empty -

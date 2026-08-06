@@ -29,7 +29,7 @@ if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
 
     # code-docker-internal is `internal: true`, so Docker's own embedded DNS
     # (127.0.0.11) refuses to forward queries externally - router runs a real
-    # forwarder instead (see .claude/backlog/router-dns-plan.md). Do this
+    # forwarder instead (see router/.claude/router-dns-plan.md). Do this
     # once, synchronously, before user-init.sh's own qwreey-fish curl below -
     # the resolv-writer supervisord program (config/resolv-writer.default.sh)
     # keeps /etc/resolv.conf correct for the rest of this container's life

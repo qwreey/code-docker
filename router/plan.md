@@ -1,10 +1,12 @@
 # router 계획 (현재 상태 — 짧게 유지)
 
 code-docker의 네트워크 경계를 전담하는 컨테이너. **이 문서는 지금 상태와 남은 할 일의
-색인만** 담는다 — 전체 비전/설계 결정은 레포 루트 `.claude/backlog/functional-router-plan.md`
-(왜 router가 필요한지, 무엇이 이관되는지)와 `.claude/backlog/egress-netgate-plan.md`
-(현재 이관된 egress/DNAT 기능의 원래 설계)에 있음. `webmanager/plan.md`와 같은 패턴 —
-기능별 자세한 문서는 `router/.claude/`에 쌓일 예정(아직 없음, 필요해지면 생성).
+색인만** 담는다 — 전체 비전/설계 결정은 `.claude/functional-router-plan.md`
+(왜 router가 필요한지, 무엇이 이관되는지, 이 서브트리로 이동됨)와 레포 루트
+`.claude/backlog/egress-netgate-plan.md`(현재 이관된 egress/DNAT 기능의 원래 설계 —
+code-docker/dind 쪽 netinit 루프도 다루는 문서라 레포 루트에 남음)에 있음.
+`webmanager/plan.md`와 같은 패턴 — 기능별 자세한 문서는 `router/.claude/`에 쌓임
+(`functional-router-plan.md`, `router-dns-plan.md`, `archive/tailscale-design.md`).
 
 ## 왜 필요한가
 
@@ -13,7 +15,7 @@ DNAT)가 이미 code-docker-internal/external 양쪽에 다리를 걸친, code-d
 수준이 높은 유일한 국경 통과 지점이었다. tailscale(데몬+forward+publish), Dev
 Proxy(Caddy), 새 tinyauth 게이트까지 이 지점으로 모으면 신뢰 경계가 더 명확해지고
 code-docker 쪽 네트워크 관련 코드/설정이 줄어든다 — 자세한 트레이드오프는
-`functional-router-plan.md` 참고.
+`.claude/functional-router-plan.md` 참고.
 
 ## 아키텍처
 
@@ -28,8 +30,8 @@ router 안의 한 기능 영역(egress/DNAT) 이름으로 유지 — 컨테이�
 | 기능 | 상태 |
 |---|---|
 | netgate(iptables 아웃바운드 필터링, 인바운드 DNAT) | `code-docker-netgate`에서 이 컨테이너로 순수 이전 완료 — 동작 변화 없음 |
-| DNS 포워딩(dnsmasq) — code-docker-internal이 `internal: true`라 Docker 내장 DNS가 외부 포워딩을 거부하는 문제 해결 | 구현 완료·커밋됨(`00bba1a`). 자세한 내용: `.claude/backlog/router-dns-plan.md` |
-| squid 제거 + DNS 레벨 블록리스트(dnsmasq `addn-hosts`)로 교체 | 구현 완료. squid의 ssl-bump anti-spoofing이 CDN형 도메인(예: `registry-1.docker.io`)을 오탐해 `docker pull`을 깨뜨리는 버그가 계기 — 자세한 내용: `.claude/backlog/router-dns-plan.md`의 "2부" |
+| DNS 포워딩(dnsmasq) — code-docker-internal이 `internal: true`라 Docker 내장 DNS가 외부 포워딩을 거부하는 문제 해결 | 구현 완료·커밋됨(`00bba1a`). 자세한 내용: `.claude/router-dns-plan.md` |
+| squid 제거 + DNS 레벨 블록리스트(dnsmasq `addn-hosts`)로 교체 | 구현 완료. squid의 ssl-bump anti-spoofing이 CDN형 도메인(예: `registry-1.docker.io`)을 오탐해 `docker pull`을 깨뜨리는 버그가 계기 — 자세한 내용: `.claude/router-dns-plan.md`의 "2부" |
 | tailscale 전체(데몬+로그인+forwards+publish) + router-manager 백엔드 | 이식 완료. `forward` alias는 이 컨테이너로 이동, `private`/bind-addr 기본값은 Phase 4 이후에도 code-docker 쪽에 남아있음 — 원래 code-docker 자신의 tailscaled가 쓰던 이유였지만 지금은 그냥 기존 기본값을 굳이 바꿀 이유가 없어서 유지 중(docker-compose.yml의 `private` alias 주석 참고) |
 | Dev Proxy(Caddy) + tinyauth forward-auth | 이식 완료. `internal/devproxy`가 tinyauth를 타겟으로 렌더링하도록 변경(webmanager의 `/api/auth/verify` 대신), `code-docker-tinyauth` 서비스(공식 이미지, 소스 빌드 아님 — pnpm 프론트엔드 빌드가 필수라 dind-authz 패턴과 안 맞음) 신설. 실제 request → Caddy → tinyauth → 401+로그인 리다이렉트 체인까지 검증됨 |
 | code-docker 컷오버 | 완료. code-docker에서 tailscale/caddy-adapter 완전 제거(프로세스 0개, 바이너리도 없음), nginx `/tailscale/`(router-manager readonly API)·`/exports/`(Dev Proxy) 라우트를 router로 배선, `tailscale-notify.default.js`가 새 엔드포인트를 폴링하도록 변경. 이제부터 code-docker는 tailscale/Dev Proxy에 대해 아무것도 모른다 |
@@ -38,7 +40,7 @@ router 안의 한 기능 영역(egress/DNAT) 이름으로 유지 — 컨테이�
 
 ## netgate → router 마이그레이션 — 완료
 
-`.claude/backlog/functional-router-plan.md`에 확정된 설계에 따른 6단계 마이그레이션(골격
+`.claude/functional-router-plan.md`에 확정된 설계에 따른 6단계 마이그레이션(골격
 이전 → tailscale → Dev Proxy+tinyauth → code-docker 컷오버 → webmanager 통합 → 문서)이
 전부 완료됨. 남은 건 이 마이그레이션 자체가 아니라 그 결과로 명확해진 후속 작업들:
 
@@ -80,7 +82,10 @@ router 안의 한 기능 영역(egress/DNAT) 이름으로 유지 — 컨테이�
 
 ## 참고 문서
 
-- `.claude/backlog/functional-router-plan.md` (레포 루트) — 전체 비전/결정 사항
-- `.claude/backlog/egress-netgate-plan.md` (레포 루트) — netgate 기능의 원 설계
-- `.claude/backlog/router-dns-plan.md` (레포 루트) — DNS 포워딩 + squid→dnsmasq 블록리스트 교체 설계
+- `.claude/functional-router-plan.md` — 전체 비전/결정 사항
+- `.claude/router-dns-plan.md` — DNS 포워딩 + squid→dnsmasq 블록리스트 교체 설계
+- `.claude/archive/tailscale-design.md` — code-docker 안에서 tailscale을 돌리던 시절의
+  원래 설계(이 컨테이너의 tailscale 기능으로 완전히 대체됨, 역사 기록용)
+- `.claude/backlog/egress-netgate-plan.md` (레포 루트) — netgate 기능의 원 설계, code-docker/dind
+  쪽 netinit 루프도 다루는 문서라 레포 루트에 남음
 - `docs/egress-netgate.md` (레포 루트) — 사용자 대상 문서

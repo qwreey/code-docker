@@ -2,7 +2,7 @@
 // /var/lib/code-docker-router/caddy-adapter/managed/ — the "managed" half of
 // the internal Caddy instance router/config/caddy-adapter/
 // caddy-adapter.default.sh starts. Moved here from webmanager/backend
-// (see .claude/backlog/functional-router-plan.md's "Dev Proxy Caddy도
+// (see .claude/functional-router-plan.md's "Dev Proxy Caddy도
 // router로 이관") — near-verbatim, with one real behavior change: RequireAuth
 // routes now forward-auth against tinyauth (router's own forward-auth
 // service, see docker-compose.yml's code-docker-tinyauth) instead of

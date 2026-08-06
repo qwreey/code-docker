@@ -5,7 +5,7 @@ set -u
 # (127.0.0.11) refuses to forward queries externally - a Docker feature, not
 # a bug, but it means code-docker can't resolve any hostname via its default
 # resolver. router runs a real forwarder (dnsmasq, see
-# .claude/backlog/router-dns-plan.md) - this loop points /etc/resolv.conf at
+# router/.claude/router-dns-plan.md) - this loop points /etc/resolv.conf at
 # it, re-resolving `router`'s own IP periodically (same getent-in-a-loop
 # pattern script/netinit-entrypoint.sh uses for the default route, since
 # docker-compose's own `dns:` field only accepts a static IP, and router's IP
@@ -31,7 +31,7 @@ fi
 # nameserver, tried on SERVFAIL - a name Docker's own resolver won't/can't
 # forward externally falls through to it. Losing 127.0.0.11 entirely was
 # tried first and broke nginx (couldn't resolve its own "private" upstream
-# anymore) - see .claude/backlog/router-dns-plan.md.
+# anymore) - see router/.claude/router-dns-plan.md.
 # Written via direct redirect (truncate-in-place), not a tmp-file+mv swap -
 # /etc/resolv.conf is a bind-mounted file (Docker's own per-container
 # generated file), and `mv` onto a bind-mount target fails with
