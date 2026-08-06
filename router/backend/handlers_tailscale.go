@@ -1,10 +1,11 @@
 // Ported from webmanager/backend/handlers_tailscale.go (see router/plan.md's
 // TODO list) — same route set, adapted to this file's decode→call→
 // writeJSON/writeError style (see handlers_devproxy.go). No host port is
-// published for router-manager yet (see main.go), so these endpoints are
-// private-by-default the same way GET /api/tailscale/state already is.
-// Router's own admin-auth story is future work, deliberately out of scope
-// here (see plan.md's TODO list).
+// published for router-manager (see main.go), so these endpoints are
+// private-by-default the same way GET /api/tailscale/state already is. On
+// top of that, every mutating route here is wrapped in main.go's package-
+// level `gate` (internal/authgate, opt-in via ROUTER_MANAGER_AUTH_PASSWORD_HASH)
+// — reads stay open, writes require an unlock.
 package main
 
 import (

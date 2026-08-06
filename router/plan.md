@@ -58,9 +58,22 @@ router 안의 한 기능 영역(egress/DNAT) 이름으로 유지 — 컨테이�
    자동 노출 경고 문구는 tailscaled가 이제 router에만 있고 code-docker엔 없다는 현재
    아키텍처에 맞게 다시 씀(예전 문구는 tailscaled가 code-docker 안에 있던 시절 얘기라 더 이상
    맞지 않았음).
-2. **router-manager 자체 admin API 인증** — 지금 `/api/dev-proxy/*`, `/api/tailscale/*`는
-   host 포트가 안 열려 있다는 것만 믿고 인증 없이 열려 있음(Phase 2/3와 동일 논리). UI가
-   생겼으니 이제 tinyauth 등으로 이 API 자체를 보호할지 결정 필요 — 아직 미정, 보류 중.
+2. **router-manager 자체 admin API 인증** — 완료. `router/backend/internal/authgate`
+   (webmanager의 것과 같은 argon2id + HMAC-signed 쿠키 설계지만, 별도 프로세스/바이너리라
+   재사용이 안 돼서 새로 작성 — 단일 TTL·쿠키 Domain 없음으로 단순화, router-manager는
+   항상 code-docker 쪽 nginx와 같은 origin으로만 도달하므로) — `ROUTER_MANAGER_AUTH_PASSWORD_HASH`
+   (기본 꺼짐, opt-in)로 설정하면 모든 mutating 라우트(tailscale config PUT/forwards·
+   publish·login의 POST·DELETE, dev-proxy expose의 POST·PUT·DELETE)가 잠기고, read 라우트
+   (state/config GET/list/status)는 계속 열려 있음 — webmanager의 reads-open/writes-gated
+   관례 그대로. `router-manager --hash-password` CLI로 해시 생성(webmanager의 동명 CLI와
+   동일 패턴). `GET /api/auth/status` + `POST /api/auth/unlock`을 새 nginx `/router-auth/`
+   위치로 노출. 프론트엔드: `router/frontend`의 `createApiClient`가 401을 받으면
+   프롬프터를 호출해 재시도하는 인터셉터를 갖게 됨(webmanager 자체 client.ts와 같은
+   패턴, 여러 prefix가 같은 게이트를 공유하도록 일반화), `RouterUnlockModalHost`를
+   webmanager `App.tsx`에서 기존 `UnlockModalHost` 옆에 항상 마운트(Dev Proxy/Tailscale
+   탭은 조건부 마운트라 401이 어느 탭에서 나든 뜨게 하려면 앱 루트에 둬야 함) — tinyauth와는
+   완전히 별개(tinyauth는 개별 Dev Proxy expose의 최종 사용자 인증, 이건 router-manager
+   자신의 admin API 보호).
 
 실제 tailscale 로그인(authUrl 접속) 및 forwards:/publish: 실사용 트래픽 검증, tinyauth
 실제 로그인 성공 경로(거부 경로만 검증됨)는 사용자의 직접 인터랙션이 필요해 아직 안 됨.

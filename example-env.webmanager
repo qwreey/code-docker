@@ -46,12 +46,11 @@ WEBMANAGER_ENV_VERSION=9
 #. env_file도 $변수 형태로 해석해서, 따옴표 없이 붙이면 해시 안의 $ 뒤 조각들이
 #. 조용히 빈 문자열로 사라져 해시가 깨집니다.
 #WEBMANAGER_AUTH_PASSWORD_HASH=
-#. 위 비밀번호로 발급되는 잠금 쿠키의 Domain 속성. 기본값(비워둠)은 지금까지와
-#. 동일하게 호스트 전용 쿠키입니다 - Dev Proxy 탭(docs/dev-proxy.md)의 인증을
-#. 쓰려면, 그 dev-proxy 와일드카드 서브도메인과 webmanager가 공유하는 상위
-#. 도메인(예: ".example.com")을 여기 설정해야 webmanager에서 한 번 잠금
-#. 해제한 게 dev-proxy 서브도메인에서도 통합니다. 설정 안 하면 dev-proxy 쪽은
-#. 계속 로그인 페이지가 뜹니다.
+#. 위 비밀번호로 발급되는 잠금 쿠키의 Domain 속성. 기본값(비워둠)은 호스트 전용
+#. 쿠키입니다 - 대부분 그대로 두면 됩니다. Dev Proxy 탭의 인증은 더 이상 이
+#. 쿠키를 쓰지 않습니다(router의 tinyauth로 이관됨, docs/dev-proxy.md 참고) -
+#. 지금은 다른 상위 도메인을 공유하는 별도 서브도메인에서 webmanager 자체
+#. 쿠키를 재사용해야 하는 경우에만 의미가 있습니다.
 #WEBMANAGER_AUTH_COOKIE_DOMAIN=
 
 #. --- File Manager ---

@@ -33,6 +33,8 @@ WORKDIR /src
 COPY backend/go.mod ./
 COPY backend/go.sum ./
 COPY backend/main.go ./
+COPY backend/hashpassword.go ./
+COPY backend/handlers_auth.go ./
 COPY backend/handlers_devproxy.go ./
 COPY backend/handlers_tailscale.go ./
 COPY backend/internal ./internal

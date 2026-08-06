@@ -4,7 +4,7 @@ import type { SectionId } from './components/Layout/sections'
 import { Supervisor } from './components/Supervisor/Supervisor'
 import { SshKeys } from './components/SshKeys/SshKeys'
 import { GitConfig } from './components/GitConfig/GitConfig'
-import { DevProxy, Tailscale } from '@code-docker/router-frontend'
+import { DevProxy, Tailscale, RouterUnlockModalHost } from '@code-docker/router-frontend'
 import { Logs } from './components/Logs/Logs'
 import { Processes } from './components/Processes/Processes'
 import { Projects } from './components/Projects/Projects'
@@ -100,6 +100,13 @@ function App() {
         </main>
       </div>
       <UnlockModalHost />
+      {/* router-manager's own gate (ROUTER_MANAGER_AUTH_PASSWORD_HASH) is a
+          separate process/cookie from webmanager's own gate above - mounted
+          unconditionally here (not inside the dev-proxy/tailscale branches
+          above) since those tabs only mount while active, but a 401 from
+          router-manager should pop this modal regardless of which tab
+          triggered it. */}
+      <RouterUnlockModalHost />
     </div>
   )
 }

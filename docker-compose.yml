@@ -290,6 +290,12 @@ services:
       # - keep both in sync if you override this.
       CADDY_ADAPTER_ENABLED: "${CADDY_ADAPTER_ENABLED:-true}"
       CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-8082}"
+      # router-manager's own admin-API password gate (see example-env's
+      # ROUTER_MANAGER_AUTH_PASSWORD_HASH comment) - protects the mutating
+      # tailscale/dev-proxy routes proxied in by code-docker's nginx below,
+      # separate from tinyauth (which protects exposed dev-server routes).
+      # Empty (default) leaves the gate off, same as today.
+      ROUTER_MANAGER_AUTH_PASSWORD_HASH: "${ROUTER_MANAGER_AUTH_PASSWORD_HASH:-}"
     volumes:
       # Persistent state for router's own features (tailscale login
       # state/config.yaml, caddy-adapter's managed/custom Caddyfile

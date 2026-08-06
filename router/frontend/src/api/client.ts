@@ -1,10 +1,18 @@
-// Much simpler than webmanager's own api/client.ts - router-manager's
-// endpoints aren't password-gated (see router/backend/handlers_devproxy.go's
-// own comment: no host-published port yet, private-by-default the same way
-// GET /api/tailscale/state is), so there's no 401-retry/unlock-prompt
-// machinery to replicate here. If router-manager ever gets its own admin
-// auth, this file is where that would need to grow a matching interceptor -
-// see router/plan.md's TODO list.
+// router-manager's own admin-API auth (internal/authgate, opt-in via
+// ROUTER_MANAGER_AUTH_PASSWORD_HASH - see router/plan.md's "router-manager
+// 자체 admin API 인증"): every createApiClient(prefix) instance shares one
+// global 401-retry/unlock-prompt handler, since there's only one gate
+// regardless of which feature area (dev-proxy/tailscale) issued the
+// request - same "prompt on 401, retry once" pattern webmanager's own
+// api/client.ts uses, generalized to cover multiple prefixes sharing one
+// gate instead of just one.
+type UnlockPrompter = () => Promise<void>
+let unlockPrompter: UnlockPrompter | null = null
+
+export function setUnlockPrompter(fn: UnlockPrompter | null) {
+  unlockPrompter = fn
+}
+
 export class ApiError extends Error {
   status: number
 
@@ -36,12 +44,17 @@ export function errorMessage(err: unknown): string {
 // router-manager is a genuinely separate backend service, not part of
 // whichever app happens to import these components, so its API routes
 // shouldn't be coupled to the consuming app's own base path.
-export function createApiClient(prefix: string) {
+//
+// skipUnlockRetry opts a client out of the 401→prompt→retry dance -
+// used only by the `/router-auth` client itself (see below), since a
+// wrong-password 401 from the unlock endpoint must surface directly to its
+// own form instead of re-triggering the prompter (which would recurse).
+export function createApiClient(prefix: string, opts: { skipUnlockRetry?: boolean } = {}) {
   function apiUrl(path: string): string {
     return `/${prefix}${path}`
   }
 
-  async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
     const res = await fetch(apiUrl(path), init)
 
     if (res.status === 204) {
@@ -59,6 +72,22 @@ export function createApiClient(prefix: string) {
     }
 
     if (!res.ok) {
+      if (res.status === 401 && !retried && unlockPrompter && !opts.skipUnlockRetry) {
+        let unlocked = false
+        try {
+          await unlockPrompter()
+          unlocked = true
+        } catch {
+          // User cancelled the prompt — fall through to the original error below.
+        }
+        if (unlocked) {
+          // Re-issue the exact same request once, with retried=true so a
+          // second 401 (or any other error) just falls through to its own
+          // normal throw instead of prompting again.
+          return request<T>(path, init, true)
+        }
+      }
+
       const message =
         data && typeof data === 'object' && 'error' in data && typeof (data as { error: unknown }).error === 'string'
           ? (data as { error: string }).error
@@ -82,3 +111,8 @@ export function createApiClient(prefix: string) {
 // Dev Proxy's own bound client - the original, pre-generalization call
 // site (RouteDialog/DevProxy.tsx import these two directly).
 export const { api, apiUrl } = createApiClient('dev-proxy')
+
+// router-manager's auth endpoints (/api/auth/unlock, /api/auth/status),
+// proxied at /router-auth/ - see config/nginx.default.conf. Used by
+// UnlockModal.tsx.
+export const { api: authApi } = createApiClient('router-auth', { skipUnlockRetry: true })

@@ -182,30 +182,44 @@ user overrides, same auto-include idiom as the main image's `config/supervisord.
   --password <p> --docker` generates the value).
 
 router-manager is router's own Go backend (`router/backend`, mirrors webmanager's own
-backend pattern) — currently just two things, both proxied in by code-docker's nginx
-(`config/nginx.default.conf`'s `/tailscale/`/`/dev-proxy/` locations, private-by-default —
-no host-published port on router-manager itself): a read-only `GET /api/tailscale/state`
-(`{backendState, authUrl}`, same shape the old status-polling script wrote — code-server's
-sign-in banner, `config/code-patch/tailscale-notify.default.js`, polls this now instead of
-a static file) and the Dev Proxy expose CRUD webmanager's Dev Proxy tab calls. `/exports/`
-(actual end-user traffic to an exposed dev server) is a separate nginx location from
+backend pattern) — proxied in by code-docker's nginx (`config/nginx.default.conf`'s
+`/tailscale/`/`/dev-proxy/`/`/router-auth/` locations, private-by-default — no
+host-published port on router-manager itself): full tailscale CRUD (`GET`/`PUT
+/api/tailscale/config`, `GET`/`POST`/`DELETE /api/tailscale/forwards[/{name}]`,
+same for `/publish`, `GET /api/tailscale/status`, `POST /api/tailscale/login/
+{start,cancel}`, plus the original read-only `GET /api/tailscale/state`
+— `{backendState, authUrl}`, same shape the old status-polling script wrote —
+code-server's sign-in banner, `config/code-patch/tailscale-notify.default.js`,
+polls this now instead of a static file), the Dev Proxy expose CRUD webmanager's
+Dev Proxy tab calls, and `POST /api/auth/unlock` + `GET /api/auth/status` for
+router-manager's own admin-API password gate (see below). `/exports/` (actual
+end-user traffic to an exposed dev server) is a separate nginx location from
 `/dev-proxy/` (the admin API) — don't confuse the two.
 
 router's own frontend (`router/frontend`, `@code-docker/router-frontend` — an npm workspace
 package, root `package.json`'s `workspaces:`) owns the actual page components; webmanager's
-`App.tsx` imports them directly (`import { DevProxy } from '@code-docker/router-frontend'`)
-rather than owning that UI itself — see "webmanager" below and
-`.claude/backlog/functional-router-plan.md`'s "router ↔ webmanager 프론트 통합 방식".
-Only Dev Proxy has been ported this way so far — router-manager never grew the
-forwards/publish/login CRUD webmanager's old Tailscale tab needed, so that tab was removed
-rather than shipped broken; see `router/plan.md`'s TODO list for the real follow-up
-(building that backend, then porting the UI).
+`App.tsx` imports them directly (`import { DevProxy, Tailscale, RouterUnlockModalHost } from
+'@code-docker/router-frontend'`) rather than owning that UI itself — see "webmanager" below and
+`.claude/backlog/functional-router-plan.md`'s "router ↔ webmanager 프론트 통합 방식". Both
+Dev Proxy and Tailscale (forwards/publish/login CRUD + status view) are ported this way.
+
+router-manager's own admin-API auth (`router/backend/internal/authgate`, opt-in via
+`ROUTER_MANAGER_AUTH_PASSWORD_HASH`, off by default) gates every *mutating* route above
+(tailscale config/forwards/publish/login writes, dev-proxy expose writes) — reads (state,
+config, list, status) stay open. A separate gate/cookie from webmanager's own
+`internal/authgate` below (different process, different secret) — `router-manager
+--hash-password` generates the argon2id hash, see example-env's
+`ROUTER_MANAGER_AUTH_PASSWORD_HASH` comment. `RouterUnlockModalHost` (mounted in
+webmanager's `App.tsx` next to its own `UnlockModalHost`) pops on any 401 from a gated
+router-manager route, same "prompt → retry once" pattern webmanager's own gate uses. See
+`router/plan.md` for the design history (this closed out the item that was previously
+tracked there as "보류/미정").
 
 `config/code-patch/` is a generic mechanism, not tailscale-specific: any `<name>.default.<ext>` there (with an optional matching gitignored `<name>.override.<ext>`) gets seeded by `code-patch.default.sh` into `/code/.local/share/code-docker/code/patch/<name>.<ext>` — code-server-autoinstall auto-injects every top-level `patch/*.js` as a `<script>` tag on every start (see "코드 서버 패치" in README). Re-seeded on *every* boot, but only when the live target's content still hashes to what was seeded last time (`/code/.local/share/code-docker/code/.code-patch-manifest` now tracks `<name>\t<hash>` pairs, not just names) — i.e. a bundled `.default.`/`.override.` fix actually reaches an already-running container instead of the old "only copy if missing" behavior silently freezing the target at whatever was first seeded forever. If the live file's hash doesn't match (user edited it directly, or there's no recorded hash yet — e.g. a target that predates this hash-tracking), it's left alone; a `.default.` file removed in a later code-docker version still gets its old target removed too instead of orphaned forever. Because there's no historical hash for anything seeded before this behavior shipped, upgrading alone won't retroactively re-apply a fixed default to an already-seeded file that was never otherwise touched — delete the file under `/code/.local/share/code-docker/code/patch/` once to force a fresh reseed with hash-tracking from then on. `code-patch.default.sh` is invoked from `code-service.default.sh` (not `user-init.default.sh` — that one's scoped to home-folder/shell setup like fish config, not code-server internals), deliberately *after* `install.sh` so `/code/.local/share/code-docker/code` actually exists by the time it runs.
 
 ### webmanager
 
-A browser admin panel (Go backend + Vite/React frontend, `webmanager/` — its own subtree, with its own `CLAUDE.md`/`plan.md`) running alongside code-server as another supervisord program, on port 81. Well beyond its original scope now: supervisord process management, SSH `authorized_keys`/`known_hosts`, git config (commit signing/GPG, git-lfs, raw `.gitconfig` editing), the vector-backed logs pipeline described above, an OS-level process/port viewer with resource-history graphs, a Projects-folder browser with a per-project git status panel, code-server extension and mise tool management, a Claude Code status tab, Docker/dind management, a Dev Proxy tab (imported from `@code-docker/router-frontend` — see "router" above, the actual Caddy instance/backend live on the router container, not here), a web terminal (ephemeral PTY sessions), and a full file manager — see `webmanager/plan.md` for the up-to-date implemented/TODO split. Most of it still has no login of its own and relies entirely on the same reverse-proxy forward-auth as code-server; an opt-in shared password gate (`internal/authgate`, off by default) additionally protects the Terminal/File Manager tabs entirely and gates write actions elsewhere (see `webmanager/.claude/archive/authgate-plan-done.md`) — note this gate no longer covers Dev Proxy at all (that moved to router-manager's own API, currently ungated) or Tailscale (that tab was removed, not ported — see "router" above).
+A browser admin panel (Go backend + Vite/React frontend, `webmanager/` — its own subtree, with its own `CLAUDE.md`/`plan.md`) running alongside code-server as another supervisord program, on port 81. Well beyond its original scope now: supervisord process management, SSH `authorized_keys`/`known_hosts`, git config (commit signing/GPG, git-lfs, raw `.gitconfig` editing), the vector-backed logs pipeline described above, an OS-level process/port viewer with resource-history graphs, a Projects-folder browser with a per-project git status panel, code-server extension and mise tool management, a Claude Code status tab, Docker/dind management, a Dev Proxy tab (imported from `@code-docker/router-frontend` — see "router" above, the actual Caddy instance/backend live on the router container, not here), a web terminal (ephemeral PTY sessions), and a full file manager — see `webmanager/plan.md` for the up-to-date implemented/TODO split. Most of it still has no login of its own and relies entirely on the same reverse-proxy forward-auth as code-server; an opt-in shared password gate (`internal/authgate`, off by default) additionally protects the Terminal/File Manager tabs entirely and gates write actions elsewhere (see `webmanager/.claude/archive/authgate-plan-done.md`) — note this gate no longer covers Dev Proxy or Tailscale at all; both moved to router-manager's own API and are gated by router-manager's own separate `internal/authgate` instance instead (`ROUTER_MANAGER_AUTH_PASSWORD_HASH` — see "router" above).
 
 ## Documentation
 

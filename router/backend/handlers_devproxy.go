@@ -1,10 +1,11 @@
 // Moved here from webmanager/backend/handlers_devproxy.go (see
 // router/backend/internal/devproxy/devproxy.go's own package comment for
 // the full migration context). No host port is published for router-manager
-// yet (see main.go) - these endpoints are private-by-default the same way
-// GET /api/tailscale/state is, matching Phase 2's precedent. Router's own
-// admin-auth story (gating router-manager's API itself, not just individual
-// exposed dev-server routes) is future work once router gets a real UI.
+// (see main.go) - these endpoints are private-by-default the same way
+// GET /api/tailscale/state is, matching Phase 2's precedent. On top of
+// that, every mutating route here is wrapped in main.go's package-level
+// `gate` (internal/authgate, opt-in via ROUTER_MANAGER_AUTH_PASSWORD_HASH)
+// - reads stay open, writes require an unlock.
 package main
 
 import (

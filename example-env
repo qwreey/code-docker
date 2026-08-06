@@ -134,6 +134,25 @@
 #TINYAUTH_AUTH_TRUSTEDPROXIES="172.16.0.0/12"
 #TINYAUTH_VOLUME="./tinyauth-data"
 
+# router-manager's own admin-API password gate (router/backend/internal/
+# authgate, opt-in - default off) - separate from tinyauth above: tinyauth
+# protects individual exposed dev-server routes, this protects
+# router-manager's own mutating endpoints (tailscale login/config/forwards/
+# publish writes, dev-proxy expose writes) reachable through code-docker's
+# nginx at /tailscale/ and /dev-proxy/ - see router/plan.md's
+# "router-manager 자체 admin API 인증". Reads (state/status/list) stay open
+# either way. Must be an argon2id hash, not a plaintext password - generate
+# one with the container already up:
+#
+#   docker compose exec code-docker-router router-manager --hash-password
+#
+# prompts for the password twice to catch typos, then prints a single
+# $argon2id$... line - wrap it in single quotes when pasting below (same
+# reasoning as WEBMANAGER_AUTH_PASSWORD_HASH in example-env.webmanager:
+# docker compose also expands $-forms inside env_file values, so an
+# unquoted hash gets silently mangled).
+#ROUTER_MANAGER_AUTH_PASSWORD_HASH='' # ex: $argon2id$...
+
 # In-container nginx (config/nginx.default.conf) access_log verbosity:
 #   errors - only log non-2xx/3xx responses (via an nginx map/if on
 #     $status), so routine traffic doesn't flood `docker compose logs`.
