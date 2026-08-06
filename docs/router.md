@@ -35,14 +35,22 @@ router의 읽기전용 상태 API(`GET /tailscale/state`, code-docker의 nginx�
 폴링합니다.
 
 로그인 상태는 `${ROUTER_VOLUME:-./router-data}/tailscale/state`(호스트 경로)에
-영속됩니다. 자동 시도를 놓쳤거나 소진된 상태라면 직접 로그인 서버 안으로 들어가야
-합니다 — router 전용 재시도 UI는 아직 없습니다(아래 "아직 없는 것" 참고), 필요하면
-`docker compose exec code-docker-router tailscale up`을 직접 실행하세요.
+영속됩니다. 자동 시도를 놓쳤거나 소진된 상태라면 webmanager의 Tailscale 탭에서
+로그인을 다시 트리거할 수 있습니다(아래 "router-manager" 참고) — 웹 UI 대신 직접
+실행하고 싶다면 `docker compose exec code-docker-router tailscale up`도 여전히
+동작합니다.
 
-### 설정 파일 (forwards / publish)
+### forwards / publish
 
-`${ROUTER_VOLUME:-./router-data}/tailscale/config.yaml`(호스트 경로, 컨테이너
-안에서는 `/var/lib/code-docker-router/tailscale/config.yaml`)을 편집합니다.
+webmanager의 Tailscale 탭(`@code-docker/router-frontend`가 렌더링, router-manager
+API를 호출)에서 forwards/publish 추가·삭제·전역 설정(SOCKS 주소/재시도 간격) 변경과
+로그인 시작/취소, 상태 조회까지 전부 UI로 할 수 있습니다 — 변경할 때마다
+`tailscale-forward`/`tailscale-publish` supervisord 프로그램을 router-manager가
+자동으로 재시작해 반영합니다.
+
+설정은 `${ROUTER_VOLUME:-./router-data}/tailscale/config.yaml`(호스트 경로, 컨테이너
+안에서는 `/var/lib/code-docker-router/tailscale/config.yaml`)에 그대로 저장되므로,
+UI 대신 직접 편집하는 것도 여전히 가능합니다:
 
 ```yaml
 forwards:
@@ -66,15 +74,16 @@ publish:
   `tailscale-publish` 프로그램이 `tcp://code-docker:<port>`로 타겟팅) — 게시하려는 서비스는
   code-docker 안에서 뜬 그대로 두면 됩니다.
 
-편집 후 반영하려면 (지금은 code-docker 안에서 실행할 방법이 없습니다 — 아래 "아직 없는
-것" 참고):
+직접 편집한 뒤 UI를 거치지 않고 반영하려면:
 
 ```sh
 docker compose exec code-docker-router supervisorctl restart tailscale-forward tailscale-publish
 ```
 
 호스트 원격 CLI로 이 명령을 실행하는 게 부담스럽다면, `bin/forward-reload`(code-docker
-안 PATH에 있음)를 실행하면 이 안내가 그대로 출력됩니다.
+안 PATH에 있음)를 실행하면 이 안내가 그대로 출력됩니다 — code-docker 안에서는
+router의 supervisorctl 소켓에 직접 닿을 수 없어 재시작 자체를 대신 해주지는
+못합니다.
 
 ### 호스트네임 지정 / 자체 호스팅 로그인 서버
 
@@ -112,22 +121,36 @@ docker run --rm ghcr.io/tinyauthapp/tinyauth:v5 user create \
 `docker compose up -d`로 재기동하세요. 자세한 사용법(라우트에 인증 요구 걸기)은
 [dev-proxy.md의 "인증"](dev-proxy.md#인증)을 확인하세요.
 
-## router-manager (읽기전용 API)
+## router-manager
 
-router는 `router-manager`라는 작은 Go 백엔드를 갖고 있습니다(webmanager와 같은 패턴).
-지금은 두 가지만 제공합니다:
+router는 `router-manager`라는 Go 백엔드를 갖고 있습니다(webmanager와 같은 패턴,
+code-docker의 nginx가 `/tailscale/`·`/dev-proxy/`·`/router-auth/` 위치로 프록시 —
+router-manager 자신은 호스트 포트를 게시하지 않습니다). 제공하는 것:
 
-- `GET /tailscale/state`(code-docker의 nginx가 프록시, 인증 없음 — backendState/authUrl만
-  노출하는 저위험 상태 조회) — code-server 화면의 로그인 배너가 여기서 읽습니다.
-- Dev Proxy expose CRUD(`/dev-proxy/*`, 역시 nginx가 프록시) — webmanager의
+- Tailscale 전체 CRUD — `GET`/`PUT /api/tailscale/config`(SOCKS 주소/재시도 간격),
+  `GET`/`POST`/`DELETE /api/tailscale/forwards[/{name}]`, 같은 패턴의
+  `/api/tailscale/publish[/{name}]`, `GET /api/tailscale/status`(self/peer 정보),
+  `POST /api/tailscale/login/{start,cancel}`. webmanager의 Tailscale 탭이 여기로
+  요청을 보냅니다. 기존 `GET /api/tailscale/state`(backendState/authUrl만 노출하는
+  저위험 읽기전용 상태)도 그대로 남아 있고, code-server 화면의 로그인 배너가 여기서
+  읽습니다.
+- Dev Proxy expose CRUD(`/api/dev-proxy/*`) — webmanager의
   [Dev Proxy 탭](webmanager.md#dev-proxy)이 여기로 요청을 보냅니다.
+- 자체 admin-API 비밀번호 게이트(`GET /api/auth/status`, `POST /api/auth/unlock`) —
+  아래 "router-manager 자체 인증" 참고.
 
-## 아직 없는 것
+### router-manager 자체 인증
 
-- **router 전용 forwards/publish 관리 UI** — webmanager가 예전에 갖고 있던 Tailscale
-  탭(forwards/publish CRUD, 로그인 트리거 버튼)은 router로 옮기면서 함께 옮기지
-  않았습니다. router-manager 백엔드가 아직 읽기전용 상태 조회만 지원하기 때문입니다 —
-  지금은 `config.yaml`을 직접 편집 + 위 명령으로 재시작하는 수밖에 없습니다.
-- **router-manager 자체 API 인증** — `/tailscale/state`, `/dev-proxy/*` 모두 호스트
-  포트가 열려있지 않다는 것에 의존해 인증 없이 열려 있습니다. UI가 생긴 지금 이 자체를
-  tinyauth 등으로 보호할지는 아직 결정되지 않았습니다.
+`ROUTER_MANAGER_AUTH_PASSWORD_HASH`(기본 꺼짐, opt-in — `example-env` 참고)를
+설정하면 위 두 API의 *쓰기* 라우트(tailscale config `PUT`, forwards/publish/login의
+`POST`/`DELETE`, dev-proxy expose의 `POST`/`PUT`/`DELETE`)가 전부 잠깁니다. 읽기
+라우트(state/config/list/status)는 계속 열려 있습니다 — webmanager 자체 게이트와
+같은 "읽기는 열어두고 쓰기만 잠근다" 관례입니다. webmanager와는 별도의 프로세스/
+비밀(argon2id 해시 + HMAC 서명 쿠키)라서 webmanager 자체 잠금과 독립적으로
+켜고 끌 수 있고, 잠긴 쓰기 요청이 401을 반환하면 webmanager UI가 자동으로
+비밀번호 입력 모달을 띄우고 재시도합니다. `router-manager --hash-password`로
+해시를 생성하세요(webmanager의 동명 CLI와 같은 패턴).
+
+tinyauth(위 "tinyauth" 절)와는 완전히 별개입니다 — tinyauth는 Dev Proxy로 노출한
+개별 dev 서버의 최종 사용자 인증이고, 이건 router-manager 자신의 admin API를
+보호하는 것입니다.

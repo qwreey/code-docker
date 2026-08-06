@@ -7,9 +7,7 @@ code-docker의 관리자 패널(webmanager) 프론트엔드. Vite + React + Type
 ## 구현 현황
 
 - 구현됨: Supervisor(프로세스 관리), SSH Keys(authorized_keys 관리), Git Config(gitconfig +
-  SSH 호스트 + 커밋 서명(SSH/GPG) + HTTPS credential), Tailscale(전역 설정 + forwards +
-  publish 관리 + 상태 조회 — 로그인 필요 시 배너/링크, 내 정보/피어 목록, `GET
-  /api/tailscale/status`; 실제 로그인 수행(`tailscale up`)은 범위 밖), Logs(앱/레벨 필터가 있는 로그 뷰어 — vector가
+  SSH 호스트 + 커밋 서명(SSH/GPG) + HTTPS credential), Logs(앱/레벨 필터가 있는 로그 뷰어 — vector가
   만드는 실제 로그 데이터를 보여줌, 응답의 `mock` 필드는 항상 `false`), Processes(상단에
   컨테이너 전체 cpu/mem/disk 사용량 요약(cgroup 기준 — `GET /api/system/resources`), 그
   아래 시스템 프로세스 목록 + 리스닝 포트 목록, btop 대체용 — 프로세스/포트 각각에서
@@ -23,6 +21,10 @@ code-docker의 관리자 패널(webmanager) 프론트엔드. Vite + React + Type
   낡아 있음 — mise, Docker (dind), Terminal 모두 이미 구현되어 있고(`../plan.md`의
   "구현 완료" 표가 최신 소스), 테마 토글/Task Manager 개명 등도 이 문서엔 반영 안 됨.
   전체 재정리는 이번 라운드의 범위 밖.
+- Tailscale/Dev Proxy 탭은 이 패키지(`webmanager/frontend`) 소속이 아님 — router로
+  완전히 이관되어 `@code-docker/router-frontend`(`router/frontend`) 패키지의
+  컴포넌트를 `App.tsx`가 그대로 import해서 렌더링한다. 아래 "구조" 절의
+  `src/components/`에는 대응하는 디렉토리가 없다.
 
 ## 개발 모드 실행
 
@@ -63,11 +65,6 @@ src/
     GitConfig/    gitconfig, SSH 호스트, 커밋 서명(SSH/GPG 키 관리 포함 — 새로 생성/선택한
                   키는 폼 상태만 바뀔 뿐 저장 버튼을 눌러야 반영된다는 경고를 SSH/GPG 양쪽
                   다 표시), HTTPS credential
-    Tailscale/    전역 설정(SOCKS 주소/재시도 간격), forwards, publish 서브섹션 (모든
-                  변경 시 tailscale-forward 재시작을 UI에서 안내. add/delete 응답이 에러여도
-                  디스크에는 이미 반영됐을 수 있으므로 — 백엔드가 디스크 저장 후 재시작을
-                  시도하는 순서라 재시작만 실패할 수 있음 — 성공/실패 관계없이 항상 목록을
-                  다시 불러와 실제 상태를 반영)
     Logs/         앱/레벨 필터 + 수동/실시간 새로고침. 빈 문자열/공백만 있는 메시지는
                   "(빈 줄)"로 표시(원본 로그의 공백 줄을 깨진 데이터처럼 보이지 않게)
     Processes/    상단 SystemSummary(컨테이너 전체 메모리/CPU/디스크 사용량 요약 카드 —

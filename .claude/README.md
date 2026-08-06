@@ -14,10 +14,6 @@
 - **`archive/`** — 이미 실행/구현이 끝났거나(또는 애초에 참고용 조사 기록), "왜
   이렇게 결정했는지" 전체 논증 과정이 궁금할 때만 열어보는 문서. 현재 상태 파악에는
   필요 없음.
-  - `tailscale-design.md` — (레포 루트에 있던 `tailscale.md`를 옮김) tailscaled/
-    forwards/publish 인프라의 원본 설계 조사 — 레포 전체(root `CLAUDE.md`가 다루는
-    영역)에 걸친 내용이라 webmanager 전용이 아니어서 여기 둠. 최신 네이밍의 권위있는
-    출처는 아니고 배경/근거 참고용.
   - `webmanager-review.md` — (`webmanager/review.md`를 옮김) webmanager 전체
     코드베이스에 대한 보안/버그 리뷰 라운드 기록 — 나온 이슈는 전부 고쳐졌거나
     각 기능의 `webmanager/.claude/*-plan-done.md`에 흡수됨. webmanager 전용
@@ -28,6 +24,10 @@
     단일 umbrella로 정리 + `user-init` 실행 위치/`set -e` 이전 +
     `code-server` → `code` 네이밍 통일까지 구현 완료 — 현재 상태는 루트
     `CLAUDE.md`, 판단 과정은 이 문서
+  - `caddy-nginx-integration-plan.md` — Dev Proxy(내부 Caddy)를 별도 포트
+    대신 in-container nginx의 `/exports/` 프리픽스를 통해서도 도달 가능하게
+    만든 설계 — 구현 완료, 지금은 `docs/dev-proxy.md`의 "바깥 리버스 프록시
+    연결하기" 절이 최신 사용자 문서
 
 - **`backlog/`** — 아직 착수하지 않은 브레인스토밍/아이디어(webmanager에 국한되지
   않는 것). `archive/`와 달리 "완료된 것"이 아니라 "언젠가 할 수도 있는 것" — 실제로
@@ -44,6 +44,11 @@
 
 - **webmanager 전용 계획/설계**: `webmanager/.claude/` — 완료된 기능은
   `*-plan-done.md`, 아직 안 한 건 `*-plan.md`. 인덱스는 그 폴더의 `README.md`.
+
+- **router 전용 계획/설계**: `router/.claude/` — `functional-router-plan.md`(전체
+  비전/결정 사항), `router-dns-plan.md`(DNS 포워딩 + 블록리스트 설계),
+  `archive/tailscale-design.md`(code-docker 안에서 tailscale을 돌리던 시절의 원본
+  설계, 참고용). 인덱스는 `router/plan.md`.
 
 - **살아있는 문서(이 폴더 밖)**: 각 서브프로젝트 폴더에 그대로 둠, 항상 최신 상태 유지
   - `webmanager/plan.md`, `webmanager/CLAUDE.md`, `webmanager/ideas.md`,

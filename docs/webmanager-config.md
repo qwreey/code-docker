@@ -75,10 +75,11 @@ cat .env.webmanager | docker compose exec -T code-docker \
 >
 > 원칙은 **조회(읽기)는 그대로 열어두고, 변경(쓰기)만 게이트** —
 > Supervisor의 start/stop/restart, Git Config의 모든 추가·수정·삭제, SSH
-> Keys 추가·삭제 등이 여기 해당합니다. Dev Proxy는 이제 router 컨테이너의 자체 API를
-> 호출하므로 이 게이트 대상이 아닙니다(개별 라우트의 "인증 요구"는 대신
-> [tinyauth](router.md#tinyauth)가 담당) — 아직 그 API 자체의 인증은 없습니다
-> ([router.md](router.md#아직-없는-것) 참고). 예외로 **Terminal, 파일 탭, Logs, Supervisor의
+> Keys 추가·삭제 등이 여기 해당합니다. Dev Proxy/Tailscale은 이제 router 컨테이너의
+> 자체 API(router-manager)를 호출하므로 이 게이트 대상이 아닙니다(개별 라우트의
+> "인증 요구"는 대신 [tinyauth](router.md#tinyauth)가 담당) — router-manager는
+> `ROUTER_MANAGER_AUTH_PASSWORD_HASH`로 켜는 자기 자신만의 별도 비밀번호 게이트를
+> 갖고 있습니다([router.md](router.md#router-manager-자체-인증) 참고). 예외로 **Terminal, 파일 탭, Logs, Supervisor의
 > 프로그램별 로그 조회는 조회까지 통째로 게이트**됩니다(각각 root 쉘/임의 파일
 > 접근/로그 속 시크릿 노출 위험 때문). 값은 반드시 환경변수로만 주입해야 하며(설정
 > 파일에 저장하면 컨테이너 안에서 프로세스를 재시작해 우회할 수 있어 일부러 지원하지

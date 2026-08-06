@@ -83,7 +83,7 @@ privileged 컨테이너는 호스트와 같은 커널을 공유하므로, dind �
   적용, 포트 80을 리버스 프록시 없이 직접 인터넷에 노출하지 않기.
 - `NGINX_BLOCK_LOOPBACK=true`(기본값), `ALLOWED_HOSTS`/`ALLOWED_EXPORT_HOSTS`
   설정 — 최소한 우발적 노출(스캐너 등)에 대한 보조 방어선.
-- `docs/tailscale.md` "보안: tailnet ACL 설정" 절의 예시 그대로 tailnet ACL에
+- `docs/router.md` "보안" 절의 예시 그대로 tailnet ACL에
   `tag:code-docker`를 태그해서 `autogroup:admin`만 접근 가능하게 — sshd(22)는
   구조상 이 백스톱 말고는 다른 방어선이 없다고 문서에도 명시돼 있음.
 - 웹매니저의 opt-in authgate(`internal/authgate`)를 켜서 Terminal/File Manager를
@@ -93,21 +93,24 @@ privileged 컨테이너는 호스트와 같은 커널을 공유하므로, dind �
 
 ## 3. 아웃바운드 LAN(사설망) 격리 — 구현됨
 
-**2026-08-05, `netgate` Phase 1+2 구현으로 해소됨.** 이 항목의 원안(아래 옛 내용 참고)은
-"호스트에서 직접 해야 함"이라고 적었지만, 논의 끝에 `network_mode: service:code-docker`
-(netns 공유) + 별도 라우터 컨테이너(`code-docker-netgate`) 조합으로 **순수
-docker-compose만으로**(호스트 iptables/eBPF 등 손대지 않고) 구현 가능함을 확인하고 실제로
-구현/실측 검증까지 완료했다. 전체 설계와 검토했다가 기각한 대안(호스트 방화벽 `DOCKER-USER`
-체인 접근 포함)은 `.claude/backlog/egress-netgate-plan.md`, 사용자 문서는
+**2026-08-05, `netgate` Phase 1+2 구현으로 해소됨(이후 netgate는 `router` 컨테이너의
+한 기능 영역으로 승격됨 — 아래 요약은 그 리네이밍 이전 시점 기록이라 컨테이너 이름이
+`code-docker-netgate`로 남아 있음, 지금은 `code-docker-router`).** 이 항목의 원안(아래
+옛 내용 참고)은 "호스트에서 직접 해야 함"이라고 적었지만, 논의 끝에
+`network_mode: service:code-docker`(netns 공유) + 별도 라우터 컨테이너 조합으로
+**순수 docker-compose만으로**(호스트 iptables/eBPF 등 손대지 않고) 구현 가능함을 확인하고
+실제로 구현/실측 검증까지 완료했다. 전체 설계와 검토했다가 기각한 대안(호스트 방화벽
+`DOCKER-USER` 체인 접근 포함)은 `.claude/backlog/egress-netgate-plan.md`, 사용자 문서는
 `docs/egress-netgate.md` 참고. 요약:
 
 - code-docker/dind는 `code-docker-external`(인터넷 방향 네트워크)에 더 이상 직접 붙지
   않고, `code-docker-netinit`(및 dind 자신)이 지속적으로 심어주는 라우트를 통해서만
-  `code-docker-netgate`를 거쳐 나갈 수 있다 — code-docker 자신은 `NET_ADMIN`이 없어
+  router를 거쳐 나갈 수 있다 — code-docker 자신은 `NET_ADMIN`이 없어
   이 경로를 스스로 바꿀 수 없다(요구사항 1 충족, "호스트에서 직접"이 아니라 컨테이너
   네임스페이스 공유로 달성).
-- `code-docker-netgate`가 RFC1918 등 사설 대역을 차단하고(요구사항 2), squid로
-  HTTP(S) 도메인 블록리스트를 적용한다(요구사항 4, best-effort).
+- router가 RFC1918 등 사설 대역을 차단하고(요구사항 2), dnsmasq의 DNS 레벨 블록리스트로
+  콘텐츠 도메인을 차단한다(요구사항 4, best-effort — 원래는 squid HTTP(S) 인터셉트
+  방식이었으나 CDN형 도메인 오탐 문제로 폐기, `router/.claude/router-dns-plan.md` 참고).
 - 아래 완화책의 옵션 2(화이트리스트 프록시)는 채택하지 않고 blocklist 방향으로
   통일했다(`egress-netgate-plan.md`의 "결정됨" 참고) — 원하는 사용자는 규칙을 뒤집어
   whitelist처럼 쓸 수 있다.

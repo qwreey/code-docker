@@ -88,7 +88,7 @@
 
 # tailscale (daemon+login+forwards+publish) now runs on the router
 # container, not code-docker (see
-# .claude/backlog/functional-router-plan.md's "tailscale 전체 이관") - these
+# router/.claude/functional-router-plan.md's "tailscale 전체 이관") - these
 # still configure it, just read by code-docker-router instead. Set to
 # "false" to disable all tailscale integration - the three supervisord
 # programs stay up but do nothing.
@@ -107,12 +107,12 @@
 # PREFIX-namespaced, so running multiple instances on the same tailnet
 # collide on this name unless you set it explicitly per instance. Only
 # applied by the automatic first-boot login attempt - see
-# docs/tailscale.md#호스트네임-지정-magicdns for how to change it after
-# you've already logged in once.
+# docs/router.md#호스트네임-지정--자체-호스팅-로그인-서버 for how to change it
+# after you've already logged in once.
 #TAILSCALE_HOSTNAME="" # ex: code-docker-router
 
 # Dev Proxy's internal Caddy instance also now runs on router (see
-# .claude/backlog/functional-router-plan.md's "Dev Proxy Caddy도 router로
+# router/.claude/functional-router-plan.md's "Dev Proxy Caddy도 router로
 # 이관") - same env vars, code-docker's nginx reads CADDY_ADAPTER_PORT too
 # (to know where to proxy /exports/ to), so keep both containers in sync -
 # docker-compose.yml already passes the same value to both.
@@ -120,8 +120,8 @@
 #CADDY_ADAPTER_PORT="8082"
 
 # router's own forward-auth (tinyauth) - protects individual Dev Proxy
-# exposes that opt into RequireAuth, see docs/dev-proxy.md once it's
-# updated for this migration. Empty TINYAUTH_AUTH_USERS means no one can
+# exposes that opt into RequireAuth, see docs/dev-proxy.md#인증. Empty
+# TINYAUTH_AUTH_USERS means no one can
 # log in yet, and tinyauth itself refuses to start without TINYAUTH_APPURL
 # set to a real URL - generate a username:bcrypt-hash pair with:
 #   docker run --rm ghcr.io/tinyauthapp/tinyauth:v5 user create \

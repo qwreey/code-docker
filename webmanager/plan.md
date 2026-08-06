@@ -16,8 +16,11 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 
 스택/배포/인증 등 전체에 걸치는 결정은 `webmanager/.claude/base/architecture.md`.
 요약: Go(stdlib) + Vite/React(TS, CSR), 기존 이미지에 supervisord program으로 추가,
-인증은 forward-auth 전적 위임(자체 로그인 없음), 바인드 주소는 `private:81`(전용
-tailscale IP, 레포 루트 `docs/tailscale.md` 참고 - tailnet 자동노출 방지).
+인증은 forward-auth 전적 위임(자체 로그인 없음), 바인드 주소는 `private:81`(레포 루트
+`docker-compose.yml`의 `private` alias 주석 참고 — 원래 code-docker 자신의
+tailscaled가 쓰던 tailnet 자동노출 회피 이유였지만, code-docker는 이제 tailscaled를
+아예 실행하지 않아 이 근거 자체는 없어짐 — 그냥 기존 기본값을 바꿀 이유가 없어서
+유지 중).
 
 ## 구현 완료
 
@@ -26,7 +29,7 @@ tailscale IP, 레포 루트 `docs/tailscale.md` 참고 - tailnet 자동노출 �
 | Supervisor 프로세스 관리 | `.claude/archive/supervisor-plan-done.md` |
 | SSH authorized_keys 관리 | `.claude/qa-request/sshkeys-plan-done.md` |
 | Git 설정(user/email, 커밋 사이닝, SSH 호스트, HTTPS credential, git-lfs install, .gitconfig 원본 편집) | `.claude/qa-request/gitconfig-plan-done.md` |
-| Tailscale forwards/publish CRUD + 상태 조회(로그인 필요 시 배너, 내 정보/피어 목록, `GET /api/tailscale/status`) | `.claude/archive/tailscale-plan-done.md` |
+| Tailscale forwards/publish CRUD + 상태 조회(로그인 필요 시 배너, 내 정보/피어 목록, `GET /api/tailscale/status`) — webmanager가 직접 구현했던 시절의 기록. 이후 이 기능 자체가 router로 완전히 이관되어 webmanager 쪽 백엔드/프론트엔드 코드는 삭제됨 — 지금은 `router/frontend`의 컴포넌트를 webmanager가 그대로 가져와 쓰고, router-manager API를 호출한다(`docs/router.md#tailscale` 참고) | `.claude/archive/tailscale-plan-done.md` |
 | vector 로그 파이프라인 + Logs 페이지 | `.claude/archive/vector-logs-plan-done.md` |
 | 작업 관리자(구 "Processes") — 성능/프로세스 서브탭 분리, 프로세스 트리+리스트, 필터/검색, 코어별 CPU 히트맵(호버 시 최근 히스토리 스파크라인 포함), 메모리 구성요소별 분해(호스트 물리 vs cgroup), 컨테이너 자체 루트 파일시스템의 최상위 디렉토리별 디스크 사용량 분석(Storage Sense류, `du` 기반, 캐시 + 수동 새로고침 전용) | `.claude/archive/processes-plan-done.md` |
 | Docker/dind 관리 M1(읽기 전용 — 컨테이너/이미지 목록, 로그 조회, `internal/dind` CLI 셸아웃)+M2(start/stop/remove, 확인 다이얼로그 필수, 비밀번호 게이트)+M3(docker inspect 상세 뷰, 비밀번호 게이트 — Config.Env 평문 노출 우려로 list/logs와 달리 게이트) | `.claude/qa-request/dind-plan-done.md` |
@@ -36,7 +39,7 @@ tailscale IP, 레포 루트 `docs/tailscale.md` 참고 - tailnet 자동노출 �
 | mise 관리(install/use/uninstall, 설치된 도구 목록, env 미리보기, 추천 목록, 설정에서만 제거하고 바이너리는 유지하는 비활성화/재활성화 토글) + 도구 검색(`mise registry --json`)/원격 버전 선택(`mise ls-remote --json`) 후 설치, mise 탭 모든 job 액션을 top-level 다이얼로그로 통일 | `.claude/archive/mise-plan-done.md` (도구 검색+버전 선택은 `.claude/archive/mise-search-plan-done.md`) |
 | 웹쉘(터미널) M1(임시 세션, xterm.js+PTY/WebSocket, 비밀번호 게이트 소급 적용됨) + M2(named 영속 세션, `internal/termsession`, 탭 UI/유지 토글/유휴 자동정리) + 모바일 레이아웃 재설계(키보드 추적, 엣지투엣지, 테마 동화 색상) | `.claude/archive/terminal-plan-done.md` |
 | 터미널 홈 탭(항상 열려있는 첫 탭 — 세션 목록 전환 + 시작 위치/실행 명령을 저장하는 프로파일 CRUD, 세션 생성 시 cwd/초기 명령 지원하도록 `internal/termsession` 확장, 데스크탑 가로 분할/카드형 목록/드래그앤드롭 정렬) | `.claude/archive/terminal-home-plan-done.md` |
-| 공용 비밀번호 게이트(`internal/authgate`, argon2id + ENV 전용 저장, 읽기 열림/쓰기 게이트 원칙으로 Git/SSH/Tailscale/Supervisor/Logs까지 확장, 터미널도 `RequiresUnlock`으로 완전히 감싸짐) | `.claude/archive/authgate-plan-done.md` |
+| 공용 비밀번호 게이트(`internal/authgate`, argon2id + ENV 전용 저장, 읽기 열림/쓰기 게이트 원칙으로 Git/SSH/Tailscale/Supervisor/Logs까지 확장, 터미널도 `RequiresUnlock`으로 완전히 감싸짐) — Tailscale 부분은 당시 기록이고, 이후 Tailscale이 router로 이관되며 이 게이트 대상에서는 빠졌다(router-manager 자신의 별도 `internal/authgate` 인스턴스가 대신 담당, `docs/router.md#router-manager-자체-인증` 참고) | `.claude/archive/authgate-plan-done.md` |
 | 파일 매니저(업로드/다운로드/이동/복사/이름변경/폴더생성/멀티선택/정보패널/텍스트편집, 자체 비밀번호 게이트) | `.claude/archive/filemanager-plan-done.md` (업로드 진행률/chmod/zip 다운로드 등 v1 잔여 항목은 `.claude/research/filemanager-rework-plan.md`) |
 | 공용 코드 에디터(CodeMirror 6, 지연 로딩) — git raw 설정 편집/파일 매니저가 재사용 | 별도 문서 없음(공용 컴포넌트, `src/components/common/CodeEditor.tsx`) |
 | Supervisor 로그 다이얼로그/바텀시트, 반응형 레이아웃(모바일 햄버거 사이드바), 로그 페이지네이션/시간범위 필터, CPU/메모리/디스크/네트워크 사용량 히스토리 그래프, 사이드바 드래그앤드롭 순서 변경(서버에 저장, `GET/PUT /api/ui/sidebar-order`), 탭 이름 영어로 통일(Code Extensions/Projects/Task Manager/Files) | 문서 없음(UI/관측성 개선, 각 기능 자체는 위 표의 해당 기능 문서 소관) |
@@ -44,10 +47,10 @@ tailscale IP, 레포 루트 `docs/tailscale.md` 참고 - tailnet 자동노출 �
 | Light/Dark 수동 토글(3-way: 자동/라이트/다크, `data-theme` 속성 + `localStorage`) + 사이드바 하단 잠금 상태 표시/미리 해제 + `index.css` 컬러 시스템 중앙화(기본 UI 다크 값 신규 설계 포함 — 원래 전혀 없었음, dataviz 스킬로 차트 팔레트 재검증) | `.claude/archive/theme-toggle-plan-done.md` |
 | `.env.webmanager` 마이그레이션 도구(`webmanager --env-migrate` — 키 추가/삭제 반영(삭제된 키는 `#~` 아카이브 섹션으로), 유저 코멘트 보존, `#!important`/`#!` 마커로 조직 강제값·권장값-변경-충돌 표시, 경로 기반 템플릿(조직 커스텀 마운트 가능) + 기동 로그/웹 UI 경고 배너(백업 안내 + 명령어 인라인 코드 표기, dismiss 영속화)) | `.claude/archive/env-migration-plan-done.md` |
 | code-server(`/`)+webmanager(`/manager`)를 컨테이너 안 nginx로 단일 origin 통합 — code-server/webmanager 내부 포트 이동, `code-config.yaml` 매 시작 재생성, 프론트엔드 서브패스(`apiUrl()`/`BASE_URL`) 대응까지 전부 구현 | `.claude/archive/expose-plan-done.md` |
-| 바인드 주소 전략 확정(구 TODO 5번) — code-server/webmanager를 loopback(`127.0.0.1`) 대신 전용 tailscale IP(`private` 호스트네임)에 바인드, nginx `listen 127.0.0.1:80`으로 tailscale 자동 loopback 포워딩 경로 차단, `ALLOWED_HOSTS`(nginx Host 헤더 화이트리스트) 추가 | 레포 루트 `docs/tailscale.md`의 "보안: tailnet ACL 설정" 절 (전용 webmanager 문서 없음 - nginx/code-server/docker-compose.yml 전체에 걸친 변경이라 레포 루트 문서가 소관) |
+| 바인드 주소 전략 확정(구 TODO 5번) — code-server/webmanager를 loopback(`127.0.0.1`) 대신 전용 tailscale IP(`private` 호스트네임)에 바인드, nginx `listen 127.0.0.1:80`으로 tailscale 자동 loopback 포워딩 경로 차단, `ALLOWED_HOSTS`(nginx Host 헤더 화이트리스트) 추가 | 레포 루트 `docs/router.md`의 "보안" 절 (당시엔 `docs/tailscale.md`에 있었으나, tailscale이 router로 이관되며 그쪽으로 옮겨짐 — 전용 webmanager 문서는 없음, nginx/code-server/docker-compose.yml 전체에 걸친 변경이라 레포 루트 문서가 소관) |
 | mise 전역 설치/삭제 성공 후 code-server 재시작을 눌러서 바로 실행 가능(`POST /api/supervisor/processes/code-server/restart` 재사용, `frontend/src/utils/restartCodeServer.ts`) — 정적 안내문에서 버튼으로 승격, 잡 진행 패널(`Mise/JobPanel.tsx`)을 Mise 탭/Claude 탭이 공유하도록 추출 | 문서 없음(작은 갭 메우기, 별도 계획 문서 없이 진행) |
 | Claude 탭 안 대화 로그 뷰어 v1 — 프로젝트 전체의 세션 트랜스크립트 목록/축약 채팅뷰(`CLAUDE_CONFIG_DIR/projects/*/*.jsonl`), 백엔드는 목록+원본 라인 페이지네이션만 제공하고 파싱은 프론트가 벤더링한 Zod 스키마(`d-kimuson/claude-code-viewer` MIT)로 처리, Terminal/Files/Logs와 동급으로 비밀번호 게이트 | `.claude/archive/claude-session-log-plan-done.md` |
-| Dev Proxy 탭 — 내부 Caddy 인스턴스(`caddy-adapter` supervisord program)로 dev 서버를 와일드카드 서브도메인에 노출, `internal/devproxy`(Caddyfile 조각 CRUD, `caddy adapt` 검증 후 `caddy reload`), 인증은 `internal/authgate`를 Caddy `forward_auth`에 연결(`GET /api/auth/verify`, 독립 로그인 페이지 `/manager/dev-auth`) — authgate 자체도 이번에 세션 저장소 없는 HMAC 서명 토큰으로 재설계되어 웹매니저 쓰기 게이트(10분)와 dev-proxy 열람(24시간)을 같은 토큰으로 다른 TTL로 검사 | `.claude/qa-request/caddy-plan-done.md`(원래 "인증은 바깥에 위임" 결정이 뒤집힘 — 문서 상단에 갱신됨) |
+| Dev Proxy 탭 — 내부 Caddy 인스턴스(`caddy-adapter` supervisord program)로 dev 서버를 와일드카드 서브도메인에 노출, `internal/devproxy`(Caddyfile 조각 CRUD, `caddy adapt` 검증 후 `caddy reload`), 인증은 `internal/authgate`를 Caddy `forward_auth`에 연결(`GET /api/auth/verify`, 독립 로그인 페이지 `/manager/dev-auth`) — webmanager가 직접 구현했던 시절의 기록. 이후 Caddy/Dev Proxy 전체가 router로 완전히 이관되어 webmanager 쪽 `internal/devproxy`/`caddy-adapter`/이 `forward_auth` 연동은 전부 삭제됨, 인증도 tinyauth로 대체됨(`docs/dev-proxy.md#인증` 참고) — 지금은 `router/frontend`의 컴포넌트를 webmanager가 그대로 가져와 쓰고, router-manager API를 호출한다 | `.claude/qa-request/caddy-plan-done.md`(원래 "인증은 바깥에 위임" 결정이 뒤집힘 — 문서 상단에 갱신됨) |
 | 프로젝트별 git 상태 패널(신규, `internal/projectgit`) — staged/changed/untracked/behind/ahead/diverged/stashed/conflicts 요약(파싱 로직은 `~/.config/fish/functions/quiteline-fish/_qtm_git_info.fish`의 `git status --porcelain -b` 분류 규칙을 그대로 이식), 커밋 로그(커서 페이지네이션)/커밋별 diff/미변경·스테이지 diff(직접 만든 +/- 라인 색칠, 새 의존성 없음)/리모트/브랜치/태그 조회. 읽기 전용만 구현(스테이징/커밋/push·pull/merge·rebase 도구는 다음 마일스톤으로 보류), 모든 엔드포인트는 프로젝트 경로를 알려진 프로젝트 목록과 정확히 일치시켜 검증한 뒤에만 `git` 셸아웃, 전부 읽기라 게이트 없음. 프론트는 `components/common/Git/`에 프로젝트 경로 하나만 받는 형태로 위치 — 파일매니저 리워크 등 다른 곳에서도 재사용 가능하게 의도적으로 분리 | `.claude/qa-request/project-git-status-plan-done.md` |
 | 열린 세션(어느 브라우저 탭이 어느 폴더를 열어놨는지) — 클라이언트가 UUID를 자체 발급해 30초마다 heartbeat를 보내는 방식, 새 사이드바 탭("열린 세션") | `.claude/archive/session-heartbeat-plan-done.md` |
 | code-server PWA manifest에 `shortcuts` 필드 주입("Open manager" 점프리스트 항목) — nginx가 `/manifest.json`만 webmanager로 가로채 원본을 fetch+편집, 실패 시 code-server 원본으로 자동 폴백 | `.claude/archive/manifest-shortcuts-plan-done.md` |

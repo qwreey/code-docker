@@ -17,29 +17,14 @@ per-program capability metadata that can disable start/stop/restart/logs with
 an explanatory note — `vector`'s log button is disabled this way, per-program
 PID-tree expand reusing the Processes tab's tree utility), SSH keys, git
 config (name/email, SSH+GPG signing, SSH hosts, HTTPS credentials, git-lfs
-install, raw `.gitconfig` editing, known_hosts management), Tailscale
-forwards/publish + a status view (`GET /api/tailscale/status`, wraps
-`tailscale status --json`: a pending-login banner with the sign-in link when
-`authUrl` is set, else self/peer info — hostname, tailscale IPs, DERP relay,
-tailnet name, peer tags — with an explicit disclaimer that ACL policy itself
-isn't queryable this way, only the visible peer/tag list) plus an on-demand
-login trigger (`POST /api/tailscale/login/start`, `internal/tailscale/
-login.go`'s thin `LoginManager` — just starts `tailscale up` detached and
-lets the existing status poll pick up the resulting `authUrl`, no stdout
-scraping needed unlike the Claude Code flow below). This reverses backend/
-README.md's earlier "actually performing a login remains out of scope"
-decision, for the same reason the Claude Code login flow below reversed its
-own equivalent decision: `tailscale-service.default.sh`'s automatic first-
-boot `tailscale up` now only fires once ever (a state-dir marker file, not
-every restart — repeated restarts before finishing login were piling up
-pending auth requests on the control server, a mild self-DDoS), so retrying
-needs a surface that doesn't require a container restart. The code-server
-sign-in banner (`tailscale-notify.default.js`) was updated to match: it now
-shows a "no attempt pending, go to webmanager" variant for the (now common)
-gap between the one-time auto-attempt and a manual retry, a working Ignore
-action backed by `localStorage` (the old dismiss button never actually
-persisted anything), and a note pointing at `TAILSCALE_ENABLED=false` for
-anyone who'd rather turn the whole feature off. Logs (real vector-backed data, time-range filter + cursor
+install, raw `.gitconfig` editing, known_hosts management) — a Tailscale tab
+also lives here (forwards/publish CRUD, status, login trigger), but it's not
+webmanager's own feature: it renders `@code-docker/router-frontend`
+components calling router-manager's API, same as the Dev Proxy tab below.
+webmanager's own `internal/tailscale` backend package (config CRUD, status,
+login) was fully deleted when tailscale moved to the `router/` container —
+see `router/CLAUDE.md` and `docs/router.md#tailscale` for the current
+design. Logs (real vector-backed data, time-range filter + cursor
 pagination, sticky filters with an internally-scrolling table, live mode that
 appends instead of replacing), a "작업 관리자" (Task Manager) tab — renamed
 from "Processes" — split into 성능/프로세스 sub-tabs (host-wide per-core CPU
@@ -195,16 +180,17 @@ password-gated like most of this app's sensitive reads, but the heartbeat
 POST itself is deliberately left ungated, a documented exception to the
 reads-open/writes-gated convention since code-server runs with `auth: none`
 and has no credential to attach to that request in the first place. A Dev
-Proxy tab (`.claude/qa-request/caddy-plan-done.md`, `internal/devproxy`) runs
-an internal Caddy instance (`caddy-adapter` supervisord program) that exposes
-dev servers on wildcard subdomains — expose CRUD writes/validates
-`.caddy` file fragments (`caddy adapt` for syntax validation, then `caddy
-reload`), with `internal/authgate` wired into Caddy's `forward_auth` for
-per-expose auth (`GET /api/auth/verify`, standalone login page
-`/manager/dev-auth`) — this reversed the original "auth stays outside,
-webmanager doesn't touch it" decision, and prompted authgate's redesign to a
-session-store-free HMAC-signed token so the same token can carry different
-TTLs for webmanager's write-gate (10 min) vs. Dev Proxy viewing (24h). A
+Proxy tab (`.claude/qa-request/caddy-plan-done.md` — historical only, see
+below) renders `@code-docker/router-frontend` components against
+router-manager's `/api/dev-proxy/*` for expose CRUD (structured route
+editor + raw `.caddy` fragment fallback). webmanager's own `internal/
+devproxy` package, the `caddy-adapter` supervisord program, and
+`internal/authgate`'s `forward_auth`/`/manager/dev-auth` wiring described in
+that archive doc were all deleted — Caddy now lives on the `router`
+container and per-expose auth goes through tinyauth instead (see
+`router/CLAUDE.md` and `docs/dev-proxy.md`). `internal/authgate` here is
+back to gating only webmanager's own write-gate (10 min TTL), with no
+second forward-auth TTL to carry. A
 per-project git status panel (`.claude/qa-request/project-git-status-plan-done.md`,
 `internal/projectgit`) reports status/log/diff/remotes/branches/tags for one
 already-known project path — read-only only (no stage/commit/push/pull yet),

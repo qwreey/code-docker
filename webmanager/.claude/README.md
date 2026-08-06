@@ -51,7 +51,7 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 | `qa-request/gitconfig-plan-done.md` | git user/email, 커밋 사이닝(SSH/GPG), 호스트별 SSH 키, HTTPS credential, git-lfs install, .gitconfig 원본 편집, known_hosts 관리 |
 | `qa-request/project-git-status-plan-done.md` | 프로젝트별 git 상태 패널(신규) — staged/changed/untracked/behind/ahead/diverged/stashed/conflicts 요약, 커밋 로그/diff, 리모트/브랜치/태그. 읽기 전용만(스테이징/커밋/push·pull은 다음 마일스톤). `gitconfig-plan-done.md`(전역 git 설정)와는 별개 기능이니 혼동 금지 |
 | `qa-request/dind-plan-done.md` | Docker/dind 관리 — M1(목록/로그, 읽기 전용)+M2(start/stop/remove, 비밀번호 게이트)+M3(docker inspect 상세 뷰, 비밀번호 게이트) 전부 코드/빌드 검증까지 완료 |
-| `qa-request/caddy-plan-done.md` | Dev Proxy 탭 — 내부 Caddy 인스턴스로 dev 서버를 와일드카드 서브도메인에 노출, `internal/devproxy`(Caddyfile 조각 CRUD) + `internal/authgate`의 `forward_auth` 연동. 설계 조사 문서였다가 실제로 구현 완료됨 |
+| `qa-request/caddy-plan-done.md` | Dev Proxy 탭 — 내부 Caddy 인스턴스로 dev 서버를 와일드카드 서브도메인에 노출, `internal/devproxy`(Caddyfile 조각 CRUD) + `internal/authgate`의 `forward_auth` 연동. 설계 조사 문서였다가 실제로 구현 완료됨 — webmanager가 직접 구현했던 시절의 기록(이후 Dev Proxy 전체가 router로 완전히 이관되어 webmanager 쪽 코드는 삭제됨, 인증도 tinyauth로 대체됨. 지금은 `router/frontend`가 이 UI를 소유). 여기 남겨둔 "사용자 검증 대기" 상태 자체도 이 기능엔 더 이상 의미 없음 — 코드가 이미 다른 곳으로 옮겨갔기 때문 |
 
 ## 완료, 사용자 실사용 검증까지 끝나서 아카이브됨 (`archive/*-plan-done.md`)
 

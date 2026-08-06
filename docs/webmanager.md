@@ -42,10 +42,14 @@ supervisord 프로그램 목록 조회 및 start/stop/restart, 표준출력/표�
 webmanager의 다른 곳에서 쓰는 CodeMirror 에디터는 아닙니다). 자세한 내용은
 [dev 서버 노출 문서](dev-proxy.md)를 확인하세요.
 
-tailscale 관리 탭은 더 이상 webmanager에 없습니다 — tailscale 자체가 router 컨테이너로
-옮겨갔고, router는 아직 forwards/publish를 관리하는 UI를 제공하지 않습니다(읽기전용 상태
-API만 있음). 자세한 내용과 현재 설정 방법은 [router.md](router.md#tailscale)를
-확인하세요.
+### Tailscale
+
+Dev Proxy와 같은 방식(router가 소유한 `@code-docker/router-frontend` 컴포넌트를
+webmanager가 그대로 가져와 보여줌)으로, tailscale의 전역 설정(SOCKS 주소/재시도
+간격)·forwards·publish 추가/삭제와 로그인 시작/취소, 상태(내 정보/피어 목록) 조회를
+이 탭에서 전부 할 수 있습니다. tailscale 데몬 자체는 router 컨테이너에서 돌고,
+webmanager는 router-manager API를 호출할 뿐입니다. 자세한 내용은
+[router.md](router.md#tailscale)를 확인하세요.
 
 ### Logs
 

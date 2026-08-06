@@ -3,16 +3,16 @@
 Go backend for the webmanager admin panel. Implements supervisord process
 management (over the existing `/run/supervisor.sock` XML-RPC socket), SSH
 `authorized_keys` management, git configuration (user.name/email, SSH host
-keys, HTTPS credential store, commit signing + GPG key management),
-tailscale forwards/publish config CRUD, a cross-service logs API backed by
-the `vector` JSONL pipeline, an OS-level process/port viewer
-(`github.com/shirou/gopsutil/v4`) for finding and killing stray processes
-squatting on a port, a whole-container cpu/mem/disk resource endpoint
-read directly from this container's own cgroup v2 pseudo-files (see
-`internal/cgroup`), and a read-only Claude Code status overview (login
-state + local usage stats, see `internal/claudecode`). See `../plan.md` for
-the wider design context — tailscale login/status, mise, dind, and the web
-terminal are deliberately not implemented here yet.
+keys, HTTPS credential store, commit signing + GPG key management), a
+cross-service logs API backed by the `vector` JSONL pipeline, an OS-level
+process/port viewer (`github.com/shirou/gopsutil/v4`) for finding and
+killing stray processes squatting on a port, a whole-container cpu/mem/disk
+resource endpoint read directly from this container's own cgroup v2
+pseudo-files (see `internal/cgroup`), and a read-only Claude Code status
+overview (login state + local usage stats, see `internal/claudecode`). See
+`../plan.md` for the wider design context and the full up-to-date feature
+list — tailscale and Dev Proxy were moved out to the separate `router/`
+container/backend and are not implemented here.
 
 ## Build
 
@@ -67,7 +67,6 @@ GIT_CONFIG_PATH=/tmp/wm-dev/gitconfig \
 SSH_CLIENT_CONFIG=/tmp/wm-dev/ssh-config \
 SSH_KEYS_DIR=/tmp/wm-dev/ssh-keys \
 GIT_CREDENTIALS_PATH=/tmp/wm-dev/git-credentials \
-TAILSCALE_CONFIG_PATH=/tmp/wm-dev/tailscale-config.yaml \
 SSH_SIGNING_KEY_PATH=/tmp/wm-dev/signing_key \
 VECTOR_LOG_DIR=/tmp/wm-dev/vector-logs \
 SYSTEM_DISK_PATH=/tmp \
@@ -91,7 +90,6 @@ shell out to `git`/`ssh-keygen`.
 | `SSH_CLIENT_CONFIG` | `/code/.ssh/config` | ssh client config (Host blocks) |
 | `SSH_KEYS_DIR` | `/code/.ssh/keys` | generated per-host ed25519 keypairs |
 | `GIT_CREDENTIALS_PATH` | `/code/.git-credentials` | HTTPS credential store file |
-| `TAILSCALE_CONFIG_PATH` | `/code/.local/share/code-docker/tailscale/config.yaml` | tailscale forwards/publish config, read by `config/tailscale-forward.default.sh` |
 | `SSH_SIGNING_KEY_PATH` | `/code/.ssh/signing_key` | dedicated ed25519 keypair generated for git SSH commit signing |
 | `VECTOR_LOG_DIR` | `/code/.local/share/code-docker/vector/logs` | directory of day-partitioned `<YYYY-MM-DD>.jsonl` log files written by the `vector` pipeline (see `.claude/archive/vector-logs-plan-done.md`) |
 | `SYSTEM_DISK_PATH` | `/code` | path `GET /api/system/resources` runs `statfs` on to report disk usage — `/code` is the bind-mounted volume (`./code:/code`), so this reflects real host disk usage for that mount |
@@ -101,7 +99,6 @@ shell out to `git`/`ssh-keygen`.
 | `WEBMANAGER_CLAUDE_BINPATH` | *(none)* | absolute path to the `claude` (Claude Code CLI) binary; if unset, falls back to a `claude` lookup on `PATH`. Neither found means "not installed" — a normal state, not an error |
 | `CLAUDE_CONFIG_DIR` | `/code/.claude` | Claude Code's own standard env var for relocating `~/.claude`; webmanager reads `stats-cache.json` from directly under this directory and does not invent a separate `WEBMANAGER_`-prefixed equivalent |
 | `WEBMANAGER_CLAUDE_PREFS_PATH` | `/code/.local/share/code-docker/webmanager/claude-prefs.json` | persisted `{hideVersionCheck}` toggle for the Claude tab's mise version-check banner (`internal/claudecode/prefs.go`) |
-| `WEBMANAGER_TAILSCALE_BINPATH` | *(none)* | absolute path to the `tailscale` binary; if unset, falls back to a `tailscale` lookup on `PATH`, same convention as `WEBMANAGER_CLAUDE_BINPATH` |
 | `WEBMANAGER_ENV_TEMPLATE_PATH` | `/etc/code-docker/webmanager/example-env.webmanager` | the `example-env.webmanager` template `--env-migrate` and the startup version check read — deliberately not `go:embed`'d so an operator running multiple instances can bind-mount their own org-customized template over this path instead of rebuilding the image. Set via `docker-compose.yml`, not `.env.webmanager` itself (see its comment there for why) |
 | `WEBMANAGER_ENV_VERSION` | *(none)* | `.env.webmanager`'s own `WEBMANAGER_ENV_VERSION` (set via `env_file`, not meant to be hand-edited — `--env-migrate` manages it). Compared at startup against the template's current version; a mismatch logs a warning and is surfaced by `GET /api/system/env-version` |
 | `WEBMANAGER_ENV_VERSION_DISMISS_PATH` | `/code/.local/share/code-docker/webmanager/env-version-dismiss.json` | persisted "user has acknowledged this version's mismatch banner" flag (`internal/envversionprefs`) |
@@ -122,14 +119,14 @@ real file.
 ## API contract
 
 Implemented per `../plan.md`'s MVP scope plus the second implementation
-round (tailscale config CRUD, git commit signing/GPG, logs API):
+round (git commit signing/GPG, logs API):
 
 Every request body is capped at 1 MiB (`http.MaxBytesReader`, applied
 uniformly via a small middleware in `main.go`) — exceeding it fails the
 `json.Decode` call, which every handler already maps to a plain `400`.
 
-"Already exists" conflicts (SSH host, SSH key, tailscale forward/publish)
-are `409 Conflict`, consistent with the supervisor package's
+"Already exists" conflicts (SSH host, SSH key) are `409 Conflict`,
+consistent with the supervisor package's
 `ALREADY_STARTED`/`NOT_RUNNING` faults; malformed-input `400`s (missing
 fields, invalid host/keyId format, etc.) are unaffected.
 
@@ -158,16 +155,6 @@ fields, invalid host/keyId format, etc.) are unaffected.
   before it's ever passed to `gpg` — anything else is `400`, closing off
   gpg-flag injection via a value like `--homedir=...`); `501` if `gpg` isn't
   installed
-- `GET/PUT /api/tailscale/config` — `socksAddress`/`retryInterval` globals
-- `GET/POST /api/tailscale/forwards`, `DELETE /api/tailscale/forwards/{name}`
-  — `409` if `name` already exists
-- `GET/POST /api/tailscale/publish`, `DELETE /api/tailscale/publish/{name}`
-  (`mode` is `tcp` or `tls-terminated-tcp`, defaults to `tcp`) — `409` if
-  `name` already exists
-- Every tailscale mutation restarts the `tailscale-forward` supervisord
-  program after a successful write (same effect as `bin/forward-reload`) —
-  see `GET /api/tailscale/status` and `POST /api/tailscale/login/start`
-  further down for status and on-demand login, which are handled separately
 - `GET /api/logs/apps` — real supervisord process names, `{"mock": false}`
 - `GET /api/logs/entries?app=&level=&limit=` — real log entries read from
   the `vector`-produced JSONL files at `VECTOR_LOG_DIR` (see
@@ -331,32 +318,11 @@ fields, invalid host/keyId format, etc.) are unaffected.
 - `POST /api/claude/login/{id}/cancel` *(gated)* → always `{"ok": true}`,
   idempotent — kills the session if it's still current, a harmless no-op
   otherwise (frontend calls this best-effort on unmount)
-- `GET /api/tailscale/status` — read-only, wraps `tailscale status --json`
-  (`internal/tailscale/status.go`, `WEBMANAGER_TAILSCALE_BINPATH` or `PATH`
-  lookup for the binary): `{"available": bool, "status": {...}|omitted}`.
-  `available: false` for both "binary not found" and "command failed" — a
-  tailnet with no config yet, or `tailscaled` not up, is a normal state, not
-  an error. `status` carries `backendState`/`authUrl`/`tailnetName` plus
-  `self`/`peers` (each `{hostName, dnsName, tailscaleIPs, relay, online,
-  tags, os}`, `peers` flattened from the CLI's map-shaped `Peer` field and
-  sorted by hostname). Read-only.
-- `POST /api/tailscale/login/start` *(gated)* — starts `tailscale up` (with
-  `TAILSCALE_LOGIN_SERVER` if set) as a detached background process and
-  returns immediately (`internal/tailscale/login.go`'s `LoginManager`); the
-  frontend just keeps polling the status endpoint above for the resulting
-  `authUrl` instead of a dedicated session/status endpoint like Claude's
-  login flow needs — `tailscale status --json` already exposes progress
-  structurally, no stdout scraping required. A no-op if already logged in or
-  if a login is already pending (`authUrl` set) rather than starting a
-  second concurrent `tailscale up` against the same daemon. This reverses an
-  earlier "actually performing a login remains out of scope" decision, for
-  the same reason `claude/login/*` reversed its own equivalent decision (see
-  `webmanager/CLAUDE.md`) — `tailscale-service.default.sh`'s automatic first-
-  boot attempt now only fires once ever (a marker file, not every restart,
-  to stop pending logins piling up on the control server), so retrying
-  needs a surface that doesn't require a container restart.
-- `POST /api/tailscale/login/cancel` *(gated)* → always `{"ok": true}`,
-  idempotent — kills the in-flight `tailscale up` process if any
+
+Tailscale (config CRUD, status, login) and Dev Proxy both used to be
+implemented here — see `router/backend/handlers_tailscale.go`/
+`handlers_devproxy.go` and `router/CLAUDE.md`, now served by router-manager
+instead.
 
 - `GET /api/dind/containers` — every container in the `code-docker-dind`
   sidecar (running and stopped, `docker ps -a` equivalent):
