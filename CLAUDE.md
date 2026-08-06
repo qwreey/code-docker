@@ -73,8 +73,8 @@ own comment on the two `[include]` globs, one git-tracked for built-ins, one git
 user overrides, same auto-include idiom as the main image's `config/supervisord.default.conf`):
 
 - **netgate (egress lockdown)** — netinit-style routing enforcement (code-docker/dind side)
-  plus router's own filtering (squid content filtering, RFC1918/CIDR blocking, inbound
-  port-forwarding). `code-docker-netinit` is a small sidecar built from the `netinit`
+  plus router's own filtering (DNS-level content blocklist via dnsmasq, RFC1918/CIDR
+  blocking, inbound port-forwarding). `code-docker-netinit` is a small sidecar built from the `netinit`
   Dockerfile stage. It runs with `network_mode: service:code-docker` (shares code-docker's
   netns entirely — same interfaces/IP/routing table, not a separate IP) and
   `cap_add: [NET_ADMIN]`, a capability code-docker itself never gets. `script/netinit-entrypoint.sh`
@@ -108,17 +108,23 @@ user overrides, same auto-include idiom as the main image's `config/supervisord.
     code-docker↔router) never reaches this chain at all — connected-route traffic bypasses
     the gateway entirely, so no RFC1918 exception is needed for `code-docker-internal`'s own
     CIDR.
-  - `[program:squid]` (`router/config/netgate/squid.default.sh` +
-    `router/config/netgate/squid.default.conf`) is reached via `netgate-firewall`'s
-    `REDIRECT` rules on port 80/443 traffic arriving from `code-docker-internal` (intercept
-    mode, not `http_proxy=` — code-docker never configures a proxy, it just has no other way
-    out). HTTP is filtered by `dstdomain`; HTTPS is filtered by SNI at `ssl_bump peek step1`
-    → `terminate` on a blocklist match → `splice` otherwise (no MITM, no cert ever presented
-    to the client — the `cert=` on `https_port` is a syntactic requirement of `ssl-bump`, not
-    actually used). The blocklist (`router/config/netgate/blocklist.default.acl`,
-    StevenBlack/hosts converted via `router/script/netgate-blocklist.sh` at build time;
-    override with `router/config/netgate/blocklist.override.acl`) is block-only, no
-    whitelist mode.
+  - `[program:dns]` (`router/config/dns/dns.default.sh` +
+    `router/config/dns/dnsmasq.default.conf`) is code-docker/dind's DNS resolver —
+    `code-docker-internal` being `internal: true` means Docker's own embedded DNS
+    (`127.0.0.11`) refuses to forward queries externally, so code-docker/dind point their
+    `/etc/resolv.conf` at router instead (see `.claude/backlog/router-dns-plan.md`), and
+    dnsmasq forwards upstream using router's own (working, non-internal) `/etc/resolv.conf`.
+    This also doubles as the content blocklist enforcement point: dnsmasq's
+    `addn-hosts=/etc/code-docker/dns/blocklist.default.hosts` answers `0.0.0.0` for any
+    domain in the baked-in StevenBlack/hosts file (no format conversion needed — dnsmasq
+    reads hosts-format directly), with `router/config/dns/blocklist.override.hosts` layered
+    on top via an extra `--addn-hosts=` flag (additive, not a replacement) if present. This
+    replaced an earlier squid-based intercept/SNI-block approach (`REDIRECT` on ports 80/443
+    to squid, blocking by `dstdomain`/SNI) — removed because squid's `ssl_bump` anti-spoofing
+    check false-positived on CDN-style domains with rotating IP pools (e.g.
+    `registry-1.docker.io`), breaking `docker pull`. Block-only, no whitelist mode, and
+    still explicitly best-effort/passive (adblock-like) — the hard boundary remains the
+    RFC1918/CIDR FORWARD rules above.
   - `NETGATE_ENABLED` (env, default `true`) is a **behavioral** opt-out only — `false`
     makes the netinit/dind/router loops idle and skips entrypoint.sh's wait gate. It does
     **not** restore `code-docker-external`/`ports: - 80:80` on code-docker or dind —

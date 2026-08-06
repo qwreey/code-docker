@@ -40,23 +40,6 @@ apply_rules() {
 		return 0
 	fi
 
-	# Same technique as script/dind-entrypoint.sh uses to find its
-	# code-docker-internal interface: it's whichever interface besides lo
-	# and the default-routed one. Assumes exactly two networks, same
-	# caveat as dind-entrypoint.sh's own comment.
-	internal_iface=""
-	for dev in /sys/class/net/*; do
-		dev="$(basename "$dev")"
-		[ "$dev" = "lo" ] && continue
-		[ "$dev" = "$default_iface" ] && continue
-		internal_iface="$dev"
-		break
-	done
-	if [ -z "$internal_iface" ]; then
-		echo >&2 "netgate-firewall: could not find the code-docker-internal interface, skipping this cycle"
-		return 0
-	fi
-
 	ensure_chain filter NETGATE-FORWARD
 	ensure_jump filter FORWARD NETGATE-FORWARD
 	ensure_chain nat NETGATE-PREROUTING
@@ -106,13 +89,6 @@ apply_rules() {
 		i=$((i + 1))
 	done
 
-	# squid content-blocklist intercept (see config/netgate/squid.default.conf)
-	# - restricted to traffic FROM code-docker-internal only, so inbound
-	# host traffic (handled by the forwards: DNAT rules above, arriving on
-	# $default_iface) is never redirected into squid by mistake.
-	iptables -t nat -A NETGATE-PREROUTING -i "$internal_iface" -p tcp --dport 80 -j REDIRECT --to-port 3129
-	iptables -t nat -A NETGATE-PREROUTING -i "$internal_iface" -p tcp --dport 443 -j REDIRECT --to-port 3130
-
 	out_count=$(yq -r '.outbound | length' "$NETGATE_CONFIG")
 	i=0
 	while [ "$i" -lt "$out_count" ]; do
@@ -126,7 +102,7 @@ apply_rules() {
 		i=$((i + 1))
 	done
 
-	echo "netgate-firewall: applied $fwd_count forward(s), $out_count outbound rule(s) (internal=$internal_iface, external=$default_iface)"
+	echo "netgate-firewall: applied $fwd_count forward(s), $out_count outbound rule(s) (external=$default_iface)"
 }
 
 # net.ipv4.ip_forward=1 is set declaratively via docker-compose.yml's

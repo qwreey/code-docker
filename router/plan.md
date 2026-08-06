@@ -8,7 +8,7 @@ code-docker의 네트워크 경계를 전담하는 컨테이너. **이 문서는
 
 ## 왜 필요한가
 
-`code-docker-netgate`(iptables 아웃바운드 필터링 + squid 콘텐츠 블록리스트 + 인바운드
+`code-docker-netgate`(iptables 아웃바운드 필터링 + DNS 레벨 콘텐츠 블록리스트 + 인바운드
 DNAT)가 이미 code-docker-internal/external 양쪽에 다리를 걸친, code-docker보다 신뢰
 수준이 높은 유일한 국경 통과 지점이었다. tailscale(데몬+forward+publish), Dev
 Proxy(Caddy), 새 tinyauth 게이트까지 이 지점으로 모으면 신뢰 경계가 더 명확해지고
@@ -27,7 +27,9 @@ router 안의 한 기능 영역(egress/DNAT) 이름으로 유지 — 컨테이�
 
 | 기능 | 상태 |
 |---|---|
-| netgate(iptables 아웃바운드 필터링, squid 블록리스트, 인바운드 DNAT) | `code-docker-netgate`에서 이 컨테이너로 순수 이전 완료 — 동작 변화 없음 |
+| netgate(iptables 아웃바운드 필터링, 인바운드 DNAT) | `code-docker-netgate`에서 이 컨테이너로 순수 이전 완료 — 동작 변화 없음 |
+| DNS 포워딩(dnsmasq) — code-docker-internal이 `internal: true`라 Docker 내장 DNS가 외부 포워딩을 거부하는 문제 해결 | 구현 완료·커밋됨(`00bba1a`). 자세한 내용: `.claude/backlog/router-dns-plan.md` |
+| squid 제거 + DNS 레벨 블록리스트(dnsmasq `addn-hosts`)로 교체 | 구현 완료. squid의 ssl-bump anti-spoofing이 CDN형 도메인(예: `registry-1.docker.io`)을 오탐해 `docker pull`을 깨뜨리는 버그가 계기 — 자세한 내용: `.claude/backlog/router-dns-plan.md`의 "2부" |
 | tailscale 전체(데몬+로그인+forwards+publish) + router-manager 백엔드(읽기전용 `GET /api/tailscale/state`) | 이식 완료. code-docker의 기존 tailscale은 Phase 4까지 병행 유지(원격 접근 단절 방지) — `forward` alias는 이미 이 컨테이너로 이동, `private`/bind-addr 기본값은 아직 code-docker 쪽(Phase 4에서 정리) |
 | Dev Proxy(Caddy) + tinyauth forward-auth | 이식 완료. `internal/devproxy`가 tinyauth를 타겟으로 렌더링하도록 변경(webmanager의 `/api/auth/verify` 대신), `code-docker-tinyauth` 서비스(공식 이미지, 소스 빌드 아님 — pnpm 프론트엔드 빌드가 필수라 dind-authz 패턴과 안 맞음) 신설. 실제 request → Caddy → tinyauth → 401+로그인 리다이렉트 체인까지 검증됨 |
 | code-docker 컷오버 | 완료. code-docker에서 tailscale/caddy-adapter 완전 제거(프로세스 0개, 바이너리도 없음), nginx `/tailscale/`(router-manager readonly API)·`/exports/`(Dev Proxy) 라우트를 router로 배선, `tailscale-notify.default.js`가 새 엔드포인트를 폴링하도록 변경. 이제부터 code-docker는 tailscale/Dev Proxy에 대해 아무것도 모른다 |
@@ -61,4 +63,5 @@ router 안의 한 기능 영역(egress/DNAT) 이름으로 유지 — 컨테이�
 
 - `.claude/backlog/functional-router-plan.md` (레포 루트) — 전체 비전/결정 사항
 - `.claude/backlog/egress-netgate-plan.md` (레포 루트) — netgate 기능의 원 설계
+- `.claude/backlog/router-dns-plan.md` (레포 루트) — DNS 포워딩 + squid→dnsmasq 블록리스트 교체 설계
 - `docs/egress-netgate.md` (레포 루트) — 사용자 대상 문서

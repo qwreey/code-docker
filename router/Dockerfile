@@ -1,7 +1,7 @@
 # router - the network-boundary container for code-docker. Phase 2 of
 # egress-netgate-plan.md's outbound lockdown started this as "netgate"
 # (RFC1918/CIDR FORWARD filtering, inbound port-forwarding DNAT, a
-# best-effort squid content blocklist); functional-router-plan.md is the
+# best-effort DNS-level content blocklist via dnsmasq); functional-router-plan.md is the
 # vision doc that expands its role to also own tailscale (daemon+forwards+
 # publish), the Dev Proxy Caddy instance, and a tinyauth forward-auth, while
 # code-docker-netinit/dind's own routing loops keep pointing their default
@@ -44,28 +44,29 @@ FROM archlinux
 # caddy: Dev Proxy's internal instance (see
 # router/config/caddy-adapter/caddy-adapter.default.sh, moved here from
 # code-docker the same way).
-# dnsmasq: DNS forwarder+cache for code-docker/dind (see
-# .claude/backlog/router-dns-plan.md) - code-docker-internal being
+# dnsmasq: DNS forwarder+cache for code-docker/dind, also doubling as the
+# content blocklist enforcement point (see .claude/backlog/router-dns-plan.md's
+# "2부" - replaces the squid intercept/SNI-block approach this container used
+# to run, removed because squid's ssl-bump anti-spoofing check false-positives
+# on CDN-style domains with rotating IP pools) - code-docker-internal being
 # `internal: true` means Docker's own embedded DNS refuses to forward
 # queries externally for anything attached to it, so code-docker/dind need
 # a real resolver to point at instead.
 RUN pacman -Suy --noconfirm --needed \
-        iptables iproute2 squid supervisor yq gettext curl openssl \
+        iptables iproute2 supervisor yq gettext curl \
         tailscale socat caddy dnsmasq && \
     pacman -Scc --noconfirm
-RUN mkdir -p /var/log/netgate-firewall /var/log/squid /var/cache/squid \
+RUN mkdir -p /var/log/netgate-firewall \
         /var/log/tailscaled /var/log/tailscale-forward /var/log/tailscale-publish \
         /var/log/router-manager /var/log/caddy-adapter /var/log/dns \
         /etc/code-docker/netgate /etc/code-docker/dns /etc/code-docker/supervisord.d \
-        /var/lib/code-docker-router && \
-    chown -R proxy:proxy /var/cache/squid
+        /var/lib/code-docker-router
 COPY --chown=root:root config/netgate /etc/code-docker/netgate
 COPY --chown=root:root config/dns /etc/code-docker/dns
 COPY --chown=root:root config/supervisord.d /etc/code-docker/supervisord.d
 COPY --chown=root:root config/tailscale/tailscale-config.default.yaml \
     /etc/code-docker/tailscale-config.default.yaml
 COPY --chown=root:root script/netgate-entrypoint.sh script/netgate-firewall.sh \
-    script/netgate-squid.sh script/netgate-blocklist.sh \
     script/tailscale-service.sh script/tailscale-forward.sh \
     script/tailscale-publish.sh script/caddy-adapter.sh script/dns.sh /etc/code-docker/
 COPY --chown=root:root config/tailscale/tailscale-service.default.sh \
@@ -73,33 +74,13 @@ COPY --chown=root:root config/tailscale/tailscale-service.default.sh \
     config/tailscale/tailscale-publish.default.sh \
     config/caddy-adapter/caddy-adapter.default.sh /etc/code-docker/
 COPY --from=router-manager-build /router-manager /usr/local/bin/router-manager
-# ssl-bump's https_port directive requires SOME cert configured at
-# parse-time even though this config only ever peeks the SNI and
-# splices/terminates (see squid.default.conf's own comment) - never
-# actually bumps/decrypts a connection, so a throwaway self-signed cert
-# generated once at build time is fine; it is never presented to a client.
-RUN openssl req -new -newkey rsa:2048 -sha256 -days 3650 -nodes -x509 \
-        -subj "/CN=code-docker-router" \
-        -keyout /tmp/netgate-ca.key -out /tmp/netgate-ca.crt && \
-    mkdir -p /etc/squid/ssl && \
-    cat /tmp/netgate-ca.crt /tmp/netgate-ca.key > /etc/squid/ssl/netgate-ca.pem && \
-    rm -f /tmp/netgate-ca.key /tmp/netgate-ca.crt && \
-    chown -R proxy:proxy /etc/squid/ssl
-# Squid's ssl-bump support unconditionally starts sslcrtd_program helpers
-# for any https_port using ssl-bump (even though generate-host-certificates
-# is never turned on here, since peek+splice/terminate never actually
-# generates a cert) - it refuses to run at all if this on-disk cert-cache
-# database doesn't exist yet, so it has to be initialized once regardless
-# of whether it's ever actually used.
-RUN /usr/lib/squid/security_file_certgen -c -s /var/cache/squid/ssl_db -M 4MB && \
-    chown -R proxy:proxy /var/cache/squid/ssl_db
 # Baked-in default blocklist (StevenBlack/hosts - a standard, generic list
 # is sufficient per the plan doc, no prompt-injection-specific list
-# needed). config/netgate/blocklist.override.acl (already in dstdomain-list
-# format - see netgate-blocklist.sh if you're converting your own
-# hosts-format source) is checked for at runtime instead, same override
-# pattern as everything else here - see squid.default.sh.
-RUN curl -fsSL -o /tmp/netgate-hosts-src https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts && \
-    /etc/code-docker/netgate-blocklist.sh /tmp/netgate-hosts-src /etc/code-docker/netgate/blocklist.default.acl && \
-    rm -f /tmp/netgate-hosts-src
+# needed), saved as-is: dnsmasq's addn-hosts= reads hosts-format files
+# directly (see config/dns/dnsmasq.default.conf), so unlike the old squid
+# era there's no dstdomain-list conversion step anymore. A
+# config/dns/blocklist.override.hosts is checked for at runtime instead,
+# added on top of this one (not swapped in for it) - see dns.default.sh.
+RUN curl -fsSL -o /etc/code-docker/dns/blocklist.default.hosts \
+        https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
 ENTRYPOINT ["/etc/code-docker/netgate-entrypoint.sh"]

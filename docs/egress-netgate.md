@@ -7,8 +7,8 @@ code-docker 안에서 실행되는 AI 코딩 에이전트(Claude Code 등)가 �
 정리되어 있습니다. 이 기능은 지금 **router** 컨테이너 안 한 기능 영역으로 통합되어
 있습니다(`code-docker-router` 서비스, 예전 이름은 `code-docker-netgate`) — router의
 다른 역할(tailscale, Dev Proxy 등)은 [router.md](router.md)를 확인하세요. 이 문서
-안에서 "netgate"는 그 기능 영역 자체(iptables 필터링+squid+DNAT)를 가리키는 이름으로
-계속 씁니다.
+안에서 "netgate"는 그 기능 영역 자체(iptables 필터링+DNS 블록리스트+DNAT)를 가리키는
+이름으로 계속 씁니다.
 
 **현재 상태: 1단계(라우팅 강제)와 2단계(`netgate`의 실제 필터링)가 모두 구현되어
 있습니다.** `docker compose up`만으로 code-docker/dind의 아웃바운드가 실제로
@@ -23,8 +23,10 @@ code-docker 안에서 실행되는 AI 코딩 에이전트(Claude Code 등)가 �
   명령을 마음대로 실행해도 이 라우트를 스스로 바꿀 수 없습니다.
 - `code-docker-router` 컨테이너가 실제 국경(border) 역할을 합니다 - `code-docker-internal`
   과 `code-docker-external` 양쪽에 다리를 걸치고, 사설 대역(RFC1918)으로 나가는 트래픽을
-  차단하고, HTTP(S)는 squid로 도메인 블록리스트를 적용하고, 호스트의 포트 80을
-  code-docker로 전달(포트포워딩)합니다.
+  차단하고, DNS 레벨(dnsmasq)로 도메인 블록리스트를 적용하고, 호스트의 포트 80을
+  code-docker로 전달(포트포워딩)합니다. `code-docker-internal`이 `internal: true`라
+  code-docker/dind 자체의 내장 DNS는 외부로 쿼리를 포워딩하지 못하므로, router가 이들의
+  DNS 리졸버 역할도 겸합니다(dnsmasq).
 - **차단은 목적지 IP 기준입니다.** 같은 네트워크(`code-docker-internal`)에 붙어있는 다른
   컨테이너(dind, router 자신 등)로 가는 트래픽은 애초에 netgate 필터링을 거치지 않고
   바로 갑니다 - "그냥 아무 IP나 다 막아준다"는 뜻이 아닙니다.
@@ -52,7 +54,7 @@ code-docker (code-docker-internal 전용, NET_ADMIN 없음)
    ▼
 code-docker-router (code-docker-internal + code-docker-external 양쪽)
    │  - ip_forward + MASQUERADE + FORWARD 순서 있는 allow/block 룰(RFC1918 등)
-   │  - squid REDIRECT 가로채기 (dstdomain/SNI 블록리스트, HTTP(S))
+   │  - dnsmasq가 DNS 리졸빙 + addn-hosts 기반 도메인 블록리스트를 겸함
    ▼
 code-docker-external → 인터넷
 
@@ -71,11 +73,16 @@ code-docker-netinit (network_mode: service:code-docker + NET_ADMIN, 방어적 �
 - 기본 `forwards:` 값은 호스트 80번 포트를 `code-docker:80`으로 전달합니다. 이
   포트포워딩용 ACCEPT 규칙은 항상 RFC1918 차단 규칙보다 **먼저** 적용됩니다 -
   code-docker의 IP 자체가 RFC1918 대역에 속하기 때문입니다.
-- squid는 `code-docker-internal`에서 들어오는 80/443 트래픽만 자신의 포트(3129/3130)로
-  가로채도록 REDIRECT 규칙이 걸려 있고 (`intercept` 모드 - TLS를 까지 않고 SNI만
-  들여다봄), StevenBlack/hosts 기반 블록리스트로 `dstdomain`/SNI 기준 차단합니다. HTTPS는
-  MITM 없이 SNI만 보고 판단(`ssl_bump peek` → 매치 시 `terminate`, 아니면 `splice`로
-  그대로 통과)하므로 인증서 발급/신뢰 스토어 관리가 필요 없습니다.
+- code-docker/dind는 `/etc/resolv.conf`가 router를 가리키도록 설정되어 있고, router의
+  `dnsmasq`(`router/config/dns/`)가 이 DNS 쿼리를 받아 자기 자신의(정상 동작하는)
+  upstream으로 포워딩합니다. 같은 dnsmasq가 `addn-hosts=`로 StevenBlack/hosts 기반
+  블록리스트 파일을 읽어, 리스트에 있는 도메인은 `0.0.0.0`으로 응답합니다 - DNS
+  단계에서 이미 막히므로 어떤 TCP/TLS 연결도 시도되지 않습니다. (이전에는 squid의
+  `REDIRECT`+`ssl_bump peek`로 HTTP(S) 트래픽을 가로채 `dstdomain`/SNI 기준으로
+  차단했으나, squid의 anti-spoofing 체크가 IP 풀이 로테이션되는 CDN형 도메인(예:
+  `registry-1.docker.io`)에서 오탐해 `docker pull`을 깨뜨리는 문제가 있어 DNS 레벨
+  차단으로 교체했습니다 - 자세한 경위는
+  [`.claude/backlog/router-dns-plan.md`](../.claude/backlog/router-dns-plan.md) 참고.)
 
 ## 위험한 패턴 - 새 브리징 컨테이너를 즉흥적으로 추가하지 마세요
 
@@ -103,7 +110,7 @@ nginx/[Dev Proxy](dev-proxy.md) 메커니즘을 쓰세요 - 새 브리징 컨테
    **네트워크 레이어의 어떤 통제로도 원천적으로 해결 불가능**합니다 - 사용자가 인지하고
    있어야 하는 한계로 명시합니다.
 
-블록리스트(squid)는 애초에 "강제적으로 완벽히 막는다"가 목적이 아니라 프롬프트 인젝션
+블록리스트(dnsmasq)는 애초에 "강제적으로 완벽히 막는다"가 목적이 아니라 프롬프트 인젝션
 콘텐츠 오염에 대한 1차/best-effort 방어입니다 - 실제 강제 방어는 CIDR 차단(FORWARD
 체인)이 담당합니다. 내부자(오염된 에이전트)가 작정하고 우회하려면(IP 직접 지정, 리스트에
 없는 새 도메인 등) 얼마든지 우회 가능합니다.
@@ -130,8 +137,9 @@ code-docker 컨테이너 자체가 재시작되면(단순히 안의 프로세스
 ## 당장 인터넷이 필요하다면 (기능 자체를 끄기)
 
 `NETGATE_ENABLED="false"`(`.env`)로 끄면 `code-docker-netinit`/dind의 라우팅 루프,
-code-docker 시작 시의 라우트 대기 가드, `code-docker-router` 자신의 방화벽/squid 적용이
-전부 아무것도 안 하고 idle 상태가 됩니다 - `TAILSCALE_ENABLED`와 같은 패턴입니다. **다만
+code-docker 시작 시의 라우트 대기 가드, `code-docker-router` 자신의 방화벽/DNS
+포워딩·블록리스트 적용이 전부 아무것도 안 하고 idle 상태가 됩니다 - `TAILSCALE_ENABLED`와
+같은 패턴입니다. **다만
 이것만으로는 예전(제한 없음) 토폴로지로 완전히 돌아가지는 않습니다** -
 `code-docker-external`이 이미 code-docker/dind의 `networks:`에서 빠져 있고, `ports:
 - 80:80`도 code-docker가 아니라 router 서비스에 있어서, `NETGATE_ENABLED=false`만으로는
@@ -157,8 +165,9 @@ code-docker 자신이 여전히 인터넷/호스트에 직접 나갈 인터페�
 `router/config/netgate/config.default.yaml`을 참고해서 `router/config/netgate/config.override.yaml`을
 만들면(override 패턴, `docker compose build code-docker-router && docker compose up -d`
 필요) `outbound:`(CIDR allow/block 순서 리스트)와 `forwards:`(포트포워딩)를 원하는 대로
-바꿀 수 있습니다. squid 블록리스트도 같은 패턴으로
-`router/config/netgate/blocklist.override.acl`(도메인 한 줄에 하나, squid `dstdomain` 형식)을
-두면 기본 StevenBlack/hosts 기반 블록리스트 대신 사용됩니다 - 다른 hosts 포맷 소스에서
-변환하려면 이미지 안의 `/etc/code-docker/netgate-blocklist.sh <입력> <출력>`(레포 안에서는
-`router/script/netgate-blocklist.sh`)을 쓰세요.
+바꿀 수 있습니다. DNS 블록리스트도 같은 override 패턴으로
+`router/config/dns/blocklist.override.hosts`(hosts 포맷, 예: `0.0.0.0 evil.com`)를
+두면 됩니다 - 단, squid 시절의 `blocklist.override.acl`과 달리 이건 기본
+StevenBlack/hosts 블록리스트를 **대체**하는 게 아니라 **추가**로 얹히는 파일입니다
+(dnsmasq가 `addn-hosts=`를 여러 개 합쳐 읽을 수 있다는 점을 이용). 원본이 이미
+hosts 포맷 그대로이므로 별도 변환 스크립트는 필요 없습니다.

@@ -250,8 +250,8 @@ services:
   # Phase 2 of egress-netgate-plan.md's outbound lockdown (service used to
   # be named code-docker-netgate): the actual filtering/forwarding
   # chokepoint code-docker-netinit's and dind's own routing loops (above)
-  # point their default route at, via the `router` alias below. Squid
-  # content-blocklist, RFC1918/CIDR FORWARD filtering, and inbound
+  # point their default route at, via the `router` alias below. DNS-level
+  # content-blocklist (dnsmasq), RFC1918/CIDR FORWARD filtering, and inbound
   # port-forwarding (DNAT) all live in this one container - see the plan
   # doc and docs/egress-netgate.md for the full design/reasoning, and
   # CLAUDE.md's "egress lockdown (netgate)" section for the short version.

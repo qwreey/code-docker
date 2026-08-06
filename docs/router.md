@@ -5,8 +5,8 @@
 인터넷으로 나가는 망) 양쪽에 다리를 걸친 유일한 컨테이너로, code-docker보다 신뢰
 수준이 높습니다. 네 가지 기능을 담당합니다:
 
-1. **아웃바운드 격리(netgate)** — RFC1918/사설망 차단, squid 콘텐츠 블록리스트, 인바운드
-   포트포워딩. 자세한 내용은 [egress-netgate.md](egress-netgate.md).
+1. **아웃바운드 격리(netgate)** — RFC1918/사설망 차단, DNS 레벨(dnsmasq) 콘텐츠
+   블록리스트, 인바운드 포트포워딩. 자세한 내용은 [egress-netgate.md](egress-netgate.md).
 2. **tailscale** — 데몬+로그인+포트 가져오기(forwards)+포트 내보내기(publish). 아래 참고.
 3. **Dev Proxy** — 컨테이너 안 dev 서버를 도메인으로 노출. 자세한 내용은
    [dev-proxy.md](dev-proxy.md).

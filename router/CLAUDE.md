@@ -19,7 +19,7 @@ re-derive decisions already recorded there.
 ## Current state
 
 Only the original netgate functionality (outbound CIDR filtering via
-iptables, squid content blocklist, inbound DNAT) lives here so far, moved
+iptables, DNS-level content blocklist via dnsmasq, inbound DNAT) lives here so far, moved
 from `config/netgate/`/`script/netgate-*.sh` at the repo root with no
 behavior change — see `router/config/netgate/` and `router/script/`. The
 `netgate` name is kept as this feature area's own namespace inside the
