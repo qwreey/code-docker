@@ -341,7 +341,7 @@ func main() {
 	mux.Handle("POST /api/files/delete", gate.RequirePassword(http.HandlerFunc(s.handleFilesDelete)))
 
 	// Not under /api — this replaces code-server's own manifest.json in
-	// place (see config/nginx.default.conf's `location = /manifest.json`).
+	// place (see config/nginx/nginx.default.conf's `location = /manifest.json`).
 	// Ungated like the other pure-read routes above: it's a passthrough of
 	// something code-server already serves unauthenticated.
 	mux.HandleFunc("GET /manifest.json", s.handleManifestPassthrough)

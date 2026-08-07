@@ -12,7 +12,7 @@ import (
 )
 
 // ErrGPGNotInstalled is returned by every function in this file when the
-// `gpg` binary isn't on PATH — config/build.default.sh now installs `gnupg`,
+// `gpg` binary isn't on PATH — config/build/build.default.sh now installs `gnupg`,
 // but that only takes effect on the container's next rebuild, so this path
 // must be handled gracefully (HTTP handlers map it to 501).
 var ErrGPGNotInstalled = errors.New("gpg is not installed")

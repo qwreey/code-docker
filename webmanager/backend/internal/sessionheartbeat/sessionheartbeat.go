@@ -1,7 +1,7 @@
 // Package sessionheartbeat tracks browser tabs currently open against this
 // code-server instance, purely for operator visibility (not a security
 // feature — see webmanager/.claude/qa-request/session-heartbeat-plan-done.md).
-// A code-patch script running inside every code-server tab (config/code-patch/
+// A code-patch script running inside every code-server tab (config/code/code-patch/
 // session-heartbeat.default.js) POSTs a self-generated id + open folder +
 // User-Agent every 30s; this package is just the upsert-and-list store behind
 // that, plus a periodic GC so tabs closed without a clean signal (there isn't

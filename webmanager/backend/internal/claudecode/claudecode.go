@@ -29,9 +29,9 @@ const statsCacheFileName = "stats-cache.json"
 
 // miseShimPath is mise's shim for the `claude` binary — checked as a last
 // resort after override/PATH. webmanager's own supervisord program
-// (config/webmanager.default.sh) never runs `mise env`, so mise-installed
+// (config/webmanager/webmanager.default.sh) never runs `mise env`, so mise-installed
 // tools never land on its process PATH the way they do for code-server (see
-// config/code-runner.default.sh) — a bare PATH lookup can never see a
+// config/code/code-runner.default.sh) — a bare PATH lookup can never see a
 // mise-managed claude-code no matter how many times webmanager or
 // code-server gets restarted. The shim sidesteps that entirely: it's a
 // small mise-dispatch binary that resolves and execs whatever version is

@@ -21,7 +21,7 @@ import (
 )
 
 // defaultBinPath is the fixed path mise installs itself to inside this
-// image — config/code-runner.default.sh calls $HOME/.local/bin/mise
+// image — config/code/code-runner.default.sh calls $HOME/.local/bin/mise
 // directly (not a bare `mise` on PATH), because mise's own install script
 // places itself outside the PATH shim it manages for other tools. $HOME is
 // always /code in this image, per the rest of this codebase's convention of

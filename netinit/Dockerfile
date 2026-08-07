@@ -3,7 +3,7 @@
 # `network_mode: service:code-docker` on the code-docker-netinit service)
 # and repeatedly points its default route at router (formerly netgate),
 # using the NET_ADMIN this tiny sidecar has but code-docker itself never
-# gets (code-docker's own `ip` binary, from config/build.default.sh, is only
+# gets (code-docker's own `ip` binary, from config/build/build.default.sh, is only
 # ever used there for read-only route inspection - see root
 # .claude/backlog/egress-netgate-plan.md for the full "why not give
 # code-docker NET_ADMIN itself" reasoning).

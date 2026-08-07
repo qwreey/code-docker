@@ -11,7 +11,7 @@ import (
 // merges in a "shortcuts" entry that opens webmanager, and serves the
 // patched result. Registered at GET /manifest.json (no /api prefix, no
 // gate — code-server already serves this unauthenticated and it carries no
-// sensitive data) — see config/nginx.default.conf's
+// sensitive data) — see config/nginx/nginx.default.conf's
 // `location = /manifest.json`, which is what routes browser requests here
 // instead of straight to code-server, and
 // webmanager/.claude/qa-request/manifest-shortcuts-plan-done.md for the

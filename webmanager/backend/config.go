@@ -28,7 +28,7 @@ type Config struct {
 
 	// CodeServerManifestURL is where internal/manifestpatch fetches
 	// code-server's real manifest.json from — code-server's own internal
-	// port directly, not through nginx (see config/nginx.default.conf's
+	// port directly, not through nginx (see config/nginx/nginx.default.conf's
 	// `location = /manifest.json`, which is what routes browser requests
 	// here in the first place; fetching back through nginx would just be an
 	// unnecessary hairpin).
