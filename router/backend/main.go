@@ -115,11 +115,10 @@ func main() {
 }
 
 // listen binds a unix socket by default (ROUTER_MANAGER_SOCK, default
-// /run/router-manager.sock - /run is container-local tmpfs, so there's
-// never a stale socket to clean up across restarts). Setting
-// ROUTER_MANAGER_ADDR is an explicit opt-in to bind TCP instead - useful
-// for local development outside a container, where nothing else in
-// router's own netns would otherwise reach a unix socket anyway.
+// /run/router-manager.sock). Setting ROUTER_MANAGER_ADDR is an explicit
+// opt-in to bind TCP instead - useful for local development outside a
+// container, where nothing else in router's own netns would otherwise
+// reach a unix socket anyway.
 func listen() (net.Listener, error) {
 	if addr := os.Getenv("ROUTER_MANAGER_ADDR"); addr != "" {
 		return net.Listen("tcp", addr)
@@ -128,6 +127,17 @@ func listen() (net.Listener, error) {
 	if sockPath == "" {
 		sockPath = "/run/router-manager.sock"
 	}
+	// /run is container-local tmpfs, but that only guarantees a clean slate
+	// across a full container recreate, not every restart - `docker compose
+	// restart` (or supervisord restarting just this program after a
+	// non-graceful SIGTERM, which skips Go's normal listener-close cleanup)
+	// keeps the same tmpfs mount, so a previous run's socket inode can still
+	// be sitting at this path. Unlinking it first is the standard unix-socket
+	// server idiom; there's only ever one router-manager process (supervisord
+	// enforces that), so removing a leftover path here can't race a still-live
+	// listener. Confirmed live: without this, a restart reliably hit "bind:
+	// address already in use" and router-manager crash-looped into FATAL.
+	_ = os.Remove(sockPath)
 	l, err := net.Listen("unix", sockPath)
 	if err != nil {
 		return nil, err
