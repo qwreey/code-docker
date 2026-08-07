@@ -178,7 +178,11 @@ webmanager 자체 비밀번호 게이트를 켜는 방법과, 이미지를 업�
 
 router 컨테이너(`router/` 서브트리) 자체의 override 파일 목록은 [router.md](router.md)를
 확인하세요 — `router/config/netgate/`, `router/config/tailscale/`,
-`router/config/caddy-adapter/`에 나뉘어 있습니다.
+`router/config/caddy-adapter/`에 나뉘어 있습니다. router 전용 기능
+환경변수(tailscale/Dev Proxy/router-manager 자체 비밀번호/tinyauth)는
+`router/example-env.router`(런타임 템플릿, `router/.env.router`로 복사해
+사용) — webmanager와 같은 `--env-migrate` 마이그레이션 도구를 공유합니다,
+자세한 내용은 [router.md#router-환경변수-마이그레이션](router.md#router-환경변수-마이그레이션) 참고.
 
 # 코드 서버 패치
 

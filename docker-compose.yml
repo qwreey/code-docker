@@ -262,67 +262,45 @@ services:
       # firewall/proxy rules (nothing would ever reach it anyway once
       # code-docker/dind's own loops are idle - see example-env).
       NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
-      # tailscale daemon+forwards+publish (see
-      # router/.claude/functional-router-plan.md's "tailscale 전체 이관") -
-      # moved from code-docker, which no longer has any tailscale env/
-      # processes of its own as of this same migration's Phase 4.
-      TAILSCALE_ENABLED: "${TAILSCALE_ENABLED:-true}"
-      TAILSCALE_LOGIN_SERVER: "${TAILSCALE_LOGIN_SERVER:-}"
-      TAILSCALE_HOSTNAME: "${TAILSCALE_HOSTNAME:-}"
       # Dev Proxy's internal Caddy instance (see
       # router/.claude/functional-router-plan.md's "Dev Proxy Caddy도
       # router로 이관"). CADDY_ADAPTER_PORT is only relevant if you opt into
       # the direct-publish alternative in docs/dev-proxy.md - router's own
       # nginx talks to Caddy over a unix socket by default now (see
-      # router/.claude/router-nginx-hardening-plan.md Phase 4).
+      # router/.claude/router-nginx-hardening-plan.md Phase 4). Stays here
+      # (not router/example-env.router) because code-docker's own nginx
+      # reads CADDY_ADAPTER_PORT too - same value, single source.
       CADDY_ADAPTER_ENABLED: "${CADDY_ADAPTER_ENABLED:-true}"
       CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-8082}"
-      # Dev Proxy route targets are restricted to known code-docker-internal
-      # services (code-docker, dind) by default - "true" lifts that for LAN/
-      # tailscale-forward targets some setups genuinely need. router itself
-      # is always rejected as a target regardless of this setting (see
-      # router/.claude/router-nginx-hardening-plan.md, Finding 1).
-      DEVPROXY_ALLOW_EXTERNAL_TARGETS: "${DEVPROXY_ALLOW_EXTERNAL_TARGETS:-false}"
-      # router-manager's own admin-API password gate. Optional now - the
-      # recommended default is setting it up in-app at /router/ on first
-      # boot (see router/.claude/router-nginx-hardening-plan.md Phase 1),
-      # which persists to router's own volume and can be changed from the
-      # same page. Setting this env var instead pins the hash at
-      # container-start (infra-as-code), taking priority over whatever's
-      # stored in-app and making it non-changeable from /router/.
-      ROUTER_MANAGER_AUTH_PASSWORD_HASH: "${ROUTER_MANAGER_AUTH_PASSWORD_HASH:-}"
       # router is now the actual internet-facing hop (see
       # router/.claude/router-nginx-hardening-plan.md) - its own nginx
       # reuses the same ALLOWED_HOSTS/NGINX_BLOCK_LOOPBACK/TRUSTED_PROXIES/
       # NGINX_LOG_LEVEL values as code-docker's copy above (same .env
       # source, shared across both services' environment: blocks, same
-      # pattern CADDY_ADAPTER_PORT already used). ALLOWED_EXPORT_HOSTS
-      # moved here entirely (was code-docker's before /exports/ itself
-      # moved) - code-docker no longer has any use for it.
+      # pattern CADDY_ADAPTER_PORT already used) - stays here for that
+      # reason, unlike ALLOWED_EXPORT_HOSTS below which moved to
+      # router/example-env.router since code-docker has no use for it.
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-}"
-      ALLOWED_EXPORT_HOSTS: "${ALLOWED_EXPORT_HOSTS:-}"
       NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
       NGINX_LOG_LEVEL: "${NGINX_LOG_LEVEL:-errors}"
-      # Denies code-docker-internal source addresses from reaching
-      # /exports/ directly (genuine external Dev Proxy traffic has no
-      # reason to originate from inside that network) - "false" disables
-      # the check. Uses the subnet pinned above on code-docker-internal's
-      # own network definition.
-      ROUTER_NGINX_DENY_INTERNAL_EXPORTS: "${ROUTER_NGINX_DENY_INTERNAL_EXPORTS:-true}"
       CODE_DOCKER_INTERNAL_SUBNET: "172.30.0.0/24"
-      # router's own forward-auth (see router/config/tinyauth/tinyauth.default.sh)
-      # - runs the official tinyauth binary directly as a router supervisord
-      # program (extracted from ghcr.io/tinyauthapp/tinyauth in
-      # router/Dockerfile) rather than as its own compose service. Empty
-      # TINYAUTH_APPURL means tinyauth just sleeps instead of starting (it
-      # refuses to run without a real URL) - see example-env. TRUSTEDPROXIES
-      # is code-docker-internal's own CIDR, so tinyauth trusts the real
-      # client IP forwarded by router's own Caddy instead of treating every
-      # request as coming from the proxy itself.
-      TINYAUTH_APPURL: "${TINYAUTH_APPURL:-}"
-      TINYAUTH_AUTH_USERS: "${TINYAUTH_AUTH_USERS:-}"
-      TINYAUTH_AUTH_TRUSTEDPROXIES: "${TINYAUTH_AUTH_TRUSTEDPROXIES:-172.16.0.0/12}"
+      # `router-manager --env-migrate`/the startup version-mismatch check
+      # read the current router/example-env.router template from here - same
+      # pattern as code-docker's own WEBMANAGER_ENV_TEMPLATE_PATH above.
+      # Left unset to use the image's own copy.
+      ROUTER_ENV_TEMPLATE_PATH: "${ROUTER_ENV_TEMPLATE_PATH:-/etc/code-docker/example-env.router}"
+    # router's own feature-specific settings (tailscale, Dev Proxy exposure
+    # policy, router-manager's own admin-API password, tinyauth, /exports/
+    # allowlists) all live in router/.env.router, not here - copy
+    # router/example-env.router to router/.env.router and uncomment only
+    # what you need (every value already has a sane default), same pattern
+    # as code-docker's own .env.webmanager above. Migrated the same way too
+    # (`router-manager --env-migrate`, see router/example-env.router's own
+    # doc comment).
+    env_file:
+      - path: router/.env.router
+        required: false
     volumes:
       # Persistent state for router's own features (tailscale login
       # state/config.yaml, caddy-adapter's managed/custom Caddyfile

@@ -16,6 +16,8 @@ import (
 	"net/http"
 	"os"
 
+	"code-docker/envmigrate"
+
 	"router/internal/authgate"
 	"router/internal/tailscale"
 )
@@ -33,6 +35,30 @@ func main() {
 	// server. See hashpassword.go's doc comment.
 	if len(os.Args) > 1 && os.Args[1] == "--hash-password" {
 		os.Exit(hashPasswordCmd())
+	}
+	// CLI helper mode: `router-manager --env-migrate` reconciles a piped-in
+	// .env.router against this image's current example-env.router and exits
+	// - never starts the server. See envmigratecmd.go's doc comment.
+	if len(os.Args) > 1 && os.Args[1] == "--env-migrate" {
+		os.Exit(envMigrateCmd())
+	}
+
+	// Env-version mismatch check, mirrors webmanager/backend/main.go's own
+	// check - a stale .env.router mostly still works fine (every key has a
+	// sane default), so this is a warning, not a startup failure. An
+	// unreadable template just means the check is skipped, not a crash.
+	envTemplatePath := os.Getenv("ROUTER_ENV_TEMPLATE_PATH")
+	if envTemplatePath == "" {
+		envTemplatePath = "/etc/code-docker/example-env.router"
+	}
+	if data, err := os.ReadFile(envTemplatePath); err != nil {
+		log.Printf("main: couldn't read env template at %s for version check: %v", envTemplatePath, err)
+	} else {
+		envTemplateVersion := envmigrate.ParseVersion(string(data), envMigrateOpts.VersionKey)
+		envVersion := os.Getenv("ROUTER_ENV_VERSION")
+		if envTemplateVersion != "" && envTemplateVersion != envVersion {
+			log.Printf("main: ⚠️ .env.router version is %q but this image's example-env.router is at %q - run `router-manager --env-migrate` to pick up added/changed settings", envVersion, envTemplateVersion)
+		}
 	}
 
 	// Cross-check against /etc/environment: storing this hash only in a

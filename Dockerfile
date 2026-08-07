@@ -95,7 +95,14 @@ COPY webmanager/frontend/ webmanager/frontend/
 RUN npm run build --workspace webmanager/frontend
 
 FROM golang:1.25-alpine AS webmanager-backend
-WORKDIR /src
+# WORKDIR mirrors the real repo's relative layout (not just /src) so
+# webmanager/backend/go.mod's `replace code-docker/envmigrate =>
+# ../../envmigrate` resolves the same way here as it does on a developer's
+# own checkout - see envmigrate/'s own doc comment for why this package is
+# a repo-root module shared with router/backend instead of living under
+# webmanager/backend/internal.
+WORKDIR /src/webmanager/backend
+COPY envmigrate/ /src/envmigrate/
 COPY webmanager/backend/go.mod webmanager/backend/go.sum ./
 RUN go mod download
 COPY webmanager/backend/ ./

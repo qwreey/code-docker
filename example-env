@@ -86,30 +86,11 @@
 #     소유권을 옮겨야 함) - docs/tips/dind.md의 "추가 경화" 절 참고.
 #DIND_TARGET="dind-authz"
 
-# tailscale (daemon+login+forwards+publish) now runs on the router
-# container, not code-docker (see
-# router/.claude/functional-router-plan.md's "tailscale 전체 이관") - these
-# still configure it, just read by code-docker-router instead. Set to
-# "false" to disable all tailscale integration - the three supervisord
-# programs stay up but do nothing.
-#TAILSCALE_ENABLED="true"
-
-# Self-hosted control server (e.g. Headscale) for `tailscale up
-# --login-server=`. Leave unset/empty to use the official
-# tailscale.com control server instead.
-#TAILSCALE_LOGIN_SERVER="" # ex: https://tail.qwreey.moe
-
-# Tailnet hostname registered by `tailscale up --hostname=` (this is what
-# shows up in MagicDNS, e.g. https://code-docker-router.your-tailnet.ts.net).
-# Leave unset/empty and tailscaled falls back to its own os.Hostname()
-# default, which is the router container's `hostname:` in
-# docker-compose.yml - fixed to "code-docker-router" and NOT
-# PREFIX-namespaced, so running multiple instances on the same tailnet
-# collide on this name unless you set it explicitly per instance. Only
-# applied by the automatic first-boot login attempt - see
-# docs/router.md#호스트네임-지정--자체-호스팅-로그인-서버 for how to change it
-# after you've already logged in once.
-#TAILSCALE_HOSTNAME="" # ex: code-docker-router
+# tailscale, Dev Proxy 노출 정책, router-manager 자체 비밀번호, tinyauth
+# 등 router 전용 기능 설정은 router/example-env.router로 옮겨졌습니다(복사해서
+# router/.env.router로 쓰세요) - 이 파일과 별도로 `router-manager
+# --env-migrate`로 마이그레이션됩니다. 여기 남은 CADDY_ADAPTER_*/ALLOWED_HOSTS류는
+# code-docker와 값을 공유하기 때문에 그대로 남아있습니다.
 
 # Dev Proxy's internal Caddy instance also now runs on router (see
 # router/.claude/functional-router-plan.md's "Dev Proxy Caddy도 router로
@@ -118,39 +99,6 @@
 # docker-compose.yml already passes the same value to both.
 #CADDY_ADAPTER_ENABLED="true"
 #CADDY_ADAPTER_PORT="8082"
-
-# router's own forward-auth (tinyauth) - protects individual Dev Proxy
-# exposes that opt into RequireAuth, see docs/dev-proxy.md#인증. Empty
-# TINYAUTH_AUTH_USERS means no one can
-# log in yet, and tinyauth itself refuses to start without TINYAUTH_APPURL
-# set to a real URL - generate a username:bcrypt-hash pair with:
-#   docker run --rm ghcr.io/tinyauthapp/tinyauth:v5 user create \
-#     --username <name> --password <password> --docker
-# (prints an already-escaped TINYAUTH_AUTH_USERS=... line ready to paste
-# below - see tinyauth's own docs at https://tinyauth.app for the current
-# exact command if this changes upstream).
-#TINYAUTH_APPURL="" # ex: https://code-docker.example.com
-#TINYAUTH_AUTH_USERS="" # ex: user:$$2a$$10$$...
-#TINYAUTH_AUTH_TRUSTEDPROXIES="172.16.0.0/12"
-
-# router-manager's own admin-API password gate (router/backend/internal/
-# authgate, opt-in - default off) - separate from tinyauth above: tinyauth
-# protects individual exposed dev-server routes, this protects
-# router-manager's own mutating endpoints (tailscale login/config/forwards/
-# publish writes, dev-proxy expose writes) reachable through code-docker's
-# nginx at /tailscale/ and /dev-proxy/ - see router/plan.md's
-# "router-manager 자체 admin API 인증". Reads (state/status/list) stay open
-# either way. Must be an argon2id hash, not a plaintext password - generate
-# one with the container already up:
-#
-#   docker compose exec code-docker-router router-manager --hash-password
-#
-# prompts for the password twice to catch typos, then prints a single
-# $argon2id$... line - wrap it in single quotes when pasting below (same
-# reasoning as WEBMANAGER_AUTH_PASSWORD_HASH in example-env.webmanager:
-# docker compose also expands $-forms inside env_file values, so an
-# unquoted hash gets silently mangled).
-#ROUTER_MANAGER_AUTH_PASSWORD_HASH='' # ex: $argon2id$...
 
 # In-container nginx (config/nginx.default.conf) access_log verbosity:
 #   errors - only log non-2xx/3xx responses (via an nginx map/if on
@@ -184,12 +132,6 @@
 # themselves. See docs/tailscale.md for the actual unspoofable defense
 # against tailscale's automatic same-port forwarding.
 #ALLOWED_HOSTS=""
-
-# Same as ALLOWED_HOSTS above, but for the /exports/ location that Dev Proxy
-# uses (see docs/dev-proxy.md) - kept as a separate allowlist since dev-proxy
-# hostnames tend to change far more often than your main code-server/
-# webmanager host. Empty (default) disables the check entirely.
-#ALLOWED_EXPORT_HOSTS=""
 
 # The in-container nginx blocks any request accepted on 127.0.0.1 (i.e.
 # tailscaled's automatic same-port forwarding into this container - see

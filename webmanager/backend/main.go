@@ -11,11 +11,12 @@ import (
 	"syscall"
 	"time"
 
+	"code-docker/envmigrate"
+
 	"webmanager/internal/authgate"
 	"webmanager/internal/cgroup"
 	"webmanager/internal/claudecode"
 	"webmanager/internal/diskusage"
-	"webmanager/internal/envmigrate"
 	"webmanager/internal/mise"
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
@@ -23,6 +24,14 @@ import (
 	"webmanager/internal/supervisor"
 	"webmanager/internal/termsession"
 )
+
+// envMigrateOpts parameterizes the shared code-docker/envmigrate package
+// for webmanager's own file names - see envmigratecmd.go's other call site.
+var envMigrateOpts = envmigrate.Options{
+	VersionKey:       "WEBMANAGER_ENV_VERSION",
+	EnvFileName:      ".env.webmanager",
+	TemplateFileName: "example-env.webmanager",
+}
 
 func main() {
 	// CLI helper mode: `webmanager --hash-password` computes an argon2id
@@ -48,7 +57,7 @@ func main() {
 	if data, err := os.ReadFile(cfg.EnvTemplatePath); err != nil {
 		log.Printf("main: couldn't read env template at %s for version check: %v", cfg.EnvTemplatePath, err)
 	} else {
-		envTemplateVersion = envmigrate.ParseVersion(string(data))
+		envTemplateVersion = envmigrate.ParseVersion(string(data), envMigrateOpts.VersionKey)
 		if envTemplateVersion != "" && envTemplateVersion != cfg.EnvVersion {
 			log.Printf("main: ⚠️ .env.webmanager version is %q but this image's example-env.webmanager is at %q — run `webmanager --env-migrate` (see README) to pick up added/changed settings", cfg.EnvVersion, envTemplateVersion)
 		}

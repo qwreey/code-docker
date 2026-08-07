@@ -145,16 +145,67 @@ router-manager 자신은 호스트 포트를 게시하지 않습니다). 제공�
 
 ### router-manager 자체 인증
 
-`ROUTER_MANAGER_AUTH_PASSWORD_HASH`(기본 꺼짐, opt-in — `example-env` 참고)를
-설정하면 위 두 API의 *쓰기* 라우트(tailscale config `PUT`, forwards/publish/login의
-`POST`/`DELETE`, dev-proxy expose의 `POST`/`PUT`/`DELETE`)가 전부 잠깁니다. 읽기
-라우트(state/config/list/status)는 계속 열려 있습니다 — webmanager 자체 게이트와
-같은 "읽기는 열어두고 쓰기만 잠근다" 관례입니다. webmanager와는 별도의 프로세스/
-비밀(argon2id 해시 + HMAC 서명 쿠키)라서 webmanager 자체 잠금과 독립적으로
-켜고 끌 수 있고, 잠긴 쓰기 요청이 401을 반환하면 webmanager UI가 자동으로
-비밀번호 입력 모달을 띄우고 재시도합니다. `router-manager --hash-password`로
-해시를 생성하세요(webmanager의 동명 CLI와 같은 패턴).
+router-manager 자신의 관리 API(tailscale config `PUT`, forwards/publish/login의
+`POST`/`DELETE`, dev-proxy expose의 `POST`/`PUT`/`DELETE`)는 비밀번호 게이트로
+보호할 수 있습니다. 읽기 라우트(state/config/list/status)는 항상 열려 있습니다
+— webmanager 자체 게이트와 같은 "읽기는 열어두고 쓰기만 잠근다" 관례입니다.
+webmanager와는 별도의 프로세스/비밀(argon2id 해시 + HMAC 서명 쿠키)이라서
+webmanager 자체 잠금과 독립적으로 켜고 끌 수 있고, 잠긴 쓰기 요청이 401을
+반환하면 webmanager UI가 자동으로 비밀번호 입력 모달을 띄우고 재시도합니다
+(`RouterUnlockModalHost`).
+
+**권장: 앱 안에서 설정 (`/router/`)** — 아무것도 설정하지 않은 채 처음
+띄우면 `GET /api/auth/status`의 `source`가 `"unset"`입니다. 컨테이너의
+`http://<host>/router/`를 열면 router-manager가 직접 제공하는 최소한의
+셋업/변경 페이지가 뜨고(webmanager 없이도 접근 가능, 빌드 스텝 없는 순수
+HTML), 여기서 새 비밀번호를 설정하면
+`${ROUTER_VOLUME:-./router-data}/auth-hash.json`(컨테이너 안에서는
+`/var/lib/code-docker-router/auth-hash.json` — `ROUTER_MANAGER_AUTH_STORE_PATH`로
+경로 변경 가능)에 저장됩니다(`source: "file"`). 이후 같은 페이지에서
+비밀번호를 바꾸려면 현재 비밀번호를 입력해야 하고(`POST
+/router/api/auth/change`, 실패 시 거부), router-manager 자신의 API가 이미
+게이트로 보호되어 있으므로 이 파일을 신뢰해도 안전합니다 — code-docker
+컨테이너에는 router 컨테이너의 파일시스템/프로세스 재시작 접근 권한이 전혀
+없습니다.
+
+**비밀번호를 잊어버렸다면** 도커 호스트에서(컨테이너 밖에서)
+`${ROUTER_VOLUME:-./router-data}/auth-hash.json`을 삭제하고
+`docker compose restart code-docker-router`로 재시작하세요 — 다시 미설정
+상태(`source: "unset"`)로 돌아가 `/router/`에서 새로 설정할 수 있습니다.
+
+**env var로 고정 (`ROUTER_MANAGER_AUTH_PASSWORD_HASH`, `router/example-env.router` 참고)** —
+인프라-as-code로 고정하고 싶을 때만 설정하세요(`router-manager
+--hash-password`로 argon2id 해시 생성, webmanager의 동명 CLI와 같은 패턴).
+설정되어 있으면 파일 저장소보다 항상 우선하고(`source: "env"`), `/router/`
+페이지의 비밀번호 변경 폼도 "환경변수로 고정되어 있어 여기서 바꿀 수
+없습니다" 메시지로 바뀌어 입력 폼 자체가 사라집니다 — `POST
+/router/api/auth/change`를 직접 호출해도 409로 거부됩니다.
 
 tinyauth(위 "tinyauth" 절)와는 완전히 별개입니다 — tinyauth는 Dev Proxy로 노출한
 개별 dev 서버의 최종 사용자 인증이고, 이건 router-manager 자신의 admin API를
 보호하는 것입니다.
+
+### router 환경변수 마이그레이션
+
+tailscale/Dev Proxy 노출 정책/router-manager 자체 비밀번호/tinyauth 같은
+router 전용 기능 설정은 저장소 루트가 아니라 `router/example-env.router`
+(런타임 템플릿)에 정리되어 있습니다 — `router/.env.router`로 복사해서
+필요한 값만 주석을 풀어 쓰세요. NETGATE_ENABLED, ROUTER_HOSTNAME,
+CADDY_ADAPTER_*, ALLOWED_HOSTS류처럼 code-docker와 값을 공유하거나
+docker-compose.yml 토폴로지에 관련된 값은 그대로 저장소 루트
+`example-env`에 남아 있습니다.
+
+webmanager의 `--env-migrate`와 완전히 같은 도구(공유 Go 모듈
+`code-docker/envmigrate`)로 동작합니다 — 이미지를 업데이트한 뒤 기존
+`.env.router`를 최신 키 구조로 재구성하려면:
+
+```sh
+cp router/.env.router router/.env.router.bak
+cat router/.env.router | docker compose exec -T code-docker-router \
+  router-manager --env-migrate > router/.env.router
+```
+
+활성화(주석 해제)해둔 값과 직접 남긴 코멘트는 그대로 보존되고, 더 이상 안
+쓰이는 키는 지우지 않고 파일 맨 아래 "더 이상 쓰이지 않는 키" 섹션으로
+옮겨집니다. `.env.router`가 낡은 버전이면(`ROUTER_ENV_VERSION` 불일치)
+router-manager가 시작 시 로그에 경고를 남깁니다 — 시작을 막지는 않습니다.

@@ -6,6 +6,7 @@ sshd/
 .allow-test
 .env
 .env.webmanager
+router/.env.router
 config/*-override*
 config/*.override*
 config/code-patch/*.override.*

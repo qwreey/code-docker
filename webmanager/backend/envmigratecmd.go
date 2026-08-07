@@ -5,14 +5,14 @@ import (
 	"io"
 	"os"
 
-	"webmanager/internal/envmigrate"
+	"code-docker/envmigrate"
 )
 
 // envMigrateCmd implements `webmanager --env-migrate` — reconciles a user's
 // .env.webmanager (piped in via stdin) against this image's current
 // example-env.webmanager (cfg.EnvTemplatePath), writing the reconstructed
 // file to stdout and any migration notes to stderr. See
-// internal/envmigrate's package doc and
+// code-docker/envmigrate's package doc and
 // webmanager/.claude/env-migration-plan.md for the full behavior. Meant to
 // be run roughly like:
 //
@@ -38,7 +38,7 @@ func envMigrateCmd(cfg Config) int {
 		return 1
 	}
 
-	res := envmigrate.Migrate(string(oldBytes), string(templateBytes))
+	res := envmigrate.Migrate(string(oldBytes), string(templateBytes), envMigrateOpts)
 
 	for _, n := range res.Notes {
 		fmt.Fprintf(os.Stderr, "env-migrate: %s: %s\n", n.Level, n.Message)
