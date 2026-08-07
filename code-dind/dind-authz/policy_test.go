@@ -41,6 +41,16 @@ func TestEvaluate(t *testing.T) {
 		{"mount type bind under /code allowed", `{"HostConfig":{"Mounts":[{"Type":"bind","Source":"/code/x"}]}}`, true},
 		{"mount type bind outside /code denied", `{"HostConfig":{"Mounts":[{"Type":"bind","Source":"/root"}]}}`, false},
 		{"mount type volume ignored by bind check", `{"HostConfig":{"Mounts":[{"Type":"volume","Source":"mydata"}]}}`, true},
+		{"bind with .. traversal escaping /code denied", `{"HostConfig":{"Binds":["/code/../../etc:/mnt/etc"]}}`, false},
+		{"mount type bind with .. traversal escaping /code denied", `{"HostConfig":{"Mounts":[{"Type":"bind","Source":"/code/../etc/dind-authz.d"}]}}`, false},
+		{"mount type volume with local bind-passthrough device outside /code denied",
+			`{"HostConfig":{"Mounts":[{"Type":"volume","VolumeOptions":{"DriverConfig":{"Name":"local","Options":{"type":"none","o":"bind","device":"/"}}}}]}}`, false},
+		{"mount type volume with local bind-passthrough device under /code allowed",
+			`{"HostConfig":{"Mounts":[{"Type":"volume","VolumeOptions":{"DriverConfig":{"Name":"local","Options":{"type":"none","o":"bind","device":"/code/x"}}}}]}}`, true},
+		{"mount type volume with unrecognized driver and no options allowed",
+			`{"HostConfig":{"Mounts":[{"Type":"volume","VolumeOptions":{"DriverConfig":{"Name":"nfs","Options":{}}}}]}}`, true},
+		{"mount type volume with unrecognized driver and options denied",
+			`{"HostConfig":{"Mounts":[{"Type":"volume","VolumeOptions":{"DriverConfig":{"Name":"nfs","Options":{"share":"host:/export"}}}}]}}`, false},
 		{"malformed json fails open (daemon validates)", `not json`, true},
 	}
 
@@ -73,6 +83,47 @@ func TestIsContainersCreate(t *testing.T) {
 	for _, tc := range cases {
 		if got := isContainersCreate(tc.method, tc.uri); got != tc.want {
 			t.Errorf("isContainersCreate(%q, %q) = %v, want %v", tc.method, tc.uri, got, tc.want)
+		}
+	}
+}
+
+func TestEvaluateVolumeCreate(t *testing.T) {
+	cases := []struct {
+		name  string
+		body  string
+		allow bool
+	}{
+		{"plain named volume, no driver opts", `{"Name":"mydata"}`, true},
+		{"local driver, no opts", `{"Name":"mydata","Driver":"local"}`, true},
+		{"local driver bind-passthrough outside /code denied", `{"Name":"evil","Driver":"local","DriverOpts":{"type":"none","o":"bind","device":"/"}}`, false},
+		{"local driver bind-passthrough under /code allowed", `{"Name":"ok","Driver":"local","DriverOpts":{"type":"none","o":"bind","device":"/code/x"}}`, true},
+		{"unrecognized driver with opts denied", `{"Name":"evil","Driver":"nfs","DriverOpts":{"share":"host:/export"}}`, false},
+		{"malformed json fails open (daemon validates)", `not json`, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			allow, reason := evaluateVolumeCreate([]byte(tc.body), testConfig())
+			if allow != tc.allow {
+				t.Errorf("evaluateVolumeCreate(%s) = allow=%v reason=%q, want allow=%v", tc.body, allow, reason, tc.allow)
+			}
+		})
+	}
+}
+
+func TestIsVolumesCreate(t *testing.T) {
+	cases := []struct {
+		method, uri string
+		want        bool
+	}{
+		{"POST", "/v1.43/volumes/create", true},
+		{"POST", "/volumes/create", true},
+		{"GET", "/v1.43/volumes/create", false},
+		{"POST", "/v1.43/volumes/myvol", false},
+		{"POST", "/v1.43/containers/create", false},
+	}
+	for _, tc := range cases {
+		if got := isVolumesCreate(tc.method, tc.uri); got != tc.want {
+			t.Errorf("isVolumesCreate(%q, %q) = %v, want %v", tc.method, tc.uri, got, tc.want)
 		}
 	}
 }

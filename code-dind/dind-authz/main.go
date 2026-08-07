@@ -60,11 +60,16 @@ func main() {
 			writeJSON(w, authZRes{Allow: false, Msg: "dind-authz: malformed request"})
 			return
 		}
-		if !isContainersCreate(req.RequestMethod, req.RequestURI) {
-			writeJSON(w, authZRes{Allow: true})
-			return
+		var allow bool
+		var reason string
+		switch {
+		case isContainersCreate(req.RequestMethod, req.RequestURI):
+			allow, reason = evaluate(req.RequestBody, cfg)
+		case isVolumesCreate(req.RequestMethod, req.RequestURI):
+			allow, reason = evaluateVolumeCreate(req.RequestBody, cfg)
+		default:
+			allow, reason = true, ""
 		}
-		allow, reason := evaluate(req.RequestBody, cfg)
 		if !allow {
 			log.Printf("dind-authz: denied %s %s: %s", req.RequestMethod, req.RequestURI, reason)
 		}

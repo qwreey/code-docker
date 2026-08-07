@@ -51,10 +51,26 @@ type createBody struct {
 		DeviceCgroupRules []string          `json:"DeviceCgroupRules"`
 		Binds             []string          `json:"Binds"`
 		Mounts            []struct {
-			Type   string `json:"Type"`
-			Source string `json:"Source"`
+			Type          string `json:"Type"`
+			Source        string `json:"Source"`
+			VolumeOptions *struct {
+				DriverConfig *struct {
+					Name    string            `json:"Name"`
+					Options map[string]string `json:"Options"`
+				} `json:"DriverConfig"`
+			} `json:"VolumeOptions"`
 		} `json:"Mounts"`
 	} `json:"HostConfig"`
+}
+
+// volumeCreateBody is the subset of a POST .../volumes/create request body
+// this plugin inspects — the "local" driver options here use the same
+// bind-passthrough mechanism as a Mounts[].VolumeOptions.DriverConfig entry
+// above, just under the top-level Driver/DriverOpts field names Docker uses
+// for this endpoint instead.
+type volumeCreateBody struct {
+	Driver     string            `json:"Driver"`
+	DriverOpts map[string]string `json:"DriverOpts"`
 }
 
 // isContainersCreate reports whether a request is a "create a container"
@@ -68,6 +84,22 @@ func isContainersCreate(method, uri string) bool {
 		u = u[:i]
 	}
 	return path.Base(u) == "create" && strings.HasSuffix(path.Dir(u), "/containers")
+}
+
+// isVolumesCreate reports whether a request is a "create a volume" call —
+// gated the same way as isContainersCreate, since a malicious named volume
+// created here (with bind-passthrough driver options) could otherwise be
+// pre-created unevaluated and referenced by name in a later container
+// create's Mounts/Binds.
+func isVolumesCreate(method, uri string) bool {
+	if method != "POST" {
+		return false
+	}
+	u := uri
+	if i := strings.IndexByte(u, '?'); i >= 0 {
+		u = u[:i]
+	}
+	return path.Base(u) == "create" && strings.HasSuffix(path.Dir(u), "/volumes")
 }
 
 // evaluate decides whether a container-create request is allowed under cfg.
@@ -131,12 +163,67 @@ func evaluate(body []byte, cfg *config) (allow bool, reason string) {
 		}
 	}
 	for _, m := range hc.Mounts {
-		if m.Type == "bind" && !bindSourceAllowed(m.Source, cfg.BindAllowPrefixes) {
-			return false, "bind mount source not allowed: " + m.Source
+		switch m.Type {
+		case "bind":
+			if !bindSourceAllowed(m.Source, cfg.BindAllowPrefixes) {
+				return false, "bind mount source not allowed: " + m.Source
+			}
+		case "volume":
+			var driverName string
+			var opts map[string]string
+			if m.VolumeOptions != nil && m.VolumeOptions.DriverConfig != nil {
+				driverName = m.VolumeOptions.DriverConfig.Name
+				opts = m.VolumeOptions.DriverConfig.Options
+			}
+			if !driverOptsAllowed(driverName, opts, cfg.BindAllowPrefixes) {
+				return false, "volume mount driver options not allowed (bind-mount passthrough): " + m.Source
+			}
 		}
 	}
 
 	return true, ""
+}
+
+// evaluateVolumeCreate decides whether a POST .../volumes/create request is
+// allowed under cfg — the "local" driver's type=none/o=bind/device=<path>
+// options perform an arbitrary host bind mount despite the request being
+// nominally a "volume", so this closes the same hole evaluate()'s Mounts
+// handling does, for a volume created ahead of time and referenced by name
+// in a later container-create call instead of inlined directly.
+func evaluateVolumeCreate(body []byte, cfg *config) (allow bool, reason string) {
+	var req volumeCreateBody
+	if err := json.Unmarshal(body, &req); err != nil {
+		return true, ""
+	}
+	if !driverOptsAllowed(req.Driver, req.DriverOpts, cfg.BindAllowPrefixes) {
+		return false, "volume driver options not allowed (bind-mount passthrough)"
+	}
+	return true, ""
+}
+
+// driverOptsAllowed reports whether a volume's driver+options are safe: a
+// plain named/anonymous volume with the default (or no) driver and no
+// options lives entirely inside dind's own storage and is always safe. Any
+// driver options at all are only allowed if they don't request a host bind
+// passthrough — recognized here by the presence of a "device" option, the
+// "local" driver's trigger for treating the volume as a bind mount of that
+// host path (typically paired with "o=bind"/"type=none", but the device key
+// alone is treated as the meaningful signal so this fails closed rather than
+// pattern-matching every way to spell "bind"). An unrecognized (non-empty,
+// non-"local") driver name can't be reasoned about at all, so it's only
+// allowed with zero options.
+func driverOptsAllowed(driverName string, opts map[string]string, allowRoots []string) bool {
+	if driverName != "" && driverName != "local" {
+		return len(opts) == 0
+	}
+	if len(opts) == 0 {
+		return true
+	}
+	device, hasDevice := opts["device"]
+	if !hasDevice {
+		return true
+	}
+	return bindSourceAllowed(device, allowRoots)
 }
 
 // bindSourceAllowed reports whether src is safe as a bind-mount source.
@@ -144,14 +231,19 @@ func evaluate(body []byte, cfg *config) (allow bool, reason string) {
 // — they live inside dind's own storage, not the host filesystem. Absolute
 // paths must equal, or fall under, one of the configured allow-list roots
 // (each entry may be given with or without a trailing slash — "/code" and
-// "/code/" mean the same root).
+// "/code/" mean the same root). Both src and each root are lexically
+// cleaned (path.Clean) before comparison — without this, a source like
+// "/code/../etc" textually satisfies a raw prefix check while actually
+// resolving (at the mount() syscall / runc layer) to a path outside every
+// allowed root.
 func bindSourceAllowed(src string, allowRoots []string) bool {
 	if !strings.HasPrefix(src, "/") {
 		return true
 	}
+	cleanSrc := path.Clean(src)
 	for _, root := range allowRoots {
-		root = strings.TrimSuffix(root, "/")
-		if src == root || strings.HasPrefix(src, root+"/") {
+		cleanRoot := path.Clean(root)
+		if cleanSrc == cleanRoot || strings.HasPrefix(cleanSrc, cleanRoot+"/") {
 			return true
 		}
 	}
