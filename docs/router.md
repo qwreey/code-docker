@@ -105,11 +105,15 @@ tailnet에서 도달 불가능하지만, sshd는 호스트 포트 게시를 위�
 
 ## tinyauth
 
-Dev Proxy 라우트별 "인증 요구"를 지원하는 forward-auth입니다(공식 이미지
-`ghcr.io/tinyauthapp/tinyauth`, 소스 빌드 아님 — pnpm 프론트엔드 빌드가 필수라 이
-레포의 다른 Go 바이너리 빌드 패턴과 안 맞습니다). 기본적으로 아무도 로그인할 수 없는
-상태로 시작합니다(`TINYAUTH_AUTH_USERS` 빈 값) — 사용하려면 `example-env`의 안내대로
-사용자를 생성하세요:
+Dev Proxy 라우트별 "인증 요구"를 지원하는 forward-auth입니다. 별도 컨테이너가 아니라
+router 자신의 supervisord 프로그램으로 돕니다 — `router/Dockerfile`이 공식 이미지
+`ghcr.io/tinyauthapp/tinyauth`에서 이미 빌드된 바이너리만 멀티스테이지로 추출해
+씁니다(소스 빌드는 안 함 — pnpm 프론트엔드 빌드가 필수라 이 레포의 다른 Go 바이너리
+빌드 패턴과 안 맞지만, 바이너리 자체를 그대로 복사해오는 데는 문제가 없습니다).
+`TINYAUTH_APPURL`이 비어 있으면(tinyauth 자신이 실제 URL 없이는 부팅을 거부하므로)
+그냥 대기 상태로 유지되고 크래시 루프를 돌지 않습니다. 기본적으로 아무도 로그인할 수
+없는 상태로 시작합니다(`TINYAUTH_AUTH_USERS` 빈 값) — 사용하려면 `example-env`의
+안내대로 사용자를 생성하세요:
 
 ```sh
 docker run --rm ghcr.io/tinyauthapp/tinyauth:v5 user create \

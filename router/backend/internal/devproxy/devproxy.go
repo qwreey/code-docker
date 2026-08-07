@@ -5,7 +5,7 @@
 // (see .claude/functional-router-plan.md's "Dev Proxy Caddy도
 // router로 이관") — near-verbatim, with one real behavior change: RequireAuth
 // routes now forward-auth against tinyauth (router's own forward-auth
-// service, see docker-compose.yml's code-docker-tinyauth) instead of
+// program, see config/tinyauth/tinyauth.default.sh) instead of
 // webmanager's `GET /api/auth/verify`, since webmanager's authgate stays
 // scoped to webmanager's own Terminal/File-Manager/Logs only.
 //
@@ -16,9 +16,9 @@
 // structured form back out of a fragment that doesn't match it.
 //
 // ManagedDir/CaddyfilePath/AdminAddr/TinyauthTarget/TinyauthVerifyURI mirror
-// the fixed layout caddy-adapter.default.sh and docker-compose.yml's
-// tinyauth service seed — kept as constants here (not config.go env vars)
-// since there's exactly one correct value, same reasoning as that script
+// the fixed layout caddy-adapter.default.sh and tinyauth.default.sh's own
+// listen port — kept as constants here (not config.go env vars) since
+// there's exactly one correct value, same reasoning as that script
 // hardcoding ADAPTER_DIR.
 package devproxy
 
@@ -50,10 +50,11 @@ const (
 	// unaddressable as a route target - this isn't just moved, it's closed.
 	AdminAddr = "unix//run/caddy-admin.sock"
 
-	// tinyauth's own compose service/alias + the forward_auth verify path
-	// its Caddy integration docs specify - see docker-compose.yml's
-	// code-docker-tinyauth service.
-	TinyauthTarget    = "tinyauth:3000"
+	// tinyauth runs as a plain supervisord program in this same container
+	// now (see config/tinyauth/tinyauth.default.sh), listening on localhost
+	// - the forward_auth verify path is its Caddy integration docs' fixed
+	// value.
+	TinyauthTarget    = "127.0.0.1:3000"
 	TinyauthVerifyURI = "/api/auth/caddy"
 )
 

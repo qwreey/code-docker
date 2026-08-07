@@ -301,6 +301,18 @@ services:
       # own network definition.
       ROUTER_NGINX_DENY_INTERNAL_EXPORTS: "${ROUTER_NGINX_DENY_INTERNAL_EXPORTS:-true}"
       CODE_DOCKER_INTERNAL_SUBNET: "172.30.0.0/24"
+      # router's own forward-auth (see router/config/tinyauth/tinyauth.default.sh)
+      # - runs the official tinyauth binary directly as a router supervisord
+      # program (extracted from ghcr.io/tinyauthapp/tinyauth in
+      # router/Dockerfile) rather than as its own compose service. Empty
+      # TINYAUTH_APPURL means tinyauth just sleeps instead of starting (it
+      # refuses to run without a real URL) - see example-env. TRUSTEDPROXIES
+      # is code-docker-internal's own CIDR, so tinyauth trusts the real
+      # client IP forwarded by router's own Caddy instead of treating every
+      # request as coming from the proxy itself.
+      TINYAUTH_APPURL: "${TINYAUTH_APPURL:-}"
+      TINYAUTH_AUTH_USERS: "${TINYAUTH_AUTH_USERS:-}"
+      TINYAUTH_AUTH_TRUSTEDPROXIES: "${TINYAUTH_AUTH_TRUSTEDPROXIES:-172.16.0.0/12}"
     volumes:
       # Persistent state for router's own features (tailscale login
       # state/config.yaml, caddy-adapter's managed/custom Caddyfile
@@ -363,48 +375,6 @@ services:
       # routing instead of the /exports/ prefix trick above - a second
       # published port, but no path-rewrite step needed on your outer proxy.
       # - "8082:8082"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    depends_on:
-      code-docker-tinyauth:
-        condition: service_started
-
-  # router's own forward-auth (see router/.claude/functional-router-plan.md's
-  # "router 전용 forward-auth — tinyauth로 결정") - a separate, lighter tool
-  # from webmanager's own internal/authgate (which stays exactly as-is,
-  # scoped only to webmanager's Terminal/File Manager/Logs). Runs as its own
-  # compose service (official image) rather than a router/Dockerfile stage -
-  # tinyauth bundles a mandatory Vue frontend build step (pnpm) ahead of its
-  # Go build, unlike dind-authz's plain single-binary build, so replicating
-  # it from source here would mean vendoring a second toolchain just to
-  # reproduce what upstream already ships as ghcr.io/tinyauthapp/tinyauth -
-  # not worth it for a project this size. Internal-only: only ever reached
-  # by router's own Caddy (`forward_auth tinyauth:3000`, see
-  # router/backend/internal/devproxy's TinyauthTarget), never directly by
-  # code-docker or the outside world.
-  code-docker-tinyauth:
-    container_name: "${PREFIX:-}code-docker-tinyauth"
-    image: "ghcr.io/tinyauthapp/tinyauth:v5"
-    restart: unless-stopped
-    environment:
-      # See example-env for how to generate TINYAUTH_AUTH_USERS
-      # (username:bcrypt-hash pairs) - empty by default so this image
-      # doesn't ship with any usable credentials baked in.
-      TINYAUTH_APPURL: "${TINYAUTH_APPURL:-}"
-      TINYAUTH_AUTH_USERS: "${TINYAUTH_AUTH_USERS:-}"
-      # code-docker-internal's own CIDR - lets tinyauth trust the real
-      # client IP forwarded by router's Caddy instead of treating every
-      # request as coming from the proxy itself.
-      TINYAUTH_AUTH_TRUSTEDPROXIES: "${TINYAUTH_AUTH_TRUSTEDPROXIES:-172.16.0.0/12}"
-    volumes:
-      - "${TINYAUTH_VOLUME:-./tinyauth-data}:/data"
-    networks:
-      code-docker-internal:
-        aliases:
-          - tinyauth
     logging:
       driver: "json-file"
       options:

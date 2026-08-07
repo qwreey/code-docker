@@ -132,7 +132,6 @@
 #TINYAUTH_APPURL="" # ex: https://code-docker.example.com
 #TINYAUTH_AUTH_USERS="" # ex: user:$$2a$$10$$...
 #TINYAUTH_AUTH_TRUSTEDPROXIES="172.16.0.0/12"
-#TINYAUTH_VOLUME="./tinyauth-data"
 
 # router-manager's own admin-API password gate (router/backend/internal/
 # authgate, opt-in - default off) - separate from tinyauth above: tinyauth

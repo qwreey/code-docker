@@ -2,7 +2,6 @@ code/
 sshd/
 /dind/
 /router-data/
-/tinyauth-data/
 /node_modules
 .allow-test
 .env

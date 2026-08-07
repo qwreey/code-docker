@@ -39,8 +39,9 @@ complete (see `plan.md`) — every feature area it envisioned now lives here:
   wildcard subdomains, managed via router-manager — `router/config/caddy-adapter/`,
   `router/backend/internal/devproxy/`, `router/frontend/src/components/DevProxy/`.
 - **tinyauth** — forward-auth for individual Dev Proxy routes that opt into
-  it (a separate `code-docker-tinyauth` compose service, not built from
-  source here).
+  it, run as a plain supervisord program in this container (`router/config/tinyauth/`)
+  — its binary is multi-stage-extracted from `ghcr.io/tinyauthapp/tinyauth` in
+  `router/Dockerfile`, not built from source, and not a separate compose service.
 
 router-manager (`router/backend`) is this container's own Go backend
 (mirrors webmanager's pattern) exposing all of the above's mutating/read

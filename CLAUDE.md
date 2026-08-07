@@ -175,12 +175,17 @@ user overrides, same auto-include idiom as the main image's `config/supervisord.
   `CADDY_ADAPTER_ENABLED`/`CADDY_ADAPTER_PORT` env, same names as before the move — also
   read by code-docker's nginx to build its `/exports/` proxy target). Moved here from
   code-docker in full, same reasoning as tailscale.
-- **tinyauth** — router's own forward-auth (`ghcr.io/tinyauthapp/tinyauth`, a separate
-  `code-docker-tinyauth` compose service using the official image — not built from source
-  like dind-authz, since tinyauth's Dockerfile requires a mandatory pnpm/Vue frontend build
-  ahead of its Go build, unlike a plain single-binary build). Protects individual Dev Proxy
-  routes that opt into "require auth" (Caddy `forward_auth` → tinyauth's
-  `/api/auth/caddy`) — a separate, lighter tool from webmanager's own `internal/authgate`,
+- **tinyauth** — router's own forward-auth, run as a plain supervisord program inside
+  router itself (`router/config/tinyauth/tinyauth.default.sh`), not a separate compose
+  service — `router/Dockerfile` multi-stage-extracts the prebuilt binary straight from
+  `ghcr.io/tinyauthapp/tinyauth` (its own Dockerfile requires a mandatory pnpm/Vue
+  frontend build ahead of its Go build, so it isn't rebuilt from source like dind-authz,
+  but the finished binary itself needs no such step and copies over cleanly). Sleeps
+  instead of starting when `TINYAUTH_APPURL` is unset (tinyauth refuses to boot without a
+  real URL) — same opt-out idiom as `CADDY_ADAPTER_ENABLED`/`TAILSCALE_ENABLED`, and what
+  keeps an unconfigured instance from crash-looping. Protects individual Dev Proxy routes
+  that opt into "require auth" (Caddy `forward_auth` → tinyauth's `/api/auth/caddy` on
+  `127.0.0.1:3000`) — a separate, lighter tool from webmanager's own `internal/authgate`,
   which stays exactly as-is, scoped only to webmanager's own Terminal/File Manager/Logs.
   `TINYAUTH_AUTH_USERS` (docker-compose env) is empty by default — no one can log in until
   set (`docker run --rm ghcr.io/tinyauthapp/tinyauth:v5 user create --username <u>

@@ -41,6 +41,13 @@ COPY backend/handlers_ui.go ./
 COPY backend/internal ./internal
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /router-manager .
 
+# Source for the tinyauth binary only (see config/tinyauth/tinyauth.default.sh)
+# - tinyauth's own Dockerfile requires a mandatory pnpm frontend build ahead
+# of its Go build, unlike router-manager-build above, so this extracts the
+# already-built binary from upstream's official image instead of reproducing
+# that build here.
+FROM ghcr.io/tinyauthapp/tinyauth:v5 AS tinyauth-bin
+
 FROM archlinux
 
 # tailscale: the daemon+forwards+publish feature moved here from code-docker
@@ -67,6 +74,7 @@ RUN pacman -Suy --noconfirm --needed \
 RUN mkdir -p /var/log/netgate-firewall \
         /var/log/tailscaled /var/log/tailscale-forward /var/log/tailscale-publish \
         /var/log/router-manager /var/log/caddy-adapter /var/log/dns /var/log/nginx \
+        /var/log/tinyauth \
         /etc/code-docker/netgate /etc/code-docker/dns /etc/code-docker/supervisord.d \
         /var/lib/code-docker-router
 COPY --chown=root:root config/netgate /etc/code-docker/netgate
@@ -77,13 +85,15 @@ COPY --chown=root:root config/tailscale/tailscale-config.default.yaml \
 COPY --chown=root:root script/netgate-entrypoint.sh script/netgate-firewall.sh \
     script/tailscale-service.sh script/tailscale-forward.sh \
     script/tailscale-publish.sh script/caddy-adapter.sh script/dns.sh \
-    script/nginx-service.sh /etc/code-docker/
+    script/nginx-service.sh script/tinyauth.sh /etc/code-docker/
 COPY --chown=root:root config/tailscale/tailscale-service.default.sh \
     config/tailscale/tailscale-forward.default.sh \
     config/tailscale/tailscale-publish.default.sh \
     config/caddy-adapter/caddy-adapter.default.sh \
-    config/nginx/nginx.default.conf config/nginx/nginx-service.default.sh /etc/code-docker/
+    config/nginx/nginx.default.conf config/nginx/nginx-service.default.sh \
+    config/tinyauth/tinyauth.default.sh /etc/code-docker/
 COPY --from=router-manager-build /router-manager /usr/local/bin/router-manager
+COPY --from=tinyauth-bin /tinyauth/tinyauth /usr/local/bin/tinyauth
 # Baked-in default blocklist (StevenBlack/hosts - a standard, generic list
 # is sufficient per the plan doc, no prompt-injection-specific list
 # needed), saved as-is: dnsmasq's addn-hosts= reads hosts-format files
