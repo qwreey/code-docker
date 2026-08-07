@@ -16,6 +16,17 @@ set -eu
 # without). If a third network is ever added to this service, this
 # picks the first non-default, non-loopback interface it finds, which
 # may need to become more specific at that point.
+#
+# Not racy against the routing loop below despite running before it ever
+# ticks: code-docker-internal is `internal: true`, so Docker itself never
+# installs a default route on it in the first place (no window where it
+# transiently looks routeless-but-shouldn't-be), and a container restart
+# resets the netns's routing table anyway, so no stale route from a prior
+# run can linger either. In the manual code-docker-external-restored
+# topology, Docker plants that network's default route synchronously as
+# part of container creation - before this entrypoint (PID 1) ever starts
+# executing - so this line already sees the right answer deterministically
+# in that case too.
 default_iface="$(ip -4 route show default 2>/dev/null | awk '{ print $5; exit }')"
 
 internal_ip=""
