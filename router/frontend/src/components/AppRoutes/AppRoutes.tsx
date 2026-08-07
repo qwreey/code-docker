@@ -273,9 +273,11 @@ export function AppRoutes() {
     <div className="card">
       <h2>App Routes</h2>
       <p className="section-description">
-        Host 헤더와 무관하게 <code>/app/&lt;이름&gt;/...</code> 경로로 들어오는 요청을 지정한 대상으로 리버스
-        프록시합니다 (<code>/app/&lt;이름&gt;</code> 접두사는 자동으로 제거됩니다) — router가 내부 앱 구조를 미리
-        모르는 채로 재사용/배포될 수 있다는 전제에서, 도메인(Host) 기반인 Dev Proxy와 달리 경로만으로 라우팅합니다.
+        호스트 포트를 여러 개 열지 않고 80번 하나로 여러 앱을 노출하기 위한 기능입니다 — 바깥 리버스 프록시가
+        요청 경로 앞에 <code>/app/&lt;이름&gt;</code>을 붙여(rewrite) router의 80번 포트로 넘기면, 이 컨테이너
+        안 Caddy가 그 접두사를 자동으로 벗기고 지정한 대상으로 다시 리버스 프록시합니다. 도메인(Host) 기반인
+        Dev Proxy와 달리 Host 헤더를 전혀 보지 않고 경로만으로 라우팅합니다 — 바깥 프록시 없이 router에 직접
+        접근해도 동일하게 동작하지만, 그건 보너스일 뿐 원래 의도된 사용 경로는 아닙니다.
       </p>
       <div className="info-note">
         <span aria-hidden="true">ℹ</span>

@@ -138,7 +138,7 @@ tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열�
 
 ## 경로 기반 앱 라우팅 (App Routes)
 
-Host 헤더와 무관하게 `/app/<이름>/...` 경로로 들어오는 요청을 지정한 대상으로 리버스 프록시하는 기능입니다(Dev Proxy와 같은 router 컨테이너 안 Caddy 인스턴스가 처리, [webmanager의 App Routes 탭](webmanager.md)에서 관리). 최초 부팅 시 `code → code-docker:80` 앱이 자동 생성됩니다.
+호스트 포트를 여러 개 열지 않고 80번 하나로 여러 앱을 노출하기 위한 기능입니다 — 바깥 리버스 프록시가 요청 경로 앞에 `/app/<이름>`을 붙여(rewrite) 넘기면, router 안 Caddy(Dev Proxy와 같은 인스턴스)가 그 접두사를 벗기고 지정한 대상으로 리버스 프록시합니다(Host 헤더와는 무관, [webmanager의 App Routes 탭](webmanager.md)에서 관리). 최초 부팅 시 `code → code-docker:80` 앱이 자동 생성됩니다.
 
 자세한 내용은 [app-routes.md](app-routes.md)를 확인하세요.
 
