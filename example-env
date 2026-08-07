@@ -91,16 +91,19 @@
 # tailscale, Dev Proxy 노출 정책, router-manager 자체 비밀번호, tinyauth
 # 등 router 전용 기능 설정은 router/example-env.router로 옮겨졌습니다(복사해서
 # router/.env.router로 쓰세요) - 이 파일과 별도로 `router-manager
-# --env-migrate`로 마이그레이션됩니다. 여기 남은 CADDY_ADAPTER_*/ALLOWED_HOSTS류는
+# --env-migrate`로 마이그레이션됩니다. 여기 남은 ALLOWED_HOSTS류는
 # code-docker와 값을 공유하기 때문에 그대로 남아있습니다.
 
-# Dev Proxy's internal Caddy instance also now runs on router (see
+# Dev Proxy's internal Caddy instance runs on router (see
 # router/.claude/functional-router-plan.md's "Dev Proxy Caddy도 router로
-# 이관") - same env vars, code-docker's nginx reads CADDY_ADAPTER_PORT too
-# (to know where to proxy /exports/ to), so keep both containers in sync -
-# docker-compose.yml already passes the same value to both.
+# 이관") - only router itself reads these, code-docker's nginx doesn't proxy
+# to Caddy at all (router's own nginx does, over a unix socket, regardless
+# of CADDY_ADAPTER_PORT - see docs/dev-proxy.md). CADDY_ADAPTER_PORT has no
+# default - leave it unset to keep caddy-adapter unix-socket-only, or set
+# it to also bind a TCP port (docs/dev-proxy.md's direct-publish
+# alternative; you'd then need to add `ports:` for it yourself too).
 #CADDY_ADAPTER_ENABLED="true"
-#CADDY_ADAPTER_PORT="8082"
+#CADDY_ADAPTER_PORT=
 
 # In-container nginx (config/nginx/nginx.default.conf) access_log verbosity:
 #   errors - only log non-2xx/3xx responses (via an nginx map/if on

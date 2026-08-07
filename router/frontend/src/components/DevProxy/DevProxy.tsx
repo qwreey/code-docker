@@ -346,10 +346,18 @@ export function DevProxy() {
       <div className="info-note">
         <span aria-hidden="true">ℹ</span>
         <span>
-          바깥 리버스 프록시가 원하는 도메인(들)을 이 컨테이너(router)의 <code>CADDY_ADAPTER_PORT</code>(기본
-          8082)로 넘기면, 그 안에서는 각 expose의 host 값과 실제 Host 헤더가 일치하는지로 분배합니다. 인증(라우트별
-          "인증 요구")을 쓰려면 <code>TINYAUTH_APPURL</code>/<code>TINYAUTH_AUTH_USERS</code>도 설정해야 합니다 —
-          자세한 내용은{' '}
+          바깥 리버스 프록시가 원하는 요청의 path 앞에 <code>/exports</code>를 붙이고(Host는 그대로 두고) 이
+          컨테이너(router)의 80번 포트로 그대로 넘기면 됩니다 — 안에서는 각 expose의 host 값과 실제 Host 헤더가
+          일치하는지로 분배합니다. 인증(라우트별 "인증 요구")을 쓰려면{' '}
+          <code>TINYAUTH_APPURL</code>/<code>TINYAUTH_AUTH_USERS</code>도 설정해야 합니다.
+        </span>
+      </div>
+      <div className="info-note">
+        <span aria-hidden="true">ℹ</span>
+        <span>
+          포트 80 하나만 열어두고 싶다면 위 방식으로 충분합니다. router가 포트를 하나 더 열어도 괜찮고 대신
+          바깥 프록시의 rewrite를 아예 안 쓰고 싶다면, <code>CADDY_ADAPTER_PORT</code>(기본값 없음 — 설정
+          필요)를 지정하고 퍼블리시하는 대안도 있습니다. 자세한 내용은{' '}
           <a href="https://github.com/qwreey/code-docker/blob/master/docs/dev-proxy.md" target="_blank" rel="noreferrer">
             docs/dev-proxy.md
           </a>

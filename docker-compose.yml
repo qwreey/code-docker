@@ -271,22 +271,23 @@ services:
       NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
       # Dev Proxy's internal Caddy instance (see
       # router/.claude/functional-router-plan.md's "Dev Proxy Caddy도
-      # router로 이관"). CADDY_ADAPTER_PORT is only relevant if you opt into
-      # the direct-publish alternative in docs/dev-proxy.md - router's own
-      # nginx talks to Caddy over a unix socket by default now (see
-      # router/.claude/router-nginx-hardening-plan.md Phase 4). Stays here
-      # (not router/example-env.router) because code-docker's own nginx
-      # reads CADDY_ADAPTER_PORT too - same value, single source.
+      # router로 이관"). Only code-docker-router ever reads CADDY_ADAPTER_PORT -
+      # router's own nginx talks to Caddy over a unix socket regardless (see
+      # router/.claude/router-nginx-hardening-plan.md Phase 4), and that's
+      # the only path docs/dev-proxy.md recommends by default. CADDY_ADAPTER_PORT
+      # has no default: leaving it unset means caddy-adapter never binds a
+      # TCP port at all. Set it only to opt into the direct-publish
+      # alternative in docs/dev-proxy.md (and then actually publish it via
+      # this service's own `ports:`, which isn't set by default either).
       CADDY_ADAPTER_ENABLED: "${CADDY_ADAPTER_ENABLED:-true}"
-      CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-8082}"
+      CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-}"
       # router is now the actual internet-facing hop (see
       # router/.claude/router-nginx-hardening-plan.md) - its own nginx
       # reuses the same ALLOWED_HOSTS/NGINX_BLOCK_LOOPBACK/TRUSTED_PROXIES/
       # NGINX_LOG_LEVEL values as code-docker's copy above (same .env
-      # source, shared across both services' environment: blocks, same
-      # pattern CADDY_ADAPTER_PORT already used) - stays here for that
-      # reason, unlike ALLOWED_EXPORT_HOSTS below which moved to
-      # router/example-env.router since code-docker has no use for it.
+      # source, shared across both services' environment: blocks) - stays
+      # here for that reason, unlike ALLOWED_EXPORT_HOSTS below which moved
+      # to router/example-env.router since code-docker has no use for it.
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-}"
       NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"

@@ -14,15 +14,19 @@
 
 ## 켜고 끄기 / 기본 설정
 
-`docker-compose.yml`의 두 환경변수로 제어합니다(router와 code-docker 양쪽에 같은 값이
-전달됩니다 — code-docker의 nginx가 `/exports/`를 이 포트로 프록시하려면 같은 포트
-번호를 알아야 하기 때문):
+`docker-compose.yml`의 두 환경변수로 제어하며, 둘 다 router 컨테이너에만 전달됩니다
+(code-docker 쪽은 몰라도 됩니다 — router 자신의 nginx가 유닉스 소켓으로 caddy-adapter와
+통신하므로, code-docker의 nginx는 애초에 Caddy를 직접 알 필요가 없습니다):
 
 - `CADDY_ADAPTER_ENABLED` (기본 `"true"`) — `"false"`면 router의 `caddy-adapter`
   프로그램이 아무것도 안 하고 idle 상태로 떠 있습니다.
-- `CADDY_ADAPTER_PORT` (기본 `8082`) — router 컨테이너 안에서 caddy-adapter가
-  리스닝하는 내부 포트. 도메인은 여기서 설정하지 않고, expose마다 개별적으로 지정합니다
-  (아래 "expose 추가하기").
+- `CADDY_ADAPTER_PORT` (기본값 없음 — 설정 필요) — 비워두면(기본값) caddy-adapter는
+  유닉스 소켓(`caddy-adapter.sock`)에만 바인드되고 TCP 포트는 전혀 열지 않습니다.
+  값을 채우면 그 번호로 TCP 포트도 함께 바인드합니다 — 아래 ["대안:
+  `CADDY_ADAPTER_PORT`를 직접
+  퍼블리시"](#대안-caddy_adapter_port를-직접-퍼블리시)에서만 필요합니다. 기본(`/exports/`
+  경유) 경로만 쓸 거라면 그냥 비워두면 됩니다. 도메인은 여기서 설정하지 않고,
+  expose마다 개별적으로 지정합니다(아래 "expose 추가하기").
 
 ## expose 추가하기
 
@@ -113,14 +117,19 @@ Host를 code-server/webmanager용 `ALLOWED_HOSTS`와 별도로 제한할 수 있
 — dev-proxy 도메인은 code-server 도메인보다 훨씬 자주 바뀌는 편이라 따로
 관리합니다.
 
-### 대안: `CADDY_ADAPTER_PORT`(기본 8082)를 직접 퍼블리시
+### 대안: `CADDY_ADAPTER_PORT`를 직접 퍼블리시
 
+포트 80 하나만 바깥에 열어두고 싶다면 위 기본(`/exports/` 경유) 방식을 그대로 쓰면
+됩니다 — 이 대안은 router가 포트를 하나 더 열어도 상관없고, 그 대신 바깥 프록시
+설정에서 rewrite 한 줄을 아예 안 쓰고 싶은 경우를 위한 것입니다.
+
+`CADDY_ADAPTER_PORT`(기본값 없음)에 원하는 포트 번호(예: `8082`)를 설정하고
 `docker-compose.yml`의 `code-docker-router` 서비스에 `ports: - 8082:8082`를 추가하면,
-`/exports` 리라이트 없이 예전처럼 caddy-adapter를 바깥에서 바로 볼 수 있습니다 —
-router 컨테이너가 export하는 포트가 하나 더 늘어나는 대신, 바깥 프록시 설정에 rewrite
-한 줄을 추가할 필요가 없습니다. caddy-adapter 자신은 Host 값을 가리지 않으므로,
-expose에 등록해둔 host와 실제로 여기까지 들어오는 요청의 Host 헤더가
-일치하기만 하면 됩니다.
+`/exports` 리라이트 없이 예전처럼 caddy-adapter를 바깥에서 바로 볼 수 있습니다.
+caddy-adapter 자신은 Host 값을 가리지 않으므로, expose에 등록해둔 host와 실제로
+여기까지 들어오는 요청의 Host 헤더가 일치하기만 하면 됩니다. `CADDY_ADAPTER_PORT`를
+비워두면(기본값) 이 TCP 포트 자체가 열리지 않습니다 — `ports:`를 추가해도 바인드할
+포트가 없으므로 반드시 값을 먼저 설정해야 합니다.
 
 ```caddyfile
 dev.example.com {

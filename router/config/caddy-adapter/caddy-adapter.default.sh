@@ -72,10 +72,13 @@ fi
 # router/.claude/router-nginx-hardening-plan.md, Finding 1). /run is
 # container-local tmpfs, same reasoning as router-manager's own socket.
 #
-# Three site blocks: the unix socket router's own nginx /exports/ proxies
-# to (default path) and the existing CADDY_ADAPTER_PORT TCP listener
-# (docs/dev-proxy.md's direct-publish alternative, unchanged) both import
-# managed/*.caddy (Dev Proxy, Host-matched); a third unix socket
+# Three (or four, if CADDY_ADAPTER_PORT is set) site blocks: the unix
+# socket router's own nginx /exports/ proxies to (default path) always
+# imports managed/*.caddy (Dev Proxy, Host-matched); the CADDY_ADAPTER_PORT
+# TCP listener (docs/dev-proxy.md's direct-publish alternative) imports the
+# same managed/*.caddy but is opt-in - CADDY_ADAPTER_PORT has no default,
+# so the block below is only emitted (and Caddy only binds the extra port)
+# when the env var is actually set. A third unix socket
 # (caddy-app.sock, router's own nginx /app/ proxies to it - see
 # nginx.default.conf) imports apps/*.caddy (App Routes, path-matched via
 # each fragment's own `handle_path /app/<name>/*`, Host-agnostic - see
@@ -97,6 +100,22 @@ fi
 # what's reachable, same trust model as everything else in this container.
 # apps/*.caddy fragments carry no host matcher at all (by design - App
 # Routes exists specifically to route without caring about Host).
+# Opt-in TCP block - only emitted when CADDY_ADAPTER_PORT is actually set
+# (docs/dev-proxy.md's direct-publish alternative). No default port: an
+# unset/empty CADDY_ADAPTER_PORT means Caddy never binds a TCP port at all,
+# leaving the unix socket above as the only way in.
+CADDY_ADAPTER_TCP_BLOCK=""
+if [ -n "${CADDY_ADAPTER_PORT:-}" ]; then
+    CADDY_ADAPTER_TCP_BLOCK="
+http://:${CADDY_ADAPTER_PORT} {
+	import ${ADAPTER_DIR}/managed/*.caddy
+	handle {
+		respond 404
+	}
+}
+"
+fi
+
 cat > "$ADAPTER_DIR/Caddyfile" <<EOF
 {
 	auto_https off
@@ -110,14 +129,7 @@ cat > "$ADAPTER_DIR/Caddyfile" <<EOF
 		respond 404
 	}
 }
-
-http://:${CADDY_ADAPTER_PORT:-8082} {
-	import ${ADAPTER_DIR}/managed/*.caddy
-	handle {
-		respond 404
-	}
-}
-
+${CADDY_ADAPTER_TCP_BLOCK}
 :9998 {
 	bind unix//run/caddy-app.sock
 	import ${ADAPTER_DIR}/apps/*.caddy
