@@ -8,7 +8,7 @@ cat <<'EOF'
 forward-reload: tailscale (forwards/publish) now runs on the router
 container, not code-docker - this command can't reach it from here anymore.
 
-Edit the config on the host at ${ROUTER_VOLUME:-./router-data}/tailscale/config.yaml,
+Edit the config on the host at ${ROUTER_VOLUME:-./data/router}/tailscale/config.yaml,
 then reload from the host (not from inside code-docker) with:
 
   docker compose exec code-docker-router supervisorctl restart tailscale-forward tailscale-publish
