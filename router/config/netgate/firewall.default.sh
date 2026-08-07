@@ -6,7 +6,7 @@ set -u
 # a one-shot init step, for two reasons: (1) a forward's target_host can
 # resolve to a new IP after the target container restarts, so the DNAT rule
 # needs periodic re-resolution, same self-healing idiom as
-# script/netinit-entrypoint.sh; (2) code-docker-external's interface may not
+# netinit/script/netinit-entrypoint.sh; (2) code-docker-external's interface may not
 # be up yet on the very first iteration, so retrying is simpler than a
 # one-shot script with its own polling/timeout logic. See
 # .claude/backlog/egress-netgate-plan.md for the overall design.

@@ -76,7 +76,7 @@ Docker가 동적으로 할당하므로, `dns: [172.x.x.x]`처럼 고정해둘 �
 바뀔 수 있음).
 
 이 레포에 이미 있는 정확히 같은 문제의 기존 해법을 재사용합니다 —
-`script/netinit-entrypoint.sh`/`script/dind-entrypoint.sh`가 라우트를 위해 하는 것과
+`netinit/script/netinit-entrypoint.sh`/`code-dind/script/dind-entrypoint.sh`가 라우트를 위해 하는 것과
 동일한 패턴(`getent hosts router`로 IP를 매 루프 다시 알아내 재적용):
 
 - code-docker/dind 양쪽에 작은 반복 스크립트를 추가 — `getent hosts router`로 IP를

@@ -6,8 +6,8 @@
 # publish), the Dev Proxy Caddy instance, and a tinyauth forward-auth, while
 # code-docker-netinit/dind's own routing loops keep pointing their default
 # route at this container the same way they always have (see
-# script/netinit-entrypoint.sh, script/dind-entrypoint.sh - both resolve the
-# `router` alias, formerly `netgate`).
+# netinit/script/netinit-entrypoint.sh, code-dind/script/dind-entrypoint.sh -
+# both resolve the `router` alias, formerly `netgate`).
 #
 # Own subtree with its own Dockerfile/build context (router/) rather than a
 # stage in the root Dockerfile - see functional-router-plan.md's "router

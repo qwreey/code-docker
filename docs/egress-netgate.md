@@ -129,7 +129,7 @@ code-docker 컨테이너 자체가 재시작되면(단순히 안의 프로세스
 그 시점에 이미 붙어있던 `code-docker-netinit`은 옛(이제는 죽은) 네임스페이스에 고아로
 남아 라우트를 전혀 심을 수 없는 상태가 됩니다.
 
-**대응은 이미 구현되어 있습니다**: `script/netinit-entrypoint.sh`가 매 루프 시작마다
+**대응은 이미 구현되어 있습니다**: `netinit/script/netinit-entrypoint.sh`가 매 루프 시작마다
 자신의 네트워크 인터페이스를 확인해서 loopback 외의 인터페이스가 하나도 없으면(= 고아가
 된 옛 네임스페이스에 갇힌 것으로 판단) `exit 1`로 스스로 종료합니다.
 `restart: unless-stopped`가 이를 감지해 컨테이너를 재생성하고, 그러면 현재 code-docker가

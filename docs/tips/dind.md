@@ -16,7 +16,7 @@ code-docker 가 `code-docker-external`/`code-docker-internal` 양쪽에 다 붙�
 <details>
 <summary>기술적으로 어떻게 막혀있는지</summary>
 
-`code-docker-internal` 은 `internal: true` 로 자체적으로는 인터넷 경로가 없으므로, `script/dind-entrypoint.sh` 가 code-docker의 `code-docker-netinit` 과 동일한 방식으로 기본 게이트웨이를 `code-docker-router` 로 계속 재설정하는 루프를 돌립니다 - `docker pull` 은 이 경로를 통해 나갑니다. dind 데몬 자체는 같은 스크립트가 `code-docker-internal` 쪽 IP에만 바인드하도록 되어있어(스톡 `docker:dind` 이미지의 `--host=tcp://0.0.0.0:2375` 기본 동작을 오버라이드함), `code-docker-dind` 는 `code-docker-external` 에 아예 붙어있지 않으므로 소켓은 인터넷/호스트 어디서도 직접 접근할 수 없습니다.
+`code-docker-internal` 은 `internal: true` 로 자체적으로는 인터넷 경로가 없으므로, `code-dind/script/dind-entrypoint.sh` 가 code-docker의 `code-docker-netinit` 과 동일한 방식으로 기본 게이트웨이를 `code-docker-router` 로 계속 재설정하는 루프를 돌립니다 - `docker pull` 은 이 경로를 통해 나갑니다. dind 데몬 자체는 같은 스크립트가 `code-docker-internal` 쪽 IP에만 바인드하도록 되어있어(스톡 `docker:dind` 이미지의 `--host=tcp://0.0.0.0:2375` 기본 동작을 오버라이드함), `code-docker-dind` 는 `code-docker-external` 에 아예 붙어있지 않으므로 소켓은 인터넷/호스트 어디서도 직접 접근할 수 없습니다.
 
 </details>
 
@@ -29,7 +29,7 @@ dind 쪽에는 `./dind:/var/lib/docker` 볼륨이 마운트되어있어 컨테�
 `docker-compose.yml`의 `DIND_TARGET` 이 어떤 Dockerfile 스테이지를 dind로 쓸지 고릅니다 (`example-env` 참고):
 
 - `dind` — 보호 없음, 예전 기본 동작 그대로.
-- `dind-authz` (**기본값**) — dind 안의 dockerd에 authorization 플러그인(`dind-authz/`, 순수 Go 표준 라이브러리로 작성)이 붙어서, 컨테이너 생성 요청에 아래 중 하나라도 포함되면 요청 자체를 거부합니다:
+- `dind-authz` (**기본값**) — dind 안의 dockerd에 authorization 플러그인(`code-dind/dind-authz/`, 순수 Go 표준 라이브러리로 작성)이 붙어서, 컨테이너 생성 요청에 아래 중 하나라도 포함되면 요청 자체를 거부합니다:
   - `--privileged`
   - `allowed_caps` 허용 목록(기본은 `NET_BIND_SERVICE`만) 밖의 `--cap-add`
   - `--security-opt seccomp=unconfined`/`apparmor=unconfined`/`label=disable`
@@ -38,7 +38,7 @@ dind 쪽에는 `./dind:/var/lib/docker` 볼륨이 마운트되어있어 컨테�
   - `/code/` 아래가 아닌 경로를 소스로 하는 bind mount (named volume은 영향 없음)
 - `dind-authz-remap` — dind-authz에 더해 [userns-remap](#추가-경화-userns-remap-dind-authz-remap)까지 적용. 기본값이 아닙니다 (아래 절 참고).
 
-정책은 이미지에 구운 기본값(`config/dind-authz/*.default.json`)과, `DIND_AUTHZ_VOLUME`(기본 `./dind-authz`)로 마운트되는 실시간 conf.d 디렉토리를 병합한 결과입니다. **이 디렉토리는 code-docker 어디에도 마운트되지 않습니다** — code-docker 자신이 자기를 제한하는 정책을 고칠 수 있으면 의미가 없기 때문에, 도커 호스트 자체에 파일시스템 접근 권한이 있는 사람만 편집할 수 있습니다. 예를 들어 특정 capability를 추가로 허용하려면:
+정책은 이미지에 구운 기본값(`code-dind/config/dind-authz/*.default.json`)과, `DIND_AUTHZ_VOLUME`(기본 `./dind-authz`)로 마운트되는 실시간 conf.d 디렉토리를 병합한 결과입니다. **이 디렉토리는 code-docker 어디에도 마운트되지 않습니다** — code-docker 자신이 자기를 제한하는 정책을 고칠 수 있으면 의미가 없기 때문에, 도커 호스트 자체에 파일시스템 접근 권한이 있는 사람만 편집할 수 있습니다. 예를 들어 특정 capability를 추가로 허용하려면:
 
 ```json
 // ./dind-authz/10-my-exception.json (도커 호스트에서 직접 작성)
@@ -61,6 +61,6 @@ dind 쪽에는 `./dind:/var/lib/docker` 볼륨이 마운트되어있어 컨테�
    - bind mount를 꼭 써야 한다면, 처음 한 번 dind 컨테이너 자신의 root로(`code-docker`가 아니라 `code-docker-dind`) 대상 디렉토리 소유권을 remap 대역으로 바꿔주세요: `docker exec code-docker-dind chown -R 165536:165536 /code/myproject/pgdata` — 이 명령 자체는 `code-docker`가 아니라 `code-docker-dind`(dind 자신)에서 실행해야 합니다(dind는 여전히 진짜 root라 임의 UID로 chown 가능하지만, code-docker에서 호스트 UID로 직접 chown하려면 보통 sudo/root 권한이 추가로 필요합니다).
 3. `dind-authz`만으로 이미 privileged/위험한 CapAdd/host 네임스페이스/`/code` 밖 마운트가 다 막혀 있어서, remap이 추가로 막는 건 "지금 알려진 구멍"이 아니라 "authz 플러그인 자체가 뚫렸을 때/아직 모르는 컨테이너 런타임 버그가 터졌을 때"에 대한 보험 성격입니다 — 필수는 아니지만, 위 제약을 감수할 수 있고 LXC 같은 중첩 호스트가 아니라면 켜서 손해 볼 건 없습니다.
 
-설계 배경 전체(왜 이 방식을 택했는지, 다른 대안들을 왜 버렸는지)는 `.claude/backlog/dind-authz-plan.md`를 참고하세요.
+설계 배경 전체(왜 이 방식을 택했는지, 다른 대안들을 왜 버렸는지)는 `code-dind/.claude/dind-authz-plan.md`를 참고하세요.
 
 webmanager의 [Docker/dind 관리 탭](../webmanager.md#dockerdind-관리)에서 컨테이너/이미지 목록, 로그 조회, 시작/정지/삭제도 브라우저에서 바로 할 수 있습니다.

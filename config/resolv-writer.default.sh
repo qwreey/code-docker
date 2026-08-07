@@ -7,7 +7,7 @@ set -u
 # resolver. router runs a real forwarder (dnsmasq, see
 # router/.claude/router-dns-plan.md) - this loop points /etc/resolv.conf at
 # it, re-resolving `router`'s own IP periodically (same getent-in-a-loop
-# pattern script/netinit-entrypoint.sh uses for the default route, since
+# pattern netinit/script/netinit-entrypoint.sh uses for the default route, since
 # docker-compose's own `dns:` field only accepts a static IP, and router's IP
 # isn't static across recreates).
 #
