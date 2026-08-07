@@ -13,6 +13,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -33,6 +34,22 @@ var (
 	ErrUserExists   = errors.New("tinyauth user already exists")
 	ErrUserNotFound = errors.New("tinyauth user not found")
 )
+
+var nameRe = regexp.MustCompile(`^[A-Za-z0-9_.@-]+$`)
+
+// validateName rejects any name unsafe to embed unquoted in
+// RenderEnvFile's output, which tinyauth.default.sh `source`s as a bash
+// script - anything outside this charset (in particular "$", backticks,
+// ":", ",", whitespace, control characters) could otherwise inject
+// arbitrary shell commands into that source, or corrupt the
+// name:hash,name:hash format itself. Same reasoning as
+// internal/devproxy.ValidateName.
+func validateName(name string) error {
+	if !nameRe.MatchString(name) {
+		return errors.New("name must contain only letters, digits, and . _ @ -")
+	}
+	return nil
+}
 
 // bcryptCost matches tinyauth's own `user create --docker` default (cost 10,
 // $2a$ hashes - see docs/router.md/router/example-env.router).
@@ -88,6 +105,9 @@ func ListUsers(path string) ([]User, error) {
 func AddUser(path, name, plaintext string) error {
 	if name == "" || plaintext == "" {
 		return errors.New("name and password are required")
+	}
+	if err := validateName(name); err != nil {
+		return err
 	}
 	users, err := load(path)
 	if err != nil {
