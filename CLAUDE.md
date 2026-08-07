@@ -234,7 +234,11 @@ package, root `package.json`'s `workspaces:`) owns the actual page components; w
 '@code-docker/router-frontend'`) rather than owning that UI itself — see "webmanager" below and
 `router/.claude/functional-router-plan.md`'s "router ↔ webmanager 프론트 통합 방식". Dev
 Proxy, App Routes, and Tailscale (forwards/publish/login CRUD + status view) are all ported
-this way. `router/frontend`'s own `App.tsx` (a plain tab switcher, no react-router) is also
+this way; webmanager also leans on this package for generic, router-unrelated UI primitives
+(`ErrorBanner`/`Sheet`/`Skeleton`), used across ~40 unrelated webmanager files — see
+`.claude/backlog/router-frontend-decouple-plan.md` for why this workspace dependency can't be
+dropped yet if `router`/`webmanager` ever split into separate repos. `router/frontend`'s own
+`App.tsx` (a plain tab switcher, no react-router) is also
 built into a real SPA now — `router/Dockerfile` has its own Node build stage (using
 `router/frontend/package-lock.json`, generated standalone since this Dockerfile's build
 context is `router/` only and can't reach the repo-root workspace lockfile) and
