@@ -92,7 +92,7 @@ shell out to `git`/`ssh-keygen`.
 | `GIT_CREDENTIALS_PATH` | `/code/.git-credentials` | HTTPS credential store file |
 | `SSH_SIGNING_KEY_PATH` | `/code/.ssh/signing_key` | dedicated ed25519 keypair generated for git SSH commit signing |
 | `VECTOR_LOG_DIR` | `/code/.local/share/code-docker/vector/logs` | directory of day-partitioned `<YYYY-MM-DD>.jsonl` log files written by the `vector` pipeline (see `.claude/archive/vector-logs-plan-done.md`) |
-| `SYSTEM_DISK_PATH` | `/code` | path `GET /api/system/resources` runs `statfs` on to report disk usage — `/code` is the bind-mounted volume (`./code:/code`), so this reflects real host disk usage for that mount |
+| `SYSTEM_DISK_PATH` | `/code` | path `GET /api/system/resources` runs `statfs` on to report disk usage — `/code` is the bind-mounted volume (`./data/code:/code`), so this reflects real host disk usage for that mount |
 | `SYSTEM_DISK_BREAKDOWN_ROOT` | `/` | root path `GET /api/system/disk-breakdown` breaks down by top-level directory (see `internal/diskusage`) — deliberately `/` (the container's own root filesystem), not `SYSTEM_DISK_PATH` |
 | `WEBMANAGER_DISK_BREAKDOWN_CACHE_PATH` | `/code/.local/share/code-docker/webmanager/disk-breakdown-cache.json` | cache file for the disk breakdown scan (only recomputed on `POST .../scan`, same convention as `WEBMANAGER_PROJECTS_CACHE_PATH`) |
 | `WEBMANAGER_STATIC_DIR` | `./static` | pre-built frontend assets (see below) |

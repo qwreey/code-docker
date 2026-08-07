@@ -34,7 +34,7 @@
 router 자신의 nginx가 host:80에서 직접 종단하는 읽기전용 상태 API
 (`GET /router/api/tailscale/state`)를 폴링합니다.
 
-로그인 상태는 `${ROUTER_VOLUME:-./router-data}/tailscale/state`(호스트 경로)에
+로그인 상태는 `${ROUTER_VOLUME:-./data/router}/tailscale/state`(호스트 경로)에
 영속됩니다. 자동 시도를 놓쳤거나 소진된 상태라면 webmanager의 Tailscale 탭에서
 로그인을 다시 트리거할 수 있습니다(아래 "router-manager" 참고) — 웹 UI 대신 직접
 실행하고 싶다면 `docker compose exec code-docker-router tailscale up`도 여전히
@@ -48,7 +48,7 @@ API를 호출)에서 forwards/publish 추가·삭제·전역 설정(SOCKS 주소
 `tailscale-forward`/`tailscale-publish` supervisord 프로그램을 router-manager가
 자동으로 재시작해 반영합니다.
 
-설정은 `${ROUTER_VOLUME:-./router-data}/tailscale/config.yaml`(호스트 경로, 컨테이너
+설정은 `${ROUTER_VOLUME:-./data/router}/tailscale/config.yaml`(호스트 경로, 컨테이너
 안에서는 `/var/lib/code-docker-router/tailscale/config.yaml`)에 그대로 저장되므로,
 UI 대신 직접 편집하는 것도 여전히 가능합니다:
 
@@ -163,7 +163,7 @@ webmanager 자체 잠금과 독립적으로 켜고 끌 수 있고, 잠긴 쓰기
 `http://<host>/router/`를 열면 router-manager가 직접 제공하는 최소한의
 셋업/변경 페이지가 뜨고(webmanager 없이도 접근 가능, 빌드 스텝 없는 순수
 HTML), 여기서 새 비밀번호를 설정하면
-`${ROUTER_VOLUME:-./router-data}/auth-hash.json`(컨테이너 안에서는
+`${ROUTER_VOLUME:-./data/router}/auth-hash.json`(컨테이너 안에서는
 `/var/lib/code-docker-router/auth-hash.json` — `ROUTER_MANAGER_AUTH_STORE_PATH`로
 경로 변경 가능)에 저장됩니다(`source: "file"`). 이후 같은 페이지에서
 비밀번호를 바꾸려면 현재 비밀번호를 입력해야 하고(`POST
@@ -173,7 +173,7 @@ HTML), 여기서 새 비밀번호를 설정하면
 없습니다.
 
 **비밀번호를 잊어버렸다면** 도커 호스트에서(컨테이너 밖에서)
-`${ROUTER_VOLUME:-./router-data}/auth-hash.json`을 삭제하고
+`${ROUTER_VOLUME:-./data/router}/auth-hash.json`을 삭제하고
 `docker compose restart code-docker-router`로 재시작하세요 — 다시 미설정
 상태(`source: "unset"`)로 돌아가 `/router/`에서 새로 설정할 수 있습니다.
 

@@ -7,12 +7,13 @@
 # router/CLAUDE.md and root CLAUDE.md's "router" section): this container's
 # own build inputs (dind-authz Go module, its policy defaults) don't have to
 # thread COPY paths back through the repo root, and it reads as a genuinely
-# separate, reusable component. Named "code-dind" rather than "dind" so this
-# source directory can't collide with the DIND_VOLUME/DIND_AUTHZ_VOLUME
-# runtime data directories (`./dind`, `./dind-authz` by default, see
-# docker-compose.yml) that live at the repo root alongside it - `router/`
-# avoids the same problem because its own runtime data directory is named
-# `router-data/`, not `router/`.
+# separate, reusable component. Named "code-dind" rather than "dind" -
+# originally to dodge a collision with the DIND_VOLUME/DIND_AUTHZ_VOLUME
+# runtime data directories that used to live at the repo root alongside it;
+# those now default under a single repo-root `data/` folder (`./data/dind`,
+# `./data/dind-authz`, see docker-compose.yml) specifically so no source
+# subtree can ever collide with runtime data again - see code-dind/CLAUDE.md's
+# "Naming" section.
 FROM docker:dind AS dind
 # iproute2: dind-entrypoint.sh's own interface-picking logic (see its
 # comments below) plus the Phase 1 egress-netgate route loop it now also
@@ -20,6 +21,11 @@ FROM docker:dind AS dind
 # PID 1 init so that loop's forked `ip`/`getent` children get reaped once
 # dockerd takes over as PID 1 - see dind-entrypoint.sh's own comment on this.
 RUN apk add --no-cache iproute2 tini
+# script/netshare/ is a hand-synced copy of the repo-root netshare/ module
+# (see root CLAUDE.md's "netshare" section) - this subtree's own isolated
+# build context can't COPY repo-root files directly. Run vendor-netshare.sh
+# after editing netshare/, before rebuilding this image.
+COPY script/netshare /netshare
 COPY script/dind-entrypoint.sh /dind-entrypoint.sh
 ENTRYPOINT ["/dind-entrypoint.sh"]
 

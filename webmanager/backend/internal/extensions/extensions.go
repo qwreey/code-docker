@@ -1,10 +1,11 @@
 // Package extensions loads the repo-root recommendations file
-// (config/recommendations.default.yaml, baked into the image at
-// /etc/code-docker/recommendations.default.yaml — see repo root CLAUDE.md's
-// "override pattern") and wraps the code-server CLI's own
+// (config/code/recommendations.default.yaml, baked into the image at
+// /etc/code-docker/code/recommendations.default.yaml — see repo root
+// CLAUDE.md's "override pattern") and wraps the code-server CLI's own
 // --list-extensions/--install-extension flags, following the same
-// override-resolution order as config/code-service.default.sh: an override
-// path wins if present, else the default path, else degrade gracefully.
+// override-resolution order as config/code/code-service.default.sh: an
+// override path wins if present, else the default path, else degrade
+// gracefully.
 package extensions
 
 import (

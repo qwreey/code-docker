@@ -81,45 +81,51 @@ fi
 # Phase 1 of egress-netgate-plan.md's outbound lockdown (see the plan doc's
 # dind section). dind already has NET_ADMIN via `privileged: true`, so
 # unlike code-docker it manages its own default route directly instead of
-# needing a netinit sidecar - same defensive loop as
-# script/netinit-entrypoint.sh, just running against dind's own netns. Also
-# keeps dind's own /etc/resolv.conf pointed at router's DNS forwarder for the
-# same reason code-docker's resolv-writer program does (see
-# router/.claude/router-dns-plan.md) - code-docker-internal being
-# `internal: true` blocks Docker's own embedded DNS from forwarding
-# externally, and dind needs real DNS too (pulling images by registry
-# hostname).
+# needing a netinit sidecar - same apply_default_route netinit uses, just
+# running against dind's own netns. Also keeps dind's own /etc/resolv.conf
+# pointed at router's DNS forwarder for the same reason code-docker's
+# resolv-writer program does (see router/.claude/router-dns-plan.md) -
+# code-docker-internal being `internal: true` blocks Docker's own embedded
+# DNS from forwarding externally, and dind needs real DNS too (pulling
+# images by registry hostname). apply_default_route/apply_nameserver are
+# shared with netinit/script/netinit-entrypoint.sh and
+# config/resolv-writer/resolv-writer.default.sh - see root CLAUDE.md's
+# "netshare" section; this subtree's own isolated build context can't reach
+# repo-root netshare/ directly, so /netshare here is a hand-synced copy
+# (code-dind/script/netshare/, run vendor-netshare.sh after editing
+# netshare/).
 if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
 	router_hostname="${ROUTER_HOSTNAME:-router}"
+	. /netshare/wait-until.sh
+	. /netshare/apply-route.sh
+	. /netshare/apply-nameserver.sh
+
+	# Apply once, synchronously, BEFORE dockerd starts below - dockerd
+	# snapshots /etc/resolv.conf at its own startup to seed the DNS it
+	# hands to every container it creates from then on (nested `docker
+	# run`s from inside code-docker). Backgrounding this loop unconditionally
+	# (the old behavior) raced dockerd's own startup: if router hadn't
+	# resolved yet by the time dockerd read /etc/resolv.conf, nested
+	# containers could end up with no working upstream DNS baked in for the
+	# rest of the daemon's life, even though this loop kept dind's own
+	# resolv.conf correct going forward. Best-effort - router not resolving
+	# yet is expected during Phase 1 (see egress-netgate-plan.md), so this
+	# never blocks dockerd from starting, just gives it its best shot at a
+	# correct starting point.
+	wait_until "router to resolve" 60 2 getent hosts "$router_hostname" \
+		|| echo >&2 "dind-entrypoint: router did not resolve in time, starting dockerd without it - the retry loop below will keep trying"
+	apply_default_route "$router_hostname"
+	apply_nameserver "$router_hostname"
+
 	(
 		trap 'exit 0' TERM INT
 		while true; do
-			gw_ip="$(getent hosts "$router_hostname" 2>/dev/null | awk '{ print $1; exit }')"
-			if [ -n "$gw_ip" ]; then
-				ip route replace default via "$gw_ip" 2>/dev/null
-
-				# Direct redirect (truncate-in-place), not tmp-file+mv - see
-				# config/resolv-writer.default.sh's comment on why: `mv`
-				# onto the bind-mounted /etc/resolv.conf fails with
-				# "Resource busy".
-				if ! grep -q "^nameserver $gw_ip\$" /etc/resolv.conf 2>/dev/null; then
-					printf 'nameserver 127.0.0.11\nnameserver %s\noptions ndots:0\n' "$gw_ip" > /etc/resolv.conf
-				fi
-			fi
-
-			default_routes="$(ip -4 route show default 2>/dev/null)"
-			line_count=$(printf '%s\n' "$default_routes" | grep -c '^default')
-			unexpected=0
-			if [ "$line_count" -gt 1 ]; then
-				unexpected=1
-			elif [ -n "$gw_ip" ] && [ -n "$default_routes" ] && ! printf '%s\n' "$default_routes" | grep -q "via $gw_ip"; then
-				unexpected=1
-			fi
-			if [ "$unexpected" -eq 1 ]; then
-				echo "dind-entrypoint: WARNING unexpected default route(s), expected only $router_hostname ($gw_ip):" >&2
-				printf '%s\n' "$default_routes" >&2
-			fi
-
+			# router (formerly netgate) not resolving is the expected,
+			# permanent state throughout Phase 1 - neither function here
+			# treats that as fatal, they just no-op and get retried next
+			# tick.
+			apply_default_route "$router_hostname"
+			apply_nameserver "$router_hostname"
 			sleep 5
 		done
 	) &

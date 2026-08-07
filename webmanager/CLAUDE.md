@@ -141,7 +141,7 @@ instances can bind-mount their own; plus a startup log warning and a web UI
 banner (dismiss state persisted backend-side via `internal/envversionprefs`)
 when the running file is stale. A single-origin merge of code-server (`/`)
 and webmanager (`/manager`) via an in-container nginx supervisord program
-(`config/nginx.default.conf`, `[program:nginx]` — see
+(`config/nginx/nginx.default.conf`, `[program:nginx]` — see
 `.claude/archive/expose-plan-done.md`): code-server's `bind-addr` and
 webmanager's `WEBMANAGER_ADDR` both moved to internal-only ports,
 `code-config.default.yaml` is now regenerated on every start (no more
@@ -152,13 +152,13 @@ real-container QA by the repo owner is still pending. A follow-on milestone
 (opening `/manager` as a widget/iframe from inside the code-server PWA, or a
 PWA `shortcuts` entry) had 4 open questions in `.claude/question.md`; trigger
 and display-form are now implemented (`.window-appicon` click opens `/manager`
-in an iframe overlay modal, `config/code-patch/webmanager-launcher.default.js`
+in an iframe overlay modal, `config/code/code-patch/webmanager-launcher.default.js`
 — see `.claude/archive/expose-plan-done.md`'s "나중 마일스톤" section);
 the PWA `shortcuts` entry is now implemented too
 (`.claude/archive/manifest-shortcuts-plan-done.md`) — rather than a
 second installable PWA (rejected: it would double the installed-app icon
 count per code-docker instance for a "check occasionally" use case),
-`config/nginx.default.conf` intercepts just `/manifest.json` with an
+`config/nginx/nginx.default.conf` intercepts just `/manifest.json` with an
 exact-match `location` that proxies to a new webmanager package
 (`internal/manifestpatch`) which fetches code-server's real manifest
 straight from its internal port, merges in a `shortcuts` array (an "Open
@@ -171,7 +171,7 @@ is never touched. An "열린 세션" (open sessions)
 tab (`.claude/archive/session-heartbeat-plan-done.md`, `internal/
 sessionheartbeat`) lists which code-server browser tabs are currently
 connected and what folder each has open, fed by a client-generated UUID that
-a new code-patch script (`config/code-patch/session-heartbeat.default.js`)
+a new code-patch script (`config/code/code-patch/session-heartbeat.default.js`)
 POSTs to `/api/sessions/heartbeat` every 30s — chosen over querying
 code-server's own connection API specifically to sidestep that approach's
 unresolved feasibility question (`.claude/archive/session-viewer-plan.md`,

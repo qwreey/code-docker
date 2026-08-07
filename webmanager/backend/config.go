@@ -159,8 +159,8 @@ func loadConfig() Config {
 		SystemHistoryIntervalSeconds: getenv("WEBMANAGER_SYSTEM_HISTORY_INTERVAL_SECONDS", "5"),
 		SystemHistoryWindowMinutes:   getenv("WEBMANAGER_SYSTEM_HISTORY_WINDOW_MINUTES", "10"),
 
-		RecommendationsDefaultPath:  getenv("WEBMANAGER_RECOMMENDATIONS_DEFAULT_PATH", "/etc/code-docker/recommendations.default.yaml"),
-		RecommendationsOverridePath: getenv("WEBMANAGER_RECOMMENDATIONS_OVERRIDE_PATH", "/etc/code-docker/recommendations.override.yaml"),
+		RecommendationsDefaultPath:  getenv("WEBMANAGER_RECOMMENDATIONS_DEFAULT_PATH", "/etc/code-docker/code/recommendations.default.yaml"),
+		RecommendationsOverridePath: getenv("WEBMANAGER_RECOMMENDATIONS_OVERRIDE_PATH", "/etc/code-docker/code/recommendations.override.yaml"),
 		CodeServerBinPath:           getenv("WEBMANAGER_CODE_SERVER_BIN", "/code/.local/share/code-docker/code/code-server/bin/code-server"),
 		CodeServerUserDataDir:       getenv("WEBMANAGER_CODE_SERVER_USER_DATA_DIR", "/code/.local/share/code-docker/code/user-data"),
 		CodeServerExtensionsDir:     getenv("WEBMANAGER_CODE_SERVER_EXTENSIONS_DIR", "/code/.local/share/code-docker/code/extensions"),

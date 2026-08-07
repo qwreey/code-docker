@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Seed /etc/code-docker/code-patch/*.default.* (each with an optional
+# Seed /etc/code-docker/code/code-patch/*.default.* (each with an optional
 # matching *.override.*) into
 # /code/.local/share/code-docker/code/patch/<name>.* - code-server-
 # autoinstall injects every top-level patch/*.js as a <script> on the
@@ -27,7 +27,7 @@
 # /code/.local/share/code-docker/code (and its patch/ folder) actually
 # exists by the time this runs.
 
-SOURCE_DIR=/etc/code-docker/code-patch
+SOURCE_DIR=/etc/code-docker/code/code-patch
 TARGET_DIR=/code/.local/share/code-docker/code/patch
 MANIFEST=/code/.local/share/code-docker/code/.code-patch-manifest
 mkdir -p "$TARGET_DIR"

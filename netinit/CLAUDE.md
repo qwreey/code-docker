@@ -15,10 +15,17 @@ don't re-derive decisions already recorded there.
 - `Dockerfile` - a minimal `alpine` image with `iproute2`, entrypoint set to
   `script/netinit-entrypoint.sh`.
 - `script/netinit-entrypoint.sh` - the loop itself: resolves `ROUTER_HOSTNAME`
-  (default `router`) every 5s and `ip route replace`s the default route to
-  it, defensively (never exits non-zero on `router` not resolving - see the
-  script's own comments for why, and for the "netns got recreated out from
-  under us" exit-and-let-`restart:`-recreate case).
+  (default `router`) every 5s and applies the default route to it via
+  `apply_default_route` (see below), defensively (never exits non-zero on
+  `router` not resolving - see the script's own comments for why, and for
+  the "netns got recreated out from under us" exit-and-let-`restart:`-recreate
+  case).
+- `script/netshare/` - a hand-synced copy of the repo-root `netshare/`
+  module (see root `CLAUDE.md`'s "netshare" section) - this subtree's own
+  isolated Dockerfile build context can't `COPY` repo-root files directly.
+  Run `vendor-netshare.sh` (repo root) after editing anything under
+  `netshare/`, before rebuilding this image - don't hand-edit
+  `script/netshare/*.sh` directly, it'll just get overwritten next sync.
 
 ## Why this is its own subtree
 

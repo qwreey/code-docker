@@ -141,7 +141,7 @@ mise 사용 도구 목록, code-server로 바로 열기(같은 origin이면 자�
 
 ---
 
-git-lfs 는 `config/build.default.sh`에 포함되어 기본으로 설치됩니다(패키지 설치만 —
+git-lfs 는 `config/build/build.default.sh`에 포함되어 기본으로 설치됩니다(패키지 설치만 —
 저장소별 `git lfs install`은 위 Git Config 탭에서 직접 실행).
 
 ## 비밀번호 게이트

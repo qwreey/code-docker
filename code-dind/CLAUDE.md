@@ -24,10 +24,21 @@ already recorded there.
   `docker:dind`'s own) that binds the daemon to `code-docker-internal` only
   (never `0.0.0.0`), self-detects which of the stages above it's running on
   (starts the authz plugin / passes `--userns-remap` only if that stage's
-  artifacts are present), and runs the same default-route-enforcement loop
-  `netinit/` runs for code-docker, against dind's own netns instead (dind
-  already has `NET_ADMIN` via `privileged: true`, so it doesn't need a
-  separate sidecar the way code-docker does).
+  artifacts are present), and applies the same default-route-enforcement +
+  nameserver-writing `netinit/`/`config/resolv-writer/` use for code-docker,
+  against dind's own netns instead (dind already has `NET_ADMIN` via
+  `privileged: true`, so it doesn't need a separate sidecar the way
+  code-docker does) - via `apply_default_route`/`apply_nameserver`, applied
+  once synchronously before `dockerd` starts (so nested containers get
+  correct DNS baked in from their very first `docker run`, not just once
+  the background loop's first tick lands) and then kept current by a
+  background loop, same shape as before.
+- `script/netshare/` - a hand-synced copy of the repo-root `netshare/`
+  module (see root `CLAUDE.md`'s "netshare" section) - this subtree's own
+  isolated Dockerfile build context can't `COPY` repo-root files directly.
+  Run `vendor-netshare.sh` (repo root) after editing anything under
+  `netshare/`, before rebuilding this image - don't hand-edit
+  `script/netshare/*.sh` directly, it'll just get overwritten next sync.
 - `dind-authz/` - the authz plugin's Go source (own `go.mod`, standalone
   module, `go test ./...` runs directly from here).
 - `config/dind-authz/*.default.json` - baked-in allow-list defaults for the
@@ -38,14 +49,17 @@ already recorded there.
 
 ## Naming
 
-This directory is named `code-dind`, not `dind`, specifically so it can't
-collide with the repo-root runtime data directories Docker actually writes
-to at `./dind` (`DIND_VOLUME`) and `./dind-authz` (`DIND_AUTHZ_VOLUME`,
-before this subtree existed the *source* for the authz plugin also lived at
-repo-root `./dind-authz/` - the exact same path as the runtime volume
-default, a real naming collision that moving the source here resolved as a
-side effect). `router/`'s own runtime volume is named `router-data/`
-instead of `router`, which is why it never ran into this problem.
+This directory is named `code-dind`, not `dind`, originally so it couldn't
+collide with the repo-root runtime data directories Docker writes to - before
+this subtree existed, the *source* for the authz plugin lived at repo-root
+`./dind-authz/`, the exact same path the runtime volume defaulted to, a real
+collision. Every runtime data directory has since moved under a single
+repo-root `data/` folder (`DIND_VOLUME`/`DIND_AUTHZ_VOLUME` now default to
+`./data/dind`/`./data/dind-authz`, see docker-compose.yml and root
+CLAUDE.md's "docker-compose topology") specifically so source subtrees
+(`code-dind/`, `router/`, ...) and runtime data never share a naming
+namespace at all - the original collision this section describes can't
+recur regardless of what any subtree is named now, but the name stuck.
 
 ## Ground rules
 

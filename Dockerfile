@@ -48,7 +48,8 @@ RUN --mount=type=cache,target=/home/makepkg \
     /etc/code-docker/install-yay.sh
 
 # Run build script
-COPY --chown=root:root script/build.sh config/build.* /etc/code-docker/
+COPY --chown=root:root script/build.sh /etc/code-docker/
+COPY --chown=root:root config/build /etc/code-docker/build
 RUN --mount=type=cache,target=/var/cache/pacman /etc/code-docker/build.sh
 
 # Copy dind docker cli
@@ -71,7 +72,15 @@ COPY example-env.webmanager /etc/code-docker/webmanager/example-env.webmanager
 RUN mkdir -p /var/log/code /var/log/sshd /var/log/webmanager /var/log/nginx \
     /var/log/resolv-writer
 
+# /etc/code-docker/supervisord/ is where a user's own gitignored
+# config/supervisord/*.conf override files land (see CLAUDE.md's "process
+# model") - no placeholder is checked into git for it (config/ is reorganized
+# into per-program folders now, see config/supervisord.d/ for the built-in
+# ones), so create it directly instead.
+RUN mkdir -p /etc/code-docker/supervisord
+
 # Copy config & static files
+COPY --chown=root:root netshare /etc/code-docker/netshare
 COPY --chown=root:root \
     config script/entrypoint.sh script/code-service.sh \
     script/user-init.sh script/get-user-shell.sh script/sshd-service.sh \

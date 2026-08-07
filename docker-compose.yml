@@ -113,8 +113,8 @@ services:
     #   if you want to bypass nginx and reach it directly on its own port.
     #   - 81:81
     volumes:
-      - "${HOME_VOLUME:-./code}:/code"
-      - "${SSHD_VOLUME:-./sshd}:/etc/ssh"
+      - "${HOME_VOLUME:-./data/code}:/code"
+      - "${SSHD_VOLUME:-./data/sshd}:/etc/ssh"
     cap_add:
       # Needed for debugging tools that trace other processes, e.g. gdb, btop
       - SYS_PTRACE
@@ -181,7 +181,10 @@ services:
       # code-dind/ is its own self-contained subtree (own Dockerfile), same
       # pattern as router/ - see code-dind/CLAUDE.md. Named "code-dind", not
       # "dind", so it can't collide with the DIND_VOLUME/DIND_AUTHZ_VOLUME
-      # runtime data directories below (./dind, ./dind-authz by default).
+      # runtime data directories below (./data/dind, ./data/dind-authz by
+      # default - every runtime data dir lives under repo-root data/ now,
+      # separate from every source subtree, see CLAUDE.md's "docker-compose
+      # topology").
       # Set BUILD_CONTEXT in .env instead of editing this file.
       context: "${BUILD_CONTEXT:-.}/code-dind"
       network: host
@@ -209,20 +212,20 @@ services:
       ROUTER_HOSTNAME: "${ROUTER_HOSTNAME:-router}"
     volumes:
       # Persist pulled images/containers across restarts
-      - "${DIND_VOLUME:-./dind}:/var/lib/docker"
+      - "${DIND_VOLUME:-./data/dind}:/var/lib/docker"
       # Same host path as code-docker's own /code (HOME_VOLUME) - DinD
       # resolves bind-mount sources against ITS OWN filesystem, not the
       # client's, so a project's `./data:/data`-style compose volume only
       # works (and only round-trips through the dind-authz /code-only
       # allow-list) if dind can see /code at the same absolute path.
-      - "${HOME_VOLUME:-./code}:/code"
+      - "${HOME_VOLUME:-./data/code}:/code"
       # dind-authz's live, host-editable conf.d directory (dind-authz stage
       # only - harmless no-op mount on the plain dind stage, nothing reads
       # it there). Deliberately NOT mounted into code-docker anywhere, by
       # any path - code-docker must never be able to edit the policy that
       # constrains what it can ask dind to create. Only someone with direct
       # access to the docker host's filesystem can edit this.
-      - "${DIND_AUTHZ_VOLUME:-./dind-authz}:/etc/dind-authz.d"
+      - "${DIND_AUTHZ_VOLUME:-./data/dind-authz}:/etc/dind-authz.d"
     networks:
       # code-docker-external deliberately NOT attached here either
       # (egress-netgate-plan.md - same reasoning as code-docker's own
@@ -310,7 +313,7 @@ services:
       # state/config.yaml, caddy-adapter's managed/custom Caddyfile
       # fragments) - router has no /code volume of its own (that's
       # code-docker's), so this is its equivalent.
-      - "${ROUTER_VOLUME:-./router-data}:/var/lib/code-docker-router"
+      - "${ROUTER_VOLUME:-./data/router}:/var/lib/code-docker-router"
     cap_add:
       # NET_ADMIN only - no privileged: true, no SYS_MODULE or anything
       # else. This container is meaningfully more trusted than code-docker
@@ -337,7 +340,7 @@ services:
         # both resolve this alias by default (see ROUTER_HOSTNAME above on
         # code-docker/code-docker-netinit/code-docker-dind, and
         # script/entrypoint.sh, netinit/script/netinit-entrypoint.sh,
-        # code-dind/script/dind-entrypoint.sh, config/resolv-writer.default.sh) -
+        # code-dind/script/dind-entrypoint.sh, config/resolv-writer/resolv-writer.default.sh) -
         # keep this alias in sync with ROUTER_HOSTNAME if you override it,
         # see example-env. Renamed from `netgate` alongside the service
         # rename. `forward` is tailscale-forward.default.sh's own socat

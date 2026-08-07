@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+. /etc/code-docker/netshare/wait-until.sh
+. /etc/code-docker/netshare/apply-nameserver.sh
+
 # Phase 1 of egress-netgate-plan.md's outbound lockdown: code-docker-netinit
 # (network_mode: service:code-docker, see docker-compose.yml) is the only
 # thing in this container's netns with NET_ADMIN, and it's what plants the
@@ -13,56 +16,31 @@ set -e
 # feature (see example-env) - nothing will ever set this route in that
 # case, so waiting on it would hang forever.
 if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
-    echo "entrypoint: waiting for netinit to set a default route..."
-    waited=0
-    timeout=60
-    interval=2
-    until ip route show default 2>/dev/null | grep -q .; do
-        waited=$((waited + interval))
-        if [ "$waited" -ge "$timeout" ]; then
-            echo >&2 "entrypoint: no default route after ${timeout}s - netinit/netgate never came up. This is EXPECTED until netgate (Phase 2) is deployed - see .claude/backlog/egress-netgate-plan.md. Exiting so restart: unless-stopped retries."
-            exit 1
-        fi
-        sleep "$interval"
-    done
-    echo "entrypoint: default route present, continuing"
+    if ! wait_until "netinit's default route" 60 2 sh -c 'ip route show default 2>/dev/null | grep -q .'; then
+        echo >&2 "entrypoint: no default route after 60s - netinit/netgate never came up. This is EXPECTED until netgate (Phase 2) is deployed - see .claude/backlog/egress-netgate-plan.md. Exiting so restart: unless-stopped retries."
+        exit 1
+    fi
 
     # code-docker-internal is `internal: true`, so Docker's own embedded DNS
     # (127.0.0.11) refuses to forward queries externally - router runs a real
     # forwarder instead (see router/.claude/router-dns-plan.md). Do this
     # once, synchronously, before user-init.sh's own qwreey-fish curl below -
-    # the resolv-writer supervisord program (config/resolv-writer.default.sh)
-    # keeps /etc/resolv.conf correct for the rest of this container's life
-    # (e.g. if router gets recreated with a new IP), but that program doesn't
-    # start until supervisord does, which is after user-init.sh already ran.
+    # the resolv-writer supervisord program
+    # (config/resolv-writer/resolv-writer.default.sh) keeps /etc/resolv.conf
+    # correct for the rest of this container's life (e.g. if router gets
+    # recreated with a new IP), but that program doesn't start until
+    # supervisord does, which is after user-init.sh already ran.
     # `getent hosts "$router_hostname"` itself doesn't need this rewrite
     # yet - Docker's embedded DNS already resolves same-network container/
     # alias names regardless of the internal-network restriction, only
-    # external forwarding is blocked.
-    echo "entrypoint: waiting for router's DNS forwarder..."
-    waited=0
-    timeout=60
-    interval=2
+    # external forwarding is blocked. apply_nameserver is shared with
+    # resolv-writer.default.sh and code-dind/script/dind-entrypoint.sh - see
+    # root CLAUDE.md's "netshare" section.
     router_hostname="${ROUTER_HOSTNAME:-router}"
-    router_ip=""
-    until [ -n "$router_ip" ]; do
-        router_ip="$(getent hosts "$router_hostname" 2>/dev/null | awk '{ print $1; exit }')"
-        [ -n "$router_ip" ] && break
-        waited=$((waited + interval))
-        if [ "$waited" -ge "$timeout" ]; then
-            echo >&2 "entrypoint: could not resolve '$router_hostname' after ${timeout}s - continuing without DNS, resolv-writer will keep retrying once supervisord starts"
-            break
-        fi
-        sleep "$interval"
-    done
-    if [ -n "$router_ip" ]; then
-        # 127.0.0.11 (Docker's own embedded resolver) stays first - it's
-        # still what resolves local container names/aliases (private,
-        # router, dind, ...), unrelated to the internal-network
-        # external-forwarding restriction this works around. router is
-        # added as a fallback for names 127.0.0.11 won't/can't forward.
-        printf 'nameserver 127.0.0.11\nnameserver %s\noptions ndots:0\n' "$router_ip" > /etc/resolv.conf
-        echo "entrypoint: /etc/resolv.conf now has router ($router_ip) as fallback nameserver"
+    if wait_until "router's DNS forwarder" 60 2 getent hosts "$router_hostname"; then
+        apply_nameserver "$router_hostname"
+    else
+        echo >&2 "entrypoint: could not resolve '$router_hostname' after 60s - continuing without DNS, resolv-writer will keep retrying once supervisord starts"
     fi
 fi
 

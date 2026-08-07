@@ -17,5 +17,10 @@
 # repo root.
 FROM alpine:latest
 RUN apk add --no-cache iproute2
+# script/netshare/ is a hand-synced copy of the repo-root netshare/ module
+# (see root CLAUDE.md's "netshare" section) - this subtree's own isolated
+# build context can't COPY repo-root files directly. Run vendor-netshare.sh
+# after editing netshare/, before rebuilding this image.
+COPY script/netshare /netshare
 COPY script/netinit-entrypoint.sh /netinit-entrypoint.sh
 ENTRYPOINT ["/netinit-entrypoint.sh"]

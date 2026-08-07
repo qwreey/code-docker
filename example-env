@@ -38,19 +38,21 @@
 #PWA_NAME="code-docker"
 #PWA_SHORT_NAME="code-docker"
 
-# 호스트에 마운트할 볼륨 경로. 기본은 저장소 안 ./code, ./sshd, ./dind - 다른
-# 위치(다른 디스크, 여러 인스턴스 간 공유 등)를 쓰고 싶을 때만 바꾸세요.
-#DIND_VOLUME="./dind"
-#HOME_VOLUME="./code"
-#SSHD_VOLUME="./sshd"
-#ROUTER_VOLUME="./router-data"
+# 호스트에 마운트할 볼륨 경로. 기본은 저장소 안 ./data/code, ./data/sshd,
+# ./data/dind 등 - 소스 디렉토리(code-dind/, router/, ...)와 헷갈리지 않도록
+# 런타임 데이터는 전부 data/ 아래 모아둡니다. 다른 위치(다른 디스크, 여러
+# 인스턴스 간 공유 등)를 쓰고 싶을 때만 바꾸세요.
+#DIND_VOLUME="./data/dind"
+#HOME_VOLUME="./data/code"
+#SSHD_VOLUME="./data/sshd"
+#ROUTER_VOLUME="./data/router"
 
 # dind-authz(아래 DIND_TARGET 참고)의 실시간 conf.d 정책 디렉토리입니다. 반드시
 # code-docker(HOME_VOLUME/`/code`)와 다른 경로여야 합니다 - code-docker 자신이
 # 이 정책을 고칠 수 있으면 dind-authz를 켜는 의미가 없어집니다. 도커 호스트
 # 자체에 파일시스템 접근 권한이 있는 사람만 이 디렉토리를 건드릴 수 있어야
 # 합니다.
-#DIND_AUTHZ_VOLUME="./dind-authz"
+#DIND_AUTHZ_VOLUME="./data/dind-authz"
 
 # Timezone for all processes in the container (glibc reads this
 # directly via tzdata, already installed - no /etc/localtime symlink

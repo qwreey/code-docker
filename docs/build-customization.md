@@ -1,36 +1,49 @@
 # 빌드 커스터마이징
 
-각각의 config 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 build.default.sh 를 build.override.sh 로 복사하여 원하는대로 변경할 수 있습니다. 단, sh 파일들은 꼭 `chmod u+x` 를 적용하여 실행가능한 파일로 만들어야합니다.
-가급적 업스트림의 변경사항에 따라 필수 바이너리가 따라가도록 하려면 override 파일에서 `/etc/code-docker/build.default.sh` 를 실행하는것을 추천합니다. 다만 원치 않는 경우 하지 않아도 됩니다.
+`config/` 아래는 프로그램별 폴더(`build/`, `code/`, `nginx/`, `resolv-writer/`, `shell/`, `sshd/`, `user-init/`, `vector/`, `webmanager/`)로 나뉘어 있습니다 — 각 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 `config/build/build.default.sh` 를 같은 폴더에 `build.override.sh` 로 복사하여 원하는대로 변경할 수 있습니다. 단, sh 파일들은 꼭 `chmod u+x` 를 적용하여 실행가능한 파일로 만들어야합니다.
+가급적 업스트림의 변경사항에 따라 필수 바이너리가 따라가도록 하려면 override 파일에서 `/etc/code-docker/build/build.default.sh` 를 실행하는것을 추천합니다. 다만 원치 않는 경우 하지 않아도 됩니다.
 각 override 파일은 편집 후, 컨테이너 재빌드가 필요합니다. `docker compose build 컨테이너명 && docker compose up -d` 를 수행하세요
 
 ## 파일 목록
 
-**빌드**
+**`config/build/`**
 - [`build.*.sh`](#buildsh-빌드-스크립트)
 
-**code-server**
+**`config/code/`**
 - [`code-service.*.sh`](#code-servicesh-code-server-서비스-진입점)
 - [`code-config.*.yaml`](#code-configyaml-code-server-기본-설정)
 - [`code-env.*.sh`](#code-envsh-code-server-환경변수)
 - [`code-runner.*.sh`](#code-runnersh-code-server-실행-방식)
 - [`recommendations.*.yaml`](#recommendationsyaml-추천-목록)
-- [`shell.*`](#shell-기본-셸-지정)
-
-**webmanager**
-- [`webmanager.*.sh`](#webmanagersh-webmanager-실행)
-- [`supervisor-metadata.*.yaml`](#supervisor-metadatayaml-supervisor-탭-메타데이터)
-- [`example-env.webmanager`](../example-env.webmanager) (저장소 루트 파일 — 런타임 환경변수 템플릿)
-
-**기타**
-- [`supervisord.*.conf`](#supervisordconf-supervisord-설정)
-- [`supervisord/*.conf`](#supervisordconf-추가-프로그램-등록)
-- [`user-init.*.sh`](#user-initsh-홈-폴더-초기화)
-- [`sshd-service.*.sh`](#sshd-servicesh-sshd-서비스)
 - [`code-patch.*.sh`](#code-patchsh-code-patch-심기-스크립트)
 - [`code-patch/`](#code-patch-기본-제공-브라우저-패치-모음)
+
+**`config/shell/`**
+- [`shell.*`](#shell-기본-셸-지정)
+
+**`config/webmanager/`**
+- [`webmanager.*.sh`](#webmanagersh-webmanager-실행)
+- [`example-env.webmanager`](../example-env.webmanager) (저장소 루트 파일 — 런타임 환경변수 템플릿)
+
+**`config/` (프로그램 폴더 밖 — supervisord/전역 메타데이터)**
+- [`supervisord.*.conf`](#supervisordconf-supervisord-설정)
+- [`supervisord/*.conf`](#supervisordconf-추가-프로그램-등록)
+- [`supervisor-metadata.*.yaml`](#supervisor-metadatayaml-supervisor-탭-메타데이터)
+
+**`config/user-init/`**
+- [`user-init.*.sh`](#user-initsh-홈-폴더-초기화)
+
+**`config/sshd/`**
+- [`sshd-service.*.sh`](#sshd-servicesh-sshd-서비스)
+
+**`config/resolv-writer/`**
+- [`resolv-writer.*.sh`](#resolv-writersh-router-dns로-nameserver-갱신)
+
+**`config/vector/`**
 - [`vector-service.*.sh`](#vector-servicesh-vector-실행)
 - [`vector.*.toml`](#vectortoml-vector-로그-파이프라인-설정)
+
+**`config/nginx/`**
 - [`nginx-service.*.sh`](#nginx-servicesh-nginx-실행)
 - [`nginx.*.conf`](#nginxconf-단일-origin-라우팅-설정)
 - [`nginx-error.*.html`](#nginx-errorhtml-code-server-준비-중-페이지)
@@ -104,6 +117,17 @@ tailscale 관련 override 파일(`tailscale-service.*.sh`, `tailscale-forward.*.
 **router** 컨테이너(`router/config/tailscale/`)에 있습니다 — 같은 override 패턴이지만
 재빌드 대상이 `code-docker-router` 서비스입니다. 자세한 내용은 [router.md](router.md)를
 확인하세요.
+
+### `resolv-writer.*.sh` (router DNS로 nameserver 갱신)
+
+`code-docker-internal` 네트워크가 `internal: true`라 Docker 자체 내장 DNS(`127.0.0.11`)가
+외부로 쿼리를 포워딩하지 못하기 때문에, router 컨테이너가 대신 실제 DNS 포워더(dnsmasq)를
+띄웁니다 — 이 supervisord 프로그램이 5초마다 `router`의 IP를 다시 조회해서
+`/etc/resolv.conf`에 두 번째 nameserver로 반영합니다(router가 재생성돼 IP가 바뀌어도 계속
+따라감). `entrypoint.sh`도 부팅 시 한 번 동기적으로 같은 일을 하고, `code-docker-dind`도
+자기 자신의 `/etc/resolv.conf`에 동일한 로직을 씁니다 — 세 곳 모두 저장소 루트
+`netshare/apply-nameserver.sh`의 `apply_nameserver` 함수를 공유합니다(직접 수정할 일은
+거의 없는 파일이지만, override한다면 이 공유 함수를 계속 쓰는 걸 권장합니다).
 
 ### `code-patch.*.sh` (code-patch 심기 스크립트)
 

@@ -167,7 +167,7 @@ webmanager 자체 비밀번호 게이트를 켜는 방법과, 이미지를 업�
 
 # 빌드 커스터마이징
 
-각각의 config 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 build.default.sh 를 build.override.sh 로 복사하여 원하는대로 변경할 수 있습니다. 단, sh 파일들은 꼭 `chmod u+x` 를 적용하여 실행가능한 파일로 만들어야합니다. 각 override 파일은 편집 후, 컨테이너 재빌드가 필요합니다 (`docker compose build 컨테이너명 && docker compose up -d`).
+`config/` 아래는 프로그램별 폴더(`build/`, `code/`, `nginx/`, ...)로 나뉘어 있고, 각 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 `config/build/build.default.sh` 를 같은 폴더에 `build.override.sh` 로 복사하여 원하는대로 변경할 수 있습니다. 단, sh 파일들은 꼭 `chmod u+x` 를 적용하여 실행가능한 파일로 만들어야합니다. 각 override 파일은 편집 후, 컨테이너 재빌드가 필요합니다 (`docker compose build 컨테이너명 && docker compose up -d`).
 
 전체 파일 목록과 각 파일의 역할은 [build-customization.md](build-customization.md)에 정리되어 있습니다:
 

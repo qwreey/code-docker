@@ -1,13 +1,7 @@
-code/
-sshd/
-/dind/
-/dind-authz/
-/router-data/
+/data/
 /node_modules
 .allow-test
 .env
 .env.webmanager
-config/*-override*
-config/*.override*
-config/code-patch/*.override.*
-config/supervisord/*.conf
+config/**/*-override*
+config/**/*.override*

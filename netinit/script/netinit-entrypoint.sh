@@ -1,10 +1,25 @@
 #!/bin/sh
 set -u
 
-# PID 1 with no explicit trap ignores SIGTERM by kernel default (this image
-# is intentionally minimal - no dedicated init) - trap explicitly so
-# `docker compose down`/stop exits immediately instead of waiting out the
-# full SIGKILL grace period every time.
+# code-docker-internal is `internal: true`, so Docker's own embedded DNS
+# (127.0.0.11) refuses to forward queries externally - a Docker feature, not
+# a bug, but it means code-docker can't resolve any hostname via its default
+# resolver. router runs a real forwarder (dnsmasq, see
+# router/.claude/router-dns-plan.md) - this loop points /etc/resolv.conf at
+# it, re-resolving `router`'s own IP periodically (same getent-in-a-loop
+# pattern this script's own apply_default_route uses for the default route,
+# since docker-compose's own `dns:` field only accepts a static IP, and
+# router's IP isn't static across recreates).
+#
+# apply_default_route/apply_nameserver are shared with
+# code-dind/script/dind-entrypoint.sh and
+# config/resolv-writer/resolv-writer.default.sh - see root CLAUDE.md's
+# "netshare" section. This subtree's own isolated build context can't reach
+# repo-root netshare/ directly, so /netshare here is a hand-synced copy
+# (netinit/script/netshare/, run vendor-netshare.sh after editing
+# netshare/).
+. /netshare/apply-route.sh
+
 trap 'exit 0' TERM INT
 
 if [ "${NETGATE_ENABLED:-true}" = "false" ]; then
@@ -30,36 +45,14 @@ while true; do
 		exit 1
 	fi
 
-	gw_ip="$(getent hosts "$router_hostname" 2>/dev/null | awk '{ print $1; exit }')"
-
 	# router (formerly netgate) not resolving is the expected, permanent
 	# state throughout Phase 1 (router itself doesn't exist yet - see
-	# .claude/backlog/egress-netgate-plan.md). This loop must never treat
-	# that as fatal or exit non-zero - a crash here would tear down
-	# code-docker's own netns setup for no benefit, since this container
-	# only patches code-docker's routing table, it doesn't own the netns.
-	if [ -n "$gw_ip" ]; then
-		ip route replace default via "$gw_ip" 2>/dev/null
-	fi
-
-	# Best-effort watch for a second default route/gateway besides router.
-	# Can't originate from inside code-docker itself (it has no NET_ADMIN
-	# anywhere in its netns except this sidecar), so this only ever fires
-	# from a deliberate compose/host edit (e.g. code-docker-external
-	# re-attached) - detect + log only, never auto-revert someone's
-	# intentional change. See the plan doc's "우리가 못 막는 것" 1.
-	default_routes="$(ip -4 route show default 2>/dev/null)"
-	line_count=$(printf '%s\n' "$default_routes" | grep -c '^default')
-	unexpected=0
-	if [ "$line_count" -gt 1 ]; then
-		unexpected=1
-	elif [ -n "$gw_ip" ] && [ -n "$default_routes" ] && ! printf '%s\n' "$default_routes" | grep -q "via $gw_ip"; then
-		unexpected=1
-	fi
-	if [ "$unexpected" -eq 1 ]; then
-		echo "netinit: WARNING unexpected default route(s), expected only $router_hostname ($gw_ip):" >&2
-		printf '%s\n' "$default_routes" >&2
-	fi
+	# .claude/backlog/egress-netgate-plan.md). apply_default_route must
+	# never be treated as fatal when it returns 1 here - a crash would
+	# tear down code-docker's own netns setup for no benefit, since this
+	# container only patches code-docker's routing table, it doesn't own
+	# the netns.
+	apply_default_route "$router_hostname"
 
 	sleep 5
 done

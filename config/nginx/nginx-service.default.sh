@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-nginx_config=/etc/code-docker/nginx.default.conf
-if [ -e /etc/code-docker/nginx.override.conf ]; then
-    nginx_config=/etc/code-docker/nginx.override.conf
+nginx_config=/etc/code-docker/nginx/nginx.default.conf
+if [ -e /etc/code-docker/nginx/nginx.override.conf ]; then
+    nginx_config=/etc/code-docker/nginx/nginx.override.conf
 fi
 
 # NGINX_LOG_LEVEL (docker-compose.yml) selects the access_log suffix that
