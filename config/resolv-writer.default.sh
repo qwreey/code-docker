@@ -23,6 +23,8 @@ if [ "${NETGATE_ENABLED:-true}" = "false" ]; then
     while true; do sleep 3600; done
 fi
 
+router_hostname="${ROUTER_HOSTNAME:-router}"
+
 # 127.0.0.11 (Docker's own embedded resolver) is kept as the FIRST
 # nameserver, not replaced - it's still what resolves local container
 # names/aliases (private, router, dind, forward, tinyauth, ...), which have
@@ -39,7 +41,7 @@ fi
 # into it directly works fine; the tiny non-atomic-write window doesn't
 # matter for a file this short.
 while true; do
-    router_ip="$(getent hosts router 2>/dev/null | awk '{ print $1; exit }')"
+    router_ip="$(getent hosts "$router_hostname" 2>/dev/null | awk '{ print $1; exit }')"
     if [ -n "$router_ip" ] && ! grep -q "^nameserver $router_ip\$" /etc/resolv.conf 2>/dev/null; then
         printf 'nameserver 127.0.0.11\nnameserver %s\noptions ndots:0\n' "$router_ip" > /etc/resolv.conf \
             && echo "resolv-writer: /etc/resolv.conf now has router ($router_ip) as fallback nameserver"

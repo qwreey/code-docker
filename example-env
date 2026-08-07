@@ -252,3 +252,14 @@
 # 눈에 띄는 수동 작업입니다. docs/egress-netgate.md의 "당장 인터넷이
 # 필요하다면" 절에 정확한 절차가 있습니다.
 #NETGATE_ENABLED="true"
+
+# code-docker/code-docker-netinit/code-docker-dind가 라우터를 찾을 때 쓰는
+# 호스트네임입니다(entrypoint.sh/netinit-entrypoint.sh/dind-entrypoint.sh/
+# resolv-writer 전부 이 값으로 getent hosts를 호출). code-docker-router 서비스
+# 자신의 code-docker-internal 별칭도 이 값을 그대로 씁니다 - docker-compose.yml
+# 한 곳에서 같은 변수를 참조하므로 둘이 어긋날 일은 없습니다. PREFIX가 이미
+# 네트워크 자체를 인스턴스별로 분리해주므로(각 인스턴스가 별도
+# code-docker-internal을 가짐) 여러 인스턴스를 한 호스트에 띄우는 것만으로는
+# 바꿀 필요가 없습니다 - docker-compose.yml을 직접 손대지 않고 라우터 별칭
+# 이름을 다른 값으로 바꾸고 싶을 때만 설정하세요.
+#ROUTER_HOSTNAME="router"

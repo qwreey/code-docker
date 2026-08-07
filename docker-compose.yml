@@ -55,6 +55,10 @@ services:
       # code-docker-external/ports below - those are static compose topology
       # and can't be conditioned on a runtime env var, see example-env.
       NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
+      # Hostname entrypoint.sh/resolv-writer resolve to find router - must
+      # match the alias on code-docker-router's own networks: block below.
+      # See example-env before overriding.
+      ROUTER_HOSTNAME: "${ROUTER_HOSTNAME:-router}"
     # webmanager(admin panel, port 81) settings all live in .env.webmanager,
     # not here - copy example-env.webmanager to .env.webmanager and uncomment
     # only what you need (every value already has a sane default). See the
@@ -152,6 +156,9 @@ services:
       - NET_ADMIN
     environment:
       NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
+      # Must match the alias on code-docker-router's own networks: block
+      # below - see example-env before overriding.
+      ROUTER_HOSTNAME: "${ROUTER_HOSTNAME:-router}"
     depends_on:
       code-docker:
         condition: service_started
@@ -193,6 +200,9 @@ services:
       # code-docker-external below - static compose topology, see
       # example-env.
       NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
+      # Must match the alias on code-docker-router's own networks: block
+      # below - see example-env before overriding.
+      ROUTER_HOSTNAME: "${ROUTER_HOSTNAME:-router}"
     volumes:
       # Persist pulled images/containers across restarts
       - "${DIND_VOLUME:-./dind}:/var/lib/docker"
@@ -342,21 +352,25 @@ services:
     networks:
       code-docker-internal:
         # code-docker-netinit's and dind-entrypoint.sh's own routing loops
-        # both resolve `router` - see script/netinit-entrypoint.sh and
-        # script/dind-entrypoint.sh. Renamed from `netgate` alongside the
-        # service rename. `forward` is tailscale-forward.default.sh's own
-        # socat bind target (`forward:<port>`, resolved from inside
-        # code-docker, reaches router's forwards listeners) - it used to
-        # live on a dedicated code-docker-forwards network to keep
-        # forwards/publish from sharing a port namespace, back when both
-        # lived inside code-docker itself. Now that both live entirely on
-        # router (forwards' socat binds router's own IP; publish's
-        # `tailscale serve` proxies to a *different* container - code-docker
-        # - rather than binding a local port at all), that collision can't
-        # happen anymore, so the dedicated network was dropped and `forward`
-        # just aliases router's existing code-docker-internal attachment.
+        # both resolve this alias by default (see ROUTER_HOSTNAME above on
+        # code-docker/code-docker-netinit/code-docker-dind, and
+        # script/entrypoint.sh, script/netinit-entrypoint.sh,
+        # script/dind-entrypoint.sh, config/resolv-writer.default.sh) -
+        # keep this alias in sync with ROUTER_HOSTNAME if you override it,
+        # see example-env. Renamed from `netgate` alongside the service
+        # rename. `forward` is tailscale-forward.default.sh's own socat
+        # bind target (`forward:<port>`, resolved from inside code-docker,
+        # reaches router's forwards listeners) - it used to live on a
+        # dedicated code-docker-forwards network to keep forwards/publish
+        # from sharing a port namespace, back when both lived inside
+        # code-docker itself. Now that both live entirely on router
+        # (forwards' socat binds router's own IP; publish's `tailscale
+        # serve` proxies to a *different* container - code-docker - rather
+        # than binding a local port at all), that collision can't happen
+        # anymore, so the dedicated network was dropped and `forward` just
+        # aliases router's existing code-docker-internal attachment.
         aliases:
-          - router
+          - "${ROUTER_HOSTNAME:-router}"
           - forward
       code-docker-external: {}
     ports:

@@ -35,21 +35,22 @@ if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
     # keeps /etc/resolv.conf correct for the rest of this container's life
     # (e.g. if router gets recreated with a new IP), but that program doesn't
     # start until supervisord does, which is after user-init.sh already ran.
-    # `getent hosts router` itself doesn't need this rewrite yet - Docker's
-    # embedded DNS already resolves same-network container/alias names
-    # regardless of the internal-network restriction, only external
-    # forwarding is blocked.
+    # `getent hosts "$router_hostname"` itself doesn't need this rewrite
+    # yet - Docker's embedded DNS already resolves same-network container/
+    # alias names regardless of the internal-network restriction, only
+    # external forwarding is blocked.
     echo "entrypoint: waiting for router's DNS forwarder..."
     waited=0
     timeout=60
     interval=2
+    router_hostname="${ROUTER_HOSTNAME:-router}"
     router_ip=""
     until [ -n "$router_ip" ]; do
-        router_ip="$(getent hosts router 2>/dev/null | awk '{ print $1; exit }')"
+        router_ip="$(getent hosts "$router_hostname" 2>/dev/null | awk '{ print $1; exit }')"
         [ -n "$router_ip" ] && break
         waited=$((waited + interval))
         if [ "$waited" -ge "$timeout" ]; then
-            echo >&2 "entrypoint: could not resolve 'router' after ${timeout}s - continuing without DNS, resolv-writer will keep retrying once supervisord starts"
+            echo >&2 "entrypoint: could not resolve '$router_hostname' after ${timeout}s - continuing without DNS, resolv-writer will keep retrying once supervisord starts"
             break
         fi
         sleep "$interval"

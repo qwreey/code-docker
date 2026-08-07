@@ -12,6 +12,8 @@ if [ "${NETGATE_ENABLED:-true}" = "false" ]; then
 	while true; do sleep 3600; done
 fi
 
+router_hostname="${ROUTER_HOSTNAME:-router}"
+
 while true; do
 	# code-docker is the netns owner (network_mode: service:code-docker) -
 	# if it restarts (not just a process inside it), Docker tears down and
@@ -28,7 +30,7 @@ while true; do
 		exit 1
 	fi
 
-	gw_ip="$(getent hosts router 2>/dev/null | awk '{ print $1; exit }')"
+	gw_ip="$(getent hosts "$router_hostname" 2>/dev/null | awk '{ print $1; exit }')"
 
 	# router (formerly netgate) not resolving is the expected, permanent
 	# state throughout Phase 1 (router itself doesn't exist yet - see
@@ -55,7 +57,7 @@ while true; do
 		unexpected=1
 	fi
 	if [ "$unexpected" -eq 1 ]; then
-		echo "netinit: WARNING unexpected default route(s), expected only router ($gw_ip):" >&2
+		echo "netinit: WARNING unexpected default route(s), expected only $router_hostname ($gw_ip):" >&2
 		printf '%s\n' "$default_routes" >&2
 	fi
 
