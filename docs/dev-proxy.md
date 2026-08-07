@@ -29,7 +29,7 @@
 [webmanager의 Dev Proxy 탭](webmanager.md)에서 먼저 이름(내부 식별자)과 host(외부에 노출할 전체 도메인, 예: `dev.example.com` — 라벨 하나만 와일드카드로 두고 싶으면 `*.staging.example.com`처럼 Caddy의 `host` matcher 와일드카드 문법을 그대로 쓸 수 있습니다)로 expose를 하나 만들고, 그 아래에 라우트를 원하는 만큼 추가하는 두 단계 구조입니다. "이름"은 파일명(`managed/<이름>.caddy`)과 Caddyfile `@이름` matcher 토큰으로만 쓰이는 내부 식별자라 점(`.`)을 포함할 수 없습니다 — 실제 노출 도메인은 항상 host 필드에 입력하세요. 이름과 host 둘 다 expose를 펼친 화면에서 나중에 바꿀 수 있습니다(각자 인라인 편집) — 이름을 바꾸면 파일도 새 이름으로 다시 쓰고 검증까지 통과한 뒤에만 옛 파일을 지우므로 중간에 실패해도 expose가 사라지지 않고, 이미 쓰이는 이름으로 바꾸려 하면 거부됩니다. 라우트 하나는:
 
 - **라우팅 대상 path** — 예: `/api/*`. 비우면 전체 요청에 매치됩니다.
-- **target** (`host:port`) — 리버스 프록시 대상. router 컨테이너 기준으로 reachable해야 합니다 — `127.0.0.1`/`localhost`는 router 자기 자신을 가리켜 code-docker 안 dev 서버에 닿지 않습니다. `code-docker:포트`처럼 compose 서비스 호스트네임을 쓰세요.
+- **target** (`host:port`) — 리버스 프록시 대상. router 컨테이너 기준으로 reachable해야 합니다 — `127.0.0.1`/`localhost`는 router 자기 자신을 가리켜 code-docker 안 dev 서버에 닿지 않습니다. `code-docker:포트`처럼 compose 서비스 호스트네임을 쓰세요. 기본적으로 `code-docker`/`dind` 두 compose 서비스 호스트네임만 허용되고 그 외 대상은 거부됩니다(Caddy 자신의 admin API 등을 겨냥한 self-SSRF 방지) — `DEVPROXY_ALLOW_EXTERNAL_TARGETS="true"`로 제한을 풀 수 있지만, router 자기 자신(`127.0.0.1`/`localhost`/자기 IP)은 이 옵트아웃으로도 절대 허용되지 않습니다.
 - **strip prefix** (선택) — 요청 경로에서 이 리터럴 문자열을 잘라내고(`uri strip_prefix`) 전달합니다.
 - **리버스프록시 path** (선택) — strip 이후 남은 경로 앞에 이 문자열을 붙입니다(`rewrite * <값>{uri}`). 예를 들어 대상 path `/api/*`, strip `/api`, 리버스프록시 path `/v1/api`면 `/api/foo` 요청이 target에는 `/v1/api/foo`로 전달됩니다.
 - **매칭 방식** — `route`(매치되면 무조건 실행, 다른 라우트와 독립적으로 겹쳐 실행 가능) 또는 `handle`(같은 서브도메인 안의 다른 라우트와 배타적, 먼저 매치되는 라우트 하나만 실행) 중 선택. Caddy 자체의 `route`/`handle` 디렉티브 의미 그대로입니다.
@@ -43,30 +43,35 @@
 
 ## 바깥 리버스 프록시 연결하기
 
-### 기본: nginx의 `/exports/`를 경유 (권장)
+### 기본: router 자신의 nginx `/exports/`를 경유 (권장)
 
-code-docker는 이미 80번 포트에서 in-container nginx가 code-server(`/`)와
-webmanager(`/manager`)를 합쳐서 서빙합니다 — Dev Proxy도 별도 포트를 새로
-열기보다 이 80번을 그대로 재사용하는 게 기본 권장 경로입니다. 이렇게 하면
-code-docker 컨테이너 하나가 바깥에 노출해야 하는 포트가 80 하나로 끝나고,
-바깥 방화벽/보안그룹/tailnet ACL도 그 하나만 신경 쓰면 됩니다.
+`code-docker-router`가 80번 포트를 직접 리스닝합니다(`code-docker`는 더 이상
+이 포트를 퍼블리시하지 않습니다 — router 자신의 nginx가 host:80을 직접
+종단합니다, 자세한 경위는
+[router-nginx-hardening-plan.md](../router/.claude/router-nginx-hardening-plan.md)
+참고). `/exports/`(Dev Proxy)와 `/router/`(router-manager)는 router의 nginx가
+직접 처리하고, 나머지 요청은 그대로 `code-docker:80`(code-server/webmanager)으로
+넘어갑니다. Dev Proxy도 별도 포트를 새로 열기보다 이 80번을 그대로 재사용하는
+게 기본 권장 경로입니다 — 바깥에 노출해야 하는 포트가 80 하나로 끝나고, 바깥
+방화벽/보안그룹/tailnet ACL도 그 하나만 신경 쓰면 됩니다.
 
 방법은 간단합니다 — 바깥 프록시가 dev-proxy로 보낼 요청의 **path 앞에만
-`/exports`를 붙이고, Host는 그대로 둔 채** 80번 포트로 보내면, 컨테이너 안
-nginx가 `/exports`를 벗겨내고 내부 Caddy(`caddy-adapter`)로 넘깁니다. Host가
-그대로 전달되므로 `caddy-adapter`의 expose별 Host 매칭은 전혀 손댈 필요가
-없고, dev 서버도 `/exports`를 보지 않으므로(nginx가 이미 벗긴 뒤) base
-path를 따로 맞출 필요도 없습니다:
+`/exports`를 붙이고, Host는 그대로 둔 채** router의 80번 포트로 보내면, router
+자신의 nginx가 `/exports`를 벗겨내고 내부 Caddy(`caddy-adapter`, 유닉스 소켓)로
+넘깁니다. Host가 그대로 전달되므로 `caddy-adapter`의 expose별 Host 매칭은
+전혀 손댈 필요가 없고, dev 서버도 `/exports`를 보지 않으므로(nginx가 이미 벗긴
+뒤) base path를 따로 맞출 필요도 없습니다:
 
 ```
 브라우저 → Host: dev.example.com, path: /api
-바깥 Caddy → rewrite로 path 앞에 /exports 추가 (Host는 그대로) → ctip:80
-code-docker 안 nginx → /exports 벗김 (Host는 그대로) → router의 caddy-adapter
+바깥 Caddy → rewrite로 path 앞에 /exports 추가 (Host는 그대로) → router:80
+router 자신의 nginx → /exports 벗김 (Host는 그대로) → caddy-adapter(유닉스 소켓)
 caddy-adapter → 기존과 동일하게 Host로 expose를 찾아 dev 서버로 전달
 ```
 
-Caddy 예시 (도메인 하나, `containerip:80`은 code-server/webmanager와 동일한
-그 IP·포트입니다):
+Caddy 예시 (도메인 하나, `containerip:80`은 이제 **router** 컨테이너의
+IP·포트입니다 — code-server/webmanager 요청도 router의 nginx를 거쳐
+`code-docker:80`으로 위임되므로 같은 진입점을 그대로 쓰면 됩니다):
 
 ```caddyfile
 dev.example.com {
@@ -98,7 +103,7 @@ server {
 }
 ```
 
-`/exports`는 바깥 프록시와 code-docker의 nginx 사이에서만 쓰이는 내부
+`/exports`는 바깥 프록시와 router 자신의 nginx 사이에서만 쓰이는 내부
 표시일 뿐이라 브라우저 URL이나 dev 서버가 받는 경로에는 전혀 나타나지
 않습니다 — expose의 host 필드나 라우트 path/target 설정은 지금까지와
 완전히 동일하게 적으면 됩니다.

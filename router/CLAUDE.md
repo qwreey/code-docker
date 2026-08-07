@@ -6,11 +6,12 @@ This subtree follows the same convention as `webmanager/` (see that
 subtree's own `CLAUDE.md` for the fully-grown example): `router/CLAUDE.md` +
 `router/plan.md` at the subtree root, feature-specific design/history docs
 under `router/.claude/` (`router/.claude/functional-router-plan.md` —
-the vision/every-decision doc, mostly implemented now, see `plan.md` —
-and `router/.claude/router-dns-plan.md`; `router/.claude/archive/` holds
-done/superseded design docs, e.g. `tailscale-design.md`, the original
-tailscale-in-code-docker design this container's own tailscale feature
-superseded).
+the vision/every-decision doc, implemented now, see `plan.md` — plus
+`router/.claude/router-dns-plan.md` and
+`router/.claude/router-nginx-hardening-plan.md`, both also implemented and
+verified, see `plan.md`; `router/.claude/archive/` holds done/superseded
+design docs, e.g. `tailscale-design.md`, the original tailscale-in-code-docker
+design this container's own tailscale feature superseded).
 
 ## What this is
 

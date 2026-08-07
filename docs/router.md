@@ -31,8 +31,8 @@
 안 마커 파일로 추적, code-docker 쪽과 동일한 self-DDoS 방지 이유). 로그인 URL은
 `docker compose logs -f code-docker-router`로 확인하거나, code-server 화면 우측 상단
 배너(같은 code-patch 메커니즘, `tailscale-notify.js`)로도 뜹니다 — 이제 이 배너는
-router의 읽기전용 상태 API(`GET /tailscale/state`, code-docker의 nginx가 프록시)를
-폴링합니다.
+router 자신의 nginx가 host:80에서 직접 종단하는 읽기전용 상태 API
+(`GET /router/api/tailscale/state`)를 폴링합니다.
 
 로그인 상태는 `${ROUTER_VOLUME:-./router-data}/tailscale/state`(호스트 경로)에
 영속됩니다. 자동 시도를 놓쳤거나 소진된 상태라면 webmanager의 Tailscale 탭에서
@@ -127,9 +127,13 @@ docker run --rm ghcr.io/tinyauthapp/tinyauth:v5 user create \
 
 ## router-manager
 
-router는 `router-manager`라는 Go 백엔드를 갖고 있습니다(webmanager와 같은 패턴,
-code-docker의 nginx가 `/tailscale/`·`/dev-proxy/`·`/router-auth/` 위치로 프록시 —
-router-manager 자신은 호스트 포트를 게시하지 않습니다). 제공하는 것:
+router는 `router-manager`라는 Go 백엔드를 갖고 있습니다(webmanager와 같은 패턴).
+router 자신의 nginx가 host:80을 직접 종단해 `/router/` 위치 하나로 모든 API를
+유닉스 소켓(`/run/router-manager.sock`) 경유로 프록시합니다 — router-manager
+자신은 TCP 포트를 전혀 열지 않습니다(`ROUTER_MANAGER_ADDR`는 컨테이너 밖 로컬
+개발용으로만 쓰는 opt-in 예외). 아래 API 경로는 router-manager 자신 기준이고,
+실제로는 router의 nginx가 그대로 `/router/api/...`로 통과시킵니다(예:
+`/router/api/tailscale/state`). 제공하는 것:
 
 - Tailscale 전체 CRUD — `GET`/`PUT /api/tailscale/config`(SOCKS 주소/재시도 간격),
   `GET`/`POST`/`DELETE /api/tailscale/forwards[/{name}]`, 같은 패턴의

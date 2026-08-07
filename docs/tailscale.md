@@ -11,5 +11,5 @@ tailscale(데몬+로그인+포트 가져오기/내보내기)은 code-docker가 �
 
 code-docker 쪽에 남아있는 것은 로그인 필요 시 code-server 화면에 뜨는 배너뿐입니다 —
 `config/code-patch/tailscale-notify.default.js`가 router의 읽기전용 상태 API를
-(code-docker의 nginx가 `/tailscale/` 경로로 프록시) 4초마다 폴링합니다. 배너 자체의
-Ignore/알림 동작은 이전과 동일합니다.
+(router 자신의 nginx가 `/router/` 경로로 host:80에서 직접 종단) 4초마다 폴링합니다.
+배너 자체의 Ignore/알림 동작은 이전과 동일합니다.

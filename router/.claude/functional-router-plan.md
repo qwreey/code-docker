@@ -98,6 +98,13 @@ forward-auth 대상으로 tinyauth를 세우는 구조가 될 것 — 세부 배
 
 ### nginx는 code-docker에 잔류 + `/tailscale` 프록시 역할 추가 — 결정됨 (2026-08-06)
 
+> **이후 갱신 (2026-08-07):** 이 절의 "`/tailscale` 프록시를 code-docker의 nginx가
+> 맡는다"는 부분은 `router/.claude/router-nginx-hardening-plan.md`의 하드닝
+> 작업으로 대체됐습니다 — router가 이제 자기 자신의 nginx로 host:80을 직접
+> 종단하고, tailscale/Dev Proxy 관리 API는 `/router/` 위치 하나로 유닉스 소켓
+> 경유 프록시됩니다. code-docker의 nginx가 `/`와 `/manager`를 서빙하는 부분(이
+> 절의 핵심 이유)은 여전히 유효합니다. 아래는 당시 결정 기록 그대로 둡니다.
+
 `egress-netgate-plan.md`에서 이미 "nginx는 유지"로 거의 결정됐던 것을, 이번에 이유까지
 명확히 함: code-docker 안 nginx의 본래 역할은 `/`(code-server)와 `/manager`
 (webmanager)를 크로스오리진 문제 없이 한 origin처럼 합치는 것이다. 이 역할을 router로
@@ -115,6 +122,11 @@ readonly API를 `code-docker-internal` 내부망으로 프록시한다. router �
 진입점부터 forward-auth를 걸기 때문.
 
 ### tailscale readonly API 노출 정책 — 결정됨 (2026-08-06)
+
+> **이후 갱신 (2026-08-07):** "위 nginx `/tailscale` 프록시 경유"는 이제 router
+> 자신의 nginx가 host:80에서 직접 종단하는 `/router/` 위치를 가리킵니다 —
+> `router-nginx-hardening-plan.md` 참고. "기본값: private-only, 전체 공개는
+> env flag로 opt-in"이라는 정책 자체는 여전히 유효합니다.
 
 router manager(Go 백엔드)가 대부분의 API를 갖되, tailscale 관련 API는:
 

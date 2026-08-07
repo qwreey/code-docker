@@ -11,18 +11,18 @@ code-docker 가 `code-docker-external`/`code-docker-internal` 양쪽에 다 붙�
 
 </details>
 
-`code-docker-dind` 는 `code-docker-external` 에도 연결되어있지만(`docker pull` 을 위해 필요), 데몬 소켓 자체는 `code-docker-internal` 쪽에만 바인드되어있어 그쪽에서는 노출되지 않습니다.
+`code-docker-dind` 는 `code-docker-internal` 에만 연결되어있고, 데몬 소켓도 그 네트워크의 IP에만 바인드되어있어 컨테이너 바깥(인터넷)에서는 노출되지 않습니다. `docker pull` 등 인터넷 접근이 필요한 요청은 `code-docker-router`(egress netgate - [`../egress-netgate.md`](../egress-netgate.md) 참고)를 게이트웨이로 거쳐 나갑니다.
 
 <details>
 <summary>기술적으로 어떻게 막혀있는지</summary>
 
-`code-docker-internal` 은 `internal: true` 로 인터넷 경로가 차단되어있어 `docker pull` 이 실패하므로, `code-docker-dind` 는 `code-docker-external` 에도 연결되어있습니다. 다만 dind 데몬 자체는 `script/dind-entrypoint.sh` 를 통해 `code-docker-internal` 쪽 IP에만 바인드되도록 되어있어(스톡 `docker:dind` 이미지의 `--host=tcp://0.0.0.0:2375` 기본 동작을 오버라이드함), 이미지 pull 은 되면서도 소켓 자체는 `code-docker-external` 에서 접근할 수 없습니다.
+`code-docker-internal` 은 `internal: true` 로 자체적으로는 인터넷 경로가 없으므로, `script/dind-entrypoint.sh` 가 code-docker의 `code-docker-netinit` 과 동일한 방식으로 기본 게이트웨이를 `code-docker-router` 로 계속 재설정하는 루프를 돌립니다 - `docker pull` 은 이 경로를 통해 나갑니다. dind 데몬 자체는 같은 스크립트가 `code-docker-internal` 쪽 IP에만 바인드하도록 되어있어(스톡 `docker:dind` 이미지의 `--host=tcp://0.0.0.0:2375` 기본 동작을 오버라이드함), `code-docker-dind` 는 `code-docker-external` 에 아예 붙어있지 않으므로 소켓은 인터넷/호스트 어디서도 직접 접근할 수 없습니다.
 
 </details>
 
 dind 쪽에는 `./dind:/var/lib/docker` 볼륨이 마운트되어있어 컨테이너/이미지가 재기동 후에도 유지됩니다.
 
-> 보안 주의: `code-docker-dind` 는 `privileged: true` 로 구동되며, 인증/TLS 없는 평문 tcp 소켓(2375)이 열려있습니다. `code-docker-external` 로부터는 격리되어있지만, `code-docker-internal` 네트워크에 연결된 컨테이너라면 누구든 이 소켓에 요청을 보낼 수 있습니다. 아래 "요청 단위 제한 (dind-authz)" 절 덕분에 기본값에서는 이 소켓을 통해 생성되는 컨테이너 자체가 특권을 요구할 수 없게 막혀있지만, 그래도 `code-docker-internal` 에는 신뢰할 수 있는 서비스만 연결하고 code-docker 접근 권한을 신뢰할 수 없는 사용자에게 주지 않는 것이 기본 전제입니다.
+> 보안 주의: `code-docker-dind` 는 `privileged: true` 로 구동되며, 인증/TLS 없는 평문 tcp 소켓(2375)이 열려있습니다. 인터넷/호스트로부터는 격리되어있지만(`code-docker-external` 에 붙어있지 않음), `code-docker-internal` 네트워크에 연결된 컨테이너라면 누구든 이 소켓에 요청을 보낼 수 있습니다. 아래 "요청 단위 제한 (dind-authz)" 절 덕분에 기본값에서는 이 소켓을 통해 생성되는 컨테이너 자체가 특권을 요구할 수 없게 막혀있지만, 그래도 `code-docker-internal` 에는 신뢰할 수 있는 서비스만 연결하고 code-docker 접근 권한을 신뢰할 수 없는 사용자에게 주지 않는 것이 기본 전제입니다.
 
 ## 요청 단위 제한 (dind-authz)
 

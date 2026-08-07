@@ -23,8 +23,8 @@ code-docker 안에서 실행되는 AI 코딩 에이전트(Claude Code 등)가 �
   명령을 마음대로 실행해도 이 라우트를 스스로 바꿀 수 없습니다.
 - `code-docker-router` 컨테이너가 실제 국경(border) 역할을 합니다 - `code-docker-internal`
   과 `code-docker-external` 양쪽에 다리를 걸치고, 사설 대역(RFC1918)으로 나가는 트래픽을
-  차단하고, DNS 레벨(dnsmasq)로 도메인 블록리스트를 적용하고, 호스트의 포트 80을
-  code-docker로 전달(포트포워딩)합니다. `code-docker-internal`이 `internal: true`라
+  차단하고, DNS 레벨(dnsmasq)로 도메인 블록리스트를 적용하고, 호스트의 포트 80을 자기
+  자신의 nginx로 직접 받아 `code-docker`로 리버스 프록시합니다. `code-docker-internal`이 `internal: true`라
   code-docker/dind 자체의 내장 DNS는 외부로 쿼리를 포워딩하지 못하므로, router가 이들의
   DNS 리졸버 역할도 겸합니다(dnsmasq).
 - **차단은 목적지 IP 기준입니다.** 같은 네트워크(`code-docker-internal`)에 붙어있는 다른
@@ -58,7 +58,7 @@ code-docker-router (code-docker-internal + code-docker-external 양쪽)
    ▼
 code-docker-external → 인터넷
 
-호스트:80 → code-docker-router (PREROUTING DNAT) → code-docker:80 (nginx)
+호스트:80 → code-docker-router 자신의 nginx (직접 종단) → code-docker:80 (nginx, 리버스 프록시)
 
 code-docker-netinit (network_mode: service:code-docker + NET_ADMIN, 방어적 루프로
    code-docker의 netns 안에 기본 라우트를 지속적으로 재적용)
@@ -70,9 +70,13 @@ code-docker-netinit (network_mode: service:code-docker + NET_ADMIN, 방어적 �
   체인은 first-match-wins이므로, 구체적인 예외를 넓은 차단보다 먼저 배치해야 합니다.
 - 기본 `outbound:` 값은 RFC1918(`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) +
   링크로컬(`169.254.0.0/16`) + 루프백(`127.0.0.0/8`)을 차단합니다.
-- 기본 `forwards:` 값은 호스트 80번 포트를 `code-docker:80`으로 전달합니다. 이
-  포트포워딩용 ACCEPT 규칙은 항상 RFC1918 차단 규칙보다 **먼저** 적용됩니다 -
-  code-docker의 IP 자체가 RFC1918 대역에 속하기 때문입니다.
+- 기본 `forwards:` 값은 **비어 있습니다**(`forwards: []`). 예전에는 호스트 80번 포트를
+  netgate의 PREROUTING DNAT로 `code-docker:80`에 전달했지만, 지금은 `code-docker-router`
+  자신의 nginx가 80번을 직접 리스닝해 로컬 리스너로 처리하므로(로컬 리스너가 항상
+  PREROUTING DNAT보다 우선합니다) 그 항목은 죽은 설정이 되어 제거되었습니다. `forwards:`
+  항목을 추가하면(다른 호스트 포트를 다른 `code-docker-internal` 컨테이너로 전달하고
+  싶을 때) 그 포트포워딩용 ACCEPT 규칙은 항상 RFC1918 차단 규칙보다 **먼저** 적용됩니다 -
+  대상 컨테이너의 IP 자체가 RFC1918 대역에 속하기 때문입니다.
 - code-docker/dind는 `/etc/resolv.conf`가 router를 가리키도록 설정되어 있고, router의
   `dnsmasq`(`router/config/dns/`)가 이 DNS 쿼리를 받아 자기 자신의(정상 동작하는)
   upstream으로 포워딩합니다. 같은 dnsmasq가 `addn-hosts=`로 StevenBlack/hosts 기반

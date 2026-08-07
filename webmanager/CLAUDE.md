@@ -105,8 +105,8 @@ whole tab, which the component doc comment notes is a supported pattern
 externally-spilled tool-result files are out of scope for v1. A shared
 password gate (`internal/authgate` — see `.claude/archive/authgate-plan-done.md` for
 the full list of what it gates; principle is reads-stay-open/writes-gated,
-with Terminal/File Manager/Logs/Supervisor-log-view/Claude-session-log gated
-entirely), a file
+with Terminal/File Manager/Logs/Sessions/Supervisor-log-view/Claude-session-log
+gated entirely), a file
 manager, a shared lazy-loaded CodeMirror 6 editor component, a responsive
 layout with a mobile hamburger/drawer sidebar (now also independently
 scrollable so short viewports can reach every item), a centralized
@@ -176,8 +176,9 @@ POSTs to `/api/sessions/heartbeat` every 30s — chosen over querying
 code-server's own connection API specifically to sidestep that approach's
 unresolved feasibility question (`.claude/archive/session-viewer-plan.md`,
 kept only as a record of the unresearched option); `GET /api/sessions` is
-password-gated like most of this app's sensitive reads, but the heartbeat
-POST itself is deliberately left ungated, a documented exception to the
+password-gated and the whole tab is wrapped in `RequiresUnlock` in `App.tsx`
+like Terminal/Files/Logs, but the heartbeat POST itself is deliberately left
+ungated, a documented exception to the
 reads-open/writes-gated convention since code-server runs with `auth: none`
 and has no credential to attach to that request in the first place. A Dev
 Proxy tab (`.claude/qa-request/caddy-plan-done.md` — historical only, see

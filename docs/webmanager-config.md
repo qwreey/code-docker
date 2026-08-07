@@ -79,9 +79,10 @@ cat .env.webmanager | docker compose exec -T code-docker \
 > 자체 API(router-manager)를 호출하므로 이 게이트 대상이 아닙니다(개별 라우트의
 > "인증 요구"는 대신 [tinyauth](router.md#tinyauth)가 담당) — router-manager는
 > `ROUTER_MANAGER_AUTH_PASSWORD_HASH`로 켜는 자기 자신만의 별도 비밀번호 게이트를
-> 갖고 있습니다([router.md](router.md#router-manager-자체-인증) 참고). 예외로 **Terminal, 파일 탭, Logs, Supervisor의
-> 프로그램별 로그 조회는 조회까지 통째로 게이트**됩니다(각각 root 쉘/임의 파일
-> 접근/로그 속 시크릿 노출 위험 때문). 값은 반드시 환경변수로만 주입해야 하며(설정
+> 갖고 있습니다([router.md](router.md#router-manager-자체-인증) 참고). 예외로 **Terminal, 파일 탭, Logs, Sessions,
+> Supervisor의 프로그램별 로그 조회, Claude Code 탭의 대화 세션 로그 서브탭은
+> 조회까지 통째로 게이트**됩니다(각각 root 쉘/임의 파일 접근/로그 속 시크릿
+> 노출/세션 내용 노출 위험 때문). 값은 반드시 환경변수로만 주입해야 하며(설정
 > 파일에 저장하면 컨테이너 안에서 프로세스를 재시작해 우회할 수 있어 일부러 지원하지
 > 않습니다), `/etc/environment`에도 같은 이름의 변수가 있으면 조작 가능성으로 보고
 > 게이트가 무시됩니다. 설정하지 않으면 이 게이트는 기본적으로 열려 있으므로(다른

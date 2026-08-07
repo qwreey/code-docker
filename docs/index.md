@@ -105,7 +105,7 @@ code-docker/dind가 `code-docker-netinit`(및 dind 자신)이 계속 심어주�
 
 ## 환경 변수 설정 (.env)
 
-`PWA_NAME`, `TZ`, `LANG`, 마운트할 볼륨 경로(`HOME_VOLUME`/`SSHD_VOLUME`/`DIND_VOLUME`), tailscale 관련 값, 로그 상세도 등 `docker-compose.yml`이 읽는 값들은 모두 `example-env`에 설명과 함께 정리되어 있습니다. `example-env`를 `.env`로 복사한 뒤 필요한 값만 주석을 풀어 쓰세요 - 전부 합리적인 기본값이 있어 이 파일이 없어도 정상 동작합니다. 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다.
+`PWA_NAME`, `TZ`, `LANG`, 마운트할 볼륨 경로(`HOME_VOLUME`/`SSHD_VOLUME`/`DIND_VOLUME`/`ROUTER_VOLUME`), 아웃바운드 격리 관련 값(`NETGATE_ENABLED`, `ROUTER_HOSTNAME`), 로그 상세도 등 `docker-compose.yml`이 읽는 값들은 모두 `example-env`에 설명과 함께 정리되어 있습니다 (tailscale/Dev Proxy/tinyauth 등 router 전용 기능 설정은 `router/example-env.router`에 별도로 있습니다 — [router.md](router.md) 참고). `example-env`를 `.env`로 복사한 뒤 필요한 값만 주석을 풀어 쓰세요 - 전부 합리적인 기본값이 있어 이 파일이 없어도 정상 동작합니다. 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다.
 
 ```sh
 cp example-env .env

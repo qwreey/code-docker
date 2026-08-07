@@ -23,11 +23,12 @@ Claude Code 탭, Caddy dev-proxy는 전부 `webmanager/.claude/`로 이동함). 
 - **환경변수/dotfiles 뷰어**: user-init이 건드리는 fish 설정이나 `.bashrc` 등을 굳이
   터미널 없이 훑어보고 싶을 때
 - **direnv `.envrc` allowlist 관리**: `direnv allow` 상태를 UI에서 확인/토글
-- **설정 백업/내보내기**: webmanager가 관리하는 파일들(ssh keys, gitconfig, tailscale
-  config 등)을 한 번에 export/import — 컨테이너 재생성 시 복원 편의
+- **설정 백업/내보내기**: webmanager가 관리하는 파일들(ssh keys, gitconfig, terminal
+  설정 등)을 한 번에 export/import — 컨테이너 재생성 시 복원 편의(tailscale config는
+  이제 router 컨테이너 소관이라 대상에서 빠짐, `docs/router.md` 참고)
 - **Docker 레지스트리 로그인**: dind 데몬이 쓰는 `~/.docker/config.json` (사설
-  레지스트리 로그인 정보) — dind 컴포넌트(`.claude/dind-plan.md`) 작업 시 같이
-  고려하면 자연스러움
+  레지스트리 로그인 정보) — Docker/dind 관리 탭(`.claude/qa-request/dind-plan-done.md`,
+  M1~M3 구현 완료)에 이어 붙이면 자연스러움
 
 ## code-server 설정(settings.json 등) 편집 UI — 후순위로 내림
 
@@ -54,11 +55,6 @@ Claude Code 탭, Caddy dev-proxy는 전부 `webmanager/.claude/`로 이동함). 
   방식 그대로(LANG도 추가함, docker-compose.yml의 environment 절 주석 참고).
   webmanager UI 기능으로서는 더 이상 브레인스토밍 대상 아님.
 -->
-
-## 사용자 세션 뷰어 — 추후 구현, 실현 가능성부터 확인 필요
-
-`webmanager/.claude/archive/session-viewer-plan.md` 참고 — 착수 전 리서치/실현 가능성
-확인이 필요해서 별도 계획 문서로 분리함(여기 브레인스토밍 목록에는 포인터만).
 
 ## mise opt-out 플래그 — 검토했으나 보류 (2026-08-03)
 
