@@ -90,11 +90,14 @@ case "${ROUTER_NGINX_DENY_INTERNAL_EXPORTS:-true}" in
         ;;
 esac
 
-# code-docker's whole nginx (port 80) - everything not matched by /exports/
-# or /router/ above falls through here unchanged.
-export NGINX_CODE_DOCKER_UPSTREAM="code-docker:80"
+# The catch-all target - everything not matched by /exports/, /router/, or
+# /app/ above falls through here unchanged. Named generically (not
+# NGINX_CODE_DOCKER_UPSTREAM) since router itself doesn't need to know it's
+# specifically code-docker on the other end - same "router doesn't assume
+# what's behind it" reasoning App Routes was built around.
+export NGINX_UPSTREAM="code-docker:80"
 
 generated_config=/run/nginx.generated.conf
-envsubst '${NGINX_ACCESS_LOG_IF} ${NGINX_ALLOWED_HOSTS_MAP} ${NGINX_ALLOWED_EXPORT_HOSTS_MAP} ${NGINX_LOOPBACK_BLOCK_MAP} ${NGINX_TRUSTED_PROXIES_DIRECTIVES} ${NGINX_DENY_INTERNAL_EXPORTS_DIRECTIVE} ${NGINX_CODE_DOCKER_UPSTREAM}' < "$nginx_config" > "$generated_config"
+envsubst '${NGINX_ACCESS_LOG_IF} ${NGINX_ALLOWED_HOSTS_MAP} ${NGINX_ALLOWED_EXPORT_HOSTS_MAP} ${NGINX_LOOPBACK_BLOCK_MAP} ${NGINX_TRUSTED_PROXIES_DIRECTIVES} ${NGINX_DENY_INTERNAL_EXPORTS_DIRECTIVE} ${NGINX_UPSTREAM}' < "$nginx_config" > "$generated_config"
 
 exec nginx -g "daemon off;" -c "$generated_config"

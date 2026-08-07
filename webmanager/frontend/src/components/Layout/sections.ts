@@ -3,6 +3,7 @@ export type SectionId =
   | 'ssh-keys'
   | 'git-config'
   | 'dev-proxy'
+  | 'app-routes'
   | 'tailscale'
   | 'logs'
   | 'processes'
@@ -26,6 +27,7 @@ export const SECTIONS: SectionMeta[] = [
   { id: 'ssh-keys', label: 'SSH Keys', implemented: true },
   { id: 'git-config', label: 'Git Config', implemented: true },
   { id: 'dev-proxy', label: 'Dev Proxy', implemented: true },
+  { id: 'app-routes', label: 'App Routes', implemented: true },
   { id: 'tailscale', label: 'Tailscale', implemented: true },
   { id: 'logs', label: 'Logs', implemented: true },
   { id: 'processes', label: 'Task Manager', implemented: true },

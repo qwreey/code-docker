@@ -119,3 +119,8 @@ export const { api, apiUrl } = createApiClient('router/api/dev-proxy')
 // router-manager's auth endpoints (/api/auth/unlock, /api/auth/status,
 // /api/auth/setup, /api/auth/change). Used by UnlockModal.tsx.
 export const { api: authApi } = createApiClient('router/api/auth', { skipUnlockRetry: true })
+
+// App Routes' own bound client - a separate prefix from Dev Proxy's plain
+// `api`/`apiUrl` export above (which already claimed that name), same
+// pattern authApi uses for its own prefix.
+export const { api: appRoutesApi } = createApiClient('router/api/app-routes')

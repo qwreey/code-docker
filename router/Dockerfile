@@ -37,6 +37,7 @@ COPY backend/hashpassword.go ./
 COPY backend/envmigratecmd.go ./
 COPY backend/handlers_auth.go ./
 COPY backend/handlers_devproxy.go ./
+COPY backend/handlers_approutes.go ./
 COPY backend/handlers_tailscale.go ./
 COPY backend/handlers_ui.go ./
 COPY backend/internal ./internal

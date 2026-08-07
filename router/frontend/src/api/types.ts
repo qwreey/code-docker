@@ -29,6 +29,22 @@ export interface DevProxyInfo {
   structured?: DevProxyExpose
 }
 
+// Mirrors router/backend/internal/approutes.App — a path-based,
+// Host-header-agnostic reverse-proxy entry (GET /api/app-routes/apps). name
+// is both the filename and the `/app/<name>/*` path segment it answers for
+// — there's no separate host concept here at all, unlike DevProxyExpose.
+export interface AppRoute {
+  name: string
+  target: string
+  requireAuth: boolean
+}
+
+export interface AppRouteInfo {
+  name: string
+  raw: string
+  structured?: AppRoute
+}
+
 // Mirrors router/backend's GET /api/tailscale/state.
 export interface TailscaleState {
   backendState: string

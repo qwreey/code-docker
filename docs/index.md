@@ -136,6 +136,18 @@ tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열�
 - [바깥 리버스 프록시 연결하기](dev-proxy.md#바깥-리버스-프록시-연결하기)
 - [인증](dev-proxy.md#인증) — [router의 tinyauth](router.md#tinyauth)에 최소 한 명의 사용자가 등록되어 있어야 합니다, 놓치기 쉬운 필수 설정입니다
 
+## 경로 기반 앱 라우팅 (App Routes)
+
+Host 헤더와 무관하게 `/app/<이름>/...` 경로로 들어오는 요청을 지정한 대상으로 리버스 프록시하는 기능입니다(Dev Proxy와 같은 router 컨테이너 안 Caddy 인스턴스가 처리, [webmanager의 App Routes 탭](webmanager.md)에서 관리). 최초 부팅 시 `code → code-docker:80` 앱이 자동 생성됩니다.
+
+자세한 내용은 [app-routes.md](app-routes.md)를 확인하세요.
+
+- [기본 앱 (code)](app-routes.md#기본-앱-code)
+- [앱 추가하기](app-routes.md#앱-추가하기)
+- [바깥 리버스 프록시 연결하기](app-routes.md#바깥-리버스-프록시-연결하기)
+- [알려진 한계 — 절대경로 응답은 제한적으로만 다뤄집니다](app-routes.md#알려진-한계--절대경로-응답은-제한적으로만-다뤄집니다)
+- [인증](app-routes.md#인증)
+
 ## webmanager (관리자 패널)
 
 80번 포트의 code-server 와 같은 origin, `/manager` 경로에 브라우저 관리자 패널이 함께 떠 있습니다 (Go 백엔드 + React 프론트엔드, `webmanager/` 폴더에서 개발됩니다) — 컨테이너 안 nginx가 `/manager`를 webmanager로, 나머지를 code-server로 라우팅해줍니다. 별도 포트로 직접 열고 싶다면(예: nginx를 거치지 않고 붙고 싶은 경우) `.env.webmanager`의 `WEBMANAGER_ADDR`를 `:81`로 바꾸고 `docker-compose.yml`의 주석 처리된 `81:81` 매핑을 되살리세요.
@@ -146,6 +158,7 @@ tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열�
 - [SSH Keys](webmanager.md#ssh-keys)
 - [Git Config](webmanager.md#git-config)
 - [Dev Proxy](webmanager.md#dev-proxy)
+- [App Routes](webmanager.md#app-routes)
 - [Logs](webmanager.md#logs)
 - [Task Manager](webmanager.md#task-manager)
 - [Claude Code](webmanager.md#claude-code)

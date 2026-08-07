@@ -3,14 +3,16 @@
 `code-docker-router`는 code-docker의 네트워크 경계를 전담하는 별도 컨테이너입니다.
 `code-docker-internal`(사설, code-docker/dind가 붙는 망)과 `code-docker-external`(진짜
 인터넷으로 나가는 망) 양쪽에 다리를 걸친 유일한 컨테이너로, code-docker보다 신뢰
-수준이 높습니다. 네 가지 기능을 담당합니다:
+수준이 높습니다. 다섯 가지 기능을 담당합니다:
 
 1. **아웃바운드 격리(netgate)** — RFC1918/사설망 차단, DNS 레벨(dnsmasq) 콘텐츠
    블록리스트, 인바운드 포트포워딩. 자세한 내용은 [egress-netgate.md](egress-netgate.md).
 2. **tailscale** — 데몬+로그인+포트 가져오기(forwards)+포트 내보내기(publish). 아래 참고.
 3. **Dev Proxy** — 컨테이너 안 dev 서버를 도메인으로 노출. 자세한 내용은
    [dev-proxy.md](dev-proxy.md).
-4. **tinyauth** — Dev Proxy 개별 라우트를 보호하는 가벼운 forward-auth.
+4. **App Routes** — Host 헤더와 무관한 경로 기반(`/app/<이름>/...`) 리버스
+   프록시. 자세한 내용은 [app-routes.md](app-routes.md).
+5. **tinyauth** — Dev Proxy/App Routes 개별 항목을 보호하는 가벼운 forward-auth.
 
 이렇게 한데 모은 이유(신뢰 경계가 code-docker보다 명확한 지점에 네트워크 관련 정책을
 집중시킨다는 설계)는
@@ -105,7 +107,7 @@ tailnet에서 도달 불가능하지만, sshd는 호스트 포트 게시를 위�
 
 ## tinyauth
 
-Dev Proxy 라우트별 "인증 요구"를 지원하는 forward-auth입니다. 별도 컨테이너가 아니라
+Dev Proxy 라우트/App Routes 앱별 "인증 요구"를 지원하는 forward-auth입니다. 별도 컨테이너가 아니라
 router 자신의 supervisord 프로그램으로 돕니다 — `router/Dockerfile`이 공식 이미지
 `ghcr.io/tinyauthapp/tinyauth`에서 이미 빌드된 바이너리만 멀티스테이지로 추출해
 씁니다(소스 빌드는 안 함 — pnpm 프론트엔드 빌드가 필수라 이 레포의 다른 Go 바이너리
@@ -122,8 +124,9 @@ docker run --rm ghcr.io/tinyauthapp/tinyauth:v5 user create \
 
 출력된 `TINYAUTH_AUTH_USERS=...` 줄을 `.env`에 붙여넣고, `TINYAUTH_APPURL`도
 실제 도메인 형식(`https://code-docker.example.com`)으로 설정한 뒤
-`docker compose up -d`로 재기동하세요. 자세한 사용법(라우트에 인증 요구 걸기)은
-[dev-proxy.md의 "인증"](dev-proxy.md#인증)을 확인하세요.
+`docker compose up -d`로 재기동하세요. 자세한 사용법(라우트/앱에 인증 요구 걸기)은
+[dev-proxy.md의 "인증"](dev-proxy.md#인증) 또는
+[app-routes.md의 "인증"](app-routes.md#인증)을 확인하세요.
 
 ## router-manager
 
@@ -144,13 +147,15 @@ router 자신의 nginx가 host:80을 직접 종단해 `/router/` 위치 하나�
   읽습니다.
 - Dev Proxy expose CRUD(`/api/dev-proxy/*`) — webmanager의
   [Dev Proxy 탭](webmanager.md#dev-proxy)이 여기로 요청을 보냅니다.
+- App Routes 앱 CRUD(`/api/app-routes/*`) — webmanager의
+  [App Routes 탭](webmanager.md#app-routes)이 여기로 요청을 보냅니다.
 - 자체 admin-API 비밀번호 게이트(`GET /api/auth/status`, `POST /api/auth/unlock`) —
   아래 "router-manager 자체 인증" 참고.
 
 ### router-manager 자체 인증
 
 router-manager 자신의 관리 API(tailscale config `PUT`, forwards/publish/login의
-`POST`/`DELETE`, dev-proxy expose의 `POST`/`PUT`/`DELETE`)는 비밀번호 게이트로
+`POST`/`DELETE`, dev-proxy expose와 app-routes 앱의 `POST`/`PUT`/`DELETE`)는 비밀번호 게이트로
 보호할 수 있습니다. 읽기 라우트(state/config/list/status)는 항상 열려 있습니다
 — webmanager 자체 게이트와 같은 "읽기는 열어두고 쓰기만 잠근다" 관례입니다.
 webmanager와는 별도의 프로세스/비밀(argon2id 해시 + HMAC 서명 쿠키)이라서
@@ -185,14 +190,14 @@ HTML), 여기서 새 비밀번호를 설정하면
 없습니다" 메시지로 바뀌어 입력 폼 자체가 사라집니다 — `POST
 /router/api/auth/change`를 직접 호출해도 409로 거부됩니다.
 
-tinyauth(위 "tinyauth" 절)와는 완전히 별개입니다 — tinyauth는 Dev Proxy로 노출한
-개별 dev 서버의 최종 사용자 인증이고, 이건 router-manager 자신의 admin API를
+tinyauth(위 "tinyauth" 절)와는 완전히 별개입니다 — tinyauth는 Dev Proxy/App Routes로
+노출한 개별 dev 서버·앱의 최종 사용자 인증이고, 이건 router-manager 자신의 admin API를
 보호하는 것입니다.
 
 ### router 환경변수 마이그레이션
 
-tailscale/Dev Proxy 노출 정책/router-manager 자체 비밀번호/tinyauth 같은
-router 전용 기능 설정은 저장소 루트가 아니라 `router/example-env.router`
+tailscale/Dev Proxy/App Routes 노출 정책/router-manager 자체 비밀번호/tinyauth
+같은 router 전용 기능 설정은 저장소 루트가 아니라 `router/example-env.router`
 (런타임 템플릿)에 정리되어 있습니다 — `router/.env.router`로 복사해서
 필요한 값만 주석을 풀어 쓰세요. NETGATE_ENABLED, ROUTER_HOSTNAME,
 CADDY_ADAPTER_*, ALLOWED_HOSTS류처럼 code-docker와 값을 공유하거나

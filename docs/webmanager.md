@@ -42,6 +42,18 @@ supervisord 프로그램 목록 조회 및 start/stop/restart, 표준출력/표�
 webmanager의 다른 곳에서 쓰는 CodeMirror 에디터는 아닙니다). 자세한 내용은
 [dev 서버 노출 문서](dev-proxy.md)를 확인하세요.
 
+### App Routes
+
+Dev Proxy와 같은 위치(`router` 컨테이너 안 `caddy-adapter`)에서 관리되는, Host
+헤더와 무관한 경로 기반(`/app/<이름>/...`) 리버스 프록시 항목 조회/추가/삭제 —
+이 탭도 router가 소유한 페이지 컴포넌트를 그대로 가져와 보여줍니다
+(`@code-docker/router-frontend`). Dev Proxy와 달리 host 필드가 없고 이름과
+target(`host:port`) 두 값만으로 앱 하나를 등록합니다 — 경로 모양이
+`/app/<이름>/*` 하나로 고정이라 path/strip prefix/매칭 방식 같은 필드 자체가
+없습니다. 최초 부팅 시 `code → code-docker:80` 앱이 자동 생성되고, 지우거나
+바꾸면 다시 생성되지 않습니다. 자세한 내용은 [app-routes.md](app-routes.md)를
+확인하세요.
+
 ### Tailscale
 
 Dev Proxy와 같은 방식(router가 소유한 `@code-docker/router-frontend` 컴포넌트를

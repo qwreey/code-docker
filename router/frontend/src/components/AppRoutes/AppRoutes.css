@@ -1,0 +1,94 @@
+.app-routes-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.app-routes-table th,
+.app-routes-table td {
+  text-align: left;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-routes-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.app-routes-edit-row td {
+  padding-top: 0;
+}
+
+.app-routes-edit-panel {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.app-routes-raw-textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  background: var(--bg);
+  color: var(--text);
+  resize: vertical;
+}
+
+.app-routes-raw-textarea:focus {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 1px;
+}
+
+.app-routes-edit-toggle {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.app-routes-checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.app-routes-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.app-routes-field-line {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.app-routes-field-line input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.5rem;
+  font-size: 0.88rem;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  flex: 1;
+}
+
+/* Not defined in common.css - Tailscale.css/GitConfig.css each carry their
+   own identical copy for the same reason (no shared "forms" stylesheet
+   exists yet), duplicated here rather than relying on another feature's CSS
+   having been loaded first as a side effect of import order. */
+.form-grid-inline {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}

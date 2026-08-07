@@ -104,6 +104,12 @@ func main() {
 	mux.Handle("DELETE /api/dev-proxy/exposes/{name}", gate.RequirePassword(http.HandlerFunc(handleDeleteDevProxyExpose)))
 	mux.Handle("POST /api/dev-proxy/reload", gate.RequirePassword(http.HandlerFunc(handleReloadDevProxy)))
 
+	mux.HandleFunc("GET /api/app-routes/apps", handleListAppRoutes)
+	mux.Handle("POST /api/app-routes/apps", gate.RequirePassword(http.HandlerFunc(handleCreateAppRoute)))
+	mux.Handle("PUT /api/app-routes/apps/{name}", gate.RequirePassword(http.HandlerFunc(handleUpdateAppRoute)))
+	mux.Handle("DELETE /api/app-routes/apps/{name}", gate.RequirePassword(http.HandlerFunc(handleDeleteAppRoute)))
+	mux.Handle("POST /api/app-routes/reload", gate.RequirePassword(http.HandlerFunc(handleReloadAppRoutes)))
+
 	listener, err := listen()
 	if err != nil {
 		log.Fatal(err)
