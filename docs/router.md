@@ -240,6 +240,18 @@ router-manager에 직접 연결합니다(SPA + API 전부) — 그 도메인에�
 접근 중이거나 전용 도메인이 있는데 공유 경로로 접근 중이면 배너로
 안내합니다.
 
+**webmanager에 내장된 Dev Proxy/App Routes/Tailscale 탭도 이 값을 따라갑니다.**
+`ROUTER_MANAGER_HOSTS`를 설정하면 webmanager 쪽 탭(`RouterFrame.tsx`)이
+자동으로 그 컴포넌트를 직접 렌더링하는 대신 전용 도메인으로 향하는
+cross-origin `<iframe>`으로 바꿔 끼웁니다 — `GET /router/api/auth/status`의
+`trustedHosts`를 읽어서 판단하며, 값이 비어있으면(기본) 지금처럼 같은
+origin에 직접 렌더링합니다. 이게 실제로 이 탭들의 쿠키 문제를 닫는
+지점입니다 — 같은 origin 렌더링은 웹매니저 자신이 뚫리면 그대로 뚫리지만,
+진짜 cross-origin iframe은 부모 페이지가 그 안의 DOM/쿠키에 접근할 방법이
+아예 없습니다. iframe 쪽은 로드가 끝날 때까지(+약간의 지연, 최대 3초
+안전장치) 스켈레톤을 덮어두고, webmanager의 라이트/다크 테마 선택을
+`postMessage`로 전달해 안팎 테마가 어긋나지 않게 맞춥니다.
+
 ### router 환경변수 마이그레이션
 
 tailscale/Dev Proxy/App Routes 노출 정책/router-manager 자체 비밀번호/tinyauth

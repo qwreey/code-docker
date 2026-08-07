@@ -1,0 +1,25 @@
+.router-frame-wrap {
+  position: relative;
+  /* Fixed rather than measured from content - an iframe doesn't report its
+     inner document's height across origins, so there's no cheap way to
+     auto-size this to whatever router-frontend actually renders. Tall
+     enough that most tab content fits without the iframe's own internal
+     scroll kicking in for typical use. */
+  height: 75vh;
+  min-height: 420px;
+}
+
+.router-frame-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: var(--radius-lg);
+}
+
+.router-frame-skeleton-overlay {
+  position: absolute;
+  inset: 0;
+  padding: 1.5rem;
+  background: var(--bg);
+  border-radius: var(--radius-lg);
+}

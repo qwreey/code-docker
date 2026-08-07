@@ -20,8 +20,12 @@ config (name/email, SSH+GPG signing, SSH hosts, HTTPS credentials, git-lfs
 install, raw `.gitconfig` editing, known_hosts management) — a Tailscale tab
 also lives here (forwards/publish CRUD, status, login trigger), but it's not
 webmanager's own feature: it renders `@code-docker/router-frontend`
-components calling router-manager's API, same as the Dev Proxy tab below.
-webmanager's own `internal/tailscale` backend package (config CRUD, status,
+components calling router-manager's API, same as the Dev Proxy tab below —
+via `components/RouterEmbed/RouterFrame.tsx`, which picks same-origin direct
+rendering or a cross-origin iframe into a dedicated `ROUTER_MANAGER_HOSTS`
+domain depending on whether one's configured (see `docs/router.md`'s "보안:
+공유 origin과 전용 도메인"). webmanager's own `internal/tailscale` backend
+package (config CRUD, status,
 login) was fully deleted when tailscale moved to the `router/` container —
 see `router/CLAUDE.md` and `docs/router.md#tailscale` for the current
 design. Logs (real vector-backed data, time-range filter + cursor
@@ -182,9 +186,10 @@ ungated, a documented exception to the
 reads-open/writes-gated convention since code-server runs with `auth: none`
 and has no credential to attach to that request in the first place. A Dev
 Proxy tab (`.claude/qa-request/caddy-plan-done.md` — historical only, see
-below) renders `@code-docker/router-frontend` components against
-router-manager's `/api/dev-proxy/*` for expose CRUD (structured route
-editor + raw `.caddy` fragment fallback). webmanager's own `internal/
+below) renders `@code-docker/router-frontend` components (through
+`RouterFrame`, see the Tailscale tab entry above) against router-manager's
+`/api/dev-proxy/*` for expose CRUD (structured route editor + raw `.caddy`
+fragment fallback). App Routes works the same way. webmanager's own `internal/
 devproxy` package, the `caddy-adapter` supervisord program, and
 `internal/authgate`'s `forward_auth`/`/manager/dev-auth` wiring described in
 that archive doc were all deleted — Caddy now lives on the `router`

@@ -285,6 +285,19 @@ to that origin alone. `router/frontend`'s `RouterAuthPanel`/`RouterTrustedHostsP
 over localhost or over the shared path despite a dedicated domain being configured — see
 docs/router.md's "보안: 공유 origin과 전용 도메인" section.
 
+`ROUTER_MANAGER_HOSTS` also changes how webmanager itself embeds the Dev Proxy/App
+Routes/Tailscale tabs — see "webmanager" below and `webmanager/components/RouterEmbed/
+RouterFrame.tsx` — switching from directly rendering `@code-docker/router-frontend`
+components (same origin as webmanager, the pre-existing default) to a cross-origin
+`<iframe>` into the dedicated domain, which is what actually closes the ambient-cookie gap
+for those specific tabs: same-origin rendering means anything that compromises webmanager
+itself already has DOM/cookie access into router-manager's calls, while a true cross-origin
+iframe has none. `router/frontend/src/embedTheme.ts`'s `?theme=`/`postMessage` handling
+(and the matching `[data-theme]` CSS blocks in `router/frontend/src/index.css`, mirroring
+webmanager's own `theme.ts` idiom) keep the embedded iframe's light/dark choice in sync with
+webmanager's, since a cross-origin iframe can't read the parent's `data-theme` attribute
+directly the way a same-origin embed implicitly could.
+
 router's own feature-specific env vars (tailscale, Dev Proxy exposure policy,
 `ROUTER_MANAGER_AUTH_PASSWORD_HASH`, tinyauth, `/exports/` allowlists — everything above
 that isn't shared with code-docker or tied to compose topology) live in

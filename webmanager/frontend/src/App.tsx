@@ -5,6 +5,7 @@ import { Supervisor } from './components/Supervisor/Supervisor'
 import { SshKeys } from './components/SshKeys/SshKeys'
 import { GitConfig } from './components/GitConfig/GitConfig'
 import { DevProxy, AppRoutes, Tailscale, RouterUnlockModalHost, RouterAuthSetupBanner } from '@code-docker/router-frontend'
+import { RouterFrame } from './components/RouterEmbed/RouterFrame'
 import { Logs } from './components/Logs/Logs'
 import { Processes } from './components/Processes/Processes'
 import { Projects } from './components/Projects/Projects'
@@ -68,9 +69,9 @@ function App() {
           {active === 'supervisor' && <Supervisor />}
           {active === 'ssh-keys' && <SshKeys />}
           {active === 'git-config' && <GitConfig />}
-          {active === 'dev-proxy' && <DevProxy />}
-          {active === 'app-routes' && <AppRoutes />}
-          {active === 'tailscale' && <Tailscale />}
+          {active === 'dev-proxy' && <RouterFrame tab="dev-proxy" Direct={DevProxy} />}
+          {active === 'app-routes' && <RouterFrame tab="app-routes" Direct={AppRoutes} />}
+          {active === 'tailscale' && <RouterFrame tab="tailscale" Direct={Tailscale} />}
           {active === 'logs' && (
             <RequiresUnlock>
               <Logs />
