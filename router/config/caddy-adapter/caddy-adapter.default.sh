@@ -14,9 +14,23 @@ fi
 ADAPTER_DIR=/var/lib/code-docker-router/caddy-adapter
 mkdir -p "$ADAPTER_DIR/managed" "$ADAPTER_DIR/apps" "$ADAPTER_DIR/custom"
 
-# App Routes' default app ("code" -> code-docker:80, docs/app-routes.md) -
-# seeded exactly once, ever. A marker file distinguishes "never existed"
-# from "user deleted it on purpose" - Caddy only reads its Caddyfile +
+# One-time seed migrations for this directory, same versioned-counter idiom
+# as config/user-init/user-init.default.sh (repo root) - swapped in from a
+# plain boolean marker (.app-routes-default-seeded) since that could only
+# ever express one lifetime seed step; a growing set of future seed changes
+# would otherwise mean inventing a new marker file each time. No legacy-marker
+# absorption needed here (unlike user-init's .installed dance) - App Routes
+# has only ever shipped on dev so far, so no live container has the old
+# boolean marker to carry forward.
+CURR_MIGRATION_VERSION=1
+MIGRATION_VERSION_FILE="$ADAPTER_DIR/.migration-version"
+OLD_MIGRATION_VERSION=0
+[ -e "$MIGRATION_VERSION_FILE" ] && OLD_MIGRATION_VERSION="$(cat "$MIGRATION_VERSION_FILE")"
+
+# v1: App Routes' default app ("code" -> code-docker:80, docs/app-routes.md) -
+# seeded exactly once, ever. Gating on OLD_MIGRATION_VERSION (rather than
+# "file already exists") is what lets a user delete this app on purpose
+# without it coming back on next boot - Caddy only reads its Caddyfile +
 # import globs once at `caddy run` startup below, so seeding has to land on
 # disk before that exec, synchronously (doing this from router-manager's own
 # Go startup instead would race caddy-adapter's own first read - the two are
@@ -24,13 +38,19 @@ mkdir -p "$ADAPTER_DIR/managed" "$ADAPTER_DIR/apps" "$ADAPTER_DIR/custom"
 # Keep this fragment's exact text in sync with approutes.Render's output
 # (router/backend/internal/approutes/approutes.go) - both are read by
 # approutes.parseStructured.
-APP_ROUTES_SEED_MARKER="$ADAPTER_DIR/.app-routes-default-seeded"
-if [ ! -e "$APP_ROUTES_SEED_MARKER" ]; then
+if [ "$OLD_MIGRATION_VERSION" -lt 1 ]; then
     if [ ! -e "$ADAPTER_DIR/apps/code.caddy" ]; then
         printf 'handle_path /app/code/* {\n\treverse_proxy code-docker:80 {\n\t\theader_down Location "^(https?://[^/]+)/" "${1}/app/code/"\n\t}\n}\n' \
             > "$ADAPTER_DIR/apps/code.caddy"
     fi
-    touch "$APP_ROUTES_SEED_MARKER"
+fi
+
+# Future versioned migration steps go here, each gated on
+# `[ "$OLD_MIGRATION_VERSION" -lt N ]` and safe to leave in place indefinitely
+# once shipped.
+
+if [ "$OLD_MIGRATION_VERSION" != "$CURR_MIGRATION_VERSION" ]; then
+    echo "$CURR_MIGRATION_VERSION" > "$MIGRATION_VERSION_FILE"
 fi
 
 # The top-level Caddyfile is entirely generated from env vars (just the

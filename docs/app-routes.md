@@ -41,11 +41,12 @@ webmanager가 그대로 가져와 보여주는 것 — Dev Proxy 탭과 같은 �
 그래서 아무 설정 없이도 `/app/code/`로 code-server, `/app/code/manager`로
 webmanager에 닿습니다(code-docker 자신의 내부 nginx가 `/` vs `/manager`를
 그대로 나눠줍니다). 이후 이 앱을 지우거나 이름/대상을 바꾸면 **다시
-자동으로 생기지 않습니다** — router 컨테이너 안 마커 파일
-(`/var/lib/code-docker-router/caddy-adapter/.app-routes-default-seeded`)로
-"한 번도 존재한 적 없음"과 "유저가 일부러 지움"을 구분하기 때문입니다.
-다시 필요해지면 마커 파일을 지울 필요 없이 그냥 App Routes 탭에서
-`code` → `code-docker:80`을 수동으로 다시 추가하면 됩니다.
+자동으로 생기지 않습니다** — router 컨테이너 안 버전 파일
+(`/var/lib/code-docker-router/caddy-adapter/.migration-version`, `config/user-init/user-init.default.sh`와
+같은 방식의 1회성 마이그레이션 카운터)로 "한 번도 존재한 적 없음"과
+"유저가 일부러 지움"을 구분하기 때문입니다. 다시 필요해지면 버전 파일을
+건드릴 필요 없이 그냥 App Routes 탭에서 `code` → `code-docker:80`을
+수동으로 다시 추가하면 됩니다.
 
 ## 앱 추가하기
 
