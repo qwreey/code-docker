@@ -20,7 +20,17 @@ fi
 
 # First time init migration
 if [ ! -e "$VERSION_FILE" ]; then
-    fish -c "curl -sL 'https://raw.githubusercontent.com/qwreey/qwreey-fish/refs/heads/main/functions/qs_setup.fish' | source && qs_setup" < /dev/null
+    # qs_setup's fisher installs can leave fish's $status non-zero even when
+    # everything installed fine - some third-party plugins pulled in here
+    # (e.g. puffer-fish, autopair.fish) start their conf.d hook with
+    # `status is-interactive || exit`, a correct guard that no-ops key
+    # bindings in a non-interactive shell, but which fish -c below still
+    # sees as this call's own non-zero exit status. Don't let that trip
+    # set -e and crash-loop the whole container on every boot - log it and
+    # move on, since the actual install (visible above in the logs either
+    # way) already happened.
+    fish -c "curl -sL 'https://raw.githubusercontent.com/qwreey/qwreey-fish/refs/heads/main/functions/qs_setup.fish' | source && qs_setup" < /dev/null \
+        || echo "user-init: qs_setup exited non-zero (see comment above) - continuing anyway" >&2
     echo "$CURR_VERSION" > "$VERSION_FILE"
 fi
 if [ "x$(cat "$VERSION_FILE")x" = "xx" ]; then

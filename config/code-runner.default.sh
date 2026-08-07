@@ -22,5 +22,15 @@ case "$CODE_SERVER_BIND_ADDR" in
         ;;
 esac
 
-eval $($HOME/.local/bin/mise env --shell bash)
+# mise itself is installed by qs_setup during user-init.sh's first-time
+# fish shell setup - if that setup failed partway (see
+# config/user-init.default.sh's comment on qs_setup's non-fatal exit
+# status), mise may not be here yet. That's not fatal to code-server
+# itself, just to mise-managed tools being on PATH for it - warn and skip
+# rather than failing the whole service.
+if [ -x "$HOME/.local/bin/mise" ]; then
+    eval "$("$HOME/.local/bin/mise" env --shell bash)"
+else
+    echo "WARN: $HOME/.local/bin/mise not found - skipping mise env setup (mise-installed tools won't be on PATH for code-server)"
+fi
 TARGET="/code/.local/share/code-docker/code" exec /etc/code-docker/code-server-autoinstall/start.sh --bind-addr="$CODE_SERVER_BIND_ADDR"
