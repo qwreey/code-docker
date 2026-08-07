@@ -14,7 +14,7 @@ export async function confirmAndRestartCodeServer(): Promise<RestartOutcome> {
     return 'declined'
   }
   try {
-    await api.post('/supervisor/processes/code-server/restart')
+    await api.post('/supervisor/processes/code/restart')
     return 'restarted'
   } catch (e) {
     console.error('code-server restart failed:', errorMessage(e))
