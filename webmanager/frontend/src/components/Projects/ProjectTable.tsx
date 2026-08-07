@@ -218,6 +218,7 @@ export function ProjectTable({
                     </button>
                     <a
                       href={codeServerHref(project.path)}
+                      target="_top"
                       className="btn btn-secondary btn-small btn-icon"
                       title="code-server에서 열기"
                       aria-label="code-server에서 열기"
