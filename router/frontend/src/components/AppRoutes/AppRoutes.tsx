@@ -270,8 +270,10 @@ export function AppRoutes() {
   }
 
   return (
-    <div className="card">
-      <h2>App Routes</h2>
+    <section>
+      <div className="section-header">
+        <h1>App Routes</h1>
+      </div>
       <p className="section-description">
         호스트 포트를 여러 개 열지 않고 80번 하나로 여러 앱을 노출하기 위한 기능입니다 — 바깥 리버스 프록시가
         요청 경로 앞에 <code>/app/&lt;이름&gt;</code>을 붙여(rewrite) router의 80번 포트로 넘기면, 이 컨테이너
@@ -279,109 +281,111 @@ export function AppRoutes() {
         Dev Proxy와 달리 Host 헤더를 전혀 보지 않고 경로만으로 라우팅합니다 — 바깥 프록시 없이 router에 직접
         접근해도 동일하게 동작하지만, 그건 보너스일 뿐 원래 의도된 사용 경로는 아닙니다.
       </p>
-      <div className="info-note">
-        <span aria-hidden="true">ℹ</span>
-        <span>
-          바깥 리버스 프록시가 원하는 요청의 경로 앞에 <code>/app/&lt;이름&gt;</code>을 붙여 이 컨테이너(router)의
-          80번 포트로 그대로 넘기면 됩니다. 최초 부팅 시 <code>code → code-docker:80</code> 앱이 자동으로
-          생성되며, 지우거나 바꾸면 다시 생성되지 않습니다. 자세한 내용은{' '}
-          <a href="https://github.com/qwreey/code-docker/blob/master/docs/app-routes.md" target="_blank" rel="noreferrer">
-            docs/app-routes.md
-          </a>
-          를 확인하세요.
-        </span>
-      </div>
+      <div className="card">
+        <div className="info-note">
+          <span aria-hidden="true">ℹ</span>
+          <span>
+            바깥 리버스 프록시가 원하는 요청의 경로 앞에 <code>/app/&lt;이름&gt;</code>을 붙여 이 컨테이너(router)의
+            80번 포트로 그대로 넘기면 됩니다. 최초 부팅 시 <code>code → code-docker:80</code> 앱이 자동으로
+            생성되며, 지우거나 바꾸면 다시 생성되지 않습니다. 자세한 내용은{' '}
+            <a href="https://github.com/qwreey/code-docker/blob/master/docs/app-routes.md" target="_blank" rel="noreferrer">
+              docs/app-routes.md
+            </a>
+            를 확인하세요.
+          </span>
+        </div>
 
-      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-      {notice && <p className="success-note">{notice}</p>}
+        {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+        {notice && <p className="success-note">{notice}</p>}
 
-      {loading ? (
-        <Skeleton />
-      ) : apps.length === 0 ? (
-        <p className="empty-state">등록된 앱이 없습니다.</p>
-      ) : (
-        <div className="table-wrapper">
-          <table className="app-routes-table">
-            <thead>
-              <tr>
-                <th>이름</th>
-                <th>target</th>
-                <th>인증</th>
-                <th aria-label="동작" />
-              </tr>
-            </thead>
-            <tbody>
-              {apps.map((info) => (
-                <Fragment key={info.name}>
-                  <tr>
-                    <td>{info.name}</td>
-                    <td>{info.structured?.target ?? <em>raw</em>}</td>
-                    <td>{info.structured ? (info.structured.requireAuth ? '요구' : '없음') : '-'}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-small"
-                        onClick={() => setExpandedName(expandedName === info.name ? null : info.name)}
-                      >
-                        {expandedName === info.name ? '닫기' : '펼치기'}
-                      </button>{' '}
-                      <button
-                        type="button"
-                        className="btn btn-danger btn-small"
-                        disabled={deleting === info.name}
-                        onClick={() => handleDelete(info.name)}
-                      >
-                        삭제
-                      </button>
-                    </td>
-                  </tr>
-                  {expandedName === info.name && (
-                    <tr className="app-routes-edit-row">
-                      <td colSpan={4}>
-                        {info.structured ? (
-                          <TargetPanel info={info} onSaved={handleAppSaved} />
-                        ) : (
-                          <RawPanel info={info} onSaved={load} />
-                        )}
+        {loading ? (
+          <Skeleton />
+        ) : apps.length === 0 ? (
+          <p className="empty-state">등록된 앱이 없습니다.</p>
+        ) : (
+          <div className="table-wrapper">
+            <table className="app-routes-table">
+              <thead>
+                <tr>
+                  <th>이름</th>
+                  <th>target</th>
+                  <th>인증</th>
+                  <th aria-label="동작" />
+                </tr>
+              </thead>
+              <tbody>
+                {apps.map((info) => (
+                  <Fragment key={info.name}>
+                    <tr>
+                      <td>{info.name}</td>
+                      <td>{info.structured?.target ?? <em>raw</em>}</td>
+                      <td>{info.structured ? (info.structured.requireAuth ? '요구' : '없음') : '-'}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-small"
+                          onClick={() => setExpandedName(expandedName === info.name ? null : info.name)}
+                        >
+                          {expandedName === info.name ? '닫기' : '펼치기'}
+                        </button>{' '}
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-small"
+                          disabled={deleting === info.name}
+                          onClick={() => handleDelete(info.name)}
+                        >
+                          삭제
+                        </button>
                       </td>
                     </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    {expandedName === info.name && (
+                      <tr className="app-routes-edit-row">
+                        <td colSpan={4}>
+                          {info.structured ? (
+                            <TargetPanel info={info} onSaved={handleAppSaved} />
+                          ) : (
+                            <RawPanel info={info} onSaved={load} />
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      <form onSubmit={handleSubmit} className="form-grid-inline">
-        <div className="form-grid">
-          <div className="form-field">
-            <label htmlFor="ar-name">이름 (경로 세그먼트)</label>
-            <input
-              id="ar-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="myapp"
-              pattern="[a-z0-9][a-z0-9-]{0,61}[a-z0-9]|[a-z0-9]"
-              required
-            />
+        <form onSubmit={handleSubmit} className="form-grid-inline">
+          <div className="form-grid">
+            <div className="form-field">
+              <label htmlFor="ar-name">이름 (경로 세그먼트)</label>
+              <input
+                id="ar-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="myapp"
+                pattern="[a-z0-9][a-z0-9-]{0,61}[a-z0-9]|[a-z0-9]"
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="ar-target">target</label>
+              <input
+                id="ar-target"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                placeholder="code-docker:3000"
+                required
+              />
+            </div>
           </div>
-          <div className="form-field">
-            <label htmlFor="ar-target">target</label>
-            <input
-              id="ar-target"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              placeholder="code-docker:3000"
-              required
-            />
-          </div>
+          {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting ? '추가하는 중...' : '앱 추가'}
+          </button>
+        </form>
         </div>
-        {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? '추가하는 중...' : '앱 추가'}
-        </button>
-      </form>
-    </div>
+    </section>
   )
 }

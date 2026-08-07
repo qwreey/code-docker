@@ -87,11 +87,15 @@ function App() {
         {tab === 'app-routes' && <AppRoutes />}
         {tab === 'tailscale' && <Tailscale />}
         {tab === 'settings' && (
-          <>
+          <section>
+            <div className="section-header">
+              <h1>설정</h1>
+            </div>
+            <p className="section-description">router-manager 자체 인증, 전용 도메인, tinyauth 사용자를 관리합니다.</p>
             <RouterAuthPanel />
             <RouterTrustedHostsPanel />
             <TinyauthUsers />
-          </>
+          </section>
         )}
       </main>
       <RouterUnlockModalHost />

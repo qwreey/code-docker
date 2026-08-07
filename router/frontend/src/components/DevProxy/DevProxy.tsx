@@ -337,126 +337,130 @@ export function DevProxy() {
   }
 
   return (
-    <div className="card">
-      <h2>Dev Proxy</h2>
+    <section>
+      <div className="section-header">
+        <h1>Dev Proxy</h1>
+      </div>
       <p className="section-description">
         컨테이너 안에서 뜬 dev 서버(예: <code>npm run dev</code>)를 도메인으로 노출합니다. expose마다 완전히 다른
         도메인을 써도 됩니다 — 공유 base 도메인 같은 건 없습니다.
       </p>
-      <div className="info-note">
-        <span aria-hidden="true">ℹ</span>
-        <span>
-          바깥 리버스 프록시가 원하는 요청의 path 앞에 <code>/exports</code>를 붙이고(Host는 그대로 두고) 이
-          컨테이너(router)의 80번 포트로 그대로 넘기면 됩니다 — 안에서는 각 expose의 host 값과 실제 Host 헤더가
-          일치하는지로 분배합니다. 인증(라우트별 "인증 요구")을 쓰려면{' '}
-          <code>TINYAUTH_APPURL</code>/<code>TINYAUTH_AUTH_USERS</code>도 설정해야 합니다.
-        </span>
-      </div>
-      <div className="info-note">
-        <span aria-hidden="true">ℹ</span>
-        <span>
-          포트 80 하나만 열어두고 싶다면 위 방식으로 충분합니다. router가 포트를 하나 더 열어도 괜찮고 대신
-          바깥 프록시의 rewrite를 아예 안 쓰고 싶다면, <code>CADDY_ADAPTER_PORT</code>(기본값 없음 — 설정
-          필요)를 지정하고 퍼블리시하는 대안도 있습니다. 자세한 내용은{' '}
-          <a href="https://github.com/qwreey/code-docker/blob/master/docs/dev-proxy.md" target="_blank" rel="noreferrer">
-            docs/dev-proxy.md
-          </a>
-          를 확인하세요.
-        </span>
-      </div>
+      <div className="card">
+        <div className="info-note">
+          <span aria-hidden="true">ℹ</span>
+          <span>
+            바깥 리버스 프록시가 원하는 요청의 path 앞에 <code>/exports</code>를 붙이고(Host는 그대로 두고) 이
+            컨테이너(router)의 80번 포트로 그대로 넘기면 됩니다 — 안에서는 각 expose의 host 값과 실제 Host 헤더가
+            일치하는지로 분배합니다. 인증(라우트별 "인증 요구")을 쓰려면{' '}
+            <code>TINYAUTH_APPURL</code>/<code>TINYAUTH_AUTH_USERS</code>도 설정해야 합니다.
+          </span>
+        </div>
+        <div className="info-note">
+          <span aria-hidden="true">ℹ</span>
+          <span>
+            포트 80 하나만 열어두고 싶다면 위 방식으로 충분합니다. router가 포트를 하나 더 열어도 괜찮고 대신
+            바깥 프록시의 rewrite를 아예 안 쓰고 싶다면, <code>CADDY_ADAPTER_PORT</code>(기본값 없음 — 설정
+            필요)를 지정하고 퍼블리시하는 대안도 있습니다. 자세한 내용은{' '}
+            <a href="https://github.com/qwreey/code-docker/blob/master/docs/dev-proxy.md" target="_blank" rel="noreferrer">
+              docs/dev-proxy.md
+            </a>
+            를 확인하세요.
+          </span>
+        </div>
 
-      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-      {notice && <p className="success-note">{notice}</p>}
+        {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+        {notice && <p className="success-note">{notice}</p>}
 
-      {loading ? (
-        <Skeleton />
-      ) : exposes.length === 0 ? (
-        <p className="empty-state">등록된 expose가 없습니다.</p>
-      ) : (
-        <div className="table-wrapper">
-          <table className="dev-proxy-table">
-            <thead>
-              <tr>
-                <th>이름</th>
-                <th>host</th>
-                <th>라우트</th>
-                <th>인증</th>
-                <th aria-label="동작" />
-              </tr>
-            </thead>
-            <tbody>
-              {exposes.map((info) => (
-                <Fragment key={info.name}>
-                  <tr>
-                    <td>{info.name}</td>
-                    <td>{info.structured?.host ?? <em>raw</em>}</td>
-                    <td>{info.structured ? `${(info.structured.routes ?? []).length}개` : <em>raw</em>}</td>
-                    <td>{info.structured ? authSummary(info.structured.routes ?? []) : '-'}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-small"
-                        onClick={() => setExpandedName(expandedName === info.name ? null : info.name)}
-                      >
-                        {expandedName === info.name ? '닫기' : '펼치기'}
-                      </button>{' '}
-                      <button
-                        type="button"
-                        className="btn btn-danger btn-small"
-                        disabled={deleting === info.name}
-                        onClick={() => handleDelete(info.name)}
-                      >
-                        삭제
-                      </button>
-                    </td>
-                  </tr>
-                  {expandedName === info.name && (
-                    <tr className="dev-proxy-edit-row">
-                      <td colSpan={5}>
-                        {info.structured ? (
-                          <RoutesPanel info={info} onSaved={handleExposeSaved} />
-                        ) : (
-                          <RawPanel info={info} onSaved={load} />
-                        )}
+        {loading ? (
+          <Skeleton />
+        ) : exposes.length === 0 ? (
+          <p className="empty-state">등록된 expose가 없습니다.</p>
+        ) : (
+          <div className="table-wrapper">
+            <table className="dev-proxy-table">
+              <thead>
+                <tr>
+                  <th>이름</th>
+                  <th>host</th>
+                  <th>라우트</th>
+                  <th>인증</th>
+                  <th aria-label="동작" />
+                </tr>
+              </thead>
+              <tbody>
+                {exposes.map((info) => (
+                  <Fragment key={info.name}>
+                    <tr>
+                      <td>{info.name}</td>
+                      <td>{info.structured?.host ?? <em>raw</em>}</td>
+                      <td>{info.structured ? `${(info.structured.routes ?? []).length}개` : <em>raw</em>}</td>
+                      <td>{info.structured ? authSummary(info.structured.routes ?? []) : '-'}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-small"
+                          onClick={() => setExpandedName(expandedName === info.name ? null : info.name)}
+                        >
+                          {expandedName === info.name ? '닫기' : '펼치기'}
+                        </button>{' '}
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-small"
+                          disabled={deleting === info.name}
+                          onClick={() => handleDelete(info.name)}
+                        >
+                          삭제
+                        </button>
                       </td>
                     </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    {expandedName === info.name && (
+                      <tr className="dev-proxy-edit-row">
+                        <td colSpan={5}>
+                          {info.structured ? (
+                            <RoutesPanel info={info} onSaved={handleExposeSaved} />
+                          ) : (
+                            <RawPanel info={info} onSaved={load} />
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      <form onSubmit={handleSubmit} className="form-grid-inline">
-        <div className="form-grid">
-          <div className="form-field">
-            <label htmlFor="dp-name">이름 (내부 식별자)</label>
-            <input
-              id="dp-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="myapp"
-              pattern="[a-z0-9][a-z0-9-]{0,61}[a-z0-9]|[a-z0-9]"
-              required
-            />
+        <form onSubmit={handleSubmit} className="form-grid-inline">
+          <div className="form-grid">
+            <div className="form-field">
+              <label htmlFor="dp-name">이름 (내부 식별자)</label>
+              <input
+                id="dp-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="myapp"
+                pattern="[a-z0-9][a-z0-9-]{0,61}[a-z0-9]|[a-z0-9]"
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="dp-host">host (노출할 도메인)</label>
+              <input
+                id="dp-host"
+                value={host}
+                onChange={(e) => setHost(e.target.value)}
+                placeholder="dev.example.com"
+                required
+              />
+            </div>
           </div>
-          <div className="form-field">
-            <label htmlFor="dp-host">host (노출할 도메인)</label>
-            <input
-              id="dp-host"
-              value={host}
-              onChange={(e) => setHost(e.target.value)}
-              placeholder="dev.example.com"
-              required
-            />
-          </div>
-        </div>
-        {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? '추가하는 중...' : 'expose 추가'}
-        </button>
-      </form>
-    </div>
+          {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting ? '추가하는 중...' : 'expose 추가'}
+          </button>
+        </form>
+      </div>
+    </section>
   )
 }
