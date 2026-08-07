@@ -41,14 +41,21 @@ done
 # publish: `tailscale serve` rules are declarative state kept by tailscaled,
 # so reset then reapply from the YAML on every start - this makes entries
 # removed from the YAML actually get torn down.
+#
+# Every yq call below needs -r: Arch's `yq` package is kislyuk/yq (a Python
+# wrapper around jq), not mikefarah/yq - string results come back
+# JSON-quoted (e.g. `"tcp"`, literal quote characters and all) without -r,
+# which silently breaks flags/args built from them (`--"tcp"=...` is not a
+# valid `tailscale serve` flag). See netgate/firewall.default.sh for the
+# same convention already followed there.
 tailscale serve reset
-count=$(yq '.publish | length' "$CONFIG")
+count=$(yq -r '.publish | length' "$CONFIG")
 i=0
 while [ "$i" -lt "$count" ]; do
-    tport=$(yq ".publish[$i].tailscale_port" "$CONFIG")
-    lport=$(yq ".publish[$i].local_port" "$CONFIG")
-    mode=$(yq ".publish[$i].mode // \"tcp\"" "$CONFIG")
-    thost=$(yq ".publish[$i].target_host // \"\"" "$CONFIG")
+    tport=$(yq -r ".publish[$i].tailscale_port" "$CONFIG")
+    lport=$(yq -r ".publish[$i].local_port" "$CONFIG")
+    mode=$(yq -r ".publish[$i].mode // \"tcp\"" "$CONFIG")
+    thost=$(yq -r ".publish[$i].target_host // \"\"" "$CONFIG")
     thost=${thost:-$DEFAULT_PUBLISH_TARGET_HOST}
     tailscale serve --bg --"$mode"="$tport" "tcp://$thost:$lport"
     i=$((i + 1))

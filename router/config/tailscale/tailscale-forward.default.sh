@@ -63,17 +63,20 @@ FORWARD_IP=$(getent hosts forward | awk '{ print $1; exit }')
 sleep infinity &
 pids="$pids $!"
 
-socks5=$(yq '.socks5_address' "$CONFIG")
-default_intervall=$(yq '.retry_intervall // 5' "$CONFIG")
+# -r on every yq call below: see tailscale-publish.default.sh's comment on
+# why (Arch's yq is kislyuk/yq, a jq wrapper - string results come back
+# JSON-quoted without it).
+socks5=$(yq -r '.socks5_address' "$CONFIG")
+default_intervall=$(yq -r '.retry_intervall // 5' "$CONFIG")
 
 # forwards: pull a remote peer's port in via socat + tailscaled's SOCKS5 proxy.
-count=$(yq '.forwards | length' "$CONFIG")
+count=$(yq -r '.forwards | length' "$CONFIG")
 i=0
 while [ "$i" -lt "$count" ]; do
-    local_port=$(yq ".forwards[$i].local_port" "$CONFIG")
-    remote_host=$(yq ".forwards[$i].remote_host" "$CONFIG")
-    remote_port=$(yq ".forwards[$i].remote_port" "$CONFIG")
-    intervall=$(yq ".forwards[$i].retry_intervall // $default_intervall" "$CONFIG")
+    local_port=$(yq -r ".forwards[$i].local_port" "$CONFIG")
+    remote_host=$(yq -r ".forwards[$i].remote_host" "$CONFIG")
+    remote_port=$(yq -r ".forwards[$i].remote_port" "$CONFIG")
+    intervall=$(yq -r ".forwards[$i].retry_intervall // $default_intervall" "$CONFIG")
     socat TCP-LISTEN:"$local_port",bind="$FORWARD_IP",fork,reuseaddr \
         SOCKS5:"$socks5":"$remote_host":"$remote_port",forever,intervall="$intervall" &
     pids="$pids $!"
