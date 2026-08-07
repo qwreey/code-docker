@@ -213,17 +213,44 @@ package, root `package.json`'s `workspaces:`) owns the actual page components; w
 `router/.claude/functional-router-plan.md`'s "router ↔ webmanager 프론트 통합 방식". Both
 Dev Proxy and Tailscale (forwards/publish/login CRUD + status view) are ported this way.
 
-router-manager's own admin-API auth (`router/backend/internal/authgate`, opt-in via
-`ROUTER_MANAGER_AUTH_PASSWORD_HASH`, off by default) gates every *mutating* route above
-(tailscale config/forwards/publish/login writes, dev-proxy expose writes) — reads (state,
-config, list, status) stay open. A separate gate/cookie from webmanager's own
+router-manager's own admin-API auth (`router/backend/internal/authgate`) is opt-in via
+`ROUTER_MANAGER_AUTH_PASSWORD_HASH` and gates every *mutating* route above (tailscale
+config/forwards/publish/login writes, dev-proxy expose writes) — reads (state, config,
+list, status) stay open. The recommended path is setting a password in-app at
+`/router/` instead of via env var, though — see docs/router.md's "router-manager 자체
+인증" for the file-backed store (`ROUTER_VOLUME`), setup/change UI, and forgot-password
+recovery; the env var remains as an infra-as-code pin that always wins over the
+in-app-set one when present. A separate gate/cookie from webmanager's own
 `internal/authgate` below (different process, different secret) — `router-manager
---hash-password` generates the argon2id hash, see example-env's
-`ROUTER_MANAGER_AUTH_PASSWORD_HASH` comment. `RouterUnlockModalHost` (mounted in
+--hash-password` generates the argon2id hash. `RouterUnlockModalHost` (mounted in
 webmanager's `App.tsx` next to its own `UnlockModalHost`) pops on any 401 from a gated
 router-manager route, same "prompt → retry once" pattern webmanager's own gate uses. See
 `router/plan.md` for the design history (this closed out the item that was previously
 tracked there as "보류/미정").
+
+router's own feature-specific env vars (tailscale, Dev Proxy exposure policy,
+`ROUTER_MANAGER_AUTH_PASSWORD_HASH`, tinyauth, `/exports/` allowlists — everything above
+that isn't shared with code-docker or tied to compose topology) live in
+`router/example-env.router` (copy to `router/.env.router`), not the repo-root
+`example-env` — mirrors webmanager's `.env.webmanager` pattern, including a
+`router-manager --env-migrate` CLI and startup version-mismatch warning
+(`ROUTER_ENV_VERSION`/`ROUTER_ENV_TEMPLATE_PATH`). The migration logic itself
+(reconcile-against-template, `#!important`/`#!` markers, `#~` dead-key archival) is a
+shared root-level Go module, `envmigrate/` — extracted from webmanager's own
+`internal/envmigrate` and parameterized (version-key name, file names) so both tools use
+it. webmanager's Dockerfile stage just adds one `COPY envmigrate/` (its build context is
+already repo root); router/backend's build context is deliberately isolated to `router/`
+(see `router/CLAUDE.md`), so it can't reach a repo-root module directly — `go mod
+vendor` materializes `envmigrate/` into `router/backend/vendor/` instead, which *is*
+inside router's own build context and gets committed like any other source. Run
+`vendor-envmigrate.sh` (repo root) after editing `envmigrate/` and before rebuilding
+router's image — `go build` fails loudly on a stale/inconsistent `vendor/`, so this
+can't silently drift. `ROUTER_HOSTNAME` (default `router`) is a similar
+compose-topology-vs-feature-var split example in the other direction: it stays in the
+repo-root `example-env` (not `router/example-env.router`) because code-docker,
+code-docker-netinit, and code-docker-dind all resolve it too (`getent hosts
+"$ROUTER_HOSTNAME"` in their own entrypoint scripts) and code-docker-router's own network
+alias must stay in sync with the same value.
 
 `config/code-patch/` is a generic mechanism, not tailscale-specific: any `<name>.default.<ext>` there (with an optional matching gitignored `<name>.override.<ext>`) gets seeded by `code-patch.default.sh` into `/code/.local/share/code-docker/code/patch/<name>.<ext>` — code-server-autoinstall auto-injects every top-level `patch/*.js` as a `<script>` tag on every start (see "코드 서버 패치" in README). Re-seeded on *every* boot, but only when the live target's content still hashes to what was seeded last time (`/code/.local/share/code-docker/code/.code-patch-manifest` now tracks `<name>\t<hash>` pairs, not just names) — i.e. a bundled `.default.`/`.override.` fix actually reaches an already-running container instead of the old "only copy if missing" behavior silently freezing the target at whatever was first seeded forever. If the live file's hash doesn't match (user edited it directly, or there's no recorded hash yet — e.g. a target that predates this hash-tracking), it's left alone; a `.default.` file removed in a later code-docker version still gets its old target removed too instead of orphaned forever. Because there's no historical hash for anything seeded before this behavior shipped, upgrading alone won't retroactively re-apply a fixed default to an already-seeded file that was never otherwise touched — delete the file under `/code/.local/share/code-docker/code/patch/` once to force a fresh reseed with hash-tracking from then on. `code-patch.default.sh` is invoked from `code-service.default.sh` (not `user-init.default.sh` — that one's scoped to home-folder/shell setup like fish config, not code-server internals), deliberately *after* `install.sh` so `/code/.local/share/code-docker/code` actually exists by the time it runs.
 
