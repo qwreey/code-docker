@@ -8,14 +8,14 @@ set -eu
 # Previously (when tailscaled ran inside code-docker itself) `publish:`
 # targeted code-docker's own `private` alias, needed only to dodge
 # tailscaled's automatic loopback/0.0.0.0 re-exposure of ITS OWN container.
-# Now that tailscaled lives in router - a different container - `publish:`
-# targets code-docker directly by its plain compose service hostname over
-# code-docker-internal (router is attached there too) - no dedicated alias
-# needed on code-docker's side for this anymore. Schema (tailscale_port/
-# local_port/mode, no target_host) is unchanged for now since code-docker is
-# the only publish target in practice; generalize with a target_host field
-# if router ever needs to publish some other internal service's port.
-PUBLISH_TARGET_HOST=code-docker
+# Now that tailscaled lives in router - a different container - each
+# publish entry names its own target_host (any hostname/IP reachable from
+# router on code-docker-internal - a plain compose service hostname works
+# the same way code-docker's does, no dedicated alias needed). Entries
+# written before target_host existed have no such field in the YAML; yq
+# returns "null" for a missing key, so that's treated the same as an empty
+# value below and falls back to "code-docker" for compatibility.
+DEFAULT_PUBLISH_TARGET_HOST=code-docker
 
 CONFIG=/var/lib/code-docker-router/tailscale/config.yaml
 mkdir -p /var/lib/code-docker-router/tailscale
@@ -48,7 +48,9 @@ while [ "$i" -lt "$count" ]; do
     tport=$(yq ".publish[$i].tailscale_port" "$CONFIG")
     lport=$(yq ".publish[$i].local_port" "$CONFIG")
     mode=$(yq ".publish[$i].mode // \"tcp\"" "$CONFIG")
-    tailscale serve --bg --"$mode"="$tport" "tcp://$PUBLISH_TARGET_HOST:$lport"
+    thost=$(yq ".publish[$i].target_host // \"\"" "$CONFIG")
+    thost=${thost:-$DEFAULT_PUBLISH_TARGET_HOST}
+    tailscale serve --bg --"$mode"="$tport" "tcp://$thost:$lport"
     i=$((i + 1))
 done
 

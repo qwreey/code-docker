@@ -34,10 +34,15 @@ type Forward struct {
 	RetryInterval int    `yaml:"retry_intervall,omitempty" json:"retryInterval"`
 }
 
-// Publish exposes a local container port to the tailnet via `tailscale serve`.
+// Publish exposes a port on some code-docker-internal host to the tailnet
+// via `tailscale serve`. TargetHost is any hostname/IP reachable from
+// router on code-docker-internal (defaults to "code-docker" when omitted,
+// for compatibility with entries written before TargetHost existed — see
+// tailscale-publish.default.sh).
 type Publish struct {
 	Name          string `yaml:"name" json:"name"`
 	TailscalePort int    `yaml:"tailscale_port" json:"tailscalePort"`
+	TargetHost    string `yaml:"target_host" json:"targetHost"`
 	LocalPort     int    `yaml:"local_port" json:"localPort"`
 	Mode          string `yaml:"mode" json:"mode"`
 }
@@ -179,6 +184,9 @@ func AddPublish(path string, p Publish) (Publish, error) {
 	}
 	if p.Mode != "tcp" && p.Mode != "tls-terminated-tcp" {
 		return Publish{}, ErrInvalidMode
+	}
+	if p.TargetHost == "" {
+		p.TargetHost = "code-docker"
 	}
 	if p.Name == "" || p.TailscalePort == 0 || p.LocalPort == 0 {
 		return Publish{}, errors.New("name, tailscalePort and localPort are required")

@@ -16,12 +16,16 @@ retry_intervall: 5               # default retry interval (seconds) for forwards
 #     remote_port: 5037
 forwards: []
 
-# Explicitly publish a local code-docker port to the tailnet (`tailscale
-# serve`, run from router now - always targets code-docker itself, see
-# tailscale-publish.default.sh).
+# Explicitly publish a port on some code-docker-internal host to the
+# tailnet (`tailscale serve`, run from router now). target_host is any
+# hostname/IP reachable from router on code-docker-internal (e.g. a plain
+# compose service hostname like "code-docker" or "dind"); omitting it
+# defaults to "code-docker" for compatibility with entries written before
+# target_host existed - see tailscale-publish.default.sh.
 # publish:
 #   - name: dev-server
 #     tailscale_port: 80
+#     target_host: code-docker
 #     local_port: 3000
 #     mode: tcp                  # tcp | tls-terminated-tcp
 publish: []

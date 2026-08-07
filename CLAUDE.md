@@ -171,9 +171,12 @@ user overrides, same auto-include idiom as the main image's `config/supervisord.
   `router/config/tailscale/tailscale-config.default.yaml`) drives `forwards:`/`publish:` —
   MagicDNS names are deliberately never used as forward/publish targets (too dynamic,
   can even point at something outside the tailnet on self-hosted control servers), only
-  tailscale hostnames/IPs. `publish:` targets code-docker directly by its plain compose
-  service hostname now (no alias dance needed — that was only ever about dodging
-  code-docker's *own* tailscaled's auto-exposure, moot once tailscaled isn't there).
+  tailscale hostnames/IPs. `publish:` entries name their own `target_host` (any
+  `code-docker-internal` hostname/IP reachable from router — a plain compose service
+  hostname works the same way code-docker's does, no alias dance needed — that was only
+  ever about dodging code-docker's *own* tailscaled's auto-exposure, moot once tailscaled
+  isn't there); omitting `target_host` defaults to `code-docker` for entries written
+  before the field existed.
   router-manager (below) replaces the old status-polling shell script with a real read-only
   HTTP endpoint, and its own `/api/tailscale/forwards`/`/api/tailscale/publish`
   CRUD already persists+restarts the affected program in one call — editing

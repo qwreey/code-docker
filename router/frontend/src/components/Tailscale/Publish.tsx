@@ -13,6 +13,7 @@ export function Publish() {
   const [notice, setNotice] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [tailscalePort, setTailscalePort] = useState('')
+  const [targetHost, setTargetHost] = useState('code-docker')
   const [localPort, setLocalPort] = useState('')
   const [mode, setMode] = useState<TailscalePublishMode>('tcp')
   const [submitting, setSubmitting] = useState(false)
@@ -47,11 +48,13 @@ export function Publish() {
       await api.post('/publish', {
         name,
         tailscalePort: Number(tailscalePort),
+        targetHost,
         localPort: Number(localPort),
         mode,
       })
       setName('')
       setTailscalePort('')
+      setTargetHost('code-docker')
       setLocalPort('')
       setMode('tcp')
       await load()
@@ -82,18 +85,21 @@ export function Publish() {
   return (
     <div className="card">
       <h2>Publish</h2>
-      <p className="section-description">로컬 포트를 tailnet 전체에 명시적으로 노출합니다.</p>
+      <p className="section-description">
+        대상 호스트의 로컬 포트를 tailnet 전체에 명시적으로 노출합니다.
+      </p>
       <div className="info-note">
         <span aria-hidden="true">ℹ</span>
         <span>
-          로컬 포트는 이 컨테이너(router)가 아니라 <code>code-docker</code> 컨테이너의 포트를 가리킵니다 —
-          publish 대상은 현재 code-docker로 고정되어 있습니다. 자세한 내용은{' '}
+          로컬 포트는 이 컨테이너(router)가 아니라 <b>대상 호스트</b>의 포트를 가리킵니다 — 대상 호스트는
+          router에서 (code-docker-internal 네트워크로) 접근 가능한 아무 컴포즈 서비스 호스트명/IP나
+          지정할 수 있습니다(예: <code>code-docker</code>, <code>dind</code>). 자세한 내용은{' '}
           <a
-            href="https://github.com/qwreey/code-docker/blob/master/docs/tailscale.md"
+            href="https://github.com/qwreey/code-docker/blob/master/docs/router.md#tailscale"
             target="_blank"
             rel="noreferrer"
           >
-            docs/tailscale.md
+            docs/router.md
           </a>
           를 확인하세요.
         </span>
@@ -112,6 +118,7 @@ export function Publish() {
               <tr>
                 <th>이름</th>
                 <th>tailscale 포트</th>
+                <th>대상 호스트</th>
                 <th>로컬 포트</th>
                 <th>모드</th>
                 <th aria-label="동작" />
@@ -122,6 +129,7 @@ export function Publish() {
                 <tr key={p.name}>
                   <td>{p.name}</td>
                   <td>{p.tailscalePort}</td>
+                  <td>{p.targetHost}</td>
                   <td>{p.localPort}</td>
                   <td>{p.mode}</td>
                   <td>
@@ -155,6 +163,16 @@ export function Publish() {
               min={1}
               value={tailscalePort}
               onChange={(e) => setTailscalePort(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="pub-target-host">대상 호스트</label>
+            <input
+              id="pub-target-host"
+              value={targetHost}
+              onChange={(e) => setTargetHost(e.target.value)}
+              placeholder="code-docker"
               required
             />
           </div>

@@ -68,6 +68,7 @@ forwards:
 publish:
   - name: dev-server
     tailscale_port: 80
+    target_host: code-docker     # router에서 보이는 아무 호스트명/IP나 가능 (code-docker, dind, ...)
     local_port: 3000
     mode: tcp                    # tcp | tls-terminated-tcp
 ```
@@ -75,10 +76,13 @@ publish:
 - **forwards** — 다른 tailnet 기기의 포트를 가져옵니다. code-docker 안에서는 `forward`
   hostname으로 접근하세요(예: [adb 연결](tips/adb.md)의 `ANDROID_ADB_SERVER_ADDRESS=forward`) —
   이 alias는 이제 router를 가리킵니다(예전엔 code-docker 자신).
-- **publish** — code-docker의 로컬 포트를 tailscale IP에 게시합니다. `publish:`의
-  `local_port`는 이제 router가 아니라 **code-docker 자신**의 포트를 가리킵니다(router의
-  `tailscale-publish` 프로그램이 `tcp://code-docker:<port>`로 타겟팅) — 게시하려는 서비스는
-  code-docker 안에서 뜬 그대로 두면 됩니다.
+- **publish** — `target_host`로 지정한 컨테이너의 로컬 포트를 tailscale IP에 게시합니다.
+  `local_port`는 router 자신이 아니라 **`target_host`**의 포트를 가리킵니다(router의
+  `tailscale-publish` 프로그램이 `tcp://<target_host>:<local_port>`로 타겟팅). `target_host`는
+  router에서 `code-docker-internal` 네트워크로 접근 가능한 아무 컴포즈 서비스 호스트명/IP나
+  될 수 있습니다 — `code-docker`뿐 아니라 `dind` 등 같은 네트워크의 다른 컨테이너도 게시
+  대상으로 쓸 수 있습니다. 생략하면 이전 버전과의 호환을 위해 `code-docker`로 기본
+  설정됩니다.
 
 직접 편집한 뒤 UI를 거치지 않고 반영하려면:
 

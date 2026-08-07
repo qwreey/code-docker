@@ -99,6 +99,7 @@ export type TailscalePublishMode = 'tcp' | 'tls-terminated-tcp'
 export interface TailscalePublish {
   name: string
   tailscalePort: number
+  targetHost: string
   localPort: number
   mode: TailscalePublishMode
 }
