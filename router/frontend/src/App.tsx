@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { DevProxy } from './components/DevProxy/DevProxy'
 import { AppRoutes } from './components/AppRoutes/AppRoutes'
 import { Tailscale } from './components/Tailscale/Tailscale'
-import { RouterAuthPanel } from './components/common/RouterAuthPanel'
+import { RouterAuthPanel, RouterTrustedHostsPanel } from './components/common/RouterAuthPanel'
 import { TinyauthUsers } from './components/Tinyauth/TinyauthUsers'
 import { RouterUnlockModalHost } from './components/common/UnlockModal'
+import { OriginWarningBanner } from './components/common/OriginWarningBanner'
 import './App.css'
 
 type Tab = 'dev-proxy' | 'app-routes' | 'tailscale' | 'settings'
@@ -46,12 +47,14 @@ function App() {
         </nav>
       </header>
       <main className="router-app-main">
+        <OriginWarningBanner />
         {tab === 'dev-proxy' && <DevProxy />}
         {tab === 'app-routes' && <AppRoutes />}
         {tab === 'tailscale' && <Tailscale />}
         {tab === 'settings' && (
           <>
             <RouterAuthPanel />
+            <RouterTrustedHostsPanel />
             <TinyauthUsers />
           </>
         )}

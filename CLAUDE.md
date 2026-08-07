@@ -175,10 +175,14 @@ user overrides, same auto-include idiom as the main image's `config/supervisord.
   service hostname now (no alias dance needed — that was only ever about dodging
   code-docker's *own* tailscaled's auto-exposure, moot once tailscaled isn't there).
   router-manager (below) replaces the old status-polling shell script with a real read-only
-  HTTP endpoint. `bin/forward-reload` (in code-docker's PATH) no longer works from inside
-  code-docker — it now just prints the `docker compose exec code-docker-router
-  supervisorctl restart ...` command needed instead, since it can't reach router's
-  supervisorctl socket from a different container.
+  HTTP endpoint, and its own `/api/tailscale/forwards`/`/api/tailscale/publish`
+  CRUD already persists+restarts the affected program in one call — editing
+  `config.yaml` by hand and reloading via `docker compose exec
+  code-docker-router supervisorctl restart ...` (see docs/router.md) is only
+  needed if you bypass that API. `bin/forward-reload` (the old code-docker-side
+  shortcut for printing that command) was removed since it couldn't actually
+  reach router's supervisorctl socket from a different container and the API
+  path above makes it unnecessary.
 - **Dev Proxy** — an internal Caddy instance (`caddy-adapter` program,
   `router/config/caddy-adapter/caddy-adapter.default.sh`) exposing dev servers on wildcard
   subdomains, managed via router-manager's API (`router/backend/internal/devproxy`,
@@ -199,7 +203,15 @@ user overrides, same auto-include idiom as the main image's `config/supervisord.
   which stays exactly as-is, scoped only to webmanager's own Terminal/File Manager/Logs.
   `TINYAUTH_AUTH_USERS` (docker-compose env) is empty by default — no one can log in until
   set (`docker run --rm ghcr.io/tinyauthapp/tinyauth:v5 user create --username <u>
-  --password <p> --docker` generates the value).
+  --password <p> --docker` generates the value). The recommended path is now per-user
+  add/delete via router-manager's own API/UI (`router/backend/internal/tinyauthusers`,
+  a "설정" tab in router's own SPA — see "router-manager" below) instead of hand-editing
+  that one env var — tinyauth itself only reads it at process start, so every add/delete
+  restarts the `tinyauth` supervisord program via the same `restartSupervisorProgram`
+  helper tailscale forwards/publish already use. `TINYAUTH_AUTH_USERS` still wins when
+  actually set (an infra-as-code pin, same priority as `ROUTER_MANAGER_AUTH_PASSWORD_HASH`
+  vs its own file-backed store) — the UI shows a read-only notice instead of an edit form
+  in that case.
 
 router-manager is router's own Go backend (`router/backend`, mirrors webmanager's own
 backend pattern) — proxied in by code-docker's nginx (`config/nginx/nginx.default.conf`'s
@@ -220,8 +232,25 @@ router's own frontend (`router/frontend`, `@code-docker/router-frontend` — an 
 package, root `package.json`'s `workspaces:`) owns the actual page components; webmanager's
 `App.tsx` imports them directly (`import { DevProxy, Tailscale, RouterUnlockModalHost } from
 '@code-docker/router-frontend'`) rather than owning that UI itself — see "webmanager" below and
-`router/.claude/functional-router-plan.md`'s "router ↔ webmanager 프론트 통합 방식". Both
-Dev Proxy and Tailscale (forwards/publish/login CRUD + status view) are ported this way.
+`router/.claude/functional-router-plan.md`'s "router ↔ webmanager 프론트 통합 방식". Dev
+Proxy, App Routes, and Tailscale (forwards/publish/login CRUD + status view) are all ported
+this way. `router/frontend`'s own `App.tsx` (a plain tab switcher, no react-router) is also
+built into a real SPA now — `router/Dockerfile` has its own Node build stage (using
+`router/frontend/package-lock.json`, generated standalone since this Dockerfile's build
+context is `router/` only and can't reach the repo-root workspace lockfile) and
+`router/backend/static.go` (ported from `webmanager/backend/static.go`) serves it directly
+at `/router/`, replacing the old password-only `handlers_ui.go` page — so App
+Routes/Dev Proxy/Tailscale/tinyauth users can all be managed without webmanager at all, only
+router-manager's own API. First-run password setup/change now lives in this SPA too
+(`RouterAuthPanel`, a React port of the old inline-JS page), under a "설정" tab alongside a
+new `TinyauthUsers` panel (see below). `router/frontend/vite.config.ts`'s build `base` is
+`'./'` (relative), not an absolute prefix like webmanager's own `'/manager/'` — this SPA is
+served from two different depths depending on deployment (the shared hostname's `/router/`
+path, or the root of a dedicated `ROUTER_MANAGER_HOSTS` domain, see below), and only a
+relative base resolves correctly under both as long as the page itself is always linked with
+a trailing slash. Confirmed live that an absolute `/` base 404s every asset under `/router/`,
+since the browser resolves a root-absolute `src` against the origin root, bypassing the
+`/router/` prefix entirely.
 
 router-manager's own admin-API auth (`router/backend/internal/authgate`) is opt-in via
 `ROUTER_MANAGER_AUTH_PASSWORD_HASH` and gates every *mutating* route above (tailscale
@@ -237,6 +266,24 @@ webmanager's `App.tsx` next to its own `UnlockModalHost`) pops on any 401 from a
 router-manager route, same "prompt → retry once" pattern webmanager's own gate uses. See
 `router/plan.md` for the design history (this closed out the item that was previously
 tracked there as "보류/미정").
+
+The unlock cookie (`router_manager_unlock`) is host-only with no Domain attribute, and
+`/router/` is reachable on the *shared* hostname by default (same origin as code-server/
+webmanager/every `/exports/` and `/app/` target) — so a compromise anywhere on that shared
+origin (XSS, a poisoned agent writing to the page) can ride the cookie into router-manager's
+API via a same-origin `fetch()`; HttpOnly/SameSite=Strict only stop cross-origin/JS-read
+access, not same-origin script. Router's own nginx strips the cookie from the proxied
+`Cookie` header on `/exports/` and `/app/` (`router_manager_cookie_stripped` map in
+`router/config/nginx/nginx.default.conf`) so an untrusted Dev Proxy/App Routes target can't
+read it directly — but that doesn't close the same-origin-script vector. `ROUTER_MANAGER_HOSTS`
+(`router/example-env.router`, comma-separated, default empty) is the actual fix: it adds a
+second `server{}` block (env-only/restart-required, same trust tier as `ALLOWED_HOSTS`/
+`ALLOWED_EXPORT_HOSTS` — never made in-app-editable) that serves router-manager's SPA+API
+standalone on a dedicated hostname via nginx `server_name` matching, so its cookie is scoped
+to that origin alone. `router/frontend`'s `RouterAuthPanel`/`RouterTrustedHostsPanel`/
+`OriginWarningBanner` show the currently-configured value read-only and warn when accessed
+over localhost or over the shared path despite a dedicated domain being configured — see
+docs/router.md's "보안: 공유 origin과 전용 도메인" section.
 
 router's own feature-specific env vars (tailscale, Dev Proxy exposure policy,
 `ROUTER_MANAGER_AUTH_PASSWORD_HASH`, tinyauth, `/exports/` allowlists — everything above

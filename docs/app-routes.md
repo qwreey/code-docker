@@ -175,3 +175,14 @@ server {
 
 인증이 없는 상태로 두려면 그냥 "인증 요구"를 끄면 됩니다 — 그 경우 바깥
 리버스 프록시 쪽에서 별도로 auth를 걸지 않는 한 완전히 공개됩니다.
+
+## 보안: router-manager 쿠키는 자동으로 잘려서 넘어갑니다
+
+Dev Proxy(`/exports/`)와 마찬가지로 `/app/`도 기본적으로 code-server/
+webmanager/router-manager와 같은 hostname을 씁니다 - router 자신의 nginx가
+router-manager의 잠금 해제 쿠키(`router_manager_unlock`)를 프록시 직전에
+헤더에서 잘라내므로(별도 설정 필요 없음, 자동), App Routes로 등록한 앱이 그
+헤더를 읽어서 router-manager API를 대신 호출하는 일은 없습니다. 다만 이건
+"등록된 앱이 헤더를 읽는" 경로만 막는 것으로, 완전한 origin 격리는 아닙니다
+- [router.md의 관련 절](router.md#보안-공유-origin과-전용-도메인routermanagerhosts)을
+참고하세요.

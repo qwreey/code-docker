@@ -36,7 +36,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-ROUTER_ENV_VERSION=2
+ROUTER_ENV_VERSION=3
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -125,3 +125,26 @@ ROUTER_ENV_VERSION=2
 #. 닿는 것을 막습니다(진짜 외부 Dev Proxy 트래픽이 이 네트워크 내부에서
 #. 시작될 이유가 없음) - "false"로 이 검사를 끕니다.
 #ROUTER_NGINX_DENY_INTERNAL_EXPORTS="true"
+
+#. --- router-manager 전용 도메인 (권장, 보안) ---
+#. router-manager(설정 UI + API)는 기본적으로 공유 도메인의 /router/
+#. 경로로도 접근할 수 있습니다(webmanager에 내장된 Tailscale/Dev
+#. Proxy/App Routes 탭이 이 방식을 씀) - 별도 설정 없이 되는 대신,
+#. code-server/webmanager/노출된 dev 서버/App Routes 대상 중 어디 하나라도
+#. 뚫리면(XSS, 오염된 에이전트가 페이지에 스크립트를 심는 경우 등) 같은
+#. origin이라 router_manager_unlock 쿠키를 그대로 같이 타고 들어와
+#. router-manager API를 조용히 호출당할 수 있습니다 - HttpOnly/
+#. SameSite=Strict는 같은 origin에서 실행되는 스크립트는 막지 못합니다.
+#.
+#. 여기 도메인(콤마로 여러 개 가능, 예: router.code.yaeji.moe)을 설정하면
+#. router-manager가 그 도메인에서 완전히 독립된 origin으로도 서비스됩니다
+#. (server_name 기반 - 이 값에 없는 Host는 기존과 동일하게 동작하며 영향
+#. 없음). 그 도메인으로 로그인해서 발급받은 쿠키는 그 도메인에만
+#. 스코프되므로, 공유 origin이 뚫려도 이 쿠키까지 같이 새지 않습니다.
+#. 프로덕션에서는 이 값을 설정하고 그 도메인으로만 router-manager를
+#. 사용하는 걸 권장합니다 - docs/router.md 참고. 일관되게 기본값은
+#. 비어있음(끔)입니다 - ALLOWED_HOSTS/ALLOWED_EXPORT_HOSTS와 마찬가지로
+#. 보안 경계라서 앱 안에서 바꿀 수 있게 하지 않고(비밀번호와 다름),
+#. 여기서 인프라 설정으로만 관리합니다. 값을 바꾸면 컨테이너 재시작이
+#. 필요합니다.
+#ROUTER_MANAGER_HOSTS= # 예: router.code.yaeji.moe

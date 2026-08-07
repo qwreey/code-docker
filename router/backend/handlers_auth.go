@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"router/internal/authgate"
@@ -45,13 +47,52 @@ type authStatusResponse struct {
 	Source        string  `json:"source"`
 	Unlocked      bool    `json:"unlocked"`
 	UnlockedUntil *string `json:"unlockedUntil,omitempty"` // RFC3339, only set when Unlocked
+	// TrustedHosts mirrors ROUTER_MANAGER_HOSTS (router/example-env.router)
+	// - the dedicated-origin hostnames router's own nginx routes straight to
+	// router-manager (see nginx.default.conf's NGINX_ROUTER_MANAGER_HOSTS
+	// block). Read-only here: this is a static, restart-required nginx
+	// routing/security boundary, same trust level as ALLOWED_HOSTS/
+	// ALLOWED_EXPORT_HOSTS, so unlike the password it's never settable via
+	// this API - the frontend just displays it so a user can tell at a
+	// glance whether a dedicated domain is configured. Empty when unset.
+	TrustedHosts []string `json:"trustedHosts"`
+	// RequestHost is the Host header this specific request arrived on -
+	// lets the frontend compare "am I currently on one of TrustedHosts" and
+	// warn if not (see the localhost/shared-origin banner).
+	RequestHost string `json:"requestHost"`
+}
+
+// trustedHosts parses ROUTER_MANAGER_HOSTS the same way
+// nginx-service.default.sh does (comma-separated, trimmed, empties
+// dropped) - kept in sync by hand since one is bash and the other is Go.
+func trustedHosts() []string {
+	raw := os.Getenv("ROUTER_MANAGER_HOSTS")
+	if raw == "" {
+		return []string{}
+	}
+	var hosts []string
+	for _, h := range strings.Split(raw, ",") {
+		h = strings.TrimSpace(h)
+		if h != "" {
+			hosts = append(hosts, h)
+		}
+	}
+	if hosts == nil {
+		hosts = []string{}
+	}
+	return hosts
 }
 
 // handleAuthStatus lets the frontend know whether to show a password
 // prompt at all, and if so whether the current session already satisfies
 // it.
 func handleAuthStatus(w http.ResponseWriter, r *http.Request) {
-	resp := authStatusResponse{Required: gate.Configured(), Source: gate.Source()}
+	resp := authStatusResponse{
+		Required:     gate.Configured(),
+		Source:       gate.Source(),
+		TrustedHosts: trustedHosts(),
+		RequestHost:  r.Host,
+	}
 	if until, ok := gate.UnlockedUntil(r); ok {
 		resp.Unlocked = true
 		formatted := until.UTC().Format(time.RFC3339)

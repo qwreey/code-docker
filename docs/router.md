@@ -19,6 +19,10 @@
 [`router/.claude/functional-router-plan.md`](../router/.claude/functional-router-plan.md)에
 정리되어 있습니다.
 
+tailscale/Dev Proxy/App Routes는 전부 webmanager의 해당 탭에서 관리할 수 있고,
+`http://<host>/router/`를 직접 열면 webmanager 없이도 같은 화면(+ tinyauth
+사용자 관리)을 쓸 수 있습니다 — 자세한 내용은 아래 "router-manager" 절.
+
 ## tailscale
 
 `docker-compose.yml`의 `TAILSCALE_ENABLED`(기본 `"true"`)로 켜고 끕니다 — `"false"`면
@@ -82,10 +86,10 @@ publish:
 docker compose exec code-docker-router supervisorctl restart tailscale-forward tailscale-publish
 ```
 
-호스트 원격 CLI로 이 명령을 실행하는 게 부담스럽다면, `bin/forward-reload`(code-docker
-안 PATH에 있음)를 실행하면 이 안내가 그대로 출력됩니다 — code-docker 안에서는
-router의 supervisorctl 소켓에 직접 닿을 수 없어 재시작 자체를 대신 해주지는
-못합니다.
+직접 편집 대신 webmanager의 Tailscale 탭(또는 router-manager
+`/api/tailscale/forwards`·`/api/tailscale/publish` API)을 쓰면 저장과 동시에
+자동으로 재시작까지 처리됩니다 — 위 수동 재시작 명령은 `config.yaml`을 손으로
+편집했을 때만 필요합니다.
 
 ### 호스트네임 지정 / 자체 호스팅 로그인 서버
 
@@ -113,18 +117,22 @@ router 자신의 supervisord 프로그램으로 돕니다 — `router/Dockerfile
 씁니다(소스 빌드는 안 함 — pnpm 프론트엔드 빌드가 필수라 이 레포의 다른 Go 바이너리
 빌드 패턴과 안 맞지만, 바이너리 자체를 그대로 복사해오는 데는 문제가 없습니다).
 `TINYAUTH_APPURL`이 비어 있으면(tinyauth 자신이 실제 URL 없이는 부팅을 거부하므로)
-그냥 대기 상태로 유지되고 크래시 루프를 돌지 않습니다. 기본적으로 아무도 로그인할 수
-없는 상태로 시작합니다(`TINYAUTH_AUTH_USERS` 빈 값) — 사용하려면 `example-env`의
-안내대로 사용자를 생성하세요:
+그냥 대기 상태로 유지되고 크래시 루프를 돌지 않습니다. `TINYAUTH_APPURL`은 실제
+도메인 형식(`https://code-docker.example.com`)으로 `.env`에 설정해야 합니다.
+
+사용자는 기본적으로 아무도 없는 상태로 시작합니다 — `/router/`(router-manager UI,
+"설정" 탭)에서 사용자를 추가/삭제할 수 있고, 추가/삭제할 때마다 자동으로
+`tinyauth`가 재시작되어 바로 반영됩니다. `TINYAUTH_AUTH_USERS` 환경변수를 직접
+설정하면 그 값이 항상 우선하며(UI로 바꿀 수 없게 고정) UI에는 편집 폼 대신 그
+사실이 표시됩니다 — 인프라 코드로 고정하고 싶을 때만 쓰세요:
 
 ```sh
 docker run --rm ghcr.io/tinyauthapp/tinyauth:v5 user create \
   --username <name> --password <password> --docker
 ```
 
-출력된 `TINYAUTH_AUTH_USERS=...` 줄을 `.env`에 붙여넣고, `TINYAUTH_APPURL`도
-실제 도메인 형식(`https://code-docker.example.com`)으로 설정한 뒤
-`docker compose up -d`로 재기동하세요. 자세한 사용법(라우트/앱에 인증 요구 걸기)은
+출력된 `TINYAUTH_AUTH_USERS=...` 줄을 `.env`에 붙여넣고 `docker compose up -d`로
+재기동하세요. 자세한 사용법(라우트/앱에 인증 요구 걸기)은
 [dev-proxy.md의 "인증"](dev-proxy.md#인증) 또는
 [app-routes.md의 "인증"](app-routes.md#인증)을 확인하세요.
 
@@ -134,21 +142,29 @@ router는 `router-manager`라는 Go 백엔드를 갖고 있습니다(webmanager�
 router 자신의 nginx가 host:80을 직접 종단해 `/router/` 위치 하나로 모든 API를
 유닉스 소켓(`/run/router-manager.sock`) 경유로 프록시합니다 — router-manager
 자신은 TCP 포트를 전혀 열지 않습니다(`ROUTER_MANAGER_ADDR`는 컨테이너 밖 로컬
-개발용으로만 쓰는 opt-in 예외). 아래 API 경로는 router-manager 자신 기준이고,
-실제로는 router의 nginx가 그대로 `/router/api/...`로 통과시킵니다(예:
-`/router/api/tailscale/state`). 제공하는 것:
+개발용으로만 쓰는 opt-in 예외). 같은 소켓이 API와 함께 `router/frontend`로
+빌드된 SPA도 서빙하므로(`router/backend/static.go`), `http://<host>/router/`를
+직접 열면 webmanager 없이도 아래 기능을 전부 UI로 쓸 수 있습니다(Dev Proxy/App
+Routes/Tailscale 탭은 webmanager가 가져다 쓰는 것과 정확히 같은 컴포넌트).
+아래 API 경로는 router-manager 자신 기준이고, 실제로는 router의 nginx가 그대로
+`/router/api/...`로 통과시킵니다(예: `/router/api/tailscale/state`). 제공하는 것:
 
 - Tailscale 전체 CRUD — `GET`/`PUT /api/tailscale/config`(SOCKS 주소/재시도 간격),
   `GET`/`POST`/`DELETE /api/tailscale/forwards[/{name}]`, 같은 패턴의
   `/api/tailscale/publish[/{name}]`, `GET /api/tailscale/status`(self/peer 정보),
-  `POST /api/tailscale/login/{start,cancel}`. webmanager의 Tailscale 탭이 여기로
-  요청을 보냅니다. 기존 `GET /api/tailscale/state`(backendState/authUrl만 노출하는
-  저위험 읽기전용 상태)도 그대로 남아 있고, code-server 화면의 로그인 배너가 여기서
-  읽습니다.
+  `POST /api/tailscale/login/{start,cancel}`. webmanager의 Tailscale 탭과 `/router/`
+  SPA의 Tailscale 탭이 여기로 요청을 보냅니다. 기존 `GET /api/tailscale/state`
+  (backendState/authUrl만 노출하는 저위험 읽기전용 상태)도 그대로 남아 있고,
+  code-server 화면의 로그인 배너가 여기서 읽습니다.
 - Dev Proxy expose CRUD(`/api/dev-proxy/*`) — webmanager의
-  [Dev Proxy 탭](webmanager.md#dev-proxy)이 여기로 요청을 보냅니다.
+  [Dev Proxy 탭](webmanager.md#dev-proxy)과 `/router/` SPA의 Dev Proxy 탭이 여기로
+  요청을 보냅니다.
 - App Routes 앱 CRUD(`/api/app-routes/*`) — webmanager의
-  [App Routes 탭](webmanager.md#app-routes)이 여기로 요청을 보냅니다.
+  [App Routes 탭](webmanager.md#app-routes)과 `/router/` SPA의 App Routes 탭이
+  여기로 요청을 보냅니다.
+- tinyauth 사용자 CRUD(`GET`/`POST /api/tinyauth/users`,
+  `DELETE /api/tinyauth/users/{name}`) — `/router/` SPA의 "설정" 탭에서만 쓰입니다
+  (webmanager 쪽엔 이 탭이 없습니다). 위 "tinyauth" 절 참고.
 - 자체 admin-API 비밀번호 게이트(`GET /api/auth/status`, `POST /api/auth/unlock`) —
   아래 "router-manager 자체 인증" 참고.
 
@@ -165,9 +181,10 @@ webmanager 자체 잠금과 독립적으로 켜고 끌 수 있고, 잠긴 쓰기
 
 **권장: 앱 안에서 설정 (`/router/`)** — 아무것도 설정하지 않은 채 처음
 띄우면 `GET /api/auth/status`의 `source`가 `"unset"`입니다. 컨테이너의
-`http://<host>/router/`를 열면 router-manager가 직접 제공하는 최소한의
-셋업/변경 페이지가 뜨고(webmanager 없이도 접근 가능, 빌드 스텝 없는 순수
-HTML), 여기서 새 비밀번호를 설정하면
+`http://<host>/router/`를 열면 router-manager가 직접 제공하는 SPA(webmanager
+없이도 접근 가능 — Dev Proxy/App Routes/Tailscale/tinyauth 사용자 관리까지
+전부 이 안에서 되고, "설정" 탭이 기본으로 열립니다)가 뜨고, 그 탭에서 새
+비밀번호를 설정하면
 `${ROUTER_VOLUME:-./data/router}/auth-hash.json`(컨테이너 안에서는
 `/var/lib/code-docker-router/auth-hash.json` — `ROUTER_MANAGER_AUTH_STORE_PATH`로
 경로 변경 가능)에 저장됩니다(`source: "file"`). 이후 같은 페이지에서
@@ -193,6 +210,35 @@ HTML), 여기서 새 비밀번호를 설정하면
 tinyauth(위 "tinyauth" 절)와는 완전히 별개입니다 — tinyauth는 Dev Proxy/App Routes로
 노출한 개별 dev 서버·앱의 최종 사용자 인증이고, 이건 router-manager 자신의 admin API를
 보호하는 것입니다.
+
+#### 보안: 공유 origin과 전용 도메인(`ROUTER_MANAGER_HOSTS`)
+
+router-manager의 잠금 해제 쿠키(`router_manager_unlock`)는 Domain 속성 없는
+host-only 쿠키입니다. `/router/` 경로는 기본적으로 code-server/webmanager와
+같은 공유 hostname 위에서 서비스되므로, 이 쿠키도 그 origin 전체에 자동으로
+붙습니다 — HttpOnly라 JS의 `document.cookie` 읽기는 막지만, 같은 origin에서
+실행되는 스크립트(예: webmanager/code-server의 XSS, 혹은 그 안에서 도는
+에이전트가 오염된 경우)가 `fetch('/router/api/...')`를 직접 호출하는 건 막지
+못합니다. router 자신의 nginx는 Dev Proxy(`/exports/`)와 App
+Routes(`/app/`)로 프록시할 때는 이 쿠키를 헤더에서 잘라내지만(사용자가
+등록한, 신뢰할 수 없는 대상이 헤더를 그대로 읽어가는 걸 막는 용도 —
+`router/config/nginx/nginx.default.conf`의 `router_manager_cookie_stripped`
+map), 이건 "프록시된 백엔드가 헤더를 읽는" 경로만 막을 뿐 위에서 말한
+같은-origin 스크립트 경로는 막지 못합니다.
+
+이걸 근본적으로 막으려면 router-manager를 아예 별도 origin으로 분리해야
+합니다. `router/example-env.router`의 `ROUTER_MANAGER_HOSTS`(콤마로 여러 개
+가능, 예: `router.code.yaeji.moe`)를 설정하면, 그 hostname으로 오는 요청은
+router의 nginx가 `server_name` 기반으로 완전히 별도의 `server{}` 블록으로
+router-manager에 직접 연결합니다(SPA + API 전부) — 그 도메인에서 로그인해
+발급받은 쿠키는 그 도메인에만 스코프되므로, code-server/webmanager/노출된
+앱 중 어디가 뚫려도 이 쿠키까지 같이 새지 않습니다. `ALLOWED_HOSTS`/
+`ALLOWED_EXPORT_HOSTS`와 같은 이유로 env-only입니다(인프라 수준의 보안
+경계라 앱 안에서 즉시 반영되는 값으로 만들지 않았습니다) — 값을 바꾸면
+컨테이너 재시작이 필요합니다. `/router/` SPA의 "설정" 탭에서 현재 설정된
+값과 지금 접근 중인 origin을 읽기 전용으로 확인할 수 있고, localhost로
+접근 중이거나 전용 도메인이 있는데 공유 경로로 접근 중이면 배너로
+안내합니다.
 
 ### router 환경변수 마이그레이션
 
