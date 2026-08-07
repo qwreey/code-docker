@@ -78,6 +78,14 @@ func parseLine(line string) (Key, bool) {
 	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 		return Key{}, false
 	}
+	// ssh.ParseAuthorizedKey only validates its FIRST line and silently
+	// succeeds with the rest discarded - without this check, a caller-
+	// supplied multi-line string would pass validation on line one while
+	// Raw (below) still captured every line, letting Add/Update smuggle
+	// unreviewed extra authorized_keys entries into the file.
+	if strings.ContainsAny(trimmed, "\n\r") {
+		return Key{}, false
+	}
 	pub, comment, _, _, err := ssh.ParseAuthorizedKey([]byte(trimmed))
 	if err != nil {
 		return Key{}, false
