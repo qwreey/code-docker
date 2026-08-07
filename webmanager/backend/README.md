@@ -104,7 +104,7 @@ shell out to `git`/`ssh-keygen`.
 | `WEBMANAGER_ENV_VERSION_DISMISS_PATH` | `/code/.local/share/code-docker/webmanager/env-version-dismiss.json` | persisted "user has acknowledged this version's mismatch banner" flag (`internal/envversionprefs`) |
 
 GPG-backed endpoints (`/api/git/gpg-keys*`) additionally depend on the `gpg`
-binary being on `PATH` (installed via `gnupg` in `config/build.default.sh`);
+binary being on `PATH` (installed via `gnupg` in `config/build/build.default.sh`);
 if it isn't found, those endpoints return `501` instead of failing outright.
 
 ## Frontend integration

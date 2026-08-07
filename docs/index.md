@@ -190,4 +190,4 @@ router 컨테이너(`router/` 서브트리) 자체의 override 파일 목록은 
 
 자세한 내용은 [code-server-patch.md](code-server-patch.md)를 확인하세요.
 
-기본으로 몇 가지 js 가 이 방식으로 주입됩니다 — 예를 들어 tailscale 로그인이 필요할 때 배너를 띄우는 `tailscale-notify.default.js`, 그리고 타이틀바 좌측 위 아이콘(`.window-appicon`)을 클릭하면 webmanager(위 "webmanager (관리자 패널)" 섹션 참고)를 오버레이 모달로 열어주는 `webmanager-launcher.default.js`가 있습니다. 다른 override 파일들처럼 `config/code-patch/webmanager-launcher.override.js`를 만들어 동작을 바꿀 수 있습니다.
+기본으로 몇 가지 js 가 이 방식으로 주입됩니다 — 예를 들어 tailscale 로그인이 필요할 때 배너를 띄우는 `tailscale-notify.default.js`, 그리고 타이틀바 좌측 위 아이콘(`.window-appicon`)을 클릭하면 webmanager(위 "webmanager (관리자 패널)" 섹션 참고)를 오버레이 모달로 열어주는 `webmanager-launcher.default.js`가 있습니다. 다른 override 파일들처럼 `config/code/code-patch/webmanager-launcher.override.js`를 만들어 동작을 바꿀 수 있습니다.
