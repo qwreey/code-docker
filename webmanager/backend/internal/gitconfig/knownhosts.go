@@ -39,6 +39,15 @@ func parseKnownHostLine(line string) (KnownHostEntry, bool) {
 	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 		return KnownHostEntry{}, false
 	}
+	// strings.Fields below splits on any whitespace, including embedded
+	// newlines - without this check, a caller-supplied multi-line string
+	// would get flattened into one token stream (only the first line
+	// meaningfully validated) while Raw (below) still preserved every
+	// line, letting AddKnownHost smuggle an unvalidated second entry into
+	// the file.
+	if strings.ContainsAny(trimmed, "\n\r") {
+		return KnownHostEntry{}, false
+	}
 
 	fields := strings.Fields(trimmed)
 	if len(fields) > 0 && strings.HasPrefix(fields[0], "@") {
