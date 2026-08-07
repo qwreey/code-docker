@@ -1,8 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { api } from '../../api/client'
-import { ErrorBanner } from './ErrorBanner'
+import { ErrorBanner, Skeleton } from '@code-docker/router-frontend'
 import { useAuthStatus } from './useAuthStatus'
-import { Skeleton } from './Skeleton'
 import './RequiresUnlock.css'
 
 /**

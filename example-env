@@ -27,7 +27,7 @@
 # BUILD_CONTEXT="builds/code-docker" 로 지정하세요.
 #BUILD_CONTEXT="."
 
-# code-docker-internal/external/forwards 세 네트워크의 enable_ipv6를 한 번에
+# code-docker-internal/external 두 네트워크의 enable_ipv6를 한 번에
 # 켭니다. PREFIX/BUILD_CONTEXT와 마찬가지로 컨테이너 안 환경변수가 아니라
 # docker-compose.yml의 네트워크 정의에만 쓰입니다. 도커 엔진 자체의 ipv6
 # 지원(daemon.json의 ipv6/fixed-cidr-v6 등)이 먼저 켜져 있어야 의미가
@@ -104,6 +104,12 @@
 # alternative; you'd then need to add `ports:` for it yourself too).
 #CADDY_ADAPTER_ENABLED="true"
 #CADDY_ADAPTER_PORT=
+
+# router의 nginx `location /` 캐치올(그 어떤 다른 위치와도 안 겹치는 요청)이
+# 최종적으로 어디로 가는지 - caddy-adapter를 거쳐 이 값으로 reverse_proxy됩니다.
+# 기본값은 code-docker 자신(zero-config 상태 유지)이지만, router는 뒤에 뭐가
+# 있는지 몰라도 되므로 다른 컨테이너/주소로 자유롭게 바꿀 수 있습니다.
+#DEFAULT_UPSTREAM="code-docker:80"
 
 # In-container nginx (config/nginx/nginx.default.conf) access_log verbosity:
 #   errors - only log non-2xx/3xx responses (via an nginx map/if on
@@ -210,3 +216,11 @@
 # 바꿀 필요가 없습니다 - docker-compose.yml을 직접 손대지 않고 라우터 별칭
 # 이름을 다른 값으로 바꾸고 싶을 때만 설정하세요.
 #ROUTER_HOSTNAME="router"
+
+# code-docker-internal 네트워크의 IPAM subnet이자, router의 /exports/
+# internal-source deny(ROUTER_NGINX_DENY_INTERNAL_EXPORTS)가 참조하는 CIDR
+# 입니다 - docker-compose.yml의 두 곳(네트워크 정의, code-docker-router의
+# environment:)이 이 값 하나를 같이 참조하므로 여기서 한 번만 바꾸면 둘 다
+# 어긋나지 않습니다. 이 값을 바꿔야 하는 경우는 거의 없습니다(다른
+# 172.30.0.0/24 사용자와 호스트 네트워크가 실제로 충돌할 때 정도).
+#ROUTER_INTERNAL_SUBNET="172.30.0.0/24"

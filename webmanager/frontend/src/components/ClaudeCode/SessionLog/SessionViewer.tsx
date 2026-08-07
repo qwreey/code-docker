@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../../api/client'
 import type { ClaudeSessionInfo, ClaudeSessionLinesResponse } from '../../../api/types'
-import { ErrorBanner } from '../../common/ErrorBanner'
+import { ErrorBanner } from '@code-docker/router-frontend'
 import { AssistantContent, UserContent } from './ContentBlocks'
 import { isNoiseUserEntry, parseConversationLine, type AssistantEntry, type UserEntry } from './entryTypes'
 

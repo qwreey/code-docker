@@ -39,7 +39,8 @@ COPY backend/handlers_auth.go ./
 COPY backend/handlers_devproxy.go ./
 COPY backend/handlers_approutes.go ./
 COPY backend/handlers_tailscale.go ./
-COPY backend/handlers_ui.go ./
+COPY backend/handlers_tinyauth.go ./
+COPY backend/static.go ./
 COPY backend/internal ./internal
 # router's build context is router/ only (see router/CLAUDE.md), so it can't
 # COPY the repo-root envmigrate/ module directly the way webmanager's own
@@ -48,6 +49,22 @@ COPY backend/internal ./internal
 # instead. `go build` auto-detects and uses vendor/ when present/consistent.
 COPY backend/vendor ./vendor
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /router-manager .
+
+# router/frontend's own SPA build (AppRoutes/DevProxy/Tailscale/설정 tabs,
+# see router/frontend/src/App.tsx) - served directly by router-manager
+# itself (static.go) at /router/, so App Routes/Dev Proxy/Tailscale/tinyauth
+# can be managed without webmanager. router/frontend has its own
+# package-lock.json (not the repo-root workspace one) specifically because
+# this Dockerfile's build context is router/ only (see router/CLAUDE.md) and
+# can't COPY sibling repo-root files the way the root Dockerfile's
+# webmanager-frontend stage does - see router/frontend/package-lock.json's
+# own note if one is added, or root CLAUDE.md's "router" section.
+FROM node:24-alpine AS router-frontend-build
+WORKDIR /src
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
 
 # Source for the tinyauth binary only (see config/tinyauth/tinyauth.default.sh)
 # - tinyauth's own Dockerfile requires a mandatory pnpm frontend build ahead
@@ -84,6 +101,7 @@ RUN mkdir -p /var/log/netgate-firewall \
         /var/log/router-manager /var/log/caddy-adapter /var/log/dns /var/log/nginx \
         /var/log/tinyauth \
         /etc/code-docker/netgate /etc/code-docker/dns /etc/code-docker/supervisord.d \
+        /etc/code-docker/router-manager \
         /var/lib/code-docker-router
 COPY --chown=root:root config/netgate /etc/code-docker/netgate
 COPY --chown=root:root config/dns /etc/code-docker/dns
@@ -101,6 +119,7 @@ COPY --chown=root:root config/tailscale/tailscale-service.default.sh \
     config/nginx/nginx.default.conf config/nginx/nginx-service.default.sh \
     config/tinyauth/tinyauth.default.sh /etc/code-docker/
 COPY --from=router-manager-build /router-manager /usr/local/bin/router-manager
+COPY --from=router-frontend-build /src/dist /etc/code-docker/router-manager/static
 COPY --from=tinyauth-bin /tinyauth/tinyauth /usr/local/bin/tinyauth
 # `router-manager --env-migrate` and its startup version-mismatch check both
 # read this (ROUTER_ENV_TEMPLATE_PATH, default matches this path) - see

@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../../api/client'
 import type { GitDiffResponse } from '../../../api/types'
-import { ErrorBanner } from '../ErrorBanner'
-import { Sheet } from '../Sheet'
-import { Skeleton } from '../Skeleton'
+import { ErrorBanner, Sheet, Skeleton } from '@code-docker/router-frontend'
 import { DiffView } from './DiffView'
 import './Git.css'
 

@@ -27,4 +27,14 @@ fi
 mkdir -p /var/lib/code-docker-router/tinyauth
 [ -e /data ] || ln -s /var/lib/code-docker-router/tinyauth /data
 
+# router-manager's own per-user credential CRUD (see
+# internal/tinyauthusers) writes TINYAUTH_AUTH_USERS to this file whenever a
+# user is added/removed, then restarts this program - only sourced when the
+# real env var isn't already pinning the value, same priority as
+# ROUTER_MANAGER_AUTH_PASSWORD_HASH vs its own file-backed store.
+if [ -z "${TINYAUTH_AUTH_USERS:-}" ] && [ -e /var/lib/code-docker-router/tinyauth-users/env ]; then
+    . /var/lib/code-docker-router/tinyauth-users/env
+    export TINYAUTH_AUTH_USERS
+fi
+
 exec /usr/local/bin/tinyauth

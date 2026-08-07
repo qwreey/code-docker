@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { GitSigningConfig, GitSigningMode, SshSigningKey } from '../../api/types'
-import { ErrorBanner } from '../common/ErrorBanner'
+import { ErrorBanner, Skeleton } from '@code-docker/router-frontend'
 import { CopyButton } from '../common/CopyButton'
 import { GpgKeys } from './GpgKeys'
-import { Skeleton } from '../common/Skeleton'
 import { withViewTransition } from '../../utils/viewTransition'
 
 const MODE_LABELS: Record<GitSigningMode, string> = {

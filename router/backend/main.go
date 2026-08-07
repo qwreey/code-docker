@@ -79,8 +79,12 @@ func main() {
 	}
 	gate = authgate.New(authPasswordHash, authStorePath)
 
+	staticDir := os.Getenv("ROUTER_MANAGER_STATIC_DIR")
+	if staticDir == "" {
+		staticDir = "./static"
+	}
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", handleRouterUI)
 	mux.HandleFunc("POST /api/auth/unlock", handleAuthUnlock)
 	mux.HandleFunc("GET /api/auth/status", handleAuthStatus)
 	mux.HandleFunc("POST /api/auth/setup", handleAuthSetup)
@@ -109,6 +113,16 @@ func main() {
 	mux.Handle("PUT /api/app-routes/apps/{name}", gate.RequirePassword(http.HandlerFunc(handleUpdateAppRoute)))
 	mux.Handle("DELETE /api/app-routes/apps/{name}", gate.RequirePassword(http.HandlerFunc(handleDeleteAppRoute)))
 	mux.Handle("POST /api/app-routes/reload", gate.RequirePassword(http.HandlerFunc(handleReloadAppRoutes)))
+
+	mux.HandleFunc("GET /api/tinyauth/users", handleListTinyauthUsers)
+	mux.Handle("POST /api/tinyauth/users", gate.RequirePassword(http.HandlerFunc(handleAddTinyauthUser)))
+	mux.Handle("DELETE /api/tinyauth/users/{name}", gate.RequirePassword(http.HandlerFunc(handleDeleteTinyauthUser)))
+
+	// Everything else falls through to the built SPA (AppRoutes/DevProxy/
+	// Tailscale/설정 tabs) - replaces the old standalone password-only page
+	// (handlers_ui.go), whose setup/change functionality is now
+	// RouterAuthPanel inside the SPA itself.
+	mux.Handle("GET /", staticHandler(staticDir))
 
 	listener, err := listen()
 	if err != nil {

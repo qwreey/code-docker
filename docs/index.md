@@ -127,14 +127,14 @@ tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열�
 
 ## dev 서버 노출 (Dev Proxy)
 
-컨테이너 안에서 뜬 dev 서버(`npm run dev` 등)를 와일드카드 서브도메인으로 바깥에 노출하는 기능입니다. router 컨테이너의 내부 Caddy 인스턴스가 서브도메인별로 로컬 포트로 프록시하고, [webmanager의 Dev Proxy 탭](webmanager.md)에서 항목을 관리합니다(router가 제공하는 페이지 컴포넌트를 webmanager가 그대로 가져와 보여줍니다).
+컨테이너 안에서 뜬 dev 서버(`npm run dev` 등)를 와일드카드 서브도메인으로 바깥에 노출하는 기능입니다. router 컨테이너의 내부 Caddy 인스턴스가 서브도메인별로 로컬 포트로 프록시하고, [webmanager의 Dev Proxy 탭](webmanager.md)에서 항목을 관리합니다(router가 제공하는 페이지 컴포넌트를 webmanager가 그대로 가져와 보여줍니다) — 또는 `http://<host>/router/`를 직접 열어 webmanager 없이 같은 화면을 쓸 수도 있습니다([router.md](router.md#router-manager) 참고).
 
 자세한 내용은 [dev-proxy.md](dev-proxy.md)를 확인하세요.
 
 - [켜고 끄기 / 기본 설정](dev-proxy.md#켜고-끄기--기본-설정)
 - [expose 추가하기](dev-proxy.md#expose-추가하기)
 - [바깥 리버스 프록시 연결하기](dev-proxy.md#바깥-리버스-프록시-연결하기)
-- [인증](dev-proxy.md#인증) — [router의 tinyauth](router.md#tinyauth)에 최소 한 명의 사용자가 등록되어 있어야 합니다, 놓치기 쉬운 필수 설정입니다
+- [인증](dev-proxy.md#인증) — [router의 tinyauth](router.md#tinyauth)에 최소 한 명의 사용자가 등록되어 있어야 합니다, 놓치기 쉬운 필수 설정입니다 (`/router/`의 "설정" 탭에서 관리)
 
 ## 경로 기반 앱 라우팅 (App Routes)
 

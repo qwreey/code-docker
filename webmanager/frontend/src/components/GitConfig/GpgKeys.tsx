@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, errorMessage } from '../../api/client'
 import type { GpgKey, GpgKeyCreated } from '../../api/types'
-import { ErrorBanner } from '../common/ErrorBanner'
+import { ErrorBanner, Skeleton } from '@code-docker/router-frontend'
 import { CopyButton } from '../common/CopyButton'
-import { Skeleton } from '../common/Skeleton'
 import { withViewTransition } from '../../utils/viewTransition'
 
 const NOT_INSTALLED_NOTICE = '컨테이너에 gnupg가 아직 설치되어 있지 않습니다 (다음 이미지 빌드부터 사용 가능합니다).'

@@ -17,7 +17,7 @@ import { Sessions } from './components/Sessions/Sessions'
 import { RequiresUnlock } from './components/common/RequiresUnlock'
 import { UnlockModalHost } from './components/common/UnlockModal'
 import { EnvVersionBanner } from './components/common/EnvVersionBanner'
-import { Skeleton } from './components/common/Skeleton'
+import { Skeleton } from '@code-docker/router-frontend'
 import { withViewTransition } from './utils/viewTransition'
 import './App.css'
 

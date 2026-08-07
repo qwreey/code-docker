@@ -1,8 +1,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { ApiError, api, errorMessage } from '../../api/client'
 import type { FileContent, FileEntry } from '../../api/types'
-import { ErrorBanner } from '../common/ErrorBanner'
-import { Sheet } from '../common/Sheet'
+import { ErrorBanner, Sheet } from '@code-docker/router-frontend'
 import { LazyCodeEditor } from '../common/LazyCodeEditor'
 import './FileManager.css'
 

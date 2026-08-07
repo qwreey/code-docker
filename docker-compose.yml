@@ -7,12 +7,14 @@ networks:
     enable_ipv6: ${ENABLE_IPV6:-false}
     # Pinned (rather than Docker's usual auto-assigned subnet) so router's
     # own nginx has a stable CIDR to reference for its /exports/
-    # internal-source deny (see CODE_DOCKER_INTERNAL_SUBNET below and
+    # internal-source deny (see ROUTER_INTERNAL_SUBNET below and
     # router/.claude/router-nginx-hardening-plan.md) - without this the
     # subnet could differ across recreations, silently breaking that ACL.
+    # Single source of truth shared with router's own environment: below -
+    # override once here via .env and both stay in sync.
     ipam:
       config:
-        - subnet: 172.30.0.0/24
+        - subnet: ${ROUTER_INTERNAL_SUBNET:-172.30.0.0/24}
   code-docker-external:
     name: "${PREFIX:-}code-docker-external"
     internal: false
@@ -281,6 +283,11 @@ services:
       # this service's own `ports:`, which isn't set by default either).
       CADDY_ADAPTER_ENABLED: "${CADDY_ADAPTER_ENABLED:-true}"
       CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-}"
+      # router's own nginx `location /` catch-all proxies to caddy-adapter's
+      # DEFAULT_UPSTREAM-backed site block instead of hardcoding a target
+      # itself (see caddy-adapter.default.sh/nginx.default.conf) - default
+      # keeps pointing at code-docker for zero-config setups.
+      DEFAULT_UPSTREAM: "${DEFAULT_UPSTREAM:-}"
       # router is now the actual internet-facing hop (see
       # router/.claude/router-nginx-hardening-plan.md) - its own nginx
       # reuses the same ALLOWED_HOSTS/NGINX_BLOCK_LOOPBACK/TRUSTED_PROXIES/
@@ -292,7 +299,7 @@ services:
       NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
       NGINX_LOG_LEVEL: "${NGINX_LOG_LEVEL:-errors}"
-      CODE_DOCKER_INTERNAL_SUBNET: "172.30.0.0/24"
+      ROUTER_INTERNAL_SUBNET: "${ROUTER_INTERNAL_SUBNET:-172.30.0.0/24}"
       # `router-manager --env-migrate`/the startup version-mismatch check
       # read the current router/example-env.router template from here - same
       # pattern as code-docker's own WEBMANAGER_ENV_TEMPLATE_PATH above.

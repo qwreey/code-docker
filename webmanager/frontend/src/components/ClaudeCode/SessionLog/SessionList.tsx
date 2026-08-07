@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../../api/client'
 import type { ClaudeSessionInfo, ClaudeSessionsResponse } from '../../../api/types'
-import { ErrorBanner } from '../../common/ErrorBanner'
-import { Skeleton } from '../../common/Skeleton'
+import { ErrorBanner, Skeleton } from '@code-docker/router-frontend'
 import { formatBytes } from '../../../utils/format'
 import { withViewTransition } from '../../../utils/viewTransition'
 

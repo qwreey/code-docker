@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { RestartStatusResponse } from '../../api/types'
 import { confirmAndRestartCodeServer, type RestartOutcome } from '../../utils/restartCodeServer'
-import { ErrorBanner } from './ErrorBanner'
+import { ErrorBanner } from '@code-docker/router-frontend'
 
 const RESTART_OUTCOME_TEXT: Record<RestartOutcome, string> = {
   restarted: '재시작을 요청했습니다.',

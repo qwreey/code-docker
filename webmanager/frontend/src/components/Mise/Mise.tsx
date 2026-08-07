@@ -11,9 +11,8 @@ import type {
   RecommendationsResponse,
 } from '../../api/types'
 import { ConfirmDialog } from '../common/ConfirmDialog'
-import { ErrorBanner } from '../common/ErrorBanner'
+import { ErrorBanner, Skeleton } from '@code-docker/router-frontend'
 import { RestartNeededBanner } from '../common/RestartNeededBanner'
-import { Skeleton } from '../common/Skeleton'
 import '../common/common.css'
 import { JobDialog } from './JobDialog'
 import { JobPanel } from './JobPanel'

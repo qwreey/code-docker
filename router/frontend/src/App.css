@@ -1,0 +1,24 @@
+.router-app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.router-app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.router-app-header h1 {
+  margin: 0;
+}
+
+.router-app-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}

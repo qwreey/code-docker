@@ -124,3 +124,6 @@ export const { api: authApi } = createApiClient('router/api/auth', { skipUnlockR
 // `api`/`apiUrl` export above (which already claimed that name), same
 // pattern authApi uses for its own prefix.
 export const { api: appRoutesApi } = createApiClient('router/api/app-routes')
+
+// tinyauth user CRUD's own bound client - same pattern as appRoutesApi.
+export const { api: tinyauthApi } = createApiClient('router/api/tinyauth')

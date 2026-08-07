@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Pencil, Pin, PinOff, Play, Plus, Trash2, X } from 'lucide-react'
 import type { TerminalProfile, TerminalSessionInfo } from '../../api/types'
 import { ConfirmDialog } from '../common/ConfirmDialog'
-import { Sheet } from '../common/Sheet'
+import { Sheet } from '@code-docker/router-frontend'
 import './TerminalHome.css'
 
 function genId(): string {

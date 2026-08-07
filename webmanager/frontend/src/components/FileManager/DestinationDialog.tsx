@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Sheet } from '../common/Sheet'
+import { Sheet } from '@code-docker/router-frontend'
 import './FileManager.css'
 
 export function DestinationDialog({

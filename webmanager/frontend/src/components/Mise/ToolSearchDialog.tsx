@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { MiseRegistryEntry, MiseRegistrySearchResponse, MiseToolEntry, MiseVersionsResponse } from '../../api/types'
-import { ErrorBanner } from '../common/ErrorBanner'
+import { ErrorBanner } from '@code-docker/router-frontend'
 import '../common/common.css'
 import './Mise.css'
 

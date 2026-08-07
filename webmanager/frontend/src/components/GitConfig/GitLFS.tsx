@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { LFSStatus } from '../../api/types'
-import { ErrorBanner } from '../common/ErrorBanner'
-import { Skeleton } from '../common/Skeleton'
+import { ErrorBanner, Skeleton } from '@code-docker/router-frontend'
 import { withViewTransition } from '../../utils/viewTransition'
 
 export function GitLFS() {

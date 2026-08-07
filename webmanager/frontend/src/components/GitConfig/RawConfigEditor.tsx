@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
-import { ErrorBanner } from '../common/ErrorBanner'
+import { ErrorBanner, Skeleton } from '@code-docker/router-frontend'
 import { ExpandableEditor } from '../common/ExpandableEditor'
-import { Skeleton } from '../common/Skeleton'
 import { withViewTransition } from '../../utils/viewTransition'
 
 export function RawConfigEditor() {

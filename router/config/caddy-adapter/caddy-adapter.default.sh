@@ -72,7 +72,7 @@ fi
 # router/.claude/router-nginx-hardening-plan.md, Finding 1). /run is
 # container-local tmpfs, same reasoning as router-manager's own socket.
 #
-# Three (or four, if CADDY_ADAPTER_PORT is set) site blocks: the unix
+# Four (or five, if CADDY_ADAPTER_PORT is set) site blocks: the unix
 # socket router's own nginx /exports/ proxies to (default path) always
 # imports managed/*.caddy (Dev Proxy, Host-matched); the CADDY_ADAPTER_PORT
 # TCP listener (docs/dev-proxy.md's direct-publish alternative) imports the
@@ -82,7 +82,14 @@ fi
 # (caddy-app.sock, router's own nginx /app/ proxies to it - see
 # nginx.default.conf) imports apps/*.caddy (App Routes, path-matched via
 # each fragment's own `handle_path /app/<name>/*`, Host-agnostic - see
-# approutes.go). Verified live (v2.11.4) that a unix path can't be used
+# approutes.go). A fourth unix socket (caddy-default.sock, router's own
+# nginx bare `location /` proxies to it) reverse-proxies straight to
+# DEFAULT_UPSTREAM - this used to be nginx directly hardcoding
+# NGINX_UPSTREAM="code-docker:80" itself; routing it through Caddy instead
+# means router's own nginx never needs to know what's behind it (same
+# "router doesn't assume what's behind it" reasoning App Routes was built
+# around), and DEFAULT_UPSTREAM stays a plain env var with the same default
+# rather than a second bespoke mechanism. Verified live (v2.11.4) that a unix path can't be used
 # directly as a site address's header - Caddy's site-address parser doesn't
 # recognize "unix//path" the way the global `admin` directive does, and
 # instead misparses it as host="unix" + path="/path" on an implicit :443
@@ -104,6 +111,12 @@ fi
 # (docs/dev-proxy.md's direct-publish alternative). No default port: an
 # unset/empty CADDY_ADAPTER_PORT means Caddy never binds a TCP port at all,
 # leaving the unix socket above as the only way in.
+# The catch-all default target - everything not matched by /exports/,
+# /router/, or /app/ falls through here unchanged. Named generically (not
+# CODE_DOCKER_UPSTREAM) since router itself doesn't need to know it's
+# specifically code-docker on the other end.
+DEFAULT_UPSTREAM="${DEFAULT_UPSTREAM:-code-docker:80}"
+
 CADDY_ADAPTER_TCP_BLOCK=""
 if [ -n "${CADDY_ADAPTER_PORT:-}" ]; then
     CADDY_ADAPTER_TCP_BLOCK="
@@ -136,6 +149,11 @@ ${CADDY_ADAPTER_TCP_BLOCK}
 	handle {
 		respond 404
 	}
+}
+
+:9997 {
+	bind unix//run/caddy-default.sock
+	reverse_proxy ${DEFAULT_UPSTREAM}
 }
 
 import ${ADAPTER_DIR}/custom/*.caddy

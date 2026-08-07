@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, setUnlockPrompter } from '../../api/client'
-import { ErrorBanner } from './ErrorBanner'
+import { ErrorBanner } from '@code-docker/router-frontend'
 import './UnlockModal.css'
 
 interface PendingUnlock {
