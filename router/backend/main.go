@@ -19,6 +19,7 @@ import (
 	"code-docker/envmigrate"
 
 	"router/internal/authgate"
+	"router/internal/netgate"
 	"router/internal/tailscale"
 )
 
@@ -116,6 +117,7 @@ func main() {
 
 	mux.HandleFunc("GET /api/tinyauth/users", handleListTinyauthUsers)
 	mux.Handle("POST /api/tinyauth/users", gate.RequirePassword(http.HandlerFunc(handleAddTinyauthUser)))
+	mux.Handle("PUT /api/tinyauth/users/{name}/password", gate.RequirePassword(http.HandlerFunc(handleSetTinyauthUserPassword)))
 	mux.Handle("DELETE /api/tinyauth/users/{name}", gate.RequirePassword(http.HandlerFunc(handleDeleteTinyauthUser)))
 
 	mux.HandleFunc("GET /api/dns/blocklist-sources", handleListBlocklistSources)
@@ -129,6 +131,15 @@ func main() {
 	mux.Handle("PUT /api/dns/custom-hosts", gate.RequirePassword(http.HandlerFunc(handleSetCustomHosts)))
 	mux.HandleFunc("GET /api/dns/resolver", handleGetResolverConfig)
 	mux.Handle("PUT /api/dns/resolver", gate.RequirePassword(http.HandlerFunc(handleSetResolverConfig)))
+
+	if err := netgate.EnsureSeeded(); err != nil {
+		log.Printf("main: couldn't seed netgate live config: %v", err)
+	}
+	mux.HandleFunc("GET /api/netgate/outbound", handleListNetgateOutbound)
+	mux.Handle("PUT /api/netgate/outbound", gate.RequirePassword(http.HandlerFunc(handleReplaceNetgateOutbound)))
+	mux.HandleFunc("GET /api/netgate/forwards", handleListNetgateForwards)
+	mux.Handle("POST /api/netgate/forwards", gate.RequirePassword(http.HandlerFunc(handleAddNetgateForward)))
+	mux.Handle("DELETE /api/netgate/forwards/{hostPort}", gate.RequirePassword(http.HandlerFunc(handleDeleteNetgateForward)))
 
 	// Everything else falls through to the built SPA (AppRoutes/DevProxy/
 	// Tailscale/설정 tabs) - replaces the old standalone password-only page

@@ -11,10 +11,27 @@ set -u
 # one-shot script with its own polling/timeout logic. See
 # .claude/backlog/egress-netgate-plan.md for the overall design.
 
-NETGATE_CONFIG=/etc/code-docker/netgate/config.default.yaml
-if [ -e /etc/code-docker/netgate/config.override.yaml ]; then
-	NETGATE_CONFIG=/etc/code-docker/netgate/config.override.yaml
-fi
+# resolve_config_path is called fresh every loop iteration (not once at
+# script start) so this picks up the live, web-editable copy
+# router-manager's Net 관리 탭 reads/writes (see
+# router/backend/internal/netgate) as soon as router-manager has seeded it
+# - netgate-firewall and router-manager are separate supervisord programs
+# with no ordering guarantee between them, so this script can easily start
+# first and would otherwise be stuck on the fallback path forever. Falls
+# back to the old file-only selection only for the brief window before
+# router-manager has run for the first time (or if it's ever disabled) -
+# this keeps existing config.override.yaml-only deployments working
+# unmodified until a live copy exists.
+resolve_config_path() {
+	live=/var/lib/code-docker-router/netgate/config.yaml
+	if [ -e "$live" ]; then
+		echo "$live"
+	elif [ -e /etc/code-docker/netgate/config.override.yaml ]; then
+		echo /etc/code-docker/netgate/config.override.yaml
+	else
+		echo /etc/code-docker/netgate/config.default.yaml
+	fi
+}
 
 # Each cycle flushes and rebuilds netgate's own chains (see apply_rules
 # below) - this is idempotent but not atomic, so there's a brief window
@@ -34,6 +51,7 @@ ensure_jump() {
 }
 
 apply_rules() {
+	NETGATE_CONFIG="$(resolve_config_path)"
 	default_iface="$(ip -4 route show default 2>/dev/null | awk '{ print $5; exit }')"
 	if [ -z "$default_iface" ]; then
 		echo >&2 "netgate-firewall: no default route yet (code-docker-external not up?), skipping this cycle"

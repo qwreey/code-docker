@@ -94,6 +94,33 @@ func handleAddTinyauthUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, tinyauthUserResponse{Name: body.Name})
 }
 
+func handleSetTinyauthUserPassword(w http.ResponseWriter, r *http.Request) {
+	if tinyauthPinned() {
+		writeError(w, http.StatusConflict, "TINYAUTH_AUTH_USERS 환경변수로 고정되어 있어 변경할 수 없습니다")
+		return
+	}
+	name := r.PathValue("name")
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := tinyauthusers.SetPassword(tinyauthusers.StorePath, name, body.Password); err != nil {
+		if errors.Is(err, tinyauthusers.ErrUserNotFound) {
+			writeError(w, http.StatusNotFound, "user not found")
+			return
+		}
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if !applyTinyauthUsers(w, r) {
+		return
+	}
+	writeJSON(w, http.StatusOK, tinyauthUserResponse{Name: name})
+}
+
 func handleDeleteTinyauthUser(w http.ResponseWriter, r *http.Request) {
 	if tinyauthPinned() {
 		writeError(w, http.StatusConflict, "TINYAUTH_AUTH_USERS 환경변수로 고정되어 있어 변경할 수 없습니다")

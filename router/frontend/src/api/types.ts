@@ -146,3 +146,21 @@ export interface DnsResolverConfig {
   mode: DnsResolverMode
   servers: string[]
 }
+
+export type NetgateOutboundAction = 'allow' | 'block'
+
+// Mirrors router/backend/internal/netgate.OutboundRule - order matters
+// (iptables FORWARD chain is first-match-wins), so the list itself IS the
+// data, not just display order.
+export interface NetgateOutboundRule {
+  action: NetgateOutboundAction
+  cidr: string
+}
+
+// Mirrors router/backend/internal/netgate.Forward. hostPort is the unique
+// key (GET/DELETE /api/netgate/forwards/{hostPort}).
+export interface NetgateForward {
+  hostPort: number
+  targetHost: string
+  targetPort: number
+}

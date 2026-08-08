@@ -44,7 +44,13 @@ CUSTOM_HOSTS=/var/lib/code-docker-router/dns/custom-hosts.hosts
 # comparison on every read and surfaces "update available" with
 # pull/ignore actions - see internal/dns/blocklist.go's GetBuiltinStatus.
 seed_builtin_blocklist() {
-    source_file=/etc/code-docker/dns/blocklist.default.hosts
+    # DNS_BUILTIN_BLOCKLIST_SOURCE lets a deployment bind-mount its own hosts
+    # file over the image-shipped default and point this env var at it
+    # instead - deploy-time only (env vars need a container recreate to take
+    # effect, same as every other env-driven toggle here), so there's no
+    # runtime web control for this by design. See example-env.router's own
+    # comment on this var.
+    source_file="${DNS_BUILTIN_BLOCKLIST_SOURCE:-/etc/code-docker/dns/blocklist.default.hosts}"
 
     mkdir -p "$SOURCES_DIR"
 
@@ -72,7 +78,31 @@ seed_builtin_blocklist() {
     fi
 }
 
-seed_builtin_blocklist
+# DNS_BUILTIN_BLOCKLIST_ENABLED="false" opts out of the image-shipped
+# StevenBlack/hosts builtin source entirely - a manifest entry and a stray
+# $BUILTIN_TARGET from a time this was enabled would otherwise keep getting
+# globbed into extra_args below forever, so this actively removes both
+# rather than just skipping the seed step going forward. Custom sources
+# (added via the DNS tab) and blocklist.override.hosts are untouched either
+# way - both are independent of $SOURCES_DIR's builtin entry.
+if [ "${DNS_BUILTIN_BLOCKLIST_ENABLED:-true}" = "false" ]; then
+    rm -f "$BUILTIN_TARGET"
+    if [ -e "$MANIFEST" ]; then
+        # Same tab-separated "<name>\t<hash>" format seed_builtin_blocklist's
+        # own read loop parses above - filtered with cut rather than a
+        # grep/sed tab-literal pattern for the same portability reasons that
+        # loop already avoids embedding one.
+        : > "$MANIFEST.tmp"
+        while read -r line; do
+            name=$(printf '%s' "$line" | cut -f1)
+            [ "$name" = "builtin" ] && continue
+            printf '%s\n' "$line" >> "$MANIFEST.tmp"
+        done < "$MANIFEST"
+        mv "$MANIFEST.tmp" "$MANIFEST"
+    fi
+else
+    seed_builtin_blocklist
+fi
 
 # extra_args is intentionally left unquoted when passed to dnsmasq below
 # (same word-splitting-on-purpose idiom netgate-firewall.default.sh's own

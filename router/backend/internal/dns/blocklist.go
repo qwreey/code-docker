@@ -27,11 +27,26 @@ const (
 	// through the custom-source CRUD below (see ErrBuiltinImmutable).
 	BuiltinName = "builtin"
 
-	// ShippedDefaultPath is read by both the seed step in dns.default.sh
-	// and this package's own GetBuiltinStatus - keep them in sync if either
-	// ever moves.
-	ShippedDefaultPath = "/etc/code-docker/dns/blocklist.default.hosts"
+	// shippedDefaultPathDefault is what ShippedDefaultPath() falls back to
+	// when DNS_BUILTIN_BLOCKLIST_SOURCE is unset - the image-shipped
+	// default. dns.default.sh's own seed_builtin_blocklist reads the exact
+	// same env var with the same fallback, so this stays in sync with
+	// whatever a deployment actually seeded from - see
+	// example-env.router's own comment on DNS_BUILTIN_BLOCKLIST_SOURCE for
+	// why this is env-driven (deploy-time bind-mount override) rather than
+	// a plain constant.
+	shippedDefaultPathDefault = "/etc/code-docker/dns/blocklist.default.hosts"
 )
+
+// ShippedDefaultPath is read by both the seed step in dns.default.sh and
+// this package's own GetBuiltinStatus - keep them in sync if either ever
+// changes how it resolves this.
+func ShippedDefaultPath() string {
+	if v := os.Getenv("DNS_BUILTIN_BLOCKLIST_SOURCE"); v != "" {
+		return v
+	}
+	return shippedDefaultPathDefault
+}
 
 // BuiltinPath is where the builtin source's live copy lives.
 func BuiltinPath() string { return filepath.Join(SourcesDir, BuiltinName+".hosts") }
@@ -320,7 +335,7 @@ func GetBuiltinStatus() (BuiltinStatus, error) {
 	// the frontend's unconditional .length checks.
 	empty := BuiltinStatus{AddedSample: []string{}, RemovedSample: []string{}}
 
-	shipped, err := os.ReadFile(ShippedDefaultPath)
+	shipped, err := os.ReadFile(ShippedDefaultPath())
 	if err != nil {
 		return empty, err
 	}
@@ -358,7 +373,7 @@ func GetBuiltinStatus() (BuiltinStatus, error) {
 // time a human sees UpdateAvailable=true here, it's always the diverged
 // case).
 func BuiltinPull() error {
-	shipped, err := os.ReadFile(ShippedDefaultPath)
+	shipped, err := os.ReadFile(ShippedDefaultPath())
 	if err != nil {
 		return err
 	}
@@ -381,7 +396,7 @@ func BuiltinPull() error {
 // from reappearing for this same shipped version, but keeps whatever the
 // user has customized.
 func BuiltinIgnore() error {
-	shipped, err := os.ReadFile(ShippedDefaultPath)
+	shipped, err := os.ReadFile(ShippedDefaultPath())
 	if err != nil {
 		return err
 	}

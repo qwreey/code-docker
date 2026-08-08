@@ -31,6 +31,10 @@ export function TinyauthUsers() {
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [changingPasswordFor, setChangingPasswordFor] = useState<string | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [changeError, setChangeError] = useState<string | null>(null)
+  const [changing, setChanging] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -69,6 +73,29 @@ export function TinyauthUsers() {
       await load()
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  function startPasswordChange(userName: string) {
+    setChangingPasswordFor(userName)
+    setNewPassword('')
+    setChangeError(null)
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!changingPasswordFor) return
+    setChanging(true)
+    setChangeError(null)
+    try {
+      await tinyauthApi.put(`/users/${encodeURIComponent(changingPasswordFor)}/password`, { password: newPassword })
+      setChangingPasswordFor(null)
+      setNewPassword('')
+      showNotice()
+    } catch (e) {
+      setChangeError(errorMessage(e))
+    } finally {
+      setChanging(false)
     }
   }
 
@@ -123,6 +150,13 @@ export function TinyauthUsers() {
                     <td>
                       <button
                         type="button"
+                        className="btn btn-secondary btn-small"
+                        onClick={() => startPasswordChange(u.name)}
+                      >
+                        비밀번호 변경
+                      </button>{' '}
+                      <button
+                        type="button"
                         className="btn btn-danger btn-small"
                         disabled={deleting === u.name}
                         onClick={() => handleDelete(u.name)}
@@ -136,6 +170,31 @@ export function TinyauthUsers() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {!pinned && changingPasswordFor && (
+        <form onSubmit={handleChangePassword} className="form-grid-inline">
+          <div className="form-grid">
+            <div className="form-field">
+              <label htmlFor="tinyauth-user-new-password">"{changingPasswordFor}"의 새 비밀번호</label>
+              <input
+                id="tinyauth-user-new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoFocus
+                required
+              />
+            </div>
+          </div>
+          {changeError && <ErrorBanner message={changeError} onDismiss={() => setChangeError(null)} />}
+          <button type="submit" className="btn btn-primary" disabled={changing}>
+            {changing ? '변경하는 중...' : '비밀번호 변경'}
+          </button>{' '}
+          <button type="button" className="btn btn-secondary" onClick={() => setChangingPasswordFor(null)}>
+            취소
+          </button>
+        </form>
       )}
 
       {!pinned && (

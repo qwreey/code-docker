@@ -36,7 +36,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-ROUTER_ENV_VERSION=3
+ROUTER_ENV_VERSION=4
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -72,6 +72,28 @@ ROUTER_ENV_VERSION=3
 #. 독립적인 별도 값입니다 - 두 기능이 각자 따로 대상 제약을 풀 수 있어야
 #. 하기 때문입니다. 자세한 내용은 docs/app-routes.md 참고.
 #APPROUTES_ALLOW_EXTERNAL_TARGETS="false"
+
+#. --- DNS 블록리스트 (dnsmasq builtin 소스) ---
+#. 둘 다 컨테이너 (재)생성 시에만 반영됩니다 - `docker compose restart`로는
+#. 적용되지 않고, DNS 탭의 다른 값들과 달리 런타임에 웹으로 바꿀 수도
+#. 없습니다(의도적 - 이미지에 내장된 소스 자체를 무엇으로 취급할지 정하는
+#. 배포 단계 설정이라, 실행 중 UI 조작으로 바뀌면 안 됩니다).
+#.
+#. "false"로 끄면 이미지 내장 StevenBlack/hosts 블록리스트를 아예 시딩하지
+#. 않습니다(이미 시딩되어 있었다면 그 라이브 카피와 매니페스트 기록도
+#. 지웁니다) - DNS 탭에서 직접 추가한 커스텀 소스나
+#. blocklist.override.hosts는 이 값과 무관하게 계속 동작합니다.
+#DNS_BUILTIN_BLOCKLIST_ENABLED="true"
+
+#. builtin 소스를 시딩할 때 읽어올 hosts 포맷 파일 경로입니다. 기본은
+#. 이미지에 내장된 blocklist.default.hosts이지만, docker-compose.yml에서
+#. 이 컨테이너에 여러분만의 hosts 파일을 바인드 마운트한 뒤 그 경로로
+#. 바꾸면 이미지 업데이트로 내장 리스트가 바뀌어도 여러분의 소스는 절대
+#. 영향받지 않습니다. 값을 바꾼 뒤, 기존 라이브 카피를 DNS 탭에서 직접
+#. 수정한 적이 없다면 다음 재시작 때 새 소스 내용으로 자동 반영되고,
+#. 이미 직접 수정해 divergence가 있는 상태였다면 다른 hash-reconcile
+#. 소스와 동일하게 DNS 탭에서 "새로 가져오기"를 눌러야 반영됩니다.
+#DNS_BUILTIN_BLOCKLIST_SOURCE=/etc/code-docker/dns/blocklist.default.hosts
 
 #. --- router-manager 자체 관리 API 비밀번호 (선택) ---
 #. 보통 여기서 설정할 필요 없습니다 - 권장 방법은 컨테이너를 띄운 뒤

@@ -166,10 +166,25 @@ code-docker 자신이 여전히 인터넷/호스트에 직접 나갈 인터페�
 
 ## 설정 커스터마이징
 
-`router/config/netgate/config.default.yaml`을 참고해서 `router/config/netgate/config.override.yaml`을
-만들면(override 패턴, `docker compose build code-docker-router && docker compose up -d`
-필요) `outbound:`(CIDR allow/block 순서 리스트)와 `forwards:`(포트포워딩)를 원하는 대로
-바꿀 수 있습니다.
+`outbound:`(CIDR allow/block 순서 리스트)와 `forwards:`(포트포워딩)는 이제 재빌드 없이
+**`/router/` 페이지(또는 webmanager)의 "Net 관리" 탭**에서 직접 관리할 수 있습니다 -
+DNS 탭이 도입한 것과 같은 "라이브 카피" 방식으로, router-manager가 처음 뜰 때
+`config.override.yaml`(있으면) 또는 `config.default.yaml`을 `/var/lib/code-docker-router/netgate/config.yaml`에
+한 번만 복사해 오고, 그 이후로는 이 라이브 카피가 유일한 진실 소스입니다 -
+`firewall.default.sh`도 이 라이브 카피를 우선 읽습니다. 웹에서 바꾼 값은 이미지
+업데이트로 `config.default.yaml`이 바뀌어도 절대 덮어써지지 않습니다.
+
+**Net 관리 탭에는 중요한 한계가 명시되어 있습니다**: `code-docker-internal`에 직접 붙은
+컨테이너끼리(code-docker↔dind, code-docker↔router)의 트래픽은 커넥티드 라우트를 타고
+FORWARD 체인 자체를 거치지 않으므로, 이 outbound 규칙으로 절대 제어할 수 없습니다 - 이
+탭의 로직에도 그 사실이 경고 배너로 노출됩니다.
+
+파일로 직접 다루고 싶다면 여전히 가능합니다: `router/config/netgate/config.default.yaml`을
+참고해서 `router/config/netgate/config.override.yaml`을 만들면(override 패턴,
+`docker compose build code-docker-router && docker compose up -d` 필요) 되지만, 이는
+router-manager가 라이브 카피를 아직 만들지 않은 **최초 1회**에만 적용되고 그 이후로는
+무시됩니다(라이브 카피가 이미 있으면 그쪽이 항상 우선) - 이미 웹으로 관리 중인 배포에는
+효과가 없습니다.
 
 DNS 블록리스트/추가 호스트/리졸버는 이제 재빌드 없이 **`/router/` 페이지의 DNS
 탭**(또는 webmanager의 DNS 탭)에서 직접 관리할 수 있습니다 - 사용자 블록리스트를
@@ -185,3 +200,11 @@ DNS 블록리스트/추가 호스트/리졸버는 이제 재빌드 없이 **`/ro
 블록리스트 위에 **항상 추가로**(대체 아님, 예전부터 그랬던 동작 그대로) 얹힙니다 -
 DNS 탭이 관리하는 소스들과는 별개의, 파일 기반 전용 경로입니다. dnsmasq가 원래
 hosts 포맷을 그대로 읽으므로 별도 변환 스크립트는 필요 없습니다.
+
+내장 StevenBlack/hosts 블록리스트 자체를 배포 단계에서 끄거나 완전히 다른
+소스로 바꾸고 싶다면 `router/example-env.router`의 `DNS_BUILTIN_BLOCKLIST_ENABLED`
+(`"false"`로 끄기)와 `DNS_BUILTIN_BLOCKLIST_SOURCE`(다른 hosts 파일 경로 -
+docker-compose.yml에서 그 경로로 자신만의 파일을 바인드 마운트하는 용도)를
+쓰세요. 둘 다 컨테이너 (재)생성이 필요하고 런타임에 웹 UI로는 바꿀 수 없습니다
+- 이미지에 내장된 소스 자체를 무엇으로 볼지 정하는 배포 설정이라 의도적으로
+그렇게 만들었습니다.

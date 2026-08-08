@@ -126,6 +126,40 @@ func AddUser(path, name, plaintext string) error {
 	return save(path, users)
 }
 
+// SetPassword rehashes plaintext and overwrites name's existing hash - no
+// knowledge of the previous password is required, since this is an
+// admin-side reset (invoked through router-manager's own gate, see
+// handlers_tinyauth.go), not a self-service "confirm your current
+// password first" change. tinyauth itself has no such API/CLI primitive
+// (it only ever generates a brand new hash via `user create`), so this
+// mirrors that same "new hash, full file rewrite" shape AddUser already
+// uses.
+func SetPassword(path, name, plaintext string) error {
+	if plaintext == "" {
+		return errors.New("password is required")
+	}
+	users, err := load(path)
+	if err != nil {
+		return err
+	}
+	idx := -1
+	for i, u := range users {
+		if u.Name == name {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return ErrUserNotFound
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(plaintext), bcryptCost)
+	if err != nil {
+		return err
+	}
+	users[idx].PasswordHash = string(hash)
+	return save(path, users)
+}
+
 // DeleteUser removes a user by name.
 func DeleteUser(path, name string) error {
 	users, err := load(path)

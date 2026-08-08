@@ -41,6 +41,7 @@ router 안의 한 기능 영역(egress/DNAT) 이름으로 유지 — 컨테이�
 | 문서 정리 | 완료. `docs/router.md` 신설, `docs/tailscale.md`/`dev-proxy.md`/`egress-netgate.md`/`webmanager.md`/`webmanager-config.md`/`build-customization.md`/`index.md`/`tips/adb.md`와 레포 루트 `CLAUDE.md`를 새 구조에 맞게 갱신. 부수적으로 발견한 회귀도 하나 고침 — `bin/forward-reload`가 Phase 2 이후 조용히 깨져 있었음(code-docker 안에서 더 이상 존재하지 않는 supervisord 프로그램을 재시작하려 시도) |
 | App Routes(경로 기반 `/app/<이름>/...` 리버스 프록시, Dev Proxy와 별개) | 구현 완료. 애초에 설계됐지만 문서 정리 과정에서 아예 빠져있던 게 뒤늦게 드러나 이번에 구현. Dev Proxy와 같은 Caddy 프로세스 안에 세 번째 site block(`unix//run/caddy-app.sock`, `apps/*.caddy` import) 추가, router 자체 nginx는 `location /app/` 고정 블록 하나만 추가(앱이 몇 개든 다시 안 바뀜). `internal/approutes` 신설(`internal/devproxy`의 `Expose`/`Route` 대신 플랫한 `App{Name,Target,RequireAuth}` — `handle_path`가 접두사를 자동으로 벗겨줘서 path/strip/rewrite/mode 필드가 필요 없음), self-SSRF 차단 로직은 `internal/targetguard`로 뽑아서 devproxy/approutes 둘 다 공유(중복 방지). `code → code-docker:80` 기본 앱은 `caddy-adapter.default.sh`가 `.migration-version` 카운터(`config/user-init/user-init.default.sh`와 같은 방식)로 최초 1회만 시딩. 자세한 내용: `docs/app-routes.md` |
 | DNS 관리(블록리스트/추가 호스트/리졸버) | 구현 완료(2026-08-08). `internal/dns` 신설 — 블록리스트 소스 여러 개(builtin은 `blocklist.default.hosts`에서 code-patch 스타일 해시 추적으로 시딩, 커스텀은 웹에서 자유 추가), MagicDNS 스타일 추가 호스트(호스트명→실제 IP), 리졸버 오버라이드(`auto`/`custom` 업스트림 서버). `dns.default.sh`가 `blocklist-manifest`(builtin 부트스트랩/안전한 재적용) + `config.yaml`(리졸버) + `custom-hosts.hosts`/`blocklist-sources/*.hosts`(글롭, 여러 `--addn-hosts=`)를 조립. `blocklist.override.hosts`는 예전 그대로 항상 추가되는 별도 플래그로 유지(builtin 시딩에 접히지 않음 — 접었으면 "추가"였던 의미가 "대체"로 조용히 바뀌었을 것). router-manager `/api/dns/*` + router/frontend `Dns` 탭(webmanager에도 사이드바로 노출). netgate 설정에도 같은 재동기화 패턴을 적용해보려 했는데 netgate엔 "시딩된 라이브 카피" 개념 자체가 없어서 선행 작업이 필요하다는 게 드러나 백로그로 되돌림 — 자세한 설계/이유: `router/.claude/dns-blocklist-management-plan.md` |
+| Net 관리 탭(netgate outbound CIDR + 포트포워딩 웹 관리), 탭 상태 URL 경로 반영(router+webmanager), tinyauth 비밀번호 변경, DNS 빌트인 블록리스트 opt-out/소스 마운트 override | 구현 완료(2026-08-08). netgate에도 DNS와 같은 "시딩된 라이브 카피" 패턴을 도입(위 DNS 항목이 백로그로 미뤘던 선행 작업) — `internal/netgate` 신설, `firewall.default.sh`가 라이브 카피를 매 루프마다 다시 확인. 나머지 3개는 각자 독립적인 작은 개선. 자세한 내용: `router/.claude/net-auth-expansion-plan.md` |
 
 ## netgate → router 마이그레이션 — 완료
 
@@ -84,8 +85,18 @@ router 안의 한 기능 영역(egress/DNAT) 이름으로 유지 — 컨테이�
 실제 tailscale 로그인(authUrl 접속) 및 forwards:/publish: 실사용 트래픽 검증, tinyauth
 실제 로그인 성공 경로(거부 경로만 검증됨)는 사용자의 직접 인터랙션이 필요해 아직 안 됨.
 
+## 다음 후보 (설계만 완료, 미구현)
+
+`router/.claude/net-auth-expansion-plan.md`의 5~7번 — 사이드바 공유
+컴포넌트화(webmanager 것을 router도 가져다 쓰기), tinyauth 전용 탭 신설 +
+유저/그룹 ACL + OIDC provider 테스트 지원 + well-known 노출 + email 필드,
+DNS dig형 조회 도구. 우선순위 제안은 그 문서의 마지막 절 참고.
+
 ## 참고 문서
 
+- `.claude/net-auth-expansion-plan.md` — Net 관리 탭/탭 URL 경로/tinyauth 비밀번호
+  변경/DNS 빌트인 블록리스트 opt-out(구현 완료) + 사이드바 공유/tinyauth 확장/DNS
+  dig 도구(설계만, 다음 후보)
 - `.claude/functional-router-plan.md` — 전체 비전/결정 사항
 - `.claude/router-dns-plan.md` — DNS 포워딩 + squid→dnsmasq 블록리스트 교체 설계
 - `.claude/router-nginx-hardening-plan.md` — router 자체 nginx + 소켓화 + Dev Proxy

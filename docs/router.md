@@ -6,7 +6,9 @@
 수준이 높습니다. 다섯 가지 기능을 담당합니다:
 
 1. **아웃바운드 격리(netgate)** — RFC1918/사설망 차단, DNS 레벨(dnsmasq) 콘텐츠
-   블록리스트, 인바운드 포트포워딩. 자세한 내용은 [egress-netgate.md](egress-netgate.md).
+   블록리스트, 인바운드 포트포워딩. outbound 규칙과 포트포워딩은 "Net 관리" 탭에서,
+   DNS 블록리스트/리졸버는 "DNS" 탭에서 웹으로 관리합니다. 자세한 내용은
+   [egress-netgate.md](egress-netgate.md).
 2. **tailscale** — 데몬+로그인+포트 가져오기(forwards)+포트 내보내기(publish). 아래 참고.
 3. **Dev Proxy** — 컨테이너 안 dev 서버를 도메인으로 노출. 자세한 내용은
    [dev-proxy.md](dev-proxy.md).
@@ -125,8 +127,12 @@ router 자신의 supervisord 프로그램으로 돕니다 — `router/Dockerfile
 도메인 형식(`https://code-docker.example.com`)으로 `.env`에 설정해야 합니다.
 
 사용자는 기본적으로 아무도 없는 상태로 시작합니다 — `/router/`(router-manager UI,
-"설정" 탭)에서 사용자를 추가/삭제할 수 있고, 추가/삭제할 때마다 자동으로
-`tinyauth`가 재시작되어 바로 반영됩니다. `TINYAUTH_AUTH_USERS` 환경변수를 직접
+"설정" 탭)에서 사용자를 추가/삭제/비밀번호 변경할 수 있고, 그때마다 자동으로
+`tinyauth`가 재시작되어 바로 반영됩니다. 비밀번호 변경은 기존 비밀번호를 몰라도
+새 비밀번호만 입력하면 되는 관리자용 재설정입니다(router-manager 자체 비밀번호로
+이미 인증된 상태에서만 가능 - tinyauth 자신에게는 이런 재설정 API/CLI가 없어서,
+매번 `AddUser`처럼 새 해시를 만들어 파일 전체를 다시 쓰는 방식으로 구현했습니다).
+`TINYAUTH_AUTH_USERS` 환경변수를 직접
 설정하면 그 값이 항상 우선하며(UI로 바꿀 수 없게 고정) UI에는 편집 폼 대신 그
 사실이 표시됩니다 — 인프라 코드로 고정하고 싶을 때만 쓰세요:
 
@@ -167,8 +173,13 @@ Routes/Tailscale 탭은 webmanager가 가져다 쓰는 것과 정확히 같은 �
   [App Routes 탭](webmanager.md#app-routes)과 `/router/` SPA의 App Routes 탭이
   여기로 요청을 보냅니다.
 - tinyauth 사용자 CRUD(`GET`/`POST /api/tinyauth/users`,
-  `DELETE /api/tinyauth/users/{name}`) — `/router/` SPA의 "설정" 탭에서만 쓰입니다
-  (webmanager 쪽엔 이 탭이 없습니다). 위 "tinyauth" 절 참고.
+  `PUT /api/tinyauth/users/{name}/password`, `DELETE /api/tinyauth/users/{name}`) —
+  `/router/` SPA의 "설정" 탭에서만 쓰입니다 (webmanager 쪽엔 이 탭이 없습니다). 위
+  "tinyauth" 절 참고.
+- netgate outbound/포트포워딩 CRUD(`GET`/`PUT /api/netgate/outbound`,
+  `GET`/`POST`/`DELETE /api/netgate/forwards[/{hostPort}]`) — webmanager와 `/router/`
+  SPA 둘 다의 "Net 관리" 탭이 여기로 요청을 보냅니다. 자세한 내용은
+  [egress-netgate.md의 "설정 커스터마이징"](egress-netgate.md#설정-커스터마이징).
 - 자체 admin-API 비밀번호 게이트(`GET /api/auth/status`, `POST /api/auth/unlock`) —
   아래 "router-manager 자체 인증" 참고.
 
