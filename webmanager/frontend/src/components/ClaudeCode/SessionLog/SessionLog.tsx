@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ClaudeSessionInfo } from '../../../api/types'
 import { RequiresUnlock } from '../../common/RequiresUnlock'
-import { Sheet } from '@code-docker/router-frontend'
+import { Sheet } from '../../common/Sheet'
 import { SessionList } from './SessionList'
 import { SessionViewer } from './SessionViewer'
 import './SessionLog.css'

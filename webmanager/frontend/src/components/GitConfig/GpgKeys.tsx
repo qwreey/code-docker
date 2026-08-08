@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, errorMessage } from '../../api/client'
 import type { GpgKey, GpgKeyCreated } from '../../api/types'
-import { ErrorBanner, Skeleton } from '@code-docker/router-frontend'
+import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
 import { CopyButton } from '../common/CopyButton'
 import { withViewTransition } from '../../utils/viewTransition'
 

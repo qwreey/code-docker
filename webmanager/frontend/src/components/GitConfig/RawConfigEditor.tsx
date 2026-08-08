@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
-import { ErrorBanner, Skeleton } from '@code-docker/router-frontend'
+import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
 import { ExpandableEditor } from '../common/ExpandableEditor'
 import { withViewTransition } from '../../utils/viewTransition'
 

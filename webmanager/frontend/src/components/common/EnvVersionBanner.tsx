@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ErrorBanner } from '@code-docker/router-frontend'
+import { ErrorBanner } from './ErrorBanner'
 import { api, errorMessage } from '../../api/client'
 
 type EnvVersionStatus = {

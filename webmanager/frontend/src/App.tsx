@@ -1,10 +1,10 @@
-import { lazy, Suspense, useState } from 'react'
-import { Sidebar } from './components/Layout/Sidebar'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { SidebarContainer } from './components/Layout/SidebarContainer'
+import { SECTIONS } from './components/Layout/sections'
 import type { SectionId } from './components/Layout/sections'
 import { Supervisor } from './components/Supervisor/Supervisor'
 import { SshKeys } from './components/SshKeys/SshKeys'
 import { GitConfig } from './components/GitConfig/GitConfig'
-import { DevProxy, AppRoutes, Tailscale, Dns, RouterUnlockModalHost, RouterAuthSetupBanner } from '@code-docker/router-frontend'
 import { RouterFrame } from './components/RouterEmbed/RouterFrame'
 import { Logs } from './components/Logs/Logs'
 import { Processes } from './components/Processes/Processes'
@@ -18,7 +18,7 @@ import { Sessions } from './components/Sessions/Sessions'
 import { RequiresUnlock } from './components/common/RequiresUnlock'
 import { UnlockModalHost } from './components/common/UnlockModal'
 import { EnvVersionBanner } from './components/common/EnvVersionBanner'
-import { Skeleton } from '@code-docker/router-frontend'
+import { Skeleton } from './components/common/Skeleton'
 import { withViewTransition } from './utils/viewTransition'
 import './App.css'
 
@@ -28,9 +28,45 @@ const FileManager = lazy(() =>
   import('./components/FileManager/FileManager').then((module) => ({ default: module.FileManager })),
 )
 
+function isSectionId(v: string | null): v is SectionId {
+  return SECTIONS.some((s) => s.id === v)
+}
+
+// Splits pathname into {root, section} the same way router/frontend's own
+// App.tsx does (see its splitPath doc comment for the full reasoning) - only
+// looks at the last path segment, so this works unmodified whether the
+// build's absolute `/manager/` base or dev's `/` base is in effect. Kept as
+// a near-duplicate rather than a shared util since router/frontend and
+// webmanager are separate Vite apps with genuinely different Tab/SectionId
+// types - see root CLAUDE.md's "sidebar reuse" note on why a shared UI
+// package would need real work, not just moving this one function.
+function splitPath(pathname: string): { root: string; section: SectionId | null } {
+  const segments = pathname.split('/')
+  const last = segments[segments.length - 1] || null
+  if (isSectionId(last)) {
+    return { root: segments.slice(0, -1).join('/') + '/', section: last }
+  }
+  return { root: pathname.endsWith('/') ? pathname : pathname + '/', section: null }
+}
+
 function App() {
-  const [active, setActive] = useState<SectionId>('supervisor')
+  const initialSplit = useMemo(() => splitPath(window.location.pathname), [])
+  const rootPath = initialSplit.root
+  const [active, setActiveState] = useState<SectionId>(() => initialSplit.section ?? 'supervisor')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  function setActive(id: SectionId) {
+    setActiveState(id)
+    window.history.pushState(null, '', rootPath + id)
+  }
+
+  useEffect(() => {
+    function onPopState() {
+      setActiveState(splitPath(window.location.pathname).section ?? 'supervisor')
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   return (
     <div className="app-shell">
@@ -46,7 +82,7 @@ function App() {
         </button>
         <span className="mobile-topbar-title">webmanager</span>
       </div>
-      <Sidebar
+      <SidebarContainer
         active={active}
         onSelect={(id) => withViewTransition(() => setActive(id))}
         open={sidebarOpen}
@@ -64,15 +100,15 @@ function App() {
           reach, for every tab, not just Terminal. */}
       <div className="app-main">
         <EnvVersionBanner />
-        <RouterAuthSetupBanner />
         <main className="app-content">
           {active === 'supervisor' && <Supervisor />}
           {active === 'ssh-keys' && <SshKeys />}
           {active === 'git-config' && <GitConfig />}
-          {active === 'dev-proxy' && <RouterFrame tab="dev-proxy" Direct={DevProxy} />}
-          {active === 'app-routes' && <RouterFrame tab="app-routes" Direct={AppRoutes} />}
-          {active === 'tailscale' && <RouterFrame tab="tailscale" Direct={Tailscale} />}
-          {active === 'dns' && <RouterFrame tab="dns" Direct={Dns} />}
+          {active === 'dev-proxy' && <RouterFrame tab="dev-proxy" />}
+          {active === 'app-routes' && <RouterFrame tab="app-routes" />}
+          {active === 'tailscale' && <RouterFrame tab="tailscale" />}
+          {active === 'dns' && <RouterFrame tab="dns" />}
+          {active === 'net' && <RouterFrame tab="net" />}
           {active === 'logs' && (
             <RequiresUnlock>
               <Logs />
@@ -104,13 +140,6 @@ function App() {
         </main>
       </div>
       <UnlockModalHost />
-      {/* router-manager's own gate (ROUTER_MANAGER_AUTH_PASSWORD_HASH) is a
-          separate process/cookie from webmanager's own gate above - mounted
-          unconditionally here (not inside the dev-proxy/tailscale branches
-          above) since those tabs only mount while active, but a 401 from
-          router-manager should pop this modal regardless of which tab
-          triggered it. */}
-      <RouterUnlockModalHost />
     </div>
   )
 }

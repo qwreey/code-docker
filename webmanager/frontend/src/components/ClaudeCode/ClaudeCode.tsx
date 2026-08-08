@@ -10,7 +10,9 @@ import type {
   ClaudeStatus,
   MiseJobStatus,
 } from '../../api/types'
-import { ErrorBanner, Sheet, Skeleton } from '@code-docker/router-frontend'
+import { ErrorBanner } from '../common/ErrorBanner'
+import { Sheet } from '../common/Sheet'
+import { Skeleton } from '../common/Skeleton'
 import { RestartNeededBanner } from '../common/RestartNeededBanner'
 import { withViewTransition } from '../../utils/viewTransition'
 import { formatDurationMs } from '../../utils/format'

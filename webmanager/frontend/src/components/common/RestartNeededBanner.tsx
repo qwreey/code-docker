@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { RestartStatusResponse } from '../../api/types'
 import { confirmAndRestartCodeServer, type RestartOutcome } from '../../utils/restartCodeServer'
-import { ErrorBanner } from '@code-docker/router-frontend'
+import { ErrorBanner } from './ErrorBanner'
 
 const RESTART_OUTCOME_TEXT: Record<RestartOutcome, string> = {
   restarted: '재시작을 요청했습니다. 완료되면 이 배너가 자동으로 사라집니다.',

@@ -7,20 +7,22 @@ FROM docker:latest AS docker-bin
 # code-docker-dind/code-docker-netinit services now build from those
 # directories as their own contexts instead of a stage here.
 
-# webmanager/frontend imports router/frontend as a real package
-# (@code-docker/router-frontend, see .claude/backlog/functional-router-plan.md's
-# "router ↔ webmanager 프론트 통합 방식") via an npm workspace rooted at the
-# repo root (package.json's `workspaces:`) - so this stage needs the whole
-# workspace, not just webmanager/frontend/ in isolation, or `npm ci` would
-# try (and fail) to resolve that package from the public registry instead
-# of linking it locally.
+# webmanager/frontend no longer imports @code-docker/router-frontend
+# (2026-08-08 decoupling - see .claude/backlog/router-frontend-decouple-plan.md
+# and router/.claude/net-auth-expansion-plan.md's item 6): router's tabs are
+# now embedded as an iframe into router's own /router/ page
+# (components/RouterEmbed/RouterFrame.tsx) instead of being rendered as
+# same-origin React components, and the couple of generic UI primitives
+# (ErrorBanner/Sheet/Skeleton) that used to live only in router/frontend are
+# hand-copied into webmanager/frontend/src/components/common/ now. This
+# stage still runs from the repo-root npm workspace (root package.json's
+# `workspaces:` still lists both frontends), but no longer needs to COPY
+# router/frontend/ at all - webmanager/frontend builds standalone.
 FROM node:24-alpine AS webmanager-frontend
 WORKDIR /src
 COPY package.json package-lock.json ./
-COPY router/frontend/package.json router/frontend/package.json
 COPY webmanager/frontend/package.json webmanager/frontend/package.json
 RUN npm ci
-COPY router/frontend/ router/frontend/
 COPY webmanager/frontend/ webmanager/frontend/
 RUN npm run build --workspace webmanager/frontend
 

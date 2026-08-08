@@ -255,17 +255,36 @@ router-manager에 직접 연결합니다(SPA + API 전부) — 그 도메인에�
 접근 중이거나 전용 도메인이 있는데 공유 경로로 접근 중이면 배너로
 안내합니다.
 
-**webmanager에 내장된 Dev Proxy/App Routes/Tailscale 탭도 이 값을 따라갑니다.**
-`ROUTER_MANAGER_HOSTS`를 설정하면 webmanager 쪽 탭(`RouterFrame.tsx`)이
-자동으로 그 컴포넌트를 직접 렌더링하는 대신 전용 도메인으로 향하는
-cross-origin `<iframe>`으로 바꿔 끼웁니다 — `GET /router/api/auth/status`의
-`trustedHosts`를 읽어서 판단하며, 값이 비어있으면(기본) 지금처럼 같은
-origin에 직접 렌더링합니다. 이게 실제로 이 탭들의 쿠키 문제를 닫는
-지점입니다 — 같은 origin 렌더링은 웹매니저 자신이 뚫리면 그대로 뚫리지만,
-진짜 cross-origin iframe은 부모 페이지가 그 안의 DOM/쿠키에 접근할 방법이
-아예 없습니다. iframe 쪽은 로드가 끝날 때까지(+약간의 지연, 최대 3초
-안전장치) 스켈레톤을 덮어두고, webmanager의 라이트/다크 테마 선택을
-`postMessage`로 전달해 안팎 테마가 어긋나지 않게 맞춥니다.
+**webmanager에 내장된 Dev Proxy/App Routes/Tailscale/DNS/Net 관리 탭은 항상
+`<iframe>`으로 router의 `/router/` 페이지를 그대로 embed합니다**
+(`components/RouterEmbed/RouterFrame.tsx`, 2026-08-08부터 — 그 전에는
+`ROUTER_MANAGER_HOSTS` 미설정 시 `@code-docker/router-frontend` 컴포넌트를
+webmanager 쪽에서 같은 origin으로 직접 렌더링하는 `Direct` 폴백이 있었지만,
+router와 webmanager를 완전히 독립적인 배포 단위로 만들기 위해
+제거했습니다 — 자세한 배경은
+[`.claude/backlog/router-frontend-decouple-plan.md`](../.claude/backlog/router-frontend-decouple-plan.md)와
+[`router/.claude/net-auth-expansion-plan.md`](../router/.claude/net-auth-expansion-plan.md)의
+6번 항목). `GET /router/api/auth/status`의 `trustedHosts`를 읽어 `ROUTER_MANAGER_HOSTS`가
+설정되어 있으면 그 전용 도메인으로 향하는 cross-origin iframe을, 비어있으면(기본)
+같은 origin의 `/router/`로 향하는 iframe을 씁니다 — 두 경우 다 iframe이라는
+점만 같고, 실제로 이 탭들의 쿠키 문제를 닫는 건 여전히 `ROUTER_MANAGER_HOSTS`를
+설정한 cross-origin 케이스뿐입니다(같은 origin iframe은 여전히 부모 페이지가
+router-manager의 쿠키를 공유하는 origin 안에 있습니다 — 다만 최소한 웹매니저
+자신의 JS 컨텍스트가 router-manager API를 직접 호출하지는 않으므로, XSS가
+router-manager를 조용히 호출하려면 iframe 자체를 조작해야 합니다). iframe 쪽은
+로드가 끝날 때까지(+약간의 지연, 최대 3초 안전장치) 스켈레톤을 덮어두고,
+webmanager의 라이트/다크 테마 선택을 `postMessage`로 전달해 안팎 테마가
+어긋나지 않게 맞춥니다.
+
+이 변경으로 webmanager는 `@code-docker/router-frontend`(router/frontend)를
+빌드 시점 의존성으로 전혀 갖지 않습니다 — router가 아예 없거나 꺼져 있어도
+webmanager 자체 빌드/실행에는 영향이 없고, Dev Proxy/App Routes/Tailscale/DNS/Net
+관리 탭만 빈 iframe으로 보입니다. 두 프로젝트가 별도 저장소로 분리될
+가능성을 염두에 둔 결정입니다. `ErrorBanner`/`Sheet`/`Skeleton` 같은
+router-frontend 전용이 아닌 범용 UI 컴포넌트는 webmanager 자체 코드
+(`webmanager/frontend/src/components/common/`)로 손수 복제되어 있습니다 —
+두 프로젝트가 각자 독립적으로 진화하면서 다시 벌어질 수 있다는 유지비용을
+감수하고 완전한 분리를 택한 결정입니다.
 
 ### router 환경변수 마이그레이션
 

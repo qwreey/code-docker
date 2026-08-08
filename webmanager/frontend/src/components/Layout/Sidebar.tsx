@@ -1,112 +1,69 @@
-import { useEffect, useRef, useState } from 'react'
-import {
-  Activity,
-  Bot,
-  Container,
-  FileText,
-  Folder,
-  GitBranch,
-  Globe,
-  GripVertical,
-  HardDrive,
-  KeyRound,
-  Puzzle,
-  Route,
-  Server,
-  Signpost,
-  Terminal,
-  Users,
-  Waypoints,
-  Wrench,
-} from 'lucide-react'
-import { api, errorMessage } from '../../api/client'
-import type { SidebarOrder } from '../../api/types'
-import { Logo } from '../common/Logo'
-import { SECTIONS } from './sections'
-import type { SectionId, SectionMeta } from './sections'
-import { SidebarFooter } from './SidebarFooter'
+import { useRef, useState, type ReactNode } from 'react'
+import { GripVertical, type LucideIcon } from 'lucide-react'
 import './Layout.css'
 
-// 탭 하나당 아이콘 하나 - 목록이 길어질수록 라벨 텍스트만으로는 훑어보기
-// 어려워서 추가함. SidebarFooter.tsx의 THEME_ICON과 같은 Record 매핑 패턴.
-const SECTION_ICON: Record<SectionId, typeof Server> = {
-  supervisor: Server,
-  'ssh-keys': KeyRound,
-  'git-config': GitBranch,
-  'dev-proxy': Route,
-  'app-routes': Signpost,
-  tailscale: Waypoints,
-  dns: Globe,
-  logs: FileText,
-  processes: Activity,
-  projects: Folder,
-  mise: Wrench,
-  dind: Container,
-  terminal: Terminal,
-  claude: Bot,
-  extensions: Puzzle,
-  files: HardDrive,
-  sessions: Users,
+// Generic sidebar item - deliberately not tied to webmanager's own
+// SectionId/SECTIONS (see SidebarContainer.tsx, which owns that mapping).
+// Kept ID-string-generic on purpose: this component was pulled apart from a
+// webmanager-only implementation on 2026-08-08 so it could be hand-copied
+// into router/frontend's own SPA too (same tab-count-growing problem, see
+// root CLAUDE.md's "사이드바 공유" note) without either side needing to
+// depend on the other's types.
+export interface SidebarItem {
+  id: string
+  label: string
+  icon: LucideIcon
+  enabled?: boolean
+  badge?: string
 }
 
 interface SidebarProps {
-  active: SectionId
-  onSelect: (id: SectionId) => void
+  title: string
+  logo?: ReactNode
+  footer?: ReactNode
+  items: SidebarItem[]
+  // Persisted order (ids) - empty means "use items' own order as given".
+  // Reconciling a saved order against the current item list (dropping
+  // stale ids, appending new ones) is this component's job since it's pure
+  // list logic; fetching/persisting the order itself is the caller's job
+  // (see SidebarContainer.tsx) so this component makes no API calls of its
+  // own.
+  order: string[]
+  onReorder: (order: string[]) => void
+  active: string
+  onSelect: (id: string) => void
   open: boolean
   onClose: () => void
 }
 
-// reconcileOrder applies a persisted id order on top of the current SECTIONS
-// list: known ids move to their saved position (in saved order), anything
-// saved-but-no-longer-a-real-section is dropped, and any real section not
-// present in the saved order (new tabs added since the user last reordered)
-// is appended at the end in its original/default order.
-function reconcileOrder(saved: string[]): SectionMeta[] {
-  const byId = new Map(SECTIONS.map((s) => [s.id, s]))
-  const ordered: SectionMeta[] = []
+// Applies a persisted id order on top of the current items list: known ids
+// move to their saved position (in saved order), anything saved-but-
+// no-longer-present is dropped, and any current item not present in the
+// saved order (new tabs added since the user last reordered) is appended
+// at the end in its original/default order.
+function reconcileOrder(items: SidebarItem[], saved: string[]): SidebarItem[] {
+  const byId = new Map(items.map((i) => [i.id, i]))
+  const ordered: SidebarItem[] = []
   const seen = new Set<string>()
   for (const id of saved) {
-    const section = byId.get(id as SectionId)
-    if (section && !seen.has(id)) {
-      ordered.push(section)
+    const item = byId.get(id)
+    if (item && !seen.has(id)) {
+      ordered.push(item)
       seen.add(id)
     }
   }
-  for (const section of SECTIONS) {
-    if (!seen.has(section.id)) ordered.push(section)
+  for (const item of items) {
+    if (!seen.has(item.id)) ordered.push(item)
   }
   return ordered
 }
 
-export function Sidebar({ active, onSelect, open, onClose }: SidebarProps) {
-  const [sections, setSections] = useState<SectionMeta[]>(SECTIONS)
-  const [dragOverId, setDragOverId] = useState<SectionId | null>(null)
-  const dragIdRef = useRef<SectionId | null>(null)
+export function Sidebar({ title, logo, footer, items, order, onReorder, active, onSelect, open, onClose }: SidebarProps) {
+  const sections = order.length > 0 ? reconcileOrder(items, order) : items
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const dragIdRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    api
-      .get<SidebarOrder>('/ui/sidebar-order')
-      .then((res) => {
-        if (res.order.length > 0) setSections(reconcileOrder(res.order))
-      })
-      .catch(() => {
-        // no saved order yet (or fetch failed) - just keep the default order,
-        // this preference isn't important enough to surface an error banner for
-      })
-  }, [])
-
-  function saveOrder(next: SectionMeta[]) {
-    setSections(next)
-    api
-      .put<{ ok: true }>('/ui/sidebar-order', { order: next.map((s) => s.id) })
-      .catch((e) => {
-        // best-effort persistence - the reorder still applies locally for this
-        // session even if saving it server-side failed
-        console.warn('사이드바 순서 저장 실패:', errorMessage(e))
-      })
-  }
-
-  function handleDrop(targetId: SectionId) {
+  function handleDrop(targetId: string) {
     const draggedId = dragIdRef.current
     dragIdRef.current = null
     setDragOverId(null)
@@ -118,7 +75,7 @@ export function Sidebar({ active, onSelect, open, onClose }: SidebarProps) {
     if (fromIndex === -1 || toIndex === -1) return
     const [moved] = next.splice(fromIndex, 1)
     next.splice(toIndex, 0, moved)
-    saveOrder(next)
+    onReorder(next.map((s) => s.id))
   }
 
   return (
@@ -126,13 +83,13 @@ export function Sidebar({ active, onSelect, open, onClose }: SidebarProps) {
       {open && <div className="sidebar-backdrop" onClick={onClose} />}
       <nav className={'sidebar' + (open ? ' sidebar-open' : '')} aria-label="섹션 메뉴">
         <div className="sidebar-title">
-          <Logo size={20} className="sidebar-title-mark" />
-          webmanager
+          {logo}
+          {title}
         </div>
         <div className="sidebar-list-wrap">
           <ul className="sidebar-list">
             {sections.map((section) => {
-              const SectionIcon = SECTION_ICON[section.id]
+              const SectionIcon = section.icon
               return (
                 <li
                   key={section.id}
@@ -160,7 +117,7 @@ export function Sidebar({ active, onSelect, open, onClose }: SidebarProps) {
                     className={
                       'sidebar-item' +
                       (section.id === active ? ' sidebar-item-active' : '') +
-                      (!section.implemented ? ' sidebar-item-disabled' : '')
+                      (section.enabled === false ? ' sidebar-item-disabled' : '')
                     }
                     onClick={() => {
                       onSelect(section.id)
@@ -175,14 +132,14 @@ export function Sidebar({ active, onSelect, open, onClose }: SidebarProps) {
                       <GripVertical size={16} className="sidebar-drag-handle" aria-hidden="true" />
                     </span>
                     <span>{section.label}</span>
-                    {!section.implemented && <span className="sidebar-badge">구현 예정</span>}
+                    {section.badge && <span className="sidebar-badge">{section.badge}</span>}
                   </button>
                 </li>
               )
             })}
           </ul>
         </div>
-        <SidebarFooter />
+        {footer}
       </nav>
     </>
   )

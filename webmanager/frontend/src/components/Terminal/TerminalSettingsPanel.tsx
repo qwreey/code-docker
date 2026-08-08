@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Sheet, ErrorBanner } from '@code-docker/router-frontend'
+import { Sheet } from '../common/Sheet'
+import { ErrorBanner } from '../common/ErrorBanner'
 import type { KeyBinding, TerminalSettings, TerminalTheme } from '../../api/types'
 import { BUILTIN_THEMES, THEME_COLOR_KEYS, findTheme, type ThemeColorKey } from './themes'
 import { bytesToDisplay, displayToBytes } from './escapeCodec'

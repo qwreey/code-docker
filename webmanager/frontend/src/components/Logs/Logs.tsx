@@ -7,7 +7,7 @@ import type {
   LogsAppsResponse,
   LogsRangeResponse,
 } from '../../api/types'
-import { ErrorBanner } from '@code-docker/router-frontend'
+import { ErrorBanner } from '../common/ErrorBanner'
 import '../common/common.css'
 import './Logs.css'
 

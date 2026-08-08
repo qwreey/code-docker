@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
-import { ErrorBanner, Sheet } from '@code-docker/router-frontend'
+import { ErrorBanner } from '../common/ErrorBanner'
+import { Sheet } from '../common/Sheet'
 import '../Supervisor/Supervisor.css'
 
 export function DindInspectPanel({ containerId, containerName, onClose }: { containerId: string; containerName: string; onClose: () => void }) {

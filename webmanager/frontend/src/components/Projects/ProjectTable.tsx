@@ -5,7 +5,7 @@ import type { MiseToolEntry, MiseToolsResponse, ProjectInfo, ReclaimableEntry } 
 import { formatBytes } from '../../utils/format'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { GitStatusPanel } from '../common/Git/GitStatusPanel'
-import { Sheet } from '@code-docker/router-frontend'
+import { Sheet } from '../common/Sheet'
 import { DeleteReclaimableDialog } from './DeleteReclaimableDialog'
 import './Projects.css'
 

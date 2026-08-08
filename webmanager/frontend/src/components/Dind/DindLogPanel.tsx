@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { LogResponse } from '../../api/types'
-import { ErrorBanner, Sheet } from '@code-docker/router-frontend'
+import { ErrorBanner } from '../common/ErrorBanner'
+import { Sheet } from '../common/Sheet'
 import '../Supervisor/Supervisor.css'
 
 const TAIL = 5000

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, errorMessage } from '../../api/client'
 import type { ClaudeLoginStartResponse, ClaudeLoginStatus } from '../../api/types'
-import { ErrorBanner } from '@code-docker/router-frontend'
+import { ErrorBanner } from '../common/ErrorBanner'
 import { CopyButton } from '../common/CopyButton'
 import '../common/common.css'
 import './ClaudeCode.css'

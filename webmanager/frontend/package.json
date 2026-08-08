@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@code-docker/router-frontend": "*",
     "@codemirror/language": "^6.12.4",
     "@codemirror/legacy-modes": "^6.5.3",
     "@codemirror/state": "^6.7.1",

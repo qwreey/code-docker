@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../../api/client'
 import type { GitTag } from '../../../api/types'
-import { ErrorBanner, Sheet, Skeleton } from '@code-docker/router-frontend'
+import { ErrorBanner } from '../ErrorBanner'
+import { Sheet } from '../Sheet'
+import { Skeleton } from '../Skeleton'
 import './Git.css'
 
 export function GitTagsSheet({ path, onClose }: { path: string; onClose: () => void }) {

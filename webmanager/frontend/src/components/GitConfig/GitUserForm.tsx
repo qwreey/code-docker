@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { GitUserConfig } from '../../api/types'
-import { ErrorBanner, Skeleton } from '@code-docker/router-frontend'
+import { ErrorBanner } from '../common/ErrorBanner'
+import { Skeleton } from '../common/Skeleton'
 import { withViewTransition } from '../../utils/viewTransition'
 
 export function GitUserForm() {
