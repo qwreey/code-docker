@@ -4,6 +4,7 @@
 export { DevProxy } from './components/DevProxy/DevProxy'
 export { AppRoutes } from './components/AppRoutes/AppRoutes'
 export { Tailscale } from './components/Tailscale/Tailscale'
+export { Dns } from './components/Dns/Dns'
 export { RouterUnlockModalHost } from './components/common/UnlockModal'
 export { RouterAuthSetupBanner } from './components/common/RouterAuthSetupBanner'
 export { OriginWarningBanner } from './components/common/OriginWarningBanner'

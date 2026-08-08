@@ -118,6 +118,18 @@ func main() {
 	mux.Handle("POST /api/tinyauth/users", gate.RequirePassword(http.HandlerFunc(handleAddTinyauthUser)))
 	mux.Handle("DELETE /api/tinyauth/users/{name}", gate.RequirePassword(http.HandlerFunc(handleDeleteTinyauthUser)))
 
+	mux.HandleFunc("GET /api/dns/blocklist-sources", handleListBlocklistSources)
+	mux.Handle("POST /api/dns/blocklist-sources", gate.RequirePassword(http.HandlerFunc(handleCreateBlocklistSource)))
+	mux.Handle("PUT /api/dns/blocklist-sources/{name}", gate.RequirePassword(http.HandlerFunc(handleUpdateBlocklistSource)))
+	mux.Handle("DELETE /api/dns/blocklist-sources/{name}", gate.RequirePassword(http.HandlerFunc(handleDeleteBlocklistSource)))
+	mux.HandleFunc("GET /api/dns/blocklist-sources/builtin/status", handleBuiltinBlocklistStatus)
+	mux.Handle("POST /api/dns/blocklist-sources/builtin/pull", gate.RequirePassword(http.HandlerFunc(handleBuiltinBlocklistPull)))
+	mux.Handle("POST /api/dns/blocklist-sources/builtin/ignore", gate.RequirePassword(http.HandlerFunc(handleBuiltinBlocklistIgnore)))
+	mux.HandleFunc("GET /api/dns/custom-hosts", handleListCustomHosts)
+	mux.Handle("PUT /api/dns/custom-hosts", gate.RequirePassword(http.HandlerFunc(handleSetCustomHosts)))
+	mux.HandleFunc("GET /api/dns/resolver", handleGetResolverConfig)
+	mux.Handle("PUT /api/dns/resolver", gate.RequirePassword(http.HandlerFunc(handleSetResolverConfig)))
+
 	// Everything else falls through to the built SPA (AppRoutes/DevProxy/
 	// Tailscale/설정 tabs) - replaces the old standalone password-only page
 	// (handlers_ui.go), whose setup/change functionality is now

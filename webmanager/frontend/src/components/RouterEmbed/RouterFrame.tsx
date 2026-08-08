@@ -24,7 +24,7 @@ const LOAD_SETTLE_MS = 200
 const LOAD_HARD_CAP_MS = 3000
 
 interface RouterFrameProps {
-  tab: 'dev-proxy' | 'app-routes' | 'tailscale'
+  tab: 'dev-proxy' | 'app-routes' | 'tailscale' | 'dns'
   // Same-origin fallback, rendered directly (no iframe) when no dedicated
   // ROUTER_MANAGER_HOSTS domain is configured - identical to how this tab
   // rendered before RouterFrame existed.

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { DevProxy } from './components/DevProxy/DevProxy'
 import { AppRoutes } from './components/AppRoutes/AppRoutes'
 import { Tailscale } from './components/Tailscale/Tailscale'
+import { Dns } from './components/Dns/Dns'
 import { RouterAuthPanel, RouterTrustedHostsPanel } from './components/common/RouterAuthPanel'
 import { TinyauthUsers } from './components/Tinyauth/TinyauthUsers'
 import { RouterUnlockModalHost } from './components/common/UnlockModal'
@@ -9,17 +10,18 @@ import { OriginWarningBanner } from './components/common/OriginWarningBanner'
 import { listenForEmbedThemeMessages, notifyEmbedReady } from './embedTheme'
 import './App.css'
 
-type Tab = 'dev-proxy' | 'app-routes' | 'tailscale' | 'settings'
+type Tab = 'dev-proxy' | 'app-routes' | 'tailscale' | 'dns' | 'settings'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'dev-proxy', label: 'Dev Proxy' },
   { id: 'app-routes', label: 'App Routes' },
   { id: 'tailscale', label: 'Tailscale' },
+  { id: 'dns', label: 'DNS' },
   { id: 'settings', label: '설정' },
 ]
 
 function isTab(v: string | null): v is Tab {
-  return v === 'dev-proxy' || v === 'app-routes' || v === 'tailscale' || v === 'settings'
+  return v === 'dev-proxy' || v === 'app-routes' || v === 'tailscale' || v === 'dns' || v === 'settings'
 }
 
 // router's own standalone management UI, served by router-manager itself at
@@ -86,6 +88,7 @@ function App() {
         {tab === 'dev-proxy' && <DevProxy />}
         {tab === 'app-routes' && <AppRoutes />}
         {tab === 'tailscale' && <Tailscale />}
+        {tab === 'dns' && <Dns />}
         {tab === 'settings' && (
           <section>
             <div className="section-header">

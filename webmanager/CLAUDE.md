@@ -18,8 +18,10 @@ an explanatory note — `vector`'s log button is disabled this way, per-program
 PID-tree expand reusing the Processes tab's tree utility), SSH keys, git
 config (name/email, SSH+GPG signing, SSH hosts, HTTPS credentials, git-lfs
 install, raw `.gitconfig` editing, known_hosts management) — a Tailscale tab
-also lives here (forwards/publish CRUD, status, login trigger), but it's not
-webmanager's own feature: it renders `@code-docker/router-frontend`
+also lives here (forwards/publish CRUD, status, login trigger), and a DNS tab
+(blocklist sources, MagicDNS-style custom hosts, resolver override — see root
+`CLAUDE.md`'s "DNS management") the same way, but neither is webmanager's own
+feature: both render `@code-docker/router-frontend`
 components calling router-manager's API, same as the Dev Proxy tab below —
 via `components/RouterEmbed/RouterFrame.tsx`, which picks same-origin direct
 rendering or a cross-origin iframe into a dedicated `ROUTER_MANAGER_HOSTS`

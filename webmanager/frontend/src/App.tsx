@@ -4,7 +4,7 @@ import type { SectionId } from './components/Layout/sections'
 import { Supervisor } from './components/Supervisor/Supervisor'
 import { SshKeys } from './components/SshKeys/SshKeys'
 import { GitConfig } from './components/GitConfig/GitConfig'
-import { DevProxy, AppRoutes, Tailscale, RouterUnlockModalHost, RouterAuthSetupBanner } from '@code-docker/router-frontend'
+import { DevProxy, AppRoutes, Tailscale, Dns, RouterUnlockModalHost, RouterAuthSetupBanner } from '@code-docker/router-frontend'
 import { RouterFrame } from './components/RouterEmbed/RouterFrame'
 import { Logs } from './components/Logs/Logs'
 import { Processes } from './components/Processes/Processes'
@@ -72,6 +72,7 @@ function App() {
           {active === 'dev-proxy' && <RouterFrame tab="dev-proxy" Direct={DevProxy} />}
           {active === 'app-routes' && <RouterFrame tab="app-routes" Direct={AppRoutes} />}
           {active === 'tailscale' && <RouterFrame tab="tailscale" Direct={Tailscale} />}
+          {active === 'dns' && <RouterFrame tab="dns" Direct={Dns} />}
           {active === 'logs' && (
             <RequiresUnlock>
               <Logs />

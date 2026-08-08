@@ -169,9 +169,19 @@ code-docker 자신이 여전히 인터넷/호스트에 직접 나갈 인터페�
 `router/config/netgate/config.default.yaml`을 참고해서 `router/config/netgate/config.override.yaml`을
 만들면(override 패턴, `docker compose build code-docker-router && docker compose up -d`
 필요) `outbound:`(CIDR allow/block 순서 리스트)와 `forwards:`(포트포워딩)를 원하는 대로
-바꿀 수 있습니다. DNS 블록리스트도 같은 override 패턴으로
-`router/config/dns/blocklist.override.hosts`(hosts 포맷, 예: `0.0.0.0 evil.com`)를
-두면 됩니다 - 단, squid 시절의 `blocklist.override.acl`과 달리 이건 기본
-StevenBlack/hosts 블록리스트를 **대체**하는 게 아니라 **추가**로 얹히는 파일입니다
-(dnsmasq가 `addn-hosts=`를 여러 개 합쳐 읽을 수 있다는 점을 이용). 원본이 이미
-hosts 포맷 그대로이므로 별도 변환 스크립트는 필요 없습니다.
+바꿀 수 있습니다.
+
+DNS 블록리스트/추가 호스트/리졸버는 이제 재빌드 없이 **`/router/` 페이지의 DNS
+탭**(또는 webmanager의 DNS 탭)에서 직접 관리할 수 있습니다 - 사용자 블록리스트를
+여러 개 만들 수 있고(각각 이름 + 호스트 목록), 특정 호스트 이름을 실제 IP로 매핑하는
+"추가 호스트"(MagicDNS와 비슷한 개념), 업스트림 DNS 서버를 `1.1.1.1` 같은 값으로
+고정하는 리졸버 설정도 여기서 바꿉니다. 이미지에 내장된 StevenBlack/hosts 블록리스트가
+새 버전으로 갱신되면 DNS 탭에 배지가 뜨고, 추가/제거된 호스트를 확인한 뒤 가져올지
+지금 목록을 유지할지 고를 수 있습니다 - 자세한 설계는
+`router/.claude/dns-blocklist-management-plan.md` 참고.
+
+파일로 직접 다루고 싶다면 여전히 가능합니다: `router/config/dns/blocklist.override.hosts`
+(hosts 포맷, 예: `0.0.0.0 evil.com`)를 두면 재빌드 시 이미지 내장 StevenBlack/hosts
+블록리스트 위에 **항상 추가로**(대체 아님, 예전부터 그랬던 동작 그대로) 얹힙니다 -
+DNS 탭이 관리하는 소스들과는 별개의, 파일 기반 전용 경로입니다. dnsmasq가 원래
+hosts 포맷을 그대로 읽으므로 별도 변환 스크립트는 필요 없습니다.

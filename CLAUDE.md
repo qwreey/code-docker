@@ -125,12 +125,13 @@ user overrides, same auto-include idiom as the main image's `config/supervisord.
     `code-docker-internal` being `internal: true` means Docker's own embedded DNS
     (`127.0.0.11`) refuses to forward queries externally, so code-docker/dind point their
     `/etc/resolv.conf` at router instead (see `router/.claude/router-dns-plan.md`), and
-    dnsmasq forwards upstream using router's own (working, non-internal) `/etc/resolv.conf`.
-    This also doubles as the content blocklist enforcement point: dnsmasq's
-    `addn-hosts=/etc/code-docker/dns/blocklist.default.hosts` answers `0.0.0.0` for any
-    domain in the baked-in StevenBlack/hosts file (no format conversion needed — dnsmasq
-    reads hosts-format directly), with `router/config/dns/blocklist.override.hosts` layered
-    on top via an extra `--addn-hosts=` flag (additive, not a replacement) if present. This
+    dnsmasq forwards upstream using router's own (working, non-internal) `/etc/resolv.conf`
+    by default, or a fixed custom upstream list (e.g. `1.1.1.1`) if configured — see
+    "DNS management" below. This also doubles as the content blocklist enforcement point:
+    dnsmasq's `addn-hosts=` answers `0.0.0.0` for any domain in the baked-in StevenBlack/hosts
+    file (no format conversion needed — dnsmasq reads hosts-format directly), now web-managed
+    (multiple sources, not a single static file — see "DNS management" below) rather than a
+    build-time-only `blocklist.default.hosts`/`blocklist.override.hosts` pair. This
     replaced an earlier squid-based intercept/SNI-block approach (`REDIRECT` on ports 80/443
     to squid, blocking by `dstdomain`/SNI) — removed because squid's `ssl_bump` anti-spoofing
     check false-positived on CDN-style domains with rotating IP pools (e.g.
@@ -226,18 +227,66 @@ same for `/publish`, `GET /api/tailscale/status`, `POST /api/tailscale/login/
 — `{backendState, authUrl}`, same shape the old status-polling script wrote —
 code-server's sign-in banner, `config/code/code-patch/tailscale-notify.default.js`,
 polls this now instead of a static file), the Dev Proxy expose CRUD webmanager's
-Dev Proxy tab calls, and `POST /api/auth/unlock` + `GET /api/auth/status` for
+Dev Proxy tab calls, DNS management (`router/backend/internal/dns`,
+`GET /api/dns/blocklist-sources` + `POST`/`PUT`/`DELETE` for custom sources +
+`GET`/`POST /api/dns/blocklist-sources/builtin/{status,pull,ignore}` for the
+hash-tracked builtin source, `GET`/`PUT /api/dns/custom-hosts`,
+`GET`/`PUT /api/dns/resolver` — see "DNS management" below), and
+`POST /api/auth/unlock` + `GET /api/auth/status` for
 router-manager's own admin-API password gate (see below). `/exports/` (actual
 end-user traffic to an exposed dev server) is a separate nginx location from
 `/dev-proxy/` (the admin API) — don't confuse the two.
+
+**DNS management** (2026-08-08, `router/.claude/dns-blocklist-management-plan.md`) —
+DNS content blocklist and resolver override, previously pure build-time
+default/override files with no runtime API, are now web-managed like
+tailscale/Dev Proxy. Three pieces, all under `/var/lib/code-docker-router/dns/`:
+(1) blocklist sources, one hosts-format file per source under
+`dns/blocklist-sources/` — `builtin.hosts` is seeded from
+`blocklist.default.hosts` **only** (deliberately not `.override.hosts` —
+that file has always been an unconditional, purely additive extra
+`--addn-hosts=` flag layered on top, not a replacement for the default, and
+folding it into this seed step would have silently reversed that for
+anyone already relying on it; it keeps working exactly as before,
+independent of everything below) using `config/code/code-patch.default.sh`'s
+own hash-tracking algorithm (`dns.default.sh`'s own `seed_builtin_blocklist`,
+on every `dns` program start): missing → copy; shipped-content unchanged →
+no-op; shipped-content changed and the live copy still matches what was
+last seeded → silently re-copy (safe, no customization exists yet to lose);
+shipped-content changed and the live copy has diverged (edited via the web
+UI) → leave it alone, and `GET /api/dns/blocklist-sources/builtin/status`
+reports `updateAvailable` with an added/removed host diff sample plus
+pull/ignore actions — this is the one behavioral difference from
+code-patch, which just leaves a diverged file alone forever with no
+follow-up. Any number of additional custom sources can be added via the web
+UI (`POST /api/dns/blocklist-sources`) — dnsmasq accepts `--addn-hosts=`
+repeated, so `dns.default.sh` just globs every file in the directory.
+(2) `dns/custom-hosts.yaml`/`.hosts` — MagicDNS-style custom hostname→real-IP
+entries (`GET`/`PUT /api/dns/custom-hosts`, whole-list replace), loaded
+*before* every blocklist source in `dns.default.sh`'s `--addn-hosts=`
+sequence (a fixed precedence decision, not user-configurable — see the plan
+doc for why dnsmasq's own multi-file-hosts precedence isn't reliable enough
+to fully resolve a host appearing in both, and how `duplicateHosts` in
+`GET /api/dns/blocklist-sources` surfaces that ambiguity as a warning
+instead). (3) `dns/config.yaml`'s `resolver: {mode, servers}` — `auto`
+(default, unchanged: dnsmasq reads this container's own `/etc/resolv.conf`)
+or `custom` (a fixed upstream list, e.g. `1.1.1.1` — `--no-resolv --server=`
+flags, confirmed feasible in userspace). `dnsmasq.default.conf`'s own static
+`addn-hosts=` line was removed since it can't reflect any of this at
+runtime. Applying the same reconcile pattern to netgate's firewall config
+was considered and explicitly deferred — see the plan doc's own section on
+why that needs netgate to first adopt the same "seeded live copy" model
+before hash-reconcile means anything coherent there (netgate today reads
+`config.default.yaml`/`.override.yaml` directly, with no seeded copy to
+diverge from).
 
 router's own frontend (`router/frontend`, `@code-docker/router-frontend` — an npm workspace
 package, root `package.json`'s `workspaces:`) owns the actual page components; webmanager's
 `App.tsx` imports them directly (`import { DevProxy, Tailscale, RouterUnlockModalHost } from
 '@code-docker/router-frontend'`) rather than owning that UI itself — see "webmanager" below and
 `router/.claude/functional-router-plan.md`'s "router ↔ webmanager 프론트 통합 방식". Dev
-Proxy, App Routes, and Tailscale (forwards/publish/login CRUD + status view) are all ported
-this way; webmanager also leans on this package for generic, router-unrelated UI primitives
+Proxy, App Routes, Tailscale (forwards/publish/login CRUD + status view), and DNS
+(blocklist sources/custom hosts/resolver) are all ported this way; webmanager also leans on this package for generic, router-unrelated UI primitives
 (`ErrorBanner`/`Sheet`/`Skeleton`), used across ~40 unrelated webmanager files — see
 `.claude/backlog/router-frontend-decouple-plan.md` for why this workspace dependency can't be
 dropped yet if `router`/`webmanager` ever split into separate repos. `router/frontend`'s own

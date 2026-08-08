@@ -103,3 +103,46 @@ export interface TailscalePublish {
   localPort: number
   mode: TailscalePublishMode
 }
+
+// Mirrors router/backend/internal/dns.SourceInfo. Hosts is only present for
+// custom (non-builtin) sources - the builtin source can be a
+// StevenBlack-sized list, so only its EntryCount is shipped.
+export interface DnsBlocklistSource {
+  name: string
+  builtin: boolean
+  entryCount: number
+  hosts?: string[]
+}
+
+// Mirrors router/backend/internal/dns.ListResult, GET /api/dns/blocklist-sources.
+export interface DnsBlocklistSourcesResponse {
+  sources: DnsBlocklistSource[]
+  duplicateHosts: string[]
+  builtinUpdateAvailable: boolean
+}
+
+// Mirrors router/backend/internal/dns.BuiltinStatus, GET
+// /api/dns/blocklist-sources/builtin/status.
+export interface DnsBuiltinBlocklistStatus {
+  updateAvailable: boolean
+  liveDiverged: boolean
+  addedCount: number
+  removedCount: number
+  addedSample: string[]
+  removedSample: string[]
+}
+
+// Mirrors router/backend/internal/dns.HostEntry - a MagicDNS-style custom
+// hostname->real-IP mapping.
+export interface DnsHostEntry {
+  host: string
+  ip: string
+}
+
+export type DnsResolverMode = 'auto' | 'custom'
+
+// Mirrors router/backend/internal/dns.ResolverConfig.
+export interface DnsResolverConfig {
+  mode: DnsResolverMode
+  servers: string[]
+}
