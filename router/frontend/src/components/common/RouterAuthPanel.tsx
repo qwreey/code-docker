@@ -101,15 +101,17 @@ export function RouterAuthPanel() {
             Routes/tinyauth 관리 API)를 보호할 비밀번호를 지금 설정하세요.
           </p>
           <form onSubmit={handleSetup} className="form-grid-inline">
-            <div className="form-field">
-              <label htmlFor="router-auth-setup-password">새 비밀번호</label>
-              <input
-                id="router-auth-setup-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+            <div className="form-grid">
+              <div className="form-field">
+                <label htmlFor="router-auth-setup-password">새 비밀번호</label>
+                <input
+                  id="router-auth-setup-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
             </div>
             <button type="submit" className="btn btn-primary" disabled={submitting || !password}>
               {submitting ? '설정하는 중...' : '비밀번호 설정'}

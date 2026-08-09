@@ -18,6 +18,7 @@ import { Sessions } from './components/Sessions/Sessions'
 import { RequiresUnlock } from './components/common/RequiresUnlock'
 import { UnlockModalHost } from './components/common/UnlockModal'
 import { EnvVersionBanner } from './components/common/EnvVersionBanner'
+import { RouterAuthSetupBanner } from './components/common/RouterAuthSetupBanner'
 import { Skeleton } from './components/common/Skeleton'
 import { withViewTransition } from './utils/viewTransition'
 import './App.css'
@@ -127,6 +128,7 @@ function App() {
           reach, for every tab, not just Terminal. */}
       <div className="app-main">
         <EnvVersionBanner />
+        <RouterAuthSetupBanner />
         <main className="app-content">
           {active === 'supervisor' && <Supervisor />}
           {active === 'ssh-keys' && <SshKeys />}
