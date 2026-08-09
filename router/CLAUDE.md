@@ -28,8 +28,14 @@ to this subtree). Don't re-derive decisions already recorded there.
 The netgate→router migration described in `functional-router-plan.md` is
 complete (see `plan.md`) — every feature area it envisioned now lives here:
 
-- **netgate** — outbound CIDR filtering via iptables, DNS-level content
-  blocklist + resolver via dnsmasq, inbound DNAT (`router/config/netgate/`,
+- **netgate** — outbound CIDR filtering via iptables and inbound DNAT, both
+  now a router-manager-backed "Net 관리" CRUD tab over a seeded live copy
+  (`router/backend/internal/netgate`, `LiveConfigPath`) rather than
+  `config.default.yaml`/`.override.yaml` read directly — plus DNS-level
+  content blocklist (multiple sources, builtin + custom, hash-tracked
+  update-available diffing), MagicDNS-style custom hosts, resolver override,
+  and a dig-style query tool, all their own "DNS" tab
+  (`router/backend/internal/dns`) (`router/config/netgate/`,
   `router/config/dns/`, `router/script/`).
 - **tailscale** — daemon, login, `forwards:`/`publish:`, and a full
   router-manager-backed admin API + UI (moved from code-docker in full;
@@ -39,18 +45,33 @@ complete (see `plan.md`) — every feature area it envisioned now lives here:
 - **Dev Proxy** — an internal Caddy instance exposing dev servers on
   wildcard subdomains, managed via router-manager — `router/config/caddy-adapter/`,
   `router/backend/internal/devproxy/`, `router/frontend/src/components/DevProxy/`.
-- **tinyauth** — forward-auth for individual Dev Proxy routes that opt into
-  it, run as a plain supervisord program in this container (`router/config/tinyauth/`)
-  — its binary is multi-stage-extracted from `ghcr.io/tinyauthapp/tinyauth` in
-  `router/Dockerfile`, not built from source, and not a separate compose service.
+- **App Routes** — path-based, Host-agnostic `/app/<name>/...` reverse
+  proxying, same Caddy process as Dev Proxy but a separate site block/API —
+  `router/backend/internal/approutes/`, `router/frontend/src/components/AppRoutes/`.
+  Shares self-SSRF target validation with Dev Proxy via `internal/targetguard`.
+- **tinyauth** — forward-auth for individual Dev Proxy/App Routes routes that
+  opt into it, run as a plain supervisord program in this container
+  (`router/config/tinyauth/`) — its binary is multi-stage-extracted from
+  `ghcr.io/tinyauthapp/tinyauth` in `router/Dockerfile`, not built from
+  source, and not a separate compose service. User CRUD (add/delete/reset
+  password) is its own router-manager tab (`internal/tinyauthusers`), separate
+  from the "설정" tab that holds router-manager's own auth setup.
 
 router-manager (`router/backend`) is this container's own Go backend
 (mirrors webmanager's pattern) exposing all of the above's mutating/read
 routes, gated by its own opt-in password gate
 (`router/backend/internal/authgate`, `ROUTER_MANAGER_AUTH_PASSWORD_HASH`) —
 separate from webmanager's own gate. `router/frontend`
-(`@code-docker/router-frontend`) is an npm workspace package webmanager
-imports directly rather than owning this UI itself.
+(`@code-docker/router-frontend`) is still an npm workspace package, and
+`router/backend/static.go` serves it standalone at `/router/`, but since
+2026-08-08's decoupling webmanager no longer imports its components directly
+— webmanager's Dev Proxy/App Routes/Tailscale/DNS/Net-관리/tinyauth tabs
+instead `<iframe>`-embed `/router/` itself (`webmanager/frontend/src/components/RouterEmbed/RouterFrame.tsx`),
+same-origin or cross-origin depending on `ROUTER_MANAGER_HOSTS` — see
+`docs/router.md`'s "router-manager 자체 인증" for why. webmanager only hand-
+duplicates the few router-frontend-authored generic UI primitives it still
+needs (`ErrorBanner`/`Sheet`/`Skeleton`) rather than depending on the package
+at all now.
 
 ## Ground rules
 

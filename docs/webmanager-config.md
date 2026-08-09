@@ -74,15 +74,18 @@ cat .env.webmanager | docker compose exec -T code-docker \
 > ```
 >
 > 원칙은 **조회(읽기)는 그대로 열어두고, 변경(쓰기)만 게이트** —
-> Supervisor의 start/stop/restart, Git Config의 모든 추가·수정·삭제, SSH
-> Keys 추가·삭제 등이 여기 해당합니다. Dev Proxy/Tailscale은 이제 router 컨테이너의
+> Supervisor의 start/stop/restart, Git Config의 모든 추가·수정·삭제(전역
+> gitignore 편집 포함), SSH Keys 추가·삭제, Projects 탭 상세 시트의 git worktree
+> 삭제 등이 여기 해당합니다. Dev Proxy/Tailscale은 이제 router 컨테이너의
 > 자체 API(router-manager)를 호출하므로 이 게이트 대상이 아닙니다(개별 라우트의
 > "인증 요구"는 대신 [tinyauth](router.md#tinyauth)가 담당) — router-manager는
 > `ROUTER_MANAGER_AUTH_PASSWORD_HASH`로 켜는 자기 자신만의 별도 비밀번호 게이트를
 > 갖고 있습니다([router.md](router.md#router-manager-자체-인증) 참고). 예외로 **Terminal, 파일 탭, Logs, Sessions,
-> Supervisor의 프로그램별 로그 조회, Claude Code 탭의 대화 세션 로그 서브탭은
+> Supervisor의 프로그램별 로그 조회, Claude Code 탭의 대화 세션 로그 서브탭(Projects
+> 탭 상세 시트에서 프로젝트별로 필터링해 재사용하는 곳 포함)은
 > 조회까지 통째로 게이트**됩니다(각각 root 쉘/임의 파일 접근/로그 속 시크릿
-> 노출/세션 내용 노출 위험 때문). 값은 반드시 환경변수로만 주입해야 하며(설정
+> 노출/세션 내용 노출 위험 때문 — 단, 같은 상세 시트의 git worktree 목록 조회와
+> Claude Code 메모리 뷰어는 정제된 데이터라 조회는 게이트되지 않습니다). 값은 반드시 환경변수로만 주입해야 하며(설정
 > 파일에 저장하면 컨테이너 안에서 프로세스를 재시작해 우회할 수 있어 일부러 지원하지
 > 않습니다), `/etc/environment`에도 같은 이름의 변수가 있으면 조작 가능성으로 보고
 > 게이트가 무시됩니다. 설정하지 않으면 이 게이트는 기본적으로 열려 있으므로(다른

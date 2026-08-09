@@ -28,7 +28,9 @@ ssh/scp 접속에도 그대로 적용). `/code/.ssh/authorized_keys` 목록 조�
 
 `/code/.gitconfig` 의 user.name/email, 커밋 사이닝(SSH 키 또는 GPG, GPG 키
 자체 생성/조회/삭제 포함), HTTPS credential store (`~/.git-credentials`, 평문
-저장), `git lfs install` 실행, `.gitconfig` 원본 직접 편집(저장 전 문법 검증)
+저장), `git lfs install` 실행, 전역 gitignore(`core.excludesFile`이 가리키는
+파일 원본 편집 — 저장소별 `.gitignore`가 아니라 모든 저장소에 적용되는 패턴),
+`.gitconfig` 원본 직접 편집(저장 전 문법 검증)
 
 ### Dev Proxy
 
@@ -142,9 +144,14 @@ Skills/Plugins 목록, 이 인스턴스에서 진행된 대화 세션 로그 뷰
 mise 사용 도구 목록, code-server로 바로 열기(같은 origin이면 자동으로 알아내고,
 `WEBMANAGER_CODE_SERVER_URL`을 설정하면 그 값을 우선함), 재생성 가능한 폴더
 단위 삭제(확인 다이얼로그 필수)와 프로젝트 폴더 자체의 완전 삭제(비밀번호 게이트,
-프로젝트 이름을 직접 입력해야 하는 확인 다이얼로그), 프로젝트별 git 상태 패널
-(staged/changed/untracked/behind/ahead/diverged/stashed/conflicts 요약, 커밋
-로그/diff/리모트/브랜치/태그 조회 — 읽기 전용, 게이트 없음)
+프로젝트 이름을 직접 입력해야 하는 확인 다이얼로그), 프로젝트를 클릭하면 열리는
+상세 시트에 git 상태 패널(staged/changed/untracked/behind/ahead/diverged/
+stashed/conflicts 요약, 커밋 로그/diff/리모트/브랜치/태그 조회 — 읽기 전용,
+게이트 없음), git worktree 목록/삭제(목록 조회는 게이트 없음, 삭제는 비밀번호
+게이트 + 확인 다이얼로그), 그 프로젝트를 건드린 Claude Code 대화 세션 기록(Claude
+Code 탭의 세션 로그 뷰어를 그대로 재사용 — 마찬가지로 비밀번호 게이트 대상), Claude
+Code 자동 메모리 뷰어(`CLAUDE_CONFIG_DIR/projects/<slug>/memory/` — 정제된 노트라
+게이트 없음, 기본 접힘)가 함께 표시됩니다
 
 ### mise
 
@@ -198,7 +205,8 @@ git-lfs 는 `config/build/build.default.sh`에 포함되어 기본으로 설치�
 webmanager는 자체 비밀번호 게이트를 지원합니다(선택 사항, 기본은 꺼짐) — 원칙은
 **조회(읽기)는 그대로 열어두고, 변경(쓰기)만 게이트**이며, Terminal/파일 탭/Logs/
 Sessions/Supervisor의 프로그램별 로그 조회, Claude Code 탭 안의 대화 세션 로그
-서브탭은 조회까지 통째로 게이트됩니다. 켜는 방법
+서브탭(Projects 탭 상세 시트에서 프로젝트로 필터링해 재사용하는 곳 포함)은 조회까지
+통째로 게이트됩니다. 켜는 방법
 (해시 생성, `WEBMANAGER_AUTH_PASSWORD_HASH` 설정)과 전체 동작 방식은
 [webmanager-config.md#비밀번호-게이트](webmanager-config.md#비밀번호-게이트)를
 확인하세요.

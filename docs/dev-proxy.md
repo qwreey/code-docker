@@ -117,7 +117,7 @@ server {
 않습니다 — expose의 host 필드나 라우트 path/target 설정은 지금까지와
 완전히 동일하게 적으면 됩니다.
 
-`ALLOWED_EXPORT_HOSTS`(`example-env`, 기본 빈 값)로 `/exports/`가 받아들일
+`ALLOWED_EXPORT_HOSTS`(`router/example-env.router`, 기본 빈 값)로 `/exports/`가 받아들일
 Host를 code-server/webmanager용 `ALLOWED_HOSTS`와 별도로 제한할 수 있습니다
 — dev-proxy 도메인은 code-server 도메인보다 훨씬 자주 바뀌는 편이라 따로
 관리합니다. 또한 `/exports/`는 기본적으로 `code-docker-internal` 네트워크

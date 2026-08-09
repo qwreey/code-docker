@@ -214,7 +214,26 @@ per-project git status panel (`.claude/qa-request/project-git-status-plan-done.m
 already-known project path — read-only only (no stage/commit/push/pull yet),
 ungated since it's read-only, and deliberately placed in
 `components/common/Git/` so it isn't tied to the Projects tab specifically.
-Keep extending as
+The Projects tab's per-project detail sheet (opened from `ProjectTable.tsx`)
+now also carries a git worktree list/remove panel
+(`components/common/Git/WorktreesPanel.tsx`, `internal/projectgit/
+worktree.go` — listing is ungated like the status panel above, but `git
+worktree remove` is a real mutation so it's password-gated + confirm-dialog
+gated, same convention as delete-reclaimable), a project-scoped Claude Code
+session history section (`components/Projects/ProjectSessionHistory.tsx`)
+that reuses the Claude tab's own `ClaudeCode/SessionLog/SessionLog.tsx`
+wholesale via a `projectFilter` prop threading into `GET /api/claude/
+sessions?project=<path>` (`internal/claudecode.FilterSessionsByProject`) —
+gated exactly like the main session-log sub-tab, since it's the same
+conversation content, not a new trust tier — and a Claude Code auto-memory
+viewer (`components/Projects/ProjectMemoryPanel.tsx`, `internal/
+claudememory`, reading `CLAUDE_CONFIG_DIR/projects/<slug>/memory/`) that's
+deliberately ungated (curated summary notes, not raw transcripts) and
+collapsed-by-default/lazy-fetched since most projects have never had Claude
+Code run against them. Git Config also gained a global-gitignore editor
+(`components/GitConfig/GlobalGitignore.tsx`, `internal/gitconfig/
+excludesfile.go` — whatever `core.excludesFile` points at, read ungated/
+write gated, same raw-editor shape as `.gitconfig`'s own raw editing). Keep extending as
 needed; see `plan.md`'s "구현 완료" table before assuming something isn't
 done yet. **Open questions the repo owner still needs to weigh in on are
 consolidated in `.claude/question.md`** — none of them block further work,
