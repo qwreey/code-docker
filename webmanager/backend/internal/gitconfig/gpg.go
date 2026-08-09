@@ -32,6 +32,21 @@ var ErrInvalidKeyID = errors.New("keyId must be a 40-character hex fingerprint")
 
 var keyIDRe = regexp.MustCompile(`^[0-9A-Fa-f]{40}$`)
 
+// ErrInvalidIdentity is returned by GenerateGPGKey when name/email would be
+// misparsed by gpg instead of taken as literal uid text - same bug class
+// ErrInvalidKeyID guards against below (a leading "-" turns the argument
+// into a flag, e.g. name="--homedir=/tmp/x" redirects gpg's homedir; empirically
+// confirmed against gpg 2.4.9). Control characters are also rejected since
+// they'd corrupt the uid string gpg stores.
+var ErrInvalidIdentity = errors.New("name and email must not start with '-' or contain control characters")
+
+func validateIdentityPart(s string) error {
+	if strings.HasPrefix(s, "-") || strings.ContainsAny(s, "\n\r\x00") {
+		return ErrInvalidIdentity
+	}
+	return nil
+}
+
 // ValidateKeyID reports whether keyID is a well-formed 40-hex-char GPG
 // fingerprint. Every function in this file that shells out with a
 // caller-supplied keyID calls this first, before exec.Command ever runs.
@@ -160,6 +175,12 @@ func GenerateGPGKey(name, email string) (GPGKey, string, error) {
 	}
 	if name == "" || email == "" {
 		return GPGKey{}, "", errors.New("name and email are required")
+	}
+	if err := validateIdentityPart(name); err != nil {
+		return GPGKey{}, "", err
+	}
+	if err := validateIdentityPart(email); err != nil {
+		return GPGKey{}, "", err
 	}
 
 	uid := fmt.Sprintf("%s <%s>", name, email)

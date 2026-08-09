@@ -179,7 +179,7 @@ func handleDNSQuery(w http.ResponseWriter, r *http.Request) {
 	result, err := dns.Query(ctx, r.URL.Query().Get("domain"), r.URL.Query().Get("type"))
 	if err != nil {
 		status := http.StatusInternalServerError
-		if errors.Is(err, dns.ErrEmptyDomain) || errors.Is(err, dns.ErrInvalidQueryType) {
+		if errors.Is(err, dns.ErrEmptyDomain) || errors.Is(err, dns.ErrInvalidDomain) || errors.Is(err, dns.ErrInvalidQueryType) {
 			status = http.StatusBadRequest
 		}
 		writeError(w, status, err.Error())

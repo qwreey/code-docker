@@ -87,6 +87,10 @@ func (s *Server) handleGenerateGPGKey(w http.ResponseWriter, r *http.Request) {
 			gpgUnavailable(w)
 			return
 		}
+		if errors.Is(err, gitconfig.ErrInvalidIdentity) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

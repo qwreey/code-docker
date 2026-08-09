@@ -6,12 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 )
 
 var ErrEmptyDomain = errors.New("domain is required")
+var ErrInvalidDomain = errors.New("invalid domain")
 var ErrInvalidQueryType = errors.New("unsupported record type")
+
+// domainPattern rejects anything dig could parse as an option instead of a
+// plain hostname. dig treats each argument as a flag purely by its leading
+// character ('-' for options like -f/-y, '@' for a server override) rather
+// than by position, so without this a domain of e.g. "@1.2.3.4" would
+// silently redirect the query away from the hardcoded @127.0.0.1 below,
+// and this is a GET route with no auth gate (see handleDNSQuery). Allows a
+// leading underscore for SRV-style names (e.g. "_sip._tcp.example.com").
+var domainPattern = regexp.MustCompile(`^[A-Za-z0-9_](?:[A-Za-z0-9_-]*[A-Za-z0-9_])?(?:\.[A-Za-z0-9_](?:[A-Za-z0-9_-]*[A-Za-z0-9_])?)*\.?$`)
 
 // queryTypes mirrors the record types `dig` accepts as a plain type
 // argument - kept as an allowlist (rather than passing the user's string
@@ -56,6 +67,9 @@ func Query(ctx context.Context, domain, recordType string) (QueryResult, error) 
 	domain = strings.TrimSpace(domain)
 	if domain == "" {
 		return QueryResult{}, ErrEmptyDomain
+	}
+	if !domainPattern.MatchString(domain) {
+		return QueryResult{}, ErrInvalidDomain
 	}
 	recordType = strings.ToUpper(strings.TrimSpace(recordType))
 	if recordType == "" {
