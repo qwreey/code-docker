@@ -259,6 +259,59 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Newer Docker Engine builds install a DOCKER-INTERNAL nftables chain for
+  # any `internal: true` network (code-docker-internal above) that
+  # unconditionally drops FORWARD-path packets leaving that network's
+  # bridge whose destination isn't inside the bridge's own subnet - this
+  # blocks router's whole egress design below (router is deliberately
+  # bridged across code-docker-internal/code-docker-external to forward
+  # + filter traffic) at the host level, regardless of what router's own
+  # iptables does internally. See docs/egress-netgate.md's "Docker의
+  # DOCKER-INTERNAL 강제 격리" section for the full story and how this was
+  # diagnosed. This container's only job is to keep a host-level DOCKER-USER
+  # exemption in sync - DOCKER-USER is the chain Docker reserves for exactly
+  # this kind of override, always evaluated before DOCKER-FORWARD/
+  # DOCKER-INTERNAL.
+  #
+  # network_mode: host (no networks: attachment at all - it never joins
+  # code-docker-internal/external) + NET_ADMIN + a read-only docker.sock
+  # mount are all required just to reach the host's own netfilter tables at
+  # all (a container's NET_ADMIN alone only grants admin rights within its
+  # OWN netns) - this is a materially bigger trust tier than any other
+  # service here except code-docker-dind, which already runs privileged
+  # with an unauthenticated Docker socket of its own (see that service's
+  # own comment above) - anyone who could already reach dind gets
+  # host-kernel-equivalent access, so this doesn't introduce a new class of
+  # risk on top of what's already accepted. Deliberately its own minimal
+  # image (netfilter-fix/, own Dockerfile) rather than added onto an
+  # existing service, so this trust tier stays scoped to one tiny
+  # single-purpose container instead of expanding code-docker/router's own.
+  #
+  # Tied to `docker compose down`/`up` on purpose instead of a host-level
+  # systemd unit: the exemption's lifetime matches this container's (it
+  # deletes its own rule on SIGTERM, see netfilter-fix/fix.sh), and running
+  # it as a compose service means a multi-instance (PREFIX) deployment gets
+  # one of these automatically per instance with no separate per-PREFIX
+  # systemd unit to remember to install.
+  code-docker-netfilter-fix:
+    container_name: "${PREFIX:-}code-docker-netfilter-fix"
+    build:
+      context: "${BUILD_CONTEXT:-.}/netfilter-fix"
+      network: host
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CODE_DOCKER_INTERNAL_NETWORK: "${PREFIX:-}code-docker-internal"
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # router - the network-boundary container for code-docker. Started as
   # Phase 2 of egress-netgate-plan.md's outbound lockdown (service used to
   # be named code-docker-netgate): the actual filtering/forwarding

@@ -139,6 +139,67 @@ code-docker 컨테이너 자체가 재시작되면(단순히 안의 프로세스
 "Phase 1 구현 완료"/"Phase 2 구현 완료" 절 참고). 재부팅 후에는 `docker compose ps`로
 `code-docker-netinit`이 정상적으로 떠 있는지 한 번 확인하는 습관을 권장합니다.
 
+## 운영상 알려진 함정 - Docker의 `DOCKER-INTERNAL` 강제 격리 (Docker Engine 29.x+)
+
+**증상**: `docker compose up`이 정상적으로 끝나고 `code-docker-netinit`/router 모두
+멀쩡히 떠 있는데도, code-docker 안에서 인터넷으로 나가는 모든 연결(code-server의
+GitHub 버전 체크, `user-init.sh`의 qwreey-fish curl 등)이 계속 타임아웃납니다.
+`getent hosts <domain>`은 성공하는데(Docker 내장 DNS `127.0.0.11`이 도커 데몬 쪽에서
+대신 응답해주는 경로라 code-docker 자신의 네트워크 경로를 전혀 검증하지 않습니다 -
+착시입니다) 실제 TCP 연결은 전부 안 됩니다. router 컨테이너 자신의 `curl`은 정상 동작하고,
+router 안 netgate의 iptables(FORWARD/MASQUERADE)도 전부 정상으로 보입니다 - 즉
+router 안에서는 아무 이상이 안 보이는데도 안 됩니다.
+
+**원인**: 최신 Docker Engine(29.5.2에서 확인됨 - 이 프로젝트를 원래 만들 때 쓰던 버전에는
+없던 동작)은 `internal: true`로 선언된 네트워크에 대해 호스트의 nftables/iptables에
+`DOCKER-INTERNAL`이라는 체인을 추가로 깔아둡니다. 이 체인은 "그 네트워크의 브리지에서
+들어온 패킷인데 목적지가 그 브리지 자신의 서브넷 밖이면 무조건 DROP"이라는 규칙을
+강제합니다 - `internal: true` 네트워크가 그 어떤 경로로도 Docker 관리 밖(인터넷)으로
+못 나가게 하려는 Docker 자체의 하드닝입니다. 그런데 이 락다운 문서의 라우팅 설계는
+**정확히 그 반대를 의도적으로** 합니다: router가 `code-docker-internal`과
+`code-docker-external` 양쪽에 다리를 걸치고 자기 자신의 iptables로 트래픽을 걸러서
+내보내주는 것 자체가 이 기능의 핵심이거든요. `DOCKER-INTERNAL`은 호스트 레벨에서
+router의 forwarding 여부와 무관하게 무조건 앞단에서 패킷을 죽여버리므로, router 안의
+netgate 설정이 아무리 정상이어도 절대 성공할 수 없습니다. `nft list ruleset`으로
+호스트에서 직접 확인하면 이 체인에 실제로 드롭된 패킷 카운터가 쌓여있는 걸 볼 수
+있습니다.
+
+**대응**: Docker는 정확히 이런 오버라이드를 위해 `DOCKER-USER`라는 빈 체인을 항상
+남겨두고, 자기 자신의 `DOCKER-FORWARD`/`DOCKER-INTERNAL`보다 먼저 평가되게 해뒀습니다.
+`code-docker-netfilter-fix`라는 전용 컨테이너(`netfilter-fix/`, 자기 자신의 Dockerfile을
+가진 독립 서브트리 - `router/`/`netinit`/`code-dind`와 같은 패턴)가 `docker-compose.yml`에
+포함되어 있고, `docker compose up`만으로 자동으로 같이 떠서 이 문제를 해결합니다 - 별도
+설치 단계가 없습니다.
+
+이 컨테이너는 `network_mode: host`(어떤 docker 네트워크에도 붙지 않습니다) +
+`NET_ADMIN` + 읽기 전용 `docker.sock` 마운트가 필요합니다 - 컨테이너의 `NET_ADMIN`은
+기본적으로 자기 자신의 네트워크 네임스페이스 안에서만 관리자 권한을 주므로, 호스트
+자체의 netfilter 테이블을 건드리려면 호스트의 네트워크 네임스페이스 자체를 공유해야
+하기 때문입니다. 이건 이 저장소의 다른 서비스들보다 눈에 띄게 큰 신뢰 등급이지만,
+`code-docker-dind`가 이미 privileged + 인증 없는 도커 소켓으로 동작하고 있어서(위
+`code-docker-dind`의 주석 참고) `code-docker-internal`에 닿을 수 있는 사람은 이미
+호스트 커널과 동급의 접근권을 갖는다는 전제가 이 프로젝트에 이미 있습니다 - 그
+전제 위에 새로운 위험 등급을 추가하는 게 아닙니다. 그래도 blast radius를 좁혀두려고
+기존 서비스(code-docker/router)에 얹지 않고 이 한 가지 일만 하는 별도의 최소
+이미지(`netfilter-fix/`)로 분리했습니다.
+
+호스트 systemd 유닛이 아니라 compose 서비스로 만든 이유는 두 가지입니다: (1)
+`docker compose down` 시 이 컨테이너도 같이 내려가면서 자기가 넣은 `DOCKER-USER`
+규칙을 SIGTERM 핸들러에서 스스로 지우고 종료합니다(`netfilter-fix/fix.sh`) - 스택이
+내려가 있는 동안 필요 없는 예외 규칙이 호스트에 계속 남아있지 않습니다. (2) 여러
+`PREFIX` 인스턴스를 한 호스트에서 돌릴 때, compose 서비스는 인스턴스마다 자동으로
+하나씩 따라오지만 systemd 유닛은 인스턴스마다 별도로 설치/enable해야 해서 깜빡하기
+쉽습니다.
+
+`code-docker-internal` 네트워크의 브리지 이름(`br-<네트워크 ID 앞 12자>`)은
+`docker compose down`/`up`으로 네트워크가 재생성될 때마다 바뀌므로,
+`netfilter-fix/fix.sh`는 30초마다 현재 살아있는 브리지 이름을 도커 소켓으로 다시
+조회해서 규칙을 맞추고, 예전 브리지 이름으로 남은 낡은 규칙은 지웁니다
+(`router/config/netgate/firewall.default.sh`가 router 컨테이너 안에서 쓰는 것과
+같은 재조정 루프 방식). `iptables` 호환 레이어 대신 `nft`를 직접 사용해서, 도커
+데몬이 실제로 관리하는 것과 동일한 nftables 오브젝트를 백엔드 불일치 없이 확실하게
+건드립니다.
+
 ## 당장 인터넷이 필요하다면 (기능 자체를 끄기)
 
 `NETGATE_ENABLED="false"`(`.env`)로 끄면 `code-docker-netinit`/dind의 라우팅 루프,
