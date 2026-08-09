@@ -317,13 +317,25 @@ function InstalledView({
     reload: reloadUpdateJob,
     clearError: clearUpdateError,
   } = useClaudeInstallJob(onUpdated, true)
+  // Snapshot of miseVersion at the moment the update was kicked off, so the
+  // "X → Y" text in the in-progress overlay reflects what triggered the
+  // update rather than the live (already-current-by-the-time-you-reload)
+  // version - otherwise a page remount while a persisted job is still
+  // running shows a self-contradictory "업데이트 중: 2.1.226 → 2.1.226".
+  // Stays null (version delta omitted) if the job was resumed from a
+  // persisted id on a fresh mount, since the "before" snapshot is lost then.
+  const [updateFromVersion, setUpdateFromVersion] = useState<ClaudeMiseVersionInfo | null>(null)
+  const handleStartUpdate = useCallback(() => {
+    setUpdateFromVersion(miseVersion)
+    startUpdate()
+  }, [miseVersion, startUpdate])
 
   return (
     <div className="claude-installed-wrap">
       {miseVersion?.outdated && !updateJob && (
         <UpdateBanner
           miseVersion={miseVersion}
-          onUpdate={startUpdate}
+          onUpdate={handleStartUpdate}
           updateBusy={updateBusy}
           updateError={updateError}
           onDismissUpdateError={clearUpdateError}
@@ -334,7 +346,7 @@ function InstalledView({
           <div className="claude-install-message">
             <p>
               Claude Code 업데이트 중
-              {miseVersion && `: ${miseVersion.current} → ${miseVersion.latest}`}
+              {updateFromVersion && `: ${updateFromVersion.current} → ${updateFromVersion.latest}`}
             </p>
             <JobPanel kind="install" toolLabel="Claude Code" status={updateJob.status} onClose={closeUpdateJob} />
             {updateSucceeded && (

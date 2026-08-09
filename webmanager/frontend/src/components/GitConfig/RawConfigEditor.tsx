@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
@@ -11,11 +11,17 @@ export function RawConfigEditor() {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  // Snapshot of what the editor last loaded/saved, so handleSave can detect
+  // whether .gitconfig changed elsewhere (e.g. user info saved via the
+  // structured form) while this editor sat open with stale content, instead
+  // of silently clobbering it (previously could wipe the file to 0 bytes).
+  const loadedContentRef = useRef('')
 
   const load = useCallback(async () => {
     try {
       const data = await api.get<{ content: string }>('/git/config/raw')
       setContent(data.content)
+      loadedContentRef.current = data.content
       setError(null)
     } catch (e) {
       setError(errorMessage(e))
@@ -33,7 +39,13 @@ export function RawConfigEditor() {
     setSaved(false)
     setError(null)
     try {
+      const latest = await api.get<{ content: string }>('/git/config/raw')
+      if (latest.content !== loadedContentRef.current) {
+        setError('다른 곳에서 이 설정이 이미 바뀌었어요 — 새로고침한 뒤 다시 편집해주세요. 지금 저장하면 그 변경이 사라집니다.')
+        return
+      }
       await api.put<{ ok: true }>('/git/config/raw', { content })
+      loadedContentRef.current = content
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (e) {
