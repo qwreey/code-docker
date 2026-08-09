@@ -241,6 +241,7 @@ func main() {
 	mux.Handle("POST /api/claude/login/{id}/cancel", gate.RequirePassword(http.HandlerFunc(s.handleClaudeLoginCancel)))
 	mux.Handle("GET /api/claude/sessions", gate.RequirePassword(http.HandlerFunc(s.handleClaudeSessions)))
 	mux.Handle("GET /api/claude/sessions/{project}/{sessionId}", gate.RequirePassword(http.HandlerFunc(s.handleClaudeSessionLines)))
+	mux.HandleFunc("GET /api/claude/memory", s.handleClaudeMemory)
 
 	mux.HandleFunc("GET /api/projects", s.handleListProjects)
 	mux.HandleFunc("POST /api/projects/scan", s.handleScanProjects)

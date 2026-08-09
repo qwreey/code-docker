@@ -1,0 +1,119 @@
+/* Section wrapper - deliberately local (mirrors common/Git/Git.css's own
+   .git-panel-section pattern) rather than reusing Projects.css's
+   .projects-detail-section, so this component stays self-contained/droppable
+   like GitStatusPanel is. Caller places it inside a flex-column list of
+   sections (.projects-detail-sections in ProjectTable.tsx) which supplies
+   the gap between siblings. */
+.claude-memory-panel-section {
+  padding-bottom: 1.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.claude-memory-panel-section:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.claude-memory-panel-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+
+.claude-memory-panel-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.claude-memory-panel-body {
+  margin-top: 0.75rem;
+}
+
+.claude-memory-index-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.claude-memory-index-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+}
+
+.claude-memory-index-item:hover {
+  background: var(--surface-hover);
+}
+
+.claude-memory-index-item.active {
+  border-color: var(--color-blue-border, var(--border));
+  background: var(--surface-hover);
+}
+
+.claude-memory-index-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.claude-memory-index-summary {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.claude-memory-file-view {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.claude-memory-file-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.claude-memory-file-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.claude-memory-file-description {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
+}
+
+.claude-memory-file-body {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  max-height: 24rem;
+  overflow-y: auto;
+}

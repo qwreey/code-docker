@@ -281,6 +281,32 @@ export interface ClaudeSessionLinesResponse {
   hasMore: boolean
 }
 
+// Mirrors internal/claudememory's contract (GET /api/claude/memory) - the
+// CLI's own persistent per-project notes, not conversation content, so
+// unlike ClaudeSessionInfo above this endpoint is ungated. exists is false
+// (index/files empty) for the normal case of a project Claude Code has
+// never run against, never an error.
+export interface ClaudeMemoryIndexEntry {
+  title: string
+  filename: string
+  summary: string
+}
+
+export interface ClaudeMemoryFile {
+  filename: string
+  name: string
+  description: string
+  type: string
+  body: string
+}
+
+export interface ClaudeMemory {
+  exists: boolean
+  indexRaw: string
+  index: ClaudeMemoryIndexEntry[]
+  files: ClaudeMemoryFile[]
+}
+
 export interface ReclaimableEntry {
   pattern: string
   path: string

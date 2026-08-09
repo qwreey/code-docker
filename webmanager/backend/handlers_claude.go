@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"webmanager/internal/claudecode"
+	"webmanager/internal/claudememory"
 	"webmanager/internal/mise"
 )
 
@@ -344,4 +345,34 @@ func (s *Server) handleClaudeSessionLines(w http.ResponseWriter, r *http.Request
 		Cursor:  cursor + len(lines),
 		HasMore: hasMore,
 	})
+}
+
+// handleClaudeMemory reports a project's Claude Code auto-memory
+// (CLAUDE_CONFIG_DIR/projects/<slug>/memory/ — MEMORY.md index + individual
+// memory files). Unlike handleClaudeSessions/handleClaudeSessionLines, this
+// is ungated: memory files are curated notes (feedback/project/user
+// summaries), not raw conversation content, and the same read-open
+// convention handlers_projectgit.go uses applies here — `project` is
+// validated against the already-known project scanner cache first, same as
+// projectGitPath. A missing memory directory is not an error (see
+// claudememory.Load's doc comment) — it's the normal state for a project
+// Claude Code has never run against.
+func (s *Server) handleClaudeMemory(w http.ResponseWriter, r *http.Request) {
+	project := r.URL.Query().Get("project")
+	if project == "" {
+		writeError(w, http.StatusBadRequest, "project is required")
+		return
+	}
+	if !s.projectScanner.IsKnownPath(project) {
+		writeError(w, http.StatusBadRequest, "unknown project path")
+		return
+	}
+
+	mem, err := claudememory.Load(s.cfg.ClaudeConfigDir, project)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, mem)
 }
