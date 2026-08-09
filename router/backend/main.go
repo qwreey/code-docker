@@ -50,7 +50,7 @@ func main() {
 	// unreadable template just means the check is skipped, not a crash.
 	envTemplatePath := os.Getenv("ROUTER_ENV_TEMPLATE_PATH")
 	if envTemplatePath == "" {
-		envTemplatePath = "/etc/code-docker/example-env.router"
+		envTemplatePath = "/etc/router/example-env.router"
 	}
 	if data, err := os.ReadFile(envTemplatePath); err != nil {
 		log.Printf("main: couldn't read env template at %s for version check: %v", envTemplatePath, err)

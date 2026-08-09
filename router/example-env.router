@@ -93,7 +93,7 @@ ROUTER_ENV_VERSION=4
 #. 수정한 적이 없다면 다음 재시작 때 새 소스 내용으로 자동 반영되고,
 #. 이미 직접 수정해 divergence가 있는 상태였다면 다른 hash-reconcile
 #. 소스와 동일하게 DNS 탭에서 "새로 가져오기"를 눌러야 반영됩니다.
-#DNS_BUILTIN_BLOCKLIST_SOURCE=/etc/code-docker/dns/blocklist.default.hosts
+#DNS_BUILTIN_BLOCKLIST_SOURCE=/etc/router/dns/blocklist.default.hosts
 
 #. --- router-manager 자체 관리 API 비밀번호 (선택) ---
 #. 보통 여기서 설정할 필요 없습니다 - 권장 방법은 컨테이너를 띄운 뒤

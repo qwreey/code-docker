@@ -26,10 +26,10 @@ resolve_config_path() {
 	live=/var/lib/code-docker-router/netgate/config.yaml
 	if [ -e "$live" ]; then
 		echo "$live"
-	elif [ -e /etc/code-docker/netgate/config.override.yaml ]; then
-		echo /etc/code-docker/netgate/config.override.yaml
+	elif [ -e /etc/router/netgate/config.override.yaml ]; then
+		echo /etc/router/netgate/config.override.yaml
 	else
-		echo /etc/code-docker/netgate/config.default.yaml
+		echo /etc/router/netgate/config.default.yaml
 	fi
 }
 

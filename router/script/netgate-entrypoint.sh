@@ -9,8 +9,8 @@ set -eu
 # idle their own program. See root CLAUDE.md's code-quality audit and
 # firewall.default.sh's own comment on its new check.
 
-if [ -e /etc/code-docker/netgate/supervisord.override.conf ]; then
-	exec /sbin/supervisord -n -c /etc/code-docker/netgate/supervisord.override.conf --user root
+if [ -e /etc/router/netgate/supervisord.override.conf ]; then
+	exec /sbin/supervisord -n -c /etc/router/netgate/supervisord.override.conf --user root
 else
-	exec /sbin/supervisord -n -c /etc/code-docker/netgate/supervisord.default.conf --user root
+	exec /sbin/supervisord -n -c /etc/router/netgate/supervisord.default.conf --user root
 fi

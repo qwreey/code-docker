@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-if [ -e /etc/code-docker/tinyauth.override.sh ]; then
-    exec /etc/code-docker/tinyauth.override.sh
+if [ -e /etc/router/tinyauth.override.sh ]; then
+    exec /etc/router/tinyauth.override.sh
 else
-    exec /etc/code-docker/tinyauth.default.sh
+    exec /etc/router/tinyauth.default.sh
 fi

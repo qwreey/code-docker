@@ -105,31 +105,31 @@ RUN mkdir -p /var/log/netgate-firewall \
         /var/log/tailscaled /var/log/tailscale-forward /var/log/tailscale-publish \
         /var/log/router-manager /var/log/caddy-adapter /var/log/dns /var/log/nginx \
         /var/log/tinyauth \
-        /etc/code-docker/netgate /etc/code-docker/dns /etc/code-docker/supervisord.d \
-        /etc/code-docker/router-manager \
+        /etc/router/netgate /etc/router/dns /etc/router/supervisord.d \
+        /etc/router/router-manager \
         /var/lib/code-docker-router
-COPY --chown=root:root config/netgate /etc/code-docker/netgate
-COPY --chown=root:root config/dns /etc/code-docker/dns
-COPY --chown=root:root config/supervisord.d /etc/code-docker/supervisord.d
+COPY --chown=root:root config/netgate /etc/router/netgate
+COPY --chown=root:root config/dns /etc/router/dns
+COPY --chown=root:root config/supervisord.d /etc/router/supervisord.d
 COPY --chown=root:root config/tailscale/tailscale-config.default.yaml \
-    /etc/code-docker/tailscale-config.default.yaml
+    /etc/router/tailscale-config.default.yaml
 COPY --chown=root:root script/netgate-entrypoint.sh script/netgate-firewall.sh \
     script/tailscale-service.sh script/tailscale-forward.sh \
     script/tailscale-publish.sh script/caddy-adapter.sh script/dns.sh \
-    script/nginx-service.sh script/tinyauth.sh /etc/code-docker/
+    script/nginx-service.sh script/tinyauth.sh /etc/router/
 COPY --chown=root:root config/tailscale/tailscale-service.default.sh \
     config/tailscale/tailscale-forward.default.sh \
     config/tailscale/tailscale-publish.default.sh \
     config/caddy-adapter/caddy-adapter.default.sh \
     config/nginx/nginx.default.conf config/nginx/nginx-service.default.sh \
-    config/tinyauth/tinyauth.default.sh /etc/code-docker/
+    config/tinyauth/tinyauth.default.sh /etc/router/
 COPY --from=router-manager-build /router-manager /usr/local/bin/router-manager
-COPY --from=router-frontend-build /src/dist /etc/code-docker/router-manager/static
+COPY --from=router-frontend-build /src/dist /etc/router/router-manager/static
 COPY --from=tinyauth-bin /tinyauth/tinyauth /usr/local/bin/tinyauth
 # `router-manager --env-migrate` and its startup version-mismatch check both
 # read this (ROUTER_ENV_TEMPLATE_PATH, default matches this path) - see
 # example-env.router's own doc comment and docs/router.md.
-COPY --chown=root:root example-env.router /etc/code-docker/example-env.router
+COPY --chown=root:root example-env.router /etc/router/example-env.router
 # Baked-in default blocklist (StevenBlack/hosts - a standard, generic list
 # is sufficient per the plan doc, no prompt-injection-specific list
 # needed), saved as-is: dnsmasq's addn-hosts= reads hosts-format files
@@ -137,6 +137,6 @@ COPY --chown=root:root example-env.router /etc/code-docker/example-env.router
 # era there's no dstdomain-list conversion step anymore. A
 # config/dns/blocklist.override.hosts is checked for at runtime instead,
 # added on top of this one (not swapped in for it) - see dns.default.sh.
-RUN curl -fsSL -o /etc/code-docker/dns/blocklist.default.hosts \
+RUN curl -fsSL -o /etc/router/dns/blocklist.default.hosts \
         https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
-ENTRYPOINT ["/etc/code-docker/netgate-entrypoint.sh"]
+ENTRYPOINT ["/etc/router/netgate-entrypoint.sh"]

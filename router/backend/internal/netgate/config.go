@@ -69,8 +69,8 @@ const (
 	// DefaultConfigPath/OverrideConfigPath mirror the image-shipped files
 	// firewall.default.sh used to read directly (see root CLAUDE.md's
 	// override pattern) - only consulted by EnsureSeeded now.
-	DefaultConfigPath  = "/etc/code-docker/netgate/config.default.yaml"
-	OverrideConfigPath = "/etc/code-docker/netgate/config.override.yaml"
+	DefaultConfigPath  = "/etc/router/netgate/config.default.yaml"
+	OverrideConfigPath = "/etc/router/netgate/config.override.yaml"
 )
 
 // OutboundRule is one ordered FORWARD-chain entry - see

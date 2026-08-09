@@ -47,7 +47,7 @@ const (
 	// example-env.router's own comment on DNS_BUILTIN_BLOCKLIST_SOURCE for
 	// why this is env-driven (deploy-time bind-mount override) rather than
 	// a plain constant.
-	shippedDefaultPathDefault = "/etc/code-docker/dns/blocklist.default.hosts"
+	shippedDefaultPathDefault = "/etc/router/dns/blocklist.default.hosts"
 )
 
 // ShippedDefaultPath is read by both the seed step in dns.default.sh and

@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-if [ -e /etc/code-docker/caddy-adapter.override.sh ]; then
-    exec /etc/code-docker/caddy-adapter.override.sh
+if [ -e /etc/router/caddy-adapter.override.sh ]; then
+    exec /etc/router/caddy-adapter.override.sh
 else
-    exec /etc/code-docker/caddy-adapter.default.sh
+    exec /etc/router/caddy-adapter.default.sh
 fi

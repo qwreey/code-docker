@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-nginx_config=/etc/code-docker/nginx.default.conf
-if [ -e /etc/code-docker/nginx.override.conf ]; then
-    nginx_config=/etc/code-docker/nginx.override.conf
+nginx_config=/etc/router/nginx.default.conf
+if [ -e /etc/router/nginx.override.conf ]; then
+    nginx_config=/etc/router/nginx.override.conf
 fi
 
 # Same NGINX_LOG_LEVEL/ALLOWED_HOSTS/NGINX_BLOCK_LOOPBACK/TRUSTED_PROXIES

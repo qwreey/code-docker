@@ -34,7 +34,7 @@ var envMigrateOpts = envmigrate.Options{
 func envMigrateCmd() int {
 	templatePath := os.Getenv("ROUTER_ENV_TEMPLATE_PATH")
 	if templatePath == "" {
-		templatePath = "/etc/code-docker/example-env.router"
+		templatePath = "/etc/router/example-env.router"
 	}
 
 	templateBytes, err := os.ReadFile(templatePath)

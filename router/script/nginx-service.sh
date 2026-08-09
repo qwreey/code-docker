@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-if [ -e /etc/code-docker/nginx-service.override.sh ]; then
-    exec /etc/code-docker/nginx-service.override.sh
+if [ -e /etc/router/nginx-service.override.sh ]; then
+    exec /etc/router/nginx-service.override.sh
 else
-    exec /etc/code-docker/nginx-service.default.sh
+    exec /etc/router/nginx-service.default.sh
 fi

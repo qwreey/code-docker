@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-if [ -e /etc/code-docker/tailscale-service.override.sh ]; then
-    exec /etc/code-docker/tailscale-service.override.sh
+if [ -e /etc/router/tailscale-service.override.sh ]; then
+    exec /etc/router/tailscale-service.override.sh
 else
-    exec /etc/code-docker/tailscale-service.default.sh
+    exec /etc/router/tailscale-service.default.sh
 fi

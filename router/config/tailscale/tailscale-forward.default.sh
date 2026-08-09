@@ -12,10 +12,10 @@ set -eu
 CONFIG=/var/lib/code-docker-router/tailscale/config.yaml
 mkdir -p /var/lib/code-docker-router/tailscale
 if [ ! -e "$CONFIG" ]; then
-    if [ -e /etc/code-docker/tailscale-config.override.yaml ]; then
-        cp /etc/code-docker/tailscale-config.override.yaml "$CONFIG"
+    if [ -e /etc/router/tailscale-config.override.yaml ]; then
+        cp /etc/router/tailscale-config.override.yaml "$CONFIG"
     else
-        cp /etc/code-docker/tailscale-config.default.yaml "$CONFIG"
+        cp /etc/router/tailscale-config.default.yaml "$CONFIG"
     fi
 fi
 

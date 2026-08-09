@@ -9,9 +9,9 @@ set -e
 # sources) - all three are runtime state under /var/lib/code-docker-router,
 # managed by router-manager's own DNS API, not baked into the image.
 
-CONF=/etc/code-docker/dns/dnsmasq.default.conf
-if [ -e /etc/code-docker/dns/dnsmasq.override.conf ]; then
-    CONF=/etc/code-docker/dns/dnsmasq.override.conf
+CONF=/etc/router/dns/dnsmasq.default.conf
+if [ -e /etc/router/dns/dnsmasq.override.conf ]; then
+    CONF=/etc/router/dns/dnsmasq.override.conf
 fi
 
 SOURCES_DIR=/var/lib/code-docker-router/dns/blocklist-sources
@@ -50,7 +50,7 @@ seed_builtin_blocklist() {
     # effect, same as every other env-driven toggle here), so there's no
     # runtime web control for this by design. See example-env.router's own
     # comment on this var.
-    source_file="${DNS_BUILTIN_BLOCKLIST_SOURCE:-/etc/code-docker/dns/blocklist.default.hosts}"
+    source_file="${DNS_BUILTIN_BLOCKLIST_SOURCE:-/etc/router/dns/blocklist.default.hosts}"
 
     mkdir -p "$SOURCES_DIR"
 
@@ -149,8 +149,8 @@ fi
 # behavior this had before router-manager's own DNS tab existed. Not part
 # of $SOURCES_DIR/not hash-tracked: it's a pure file-based escape hatch for
 # anyone who'd rather keep managing this outside the web UI.
-if [ -e /etc/code-docker/dns/blocklist.override.hosts ]; then
-    extra_args="$extra_args --addn-hosts=/etc/code-docker/dns/blocklist.override.hosts"
+if [ -e /etc/router/dns/blocklist.override.hosts ]; then
+    extra_args="$extra_args --addn-hosts=/etc/router/dns/blocklist.override.hosts"
 fi
 
 # Every blocklist source (builtin + any custom ones added via the DNS tab)

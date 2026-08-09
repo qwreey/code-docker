@@ -325,7 +325,7 @@ services:
       # read the current router/example-env.router template from here - same
       # pattern as code-docker's own WEBMANAGER_ENV_TEMPLATE_PATH above.
       # Left unset to use the image's own copy.
-      ROUTER_ENV_TEMPLATE_PATH: "${ROUTER_ENV_TEMPLATE_PATH:-/etc/code-docker/example-env.router}"
+      ROUTER_ENV_TEMPLATE_PATH: "${ROUTER_ENV_TEMPLATE_PATH:-/etc/router/example-env.router}"
     # router's own feature-specific settings (tailscale, Dev Proxy exposure
     # policy, router-manager's own admin-API password, tinyauth, /exports/
     # allowlists) all live in router/.env.router, not here - copy
