@@ -3,6 +3,7 @@ import { api, errorMessage } from '../../api/client'
 import type { GitCredential } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { withViewTransition } from '../../utils/viewTransition'
 
 export function HttpsCredentials() {
@@ -15,6 +16,7 @@ export function HttpsCredentials() {
   const [token, setToken] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -50,7 +52,6 @@ export function HttpsCredentials() {
   }
 
   async function handleDelete(hostId: string) {
-    if (!window.confirm(`"${hostId}"의 저장된 자격 증명을 삭제하시겠습니까?`)) return
     setDeleting(hostId)
     try {
       await api.del(`/git/credentials/${encodeURIComponent(hostId)}`)
@@ -59,6 +60,7 @@ export function HttpsCredentials() {
       setError(errorMessage(e))
     } finally {
       setDeleting(null)
+      setConfirmDelete(null)
     }
   }
 
@@ -98,7 +100,7 @@ export function HttpsCredentials() {
                       type="button"
                       className="btn btn-danger btn-small"
                       disabled={deleting === c.host}
-                      onClick={() => handleDelete(c.host)}
+                      onClick={() => setConfirmDelete(c.host)}
                     >
                       삭제
                     </button>
@@ -143,6 +145,17 @@ export function HttpsCredentials() {
           {submitting ? '저장하는 중...' : '자격 증명 저장'}
         </button>
       </form>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete !== null && handleDelete(confirmDelete)}
+        title="자격 증명 삭제"
+        confirmLabel="삭제"
+        busy={deleting !== null}
+      >
+        &quot;{confirmDelete}&quot;의 저장된 자격 증명을 삭제하시겠습니까?
+      </ConfirmDialog>
     </div>
   )
 }

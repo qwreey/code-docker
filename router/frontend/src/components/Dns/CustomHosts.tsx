@@ -46,11 +46,17 @@ export function CustomHosts() {
   }
 
   async function handleSave() {
-    setSaving(true)
     setSaved(false)
     setError(null)
+    const trimmed = entries.map((e) => ({ host: e.host.trim(), ip: e.ip.trim() }))
+    const incomplete = trimmed.some((e) => (e.host && !e.ip) || (!e.host && e.ip))
+    if (incomplete) {
+      setError('호스트 이름과 IP를 모두 입력하거나, 둘 다 비워 그 행을 제거하세요.')
+      return
+    }
+    const cleaned = trimmed.filter((e) => e.host && e.ip)
+    setSaving(true)
     try {
-      const cleaned = entries.map((e) => ({ host: e.host.trim(), ip: e.ip.trim() })).filter((e) => e.host && e.ip)
       const data = await api.put<DnsHostEntry[]>('/custom-hosts', cleaned)
       setEntries(data)
       setSaved(true)
@@ -84,7 +90,7 @@ export function CustomHosts() {
                   <tr>
                     <th>호스트 이름</th>
                     <th>IP</th>
-                    <th aria-label="동작" />
+                    <th aria-label="동작" className="table-actions-col" />
                   </tr>
                 </thead>
                 <tbody>
@@ -96,7 +102,7 @@ export function CustomHosts() {
                       <td>
                         <input value={e.ip} onChange={(ev) => updateEntry(i, 'ip', ev.target.value)} placeholder="10.0.0.5" />
                       </td>
-                      <td>
+                      <td className="table-actions-col">
                         <button type="button" className="btn btn-danger btn-small" onClick={() => removeRow(i)}>
                           삭제
                         </button>

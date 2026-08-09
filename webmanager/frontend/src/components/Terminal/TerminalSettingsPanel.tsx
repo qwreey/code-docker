@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Sheet } from '../common/Sheet'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import type { KeyBinding, TerminalSettings, TerminalTheme } from '../../api/types'
 import { BUILTIN_THEMES, THEME_COLOR_KEYS, findTheme, type ThemeColorKey } from './themes'
 import { bytesToDisplay, displayToBytes } from './escapeCodec'
@@ -46,6 +47,7 @@ export function TerminalSettingsPanel({
 }) {
   const [draftKeybindings, setDraftKeybindings] = useState<KeyBinding[]>(settings.keybindings)
   const [themeDraft, setThemeDraft] = useState<ThemeDraft | null>(null)
+  const [confirmDeleteTheme, setConfirmDeleteTheme] = useState<TerminalTheme | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -120,15 +122,16 @@ export function TerminalSettingsPanel({
   }
 
   function deleteTheme(themeId: string) {
-    if (!window.confirm('이 사용자 정의 테마를 삭제하시겠습니까?')) return
     const customThemes = settings.customThemes.filter((t) => t.id !== themeId)
     const themeIdWasSelected = settings.themeId === themeId
     const nextThemeId = themeIdWasSelected ? BUILTIN_THEMES[0].id : settings.themeId
     if (themeIdWasSelected) onPreviewTheme(BUILTIN_THEMES[0].colors)
     onSave({ ...settings, customThemes, themeId: nextThemeId })
+    setConfirmDeleteTheme(null)
   }
 
   return (
+    <>
     <Sheet open={open} onClose={onClose} title="터미널 설정">
       {error && <ErrorBanner message={error} onDismiss={onDismissError} />}
 
@@ -203,7 +206,7 @@ export function TerminalSettingsPanel({
                 <button type="button" className="btn btn-secondary btn-small" onClick={() => startEditTheme(theme)}>
                   편집
                 </button>
-                <button type="button" className="btn btn-danger btn-small" onClick={() => deleteTheme(theme.id)}>
+                <button type="button" className="btn btn-danger btn-small" onClick={() => setConfirmDeleteTheme(theme)}>
                   삭제
                 </button>
               </div>
@@ -251,5 +254,16 @@ export function TerminalSettingsPanel({
         )}
       </section>
     </Sheet>
+
+    <ConfirmDialog
+      open={confirmDeleteTheme !== null}
+      onClose={() => setConfirmDeleteTheme(null)}
+      onConfirm={() => confirmDeleteTheme && deleteTheme(confirmDeleteTheme.id)}
+      title="테마 삭제"
+      confirmLabel="삭제"
+    >
+      &quot;{confirmDeleteTheme?.name}&quot; 사용자 정의 테마를 삭제하시겠습니까?
+    </ConfirmDialog>
+    </>
   )
 }

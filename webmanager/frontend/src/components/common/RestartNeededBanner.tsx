@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { RestartStatusResponse } from '../../api/types'
-import { confirmAndRestartCodeServer, type RestartOutcome } from '../../utils/restartCodeServer'
+import { restartCodeServer, type RestartOutcome } from '../../utils/restartCodeServer'
 import { ErrorBanner } from './ErrorBanner'
+import { ConfirmDialog } from './ConfirmDialog'
 
 const RESTART_OUTCOME_TEXT: Record<RestartOutcome, string> = {
   restarted: '재시작을 요청했습니다. 완료되면 이 배너가 자동으로 사라집니다.',
-  declined: '',
   error: '재시작 요청에 실패했습니다. Supervisor 탭에서 직접 재시작해 주세요.',
 }
 
@@ -34,6 +34,7 @@ export function RestartNeededBanner({ refreshToken }: { refreshToken?: unknown }
   const [restarting, setRestarting] = useState(false)
   const [waitingForRestart, setWaitingForRestart] = useState(false)
   const [outcome, setOutcome] = useState<RestartOutcome | null>(null)
+  const [confirmRestart, setConfirmRestart] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // Bumped on every mount/refreshToken change so a response from a
   // superseded fetchStatus call (initial fetch or an in-flight poll tick)
@@ -74,11 +75,12 @@ export function RestartNeededBanner({ refreshToken }: { refreshToken?: unknown }
 
   if (!dirty) return null
 
-  async function handleRestart() {
+  async function handleRestartConfirm() {
     setRestarting(true)
-    const result = await confirmAndRestartCodeServer()
+    const result = await restartCodeServer()
     setOutcome(result)
     setRestarting(false)
+    setConfirmRestart(false)
     if (result === 'restarted') {
       stopPolling()
       setWaitingForRestart(true)
@@ -88,6 +90,7 @@ export function RestartNeededBanner({ refreshToken }: { refreshToken?: unknown }
   }
 
   return (
+    <>
     <ErrorBanner
       variant="warning"
       message={
@@ -96,14 +99,26 @@ export function RestartNeededBanner({ refreshToken }: { refreshToken?: unknown }
           <button
             type="button"
             className="btn btn-secondary btn-small"
-            onClick={handleRestart}
+            onClick={() => setConfirmRestart(true)}
             disabled={restarting || waitingForRestart}
           >
             {waitingForRestart ? '재시작 확인 중...' : '지금 재시작'}
           </button>
-          {outcome && outcome !== 'declined' && <span>{RESTART_OUTCOME_TEXT[outcome]}</span>}
+          {outcome && <span>{RESTART_OUTCOME_TEXT[outcome]}</span>}
         </span>
       }
     />
+
+    <ConfirmDialog
+      open={confirmRestart}
+      onClose={() => setConfirmRestart(false)}
+      onConfirm={handleRestartConfirm}
+      title="code-server 재시작"
+      confirmLabel="재시작"
+      busy={restarting}
+    >
+      code-server를 지금 재시작할까요? 재시작 중 code-server 연결이 잠시 끊깁니다.
+    </ConfirmDialog>
+    </>
   )
 }

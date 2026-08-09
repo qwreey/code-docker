@@ -68,8 +68,8 @@ export function RouteDialog({
           />
           {looksUnreachable(target) && (
             <p className="dev-proxy-route-hint">
-              <code>{target || '(비어있음)'}</code>은(는) 이 컨테이너(router) 자신을 가리켜, code-docker 안의 dev
-              서버에는 닿지 않습니다 — <code>code-docker:포트</code> 같은 compose 서비스 호스트네임을 쓰세요.
+              <code>{target || '(비어있음)'}</code>은(는) 이 컨테이너(router) 자신을 가리켜, 다른 컨테이너 안의 dev
+              서버에는 닿지 않습니다 — <code>code-docker:포트</code>처럼 compose 서비스 호스트네임을 쓰세요.
             </p>
           )}
         </div>

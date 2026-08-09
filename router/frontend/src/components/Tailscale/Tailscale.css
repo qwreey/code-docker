@@ -28,6 +28,24 @@
   color: var(--accent-contrast);
 }
 
+/* Wraps to as many rows as needed instead of overflowing the viewport;
+   once wrapped, each row's tabs stretch to share its full width evenly.
+   Same rule as Dns.css's own .dns-tabs - not shared cross-folder CSS, see
+   that file's own header comment for why. */
+@media (max-width: 560px) {
+  .tailscale-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    height: auto;
+  }
+
+  .tailscale-tab {
+    flex: 1 1 50%;
+    justify-content: center;
+  }
+}
+
 .tailscale-table {
   width: 100%;
   border-collapse: collapse;

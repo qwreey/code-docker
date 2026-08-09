@@ -158,6 +158,18 @@
   margin-bottom: 0.75rem;
 }
 
+/* A tab group (or any other header action) that doesn't fit next to the
+   title drops to its own full-width row instead of overflowing the
+   viewport - see e.g. Processes.css's own .processes-tabs for the matching
+   wrap-and-share-width rule applied to the tab buttons themselves. Mirrors
+   router-frontend's common.css's own identical rule (see that file's
+   comment on why it's hand-duplicated rather than shared). */
+@media (max-width: 560px) {
+  .section-header {
+    flex-wrap: wrap;
+  }
+}
+
 .section-header h1 {
   margin: 0;
 }

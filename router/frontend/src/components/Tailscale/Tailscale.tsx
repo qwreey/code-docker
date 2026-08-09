@@ -48,8 +48,8 @@ export function Tailscale() {
         <span aria-hidden="true">⚠</span>
         <span>
           <strong>이 컨테이너(router) 안에서 <code>0.0.0.0</code>/<code>localhost</code>에 바인드된 포트는 규칙 없이도
-          tailnet 전체에 같은 포트 번호로 자동 노출</strong>됩니다 (tailscaled netstack의 기본 동작). code-docker의
-          sshd 등 다른 컨테이너에서 뜨는 서비스는 tailscaled가 router에서만 실행되므로 이 자동 노출 대상이{' '}
+          tailnet 전체에 같은 포트 번호로 자동 노출</strong>됩니다 (tailscaled netstack의 기본 동작). 다른 컨테이너에서
+          뜨는 서비스(예: code-docker의 sshd)는 tailscaled가 router에서만 실행되므로 이 자동 노출 대상이{' '}
           <strong>아닙니다</strong> — 그 컨테이너들에 접근하려면 아래 forwards/publish를 명시적으로 설정해야 합니다.
           자세한 내용은 레포 루트 <code>docs/tailscale.md</code> 참고.
         </span>

@@ -105,6 +105,15 @@
   background: var(--surface);
 }
 
+/* A table's rightmost actions column hugs its row buttons instead of
+   stretching to share whatever space is left over - apply to both the
+   header <th> and each row's <td>. */
+.table-actions-col {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
 .card {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -203,8 +212,41 @@
   margin-bottom: 0.75rem;
 }
 
+/* Same shape as .section-header, one size down - a <h2>/badge/action-button
+   row inside a .card rather than the page-level title row. */
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* A dialog's fields stack vertically (no .form-grid auto-fit columns) - the
+   dialog is narrow on mobile and horizontal fields there are cramped. */
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .section-header h1 {
   margin: 0;
+}
+
+/* A tab group (or any other header action) that doesn't fit next to the
+   title drops to its own full-width row instead of overflowing the
+   viewport - see each feature's own -tabs class for the matching
+   wrap-and-share-width rule applied to the tab buttons themselves. */
+@media (max-width: 560px) {
+  .section-header,
+  .card-header {
+    flex-wrap: wrap;
+  }
 }
 
 .mono-cell {

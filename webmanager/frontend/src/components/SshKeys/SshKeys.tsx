@@ -4,6 +4,7 @@ import type { SshEntry } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Sheet } from '../common/Sheet'
 import { Skeleton } from '../common/Skeleton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import '../common/common.css'
 import './SshKeys.css'
 import { withViewTransition } from '../../utils/viewTransition'
@@ -36,6 +37,7 @@ export function SshKeys() {
   const [commentFormError, setCommentFormError] = useState<string | null>(null)
 
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<SshEntry | null>(null)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -96,11 +98,6 @@ export function SshKeys() {
   }
 
   async function handleDelete(entry: SshEntry) {
-    const confirmMessage =
-      entry.kind === 'comment'
-        ? '이 주석을 삭제하시겠습니까?'
-        : '이 키를 삭제하시겠습니까? 해당 키로는 더 이상 로그인할 수 없습니다.'
-    if (!window.confirm(confirmMessage)) return
     setDeletingId(entry.id)
     try {
       await api.del(entryUrl(entry))
@@ -109,6 +106,7 @@ export function SshKeys() {
       setError(errorMessage(e))
     } finally {
       setDeletingId(null)
+      setConfirmDelete(null)
     }
   }
 
@@ -288,7 +286,7 @@ export function SshKeys() {
                         type="button"
                         className="btn btn-danger btn-small"
                         disabled={deletingId === entry.id}
-                        onClick={() => handleDelete(entry)}
+                        onClick={() => setConfirmDelete(entry)}
                       >
                         삭제
                       </button>
@@ -355,6 +353,19 @@ export function SshKeys() {
           </div>
         </form>
       </Sheet>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
+        title={confirmDelete?.kind === 'comment' ? '주석 삭제' : '키 삭제'}
+        confirmLabel="삭제"
+        busy={deletingId !== null}
+      >
+        {confirmDelete?.kind === 'comment'
+          ? '이 주석을 삭제하시겠습니까?'
+          : '이 키를 삭제하시겠습니까? 해당 키로는 더 이상 로그인할 수 없습니다.'}
+      </ConfirmDialog>
     </section>
   )
 }

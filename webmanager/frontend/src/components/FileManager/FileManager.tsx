@@ -4,6 +4,7 @@ import { api, apiUrl, errorMessage } from '../../api/client'
 import type { FileEntry, FileOpResult, FileUploadResult } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { FileTable } from './FileTable'
 import { InfoPanel } from './InfoPanel'
 import { FileEditorSheet } from './FileEditorSheet'
@@ -69,6 +70,8 @@ export function FileManager({
   const [uploadSummary, setUploadSummary] = useState<string | null>(null)
 
   const [bulkMode, setBulkMode] = useState<'move' | 'copy' | null>(null)
+  const [confirmDeletePaths, setConfirmDeletePaths] = useState<string[] | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
 
   const currentPath = pathStack[pathStack.length - 1].path
@@ -155,7 +158,7 @@ export function FileManager({
 
   async function handleDelete(paths: string[]) {
     if (paths.length === 0) return
-    if (!window.confirm(`${paths.length}개 항목을 삭제하시겠습니까?`)) return
+    setDeleteBusy(true)
     try {
       const res = await api.post<{ results: FileOpResult[] }>('/files/delete', { items: paths })
       setError(summarizeFailures(res.results))
@@ -163,6 +166,9 @@ export function FileManager({
       await load()
     } catch (e) {
       setError(errorMessage(e))
+    } finally {
+      setDeleteBusy(false)
+      setConfirmDeletePaths(null)
     }
   }
 
@@ -346,7 +352,7 @@ export function FileManager({
           onInfo={setInfoTarget}
           onDownload={handleDownload}
           onEdit={setEditingEntry}
-          onDelete={(entry) => handleDelete([entry.path])}
+          onDelete={(entry) => setConfirmDeletePaths([entry.path])}
           onStartRename={(entry) => setRenamingPath(entry.path)}
           onCancelRename={() => setRenamingPath(null)}
           onSubmitRename={submitRename}
@@ -368,7 +374,7 @@ export function FileManager({
         <button type="button" className="btn btn-secondary btn-small" onClick={() => setBulkMode('copy')}>
           복사
         </button>
-        <button type="button" className="btn btn-danger btn-small" onClick={() => handleDelete(Array.from(selected))}>
+        <button type="button" className="btn btn-danger btn-small" onClick={() => setConfirmDeletePaths(Array.from(selected))}>
           삭제
         </button>
         <button type="button" className="btn btn-secondary btn-small" onClick={() => setSelected(new Set())}>
@@ -390,6 +396,17 @@ export function FileManager({
           onConfirm={submitBulk}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDeletePaths !== null}
+        onClose={() => setConfirmDeletePaths(null)}
+        onConfirm={() => confirmDeletePaths && handleDelete(confirmDeletePaths)}
+        title="삭제"
+        confirmLabel="삭제"
+        busy={deleteBusy}
+      >
+        {confirmDeletePaths?.length}개 항목을 삭제하시겠습니까?
+      </ConfirmDialog>
     </section>
   )
 }

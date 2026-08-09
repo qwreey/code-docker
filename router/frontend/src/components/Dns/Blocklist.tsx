@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from './client'
-import type { DnsBlocklistSourcesResponse, DnsBuiltinBlocklistStatus } from '../../api/types'
+import type { DnsBlocklistSource, DnsBlocklistSourcesResponse, DnsBuiltinBlocklistStatus } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { withViewTransition } from '../../utils/viewTransition'
+import { BlocklistSourceDialog } from './BlocklistSourceDialog'
 
 // BuiltinCard is split out from the custom-source list below it since it
 // has an entirely different shape: no name/hosts editing, just an
@@ -74,7 +76,7 @@ function BuiltinCard({
 
   return (
     <div className="card">
-      <div className="dns-source-header">
+      <div className="card-header">
         <h2>
           builtin <span className="dns-source-meta">(이미지 내장, StevenBlack/hosts)</span>
         </h2>
@@ -139,11 +141,11 @@ export function Blocklist() {
   const [data, setData] = useState<DnsBlocklistSourcesResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [name, setName] = useState('')
-  const [hostsText, setHostsText] = useState('')
+  const [dialogError, setDialogError] = useState<string | null>(null)
+  const [dialog, setDialog] = useState<{ source: DnsBlocklistSource | null } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -161,31 +163,25 @@ export function Blocklist() {
     load()
   }, [load])
 
-  function parseHosts(text: string): string[] {
-    return text
-      .split('\n')
-      .map((h) => h.trim())
-      .filter((h) => h.length > 0)
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSave(name: string, hosts: string[]) {
     setSubmitting(true)
-    setFormError(null)
+    setDialogError(null)
     try {
-      await api.post('/blocklist-sources', { name, hosts: parseHosts(hostsText) })
-      setName('')
-      setHostsText('')
+      if (dialog?.source) {
+        await api.put(`/blocklist-sources/${encodeURIComponent(name)}`, { hosts })
+      } else {
+        await api.post('/blocklist-sources', { name, hosts })
+      }
+      setDialog(null)
       await load()
     } catch (e) {
-      setFormError(errorMessage(e))
+      setDialogError(errorMessage(e))
     } finally {
       setSubmitting(false)
     }
   }
 
   async function handleDelete(sourceName: string) {
-    if (!window.confirm(`"${sourceName}" 블록리스트를 삭제하시겠습니까?`)) return
     setDeleting(sourceName)
     try {
       await api.del(`/blocklist-sources/${encodeURIComponent(sourceName)}`)
@@ -194,6 +190,7 @@ export function Blocklist() {
       setError(errorMessage(e))
     } finally {
       setDeleting(null)
+      setConfirmDelete(null)
     }
   }
 
@@ -223,7 +220,12 @@ export function Blocklist() {
       )}
 
       <div className="card">
-        <h2>사용자 블록리스트</h2>
+        <div className="card-header">
+          <h2>사용자 블록리스트</h2>
+          <button type="button" className="btn btn-primary btn-small" onClick={() => setDialog({ source: null })}>
+            블록리스트 추가
+          </button>
+        </div>
         <p className="section-description">직접 추가한 블록리스트 소스입니다. 여러 개를 만들 수 있습니다.</p>
         {custom.length === 0 ? (
           <p className="empty-state">등록된 사용자 블록리스트가 없습니다.</p>
@@ -234,7 +236,7 @@ export function Blocklist() {
                 <tr>
                   <th>이름</th>
                   <th>호스트 수</th>
-                  <th aria-label="동작" />
+                  <th aria-label="동작" className="table-actions-col" />
                 </tr>
               </thead>
               <tbody>
@@ -242,12 +244,15 @@ export function Blocklist() {
                   <tr key={s.name}>
                     <td>{s.name}</td>
                     <td>{s.entryCount.toLocaleString()}</td>
-                    <td>
+                    <td className="table-actions-col">
+                      <button type="button" className="btn btn-small" onClick={() => setDialog({ source: s })}>
+                        편집
+                      </button>{' '}
                       <button
                         type="button"
                         className="btn btn-danger btn-small"
                         disabled={deleting === s.name}
-                        onClick={() => handleDelete(s.name)}
+                        onClick={() => setConfirmDelete(s.name)}
                       >
                         삭제
                       </button>
@@ -258,35 +263,28 @@ export function Blocklist() {
             </table>
           </div>
         )}
-
-        <form onSubmit={handleSubmit} className="form-grid-inline">
-          <div className="form-field">
-            <label htmlFor="bl-name">이름</label>
-            <input
-              id="bl-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="my-list"
-              required
-            />
-          </div>
-          <div className="form-field">
-            <label htmlFor="bl-hosts">호스트 이름 (한 줄에 하나)</label>
-            <textarea
-              id="bl-hosts"
-              rows={5}
-              value={hostsText}
-              onChange={(e) => setHostsText(e.target.value)}
-              placeholder={'ads.example.com\ntracker.example.net'}
-              required
-            />
-          </div>
-          {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? '추가하는 중...' : '블록리스트 추가'}
-          </button>
-        </form>
       </div>
+
+      {dialog && (
+        <BlocklistSourceDialog
+          source={dialog.source}
+          submitting={submitting}
+          error={dialogError}
+          onCancel={() => setDialog(null)}
+          onSave={handleSave}
+        />
+      )}
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete !== null && handleDelete(confirmDelete)}
+        title="블록리스트 삭제"
+        confirmLabel="삭제"
+        busy={deleting !== null}
+      >
+        &quot;{confirmDelete}&quot; 블록리스트를 삭제하시겠습니까?
+      </ConfirmDialog>
     </div>
   )
 }

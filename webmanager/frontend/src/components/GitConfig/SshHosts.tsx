@@ -4,6 +4,7 @@ import type { GitSshHost } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
 import { CopyButton } from '../common/CopyButton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { withViewTransition } from '../../utils/viewTransition'
 
 export function SshHosts() {
@@ -17,6 +18,7 @@ export function SshHosts() {
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [createdKey, setCreatedKey] = useState<GitSshHost | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -53,7 +55,6 @@ export function SshHosts() {
   }
 
   async function handleDelete(hostId: string) {
-    if (!window.confirm(`"${hostId}" 호스트 설정을 삭제하시겠습니까?`)) return
     setDeleting(hostId)
     try {
       await api.del(`/git/ssh-hosts/${encodeURIComponent(hostId)}`)
@@ -63,6 +64,7 @@ export function SshHosts() {
       setError(errorMessage(e))
     } finally {
       setDeleting(null)
+      setConfirmDelete(null)
     }
   }
 
@@ -100,7 +102,7 @@ export function SshHosts() {
                       type="button"
                       className="btn btn-danger btn-small"
                       disabled={deleting === h.host}
-                      onClick={() => handleDelete(h.host)}
+                      onClick={() => setConfirmDelete(h.host)}
                     >
                       삭제
                     </button>
@@ -151,6 +153,17 @@ export function SshHosts() {
           {submitting ? '추가하는 중...' : '호스트 추가'}
         </button>
       </form>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete !== null && handleDelete(confirmDelete)}
+        title="호스트 설정 삭제"
+        confirmLabel="삭제"
+        busy={deleting !== null}
+      >
+        &quot;{confirmDelete}&quot; 호스트 설정을 삭제하시겠습니까?
+      </ConfirmDialog>
     </div>
   )
 }

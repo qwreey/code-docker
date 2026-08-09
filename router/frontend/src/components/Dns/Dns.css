@@ -27,6 +27,22 @@
   color: var(--accent-contrast);
 }
 
+/* Wraps to as many rows as needed instead of overflowing the viewport;
+   once wrapped, each row's tabs stretch to share its full width evenly. */
+@media (max-width: 560px) {
+  .dns-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    height: auto;
+  }
+
+  .dns-tab {
+    flex: 1 1 50%;
+    justify-content: center;
+  }
+}
+
 .dns-table {
   width: 100%;
   border-collapse: collapse;
@@ -52,13 +68,6 @@
   font-size: 0.85rem;
   background: var(--bg);
   color: var(--text);
-}
-
-.dns-source-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
 }
 
 .dns-source-meta {

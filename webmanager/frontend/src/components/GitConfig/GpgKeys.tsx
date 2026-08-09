@@ -4,6 +4,7 @@ import type { GpgKey, GpgKeyCreated } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
 import { CopyButton } from '../common/CopyButton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { withViewTransition } from '../../utils/viewTransition'
 
 const NOT_INSTALLED_NOTICE = '컨테이너에 gnupg가 아직 설치되어 있지 않습니다 (다음 이미지 빌드부터 사용 가능합니다).'
@@ -24,6 +25,7 @@ export function GpgKeys({ onUseKey }: { onUseKey: (keyId: string) => void }) {
   const [createNotInstalled, setCreateNotInstalled] = useState(false)
   const [createdKey, setCreatedKey] = useState<GpgKeyCreated | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -70,7 +72,6 @@ export function GpgKeys({ onUseKey }: { onUseKey: (keyId: string) => void }) {
   }
 
   async function handleDelete(keyId: string) {
-    if (!window.confirm(`"${keyId}" GPG 키를 삭제하시겠습니까?`)) return
     setDeleting(keyId)
     try {
       await api.del(`/git/gpg-keys/${encodeURIComponent(keyId)}`)
@@ -84,6 +85,7 @@ export function GpgKeys({ onUseKey }: { onUseKey: (keyId: string) => void }) {
       }
     } finally {
       setDeleting(null)
+      setConfirmDelete(null)
     }
   }
 
@@ -133,7 +135,7 @@ export function GpgKeys({ onUseKey }: { onUseKey: (keyId: string) => void }) {
                         type="button"
                         className="btn btn-danger btn-small"
                         disabled={deleting === k.keyId}
-                        onClick={() => handleDelete(k.keyId)}
+                        onClick={() => setConfirmDelete(k.keyId)}
                       >
                         삭제
                       </button>
@@ -190,6 +192,17 @@ export function GpgKeys({ onUseKey }: { onUseKey: (keyId: string) => void }) {
           {creating ? '생성하는 중...' : '새 GPG 키 생성'}
         </button>
       </form>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete !== null && handleDelete(confirmDelete)}
+        title="GPG 키 삭제"
+        confirmLabel="삭제"
+        busy={deleting !== null}
+      >
+        &quot;{confirmDelete}&quot; GPG 키를 삭제하시겠습니까?
+      </ConfirmDialog>
     </div>
   )
 }

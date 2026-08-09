@@ -39,8 +39,8 @@ export function Query() {
     <div className="card">
       <h2>조회</h2>
       <p className="section-description">
-        이 컨테이너 자신의 dnsmasq(127.0.0.1)로 dig 조회를 실행합니다 - code-docker/dind이 실제로
-        받는 응답(블록리스트, 추가 호스트, 캐시 여부 포함)을 그대로 확인할 수 있습니다.
+        이 컨테이너 자신의 dnsmasq(127.0.0.1)로 dig 조회를 실행합니다 - 이 라우터를 게이트웨이로 사용하는 컨테이너가
+        실제로 받는 응답(블록리스트, 추가 호스트, 캐시 여부 포함)을 그대로 확인할 수 있습니다.
       </p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <form onSubmit={handleSubmit}>

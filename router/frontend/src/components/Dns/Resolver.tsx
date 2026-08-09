@@ -63,7 +63,7 @@ export function Resolver() {
     <div className="card">
       <h2>리졸버</h2>
       <p className="section-description">
-        code-docker/dind이 이 컨테이너를 통해 사용하는 업스트림 DNS 서버를 지정합니다.
+        이 라우터를 DNS 서버로 사용하는 컨테이너가 실제로 조회하게 될 업스트림 DNS 서버를 지정합니다.
       </p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {saved && <p className="success-note">저장됨 (dns 재시작됨)</p>}

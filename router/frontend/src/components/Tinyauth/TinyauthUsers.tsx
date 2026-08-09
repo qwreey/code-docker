@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { tinyauthApi, errorMessage } from '../../api/client'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { withViewTransition } from '../../utils/viewTransition'
 
 interface TinyauthUser {
@@ -35,6 +36,7 @@ export function TinyauthUsers() {
   const [newPassword, setNewPassword] = useState('')
   const [changeError, setChangeError] = useState<string | null>(null)
   const [changing, setChanging] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -100,7 +102,6 @@ export function TinyauthUsers() {
   }
 
   async function handleDelete(userName: string) {
-    if (!window.confirm(`"${userName}" 사용자를 삭제하시겠습니까?`)) return
     setDeleting(userName)
     try {
       await tinyauthApi.del(`/users/${encodeURIComponent(userName)}`)
@@ -111,6 +112,7 @@ export function TinyauthUsers() {
       setError(errorMessage(e))
     } finally {
       setDeleting(null)
+      setConfirmDelete(null)
     }
   }
 
@@ -139,7 +141,7 @@ export function TinyauthUsers() {
             <thead>
               <tr>
                 <th>이름</th>
-                {!pinned && <th aria-label="동작" />}
+                {!pinned && <th aria-label="동작" className="table-actions-col" />}
               </tr>
             </thead>
             <tbody>
@@ -147,7 +149,7 @@ export function TinyauthUsers() {
                 <tr key={u.name}>
                   <td>{u.name}</td>
                   {!pinned && (
-                    <td>
+                    <td className="table-actions-col">
                       <button
                         type="button"
                         className="btn btn-secondary btn-small"
@@ -159,7 +161,7 @@ export function TinyauthUsers() {
                         type="button"
                         className="btn btn-danger btn-small"
                         disabled={deleting === u.name}
-                        onClick={() => handleDelete(u.name)}
+                        onClick={() => setConfirmDelete(u.name)}
                       >
                         삭제
                       </button>
@@ -221,6 +223,17 @@ export function TinyauthUsers() {
           </button>
         </form>
       )}
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete !== null && handleDelete(confirmDelete)}
+        title="사용자 삭제"
+        confirmLabel="삭제"
+        busy={deleting !== null}
+      >
+        &quot;{confirmDelete}&quot; 사용자를 삭제하시겠습니까?
+      </ConfirmDialog>
     </div>
   )
 }

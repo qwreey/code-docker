@@ -3,6 +3,7 @@ import { netgateApi, errorMessage } from '../../api/client'
 import type { NetgateForward } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { withViewTransition } from '../../utils/viewTransition'
 
 export function Forwards() {
@@ -16,6 +17,7 @@ export function Forwards() {
   const [targetPort, setTargetPort] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
+  const [confirmPort, setConfirmPort] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -62,7 +64,6 @@ export function Forwards() {
   }
 
   async function handleDelete(port: number) {
-    if (!window.confirm(`호스트 포트 ${port} forward를 삭제하시겠습니까?`)) return
     setDeleting(port)
     try {
       await netgateApi.del(`/forwards/${port}`)
@@ -73,6 +74,7 @@ export function Forwards() {
       setError(errorMessage(e))
     } finally {
       setDeleting(null)
+      setConfirmPort(null)
     }
   }
 
@@ -80,8 +82,8 @@ export function Forwards() {
     <div className="card">
       <h2>포트 포워딩</h2>
       <p className="section-description">
-        호스트의 특정 포트를 <code>code-docker-internal</code>에 있는 컨테이너의 포트로 전달합니다(홈 라우터의
-        포트포워딩과 동일). 변경사항은 최대 30초 내 반영됩니다(재시작 불필요).
+        호스트의 특정 포트를 내부 네트워크에 있는 컨테이너의 포트로 전달합니다(홈 라우터의 포트포워딩과 동일).
+        변경사항은 최대 30초 내 반영됩니다(재시작 불필요).
       </p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {notice && <p className="success-note">{notice}</p>}
@@ -98,7 +100,7 @@ export function Forwards() {
                 <th>호스트 포트</th>
                 <th>대상 호스트</th>
                 <th>대상 포트</th>
-                <th aria-label="동작" />
+                <th aria-label="동작" className="table-actions-col" />
               </tr>
             </thead>
             <tbody>
@@ -107,12 +109,12 @@ export function Forwards() {
                   <td>{f.hostPort}</td>
                   <td>{f.targetHost}</td>
                   <td>{f.targetPort}</td>
-                  <td>
+                  <td className="table-actions-col">
                     <button
                       type="button"
                       className="btn btn-danger btn-small"
                       disabled={deleting === f.hostPort}
-                      onClick={() => handleDelete(f.hostPort)}
+                      onClick={() => setConfirmPort(f.hostPort)}
                     >
                       삭제
                     </button>
@@ -123,6 +125,17 @@ export function Forwards() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmPort !== null}
+        onClose={() => setConfirmPort(null)}
+        onConfirm={() => confirmPort !== null && handleDelete(confirmPort)}
+        title="forward 삭제"
+        confirmLabel="삭제"
+        busy={deleting !== null}
+      >
+        호스트 포트 {confirmPort} forward를 삭제하시겠습니까?
+      </ConfirmDialog>
 
       <form onSubmit={handleSubmit} className="form-grid-inline">
         <div className="form-grid">

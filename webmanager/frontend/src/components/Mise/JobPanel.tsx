@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { MiseJobStatus } from '../../api/types'
-import { confirmAndRestartCodeServer, type RestartOutcome } from '../../utils/restartCodeServer'
+import { restartCodeServer, type RestartOutcome } from '../../utils/restartCodeServer'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import './Mise.css'
 
 // Shared by Mise.tsx and ClaudeCode.tsx - both poll the same
@@ -22,19 +23,23 @@ export interface JobPanelProps {
 
 const RESTART_OUTCOME_TEXT: Record<RestartOutcome, string> = {
   restarted: '재시작을 요청했습니다.',
-  declined: '',
   error: '재시작 요청에 실패했습니다. Supervisor 탭에서 직접 재시작해 주세요.',
 }
 
 export function JobPanel({ kind, toolLabel, status, onClose, offerRestart = true, actionLabel }: JobPanelProps) {
   const [restartOutcome, setRestartOutcome] = useState<RestartOutcome | null>(null)
+  const [confirmRestart, setConfirmRestart] = useState(false)
+  const [restarting, setRestarting] = useState(false)
 
   const jobDone = status !== null && !status.running
   const jobFailed = jobDone && status!.exitCode !== 0
 
-  async function handleRestartClick() {
-    const outcome = await confirmAndRestartCodeServer()
+  async function handleRestartConfirm() {
+    setRestarting(true)
+    const outcome = await restartCodeServer()
     setRestartOutcome(outcome)
+    setRestarting(false)
+    setConfirmRestart(false)
   }
 
   return (
@@ -57,10 +62,10 @@ export function JobPanel({ kind, toolLabel, status, onClose, offerRestart = true
       {jobDone && !jobFailed && offerRestart && (
         <div className="mise-restart-note">
           <span>code-server에 반영하려면 재시작이 필요합니다.</span>
-          <button type="button" className="btn btn-secondary btn-small" onClick={handleRestartClick}>
+          <button type="button" className="btn btn-secondary btn-small" onClick={() => setConfirmRestart(true)}>
             지금 재시작
           </button>
-          {restartOutcome && restartOutcome !== 'declined' && (
+          {restartOutcome && (
             <span className={restartOutcome === 'error' ? 'mise-restart-result-error' : 'mise-restart-result'}>
               {RESTART_OUTCOME_TEXT[restartOutcome]}
             </span>
@@ -70,6 +75,17 @@ export function JobPanel({ kind, toolLabel, status, onClose, offerRestart = true
       <button type="button" className="btn btn-secondary btn-small" onClick={onClose}>
         닫기
       </button>
+
+      <ConfirmDialog
+        open={confirmRestart}
+        onClose={() => setConfirmRestart(false)}
+        onConfirm={handleRestartConfirm}
+        title="code-server 재시작"
+        confirmLabel="재시작"
+        busy={restarting}
+      >
+        code-server를 지금 재시작할까요? 재시작 중 code-server 연결이 잠시 끊깁니다.
+      </ConfirmDialog>
     </div>
   )
 }

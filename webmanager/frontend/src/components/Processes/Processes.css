@@ -40,6 +40,25 @@
   color: var(--accent-contrast);
 }
 
+/* Wraps to as many rows as needed instead of overflowing the viewport;
+   once wrapped, each row's tabs stretch to share its full width evenly.
+   Not applied to .processes-tabs-inline - that variant sits compactly next
+   to other filter controls (search input/status select) in a row, and
+   forcing it to full width there would break that row's layout. */
+@media (max-width: 560px) {
+  .processes-tabs:not(.processes-tabs-inline) {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    height: auto;
+  }
+
+  .processes-tabs:not(.processes-tabs-inline) .processes-tab {
+    flex: 1 1 50%;
+    justify-content: center;
+  }
+}
+
 .process-info-table {
   width: 100%;
   border-collapse: collapse;

@@ -1,23 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from './client'
-import type { TailscalePublish, TailscalePublishMode } from '../../api/types'
+import type { TailscalePublish } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
+import { PublishDialog } from './PublishDialog'
 import { withViewTransition } from '../../utils/viewTransition'
 
 export function Publish() {
   const [publishes, setPublishes] = useState<TailscalePublish[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [dialogError, setDialogError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [name, setName] = useState('')
-  const [tailscalePort, setTailscalePort] = useState('')
-  const [targetHost, setTargetHost] = useState('code-docker')
-  const [localPort, setLocalPort] = useState('')
-  const [mode, setMode] = useState<TailscalePublishMode>('tcp')
+  const [dialog, setDialog] = useState<{ publish: TailscalePublish | null } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -40,35 +39,26 @@ export function Publish() {
     setTimeout(() => setNotice(null), 2500)
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSave(publish: TailscalePublish) {
     setSubmitting(true)
-    setFormError(null)
+    setDialogError(null)
     try {
-      await api.post('/publish', {
-        name,
-        tailscalePort: Number(tailscalePort),
-        targetHost,
-        localPort: Number(localPort),
-        mode,
-      })
-      setName('')
-      setTailscalePort('')
-      setTargetHost('code-docker')
-      setLocalPort('')
-      setMode('tcp')
+      if (dialog?.publish) {
+        await api.put(`/publish/${encodeURIComponent(publish.name)}`, publish)
+      } else {
+        await api.post('/publish', publish)
+      }
+      setDialog(null)
       await load()
       showNotice()
     } catch (e) {
-      setFormError(errorMessage(e))
-      await load()
+      setDialogError(errorMessage(e))
     } finally {
       setSubmitting(false)
     }
   }
 
   async function handleDelete(publishName: string) {
-    if (!window.confirm(`"${publishName}" publish를 삭제하시겠습니까?`)) return
     setDeleting(publishName)
     try {
       await api.del(`/publish/${encodeURIComponent(publishName)}`)
@@ -79,12 +69,18 @@ export function Publish() {
       setError(errorMessage(e))
     } finally {
       setDeleting(null)
+      setConfirmDelete(null)
     }
   }
 
   return (
     <div className="card">
-      <h2>Publish</h2>
+      <div className="card-header">
+        <h2>Publish</h2>
+        <button type="button" className="btn btn-primary btn-small" onClick={() => setDialog({ publish: null })}>
+          publish 추가
+        </button>
+      </div>
       <p className="section-description">
         대상 호스트의 로컬 포트를 tailnet 전체에 명시적으로 노출합니다.
       </p>
@@ -92,8 +88,8 @@ export function Publish() {
         <span aria-hidden="true">ℹ</span>
         <span>
           로컬 포트는 이 컨테이너(router)가 아니라 <b>대상 호스트</b>의 포트를 가리킵니다 — 대상 호스트는
-          router에서 (code-docker-internal 네트워크로) 접근 가능한 아무 컴포즈 서비스 호스트명/IP나
-          지정할 수 있습니다(예: <code>code-docker</code>, <code>dind</code>). 자세한 내용은{' '}
+          router에서 접근 가능한 아무 컴포즈 서비스 호스트명/IP나 지정할 수 있습니다(예: <code>code-docker</code>,{' '}
+          <code>dind</code>). 자세한 내용은{' '}
           <a
             href="https://github.com/qwreey/code-docker/blob/master/docs/router.md#tailscale"
             target="_blank"
@@ -121,7 +117,7 @@ export function Publish() {
                 <th>대상 호스트</th>
                 <th>로컬 포트</th>
                 <th>모드</th>
-                <th aria-label="동작" />
+                <th aria-label="동작" className="table-actions-col" />
               </tr>
             </thead>
             <tbody>
@@ -132,12 +128,15 @@ export function Publish() {
                   <td>{p.targetHost}</td>
                   <td>{p.localPort}</td>
                   <td>{p.mode}</td>
-                  <td>
+                  <td className="table-actions-col">
+                    <button type="button" className="btn btn-small" onClick={() => setDialog({ publish: p })}>
+                      편집
+                    </button>{' '}
                     <button
                       type="button"
                       className="btn btn-danger btn-small"
                       disabled={deleting === p.name}
-                      onClick={() => handleDelete(p.name)}
+                      onClick={() => setConfirmDelete(p.name)}
                     >
                       삭제
                     </button>
@@ -149,57 +148,26 @@ export function Publish() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="form-grid-inline">
-        <div className="form-grid">
-          <div className="form-field">
-            <label htmlFor="pub-name">이름</label>
-            <input id="pub-name" value={name} onChange={(e) => setName(e.target.value)} required />
-          </div>
-          <div className="form-field">
-            <label htmlFor="pub-tailscale-port">tailscale 포트</label>
-            <input
-              id="pub-tailscale-port"
-              type="number"
-              min={1}
-              value={tailscalePort}
-              onChange={(e) => setTailscalePort(e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-field">
-            <label htmlFor="pub-target-host">대상 호스트</label>
-            <input
-              id="pub-target-host"
-              value={targetHost}
-              onChange={(e) => setTargetHost(e.target.value)}
-              placeholder="code-docker"
-              required
-            />
-          </div>
-          <div className="form-field">
-            <label htmlFor="pub-local-port">로컬 포트</label>
-            <input
-              id="pub-local-port"
-              type="number"
-              min={1}
-              value={localPort}
-              onChange={(e) => setLocalPort(e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-field">
-            <label htmlFor="pub-mode">모드</label>
-            <select id="pub-mode" value={mode} onChange={(e) => setMode(e.target.value as TailscalePublishMode)}>
-              <option value="tcp">tcp</option>
-              <option value="tls-terminated-tcp">tls-terminated-tcp</option>
-            </select>
-          </div>
-        </div>
-        {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? '추가하는 중...' : 'publish 추가'}
-        </button>
-      </form>
+      {dialog && (
+        <PublishDialog
+          publish={dialog.publish}
+          submitting={submitting}
+          error={dialogError}
+          onCancel={() => setDialog(null)}
+          onSave={handleSave}
+        />
+      )}
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete !== null && handleDelete(confirmDelete)}
+        title="publish 삭제"
+        confirmLabel="삭제"
+        busy={deleting !== null}
+      >
+        &quot;{confirmDelete}&quot; publish를 삭제하시겠습니까?
+      </ConfirmDialog>
     </div>
   )
 }

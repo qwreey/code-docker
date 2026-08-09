@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import type { DindContainer } from '../../api/types'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import './Dind.css'
 
 const COLOR_BY_STATE: Record<string, string> = {
@@ -17,19 +19,7 @@ function StateBadge({ state }: { state: string }) {
 
 type Action = 'start' | 'stop' | 'remove'
 
-// Remove of a running container needs `docker rm -f`, which kills it without
-// the graceful stop `docker stop` gives — the confirm copy must say so
-// explicitly rather than silently forcing (dind-plan.md's M2 requirement).
-function confirmRemove(container: DindContainer): { ok: boolean; force: boolean } {
-  if (container.state === 'running') {
-    const ok = window.confirm(
-      `"${container.names}" 컨테이너가 실행 중입니다.\n\n강제 삭제를 진행하면 컨테이너를 즉시 종료(kill)한 뒤 삭제합니다. 안전하게 종료하려면 먼저 "정지" 버튼으로 정지한 후 삭제하세요.\n\n그래도 강제로 삭제하시겠습니까?`,
-    )
-    return { ok, force: true }
-  }
-  const ok = window.confirm(`"${container.names}" 컨테이너를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)
-  return { ok, force: false }
-}
+type PendingAction = { container: DindContainer; action: Action; force: boolean }
 
 export function ContainerTable({
   containers,
@@ -44,27 +34,20 @@ export function ContainerTable({
   onInspect: (container: DindContainer) => void
   onAction: (id: string, action: Action, force?: boolean) => void
 }) {
+  const [pending, setPending] = useState<PendingAction | null>(null)
+
   if (containers.length === 0) {
     return <p className="empty-state">dind에 컨테이너가 없습니다.</p>
   }
 
-  function handleStart(c: DindContainer) {
-    if (!window.confirm(`"${c.names}" 컨테이너를 시작하시겠습니까?`)) return
-    onAction(c.id, 'start')
-  }
-
-  function handleStop(c: DindContainer) {
-    if (!window.confirm(`"${c.names}" 컨테이너를 정지하시겠습니까?`)) return
-    onAction(c.id, 'stop')
-  }
-
-  function handleRemove(c: DindContainer) {
-    const { ok, force } = confirmRemove(c)
-    if (!ok) return
-    onAction(c.id, 'remove', force)
+  function handleConfirm() {
+    if (!pending) return
+    onAction(pending.container.id, pending.action, pending.force)
+    setPending(null)
   }
 
   return (
+    <>
     <div className="table-wrapper">
       <table className="process-info-table">
         <thead>
@@ -100,7 +83,7 @@ export function ContainerTable({
                       type="button"
                       className="btn btn-small"
                       disabled={isRunning || isBusy}
-                      onClick={() => handleStart(c)}
+                      onClick={() => setPending({ container: c, action: 'start', force: false })}
                     >
                       시작
                     </button>
@@ -108,7 +91,7 @@ export function ContainerTable({
                       type="button"
                       className="btn btn-small"
                       disabled={!isRunning || isBusy}
-                      onClick={() => handleStop(c)}
+                      onClick={() => setPending({ container: c, action: 'stop', force: false })}
                     >
                       정지
                     </button>
@@ -116,7 +99,7 @@ export function ContainerTable({
                       type="button"
                       className="btn btn-danger btn-small"
                       disabled={isBusy}
-                      onClick={() => handleRemove(c)}
+                      onClick={() => setPending({ container: c, action: 'remove', force: isRunning })}
                     >
                       삭제
                     </button>
@@ -142,5 +125,42 @@ export function ContainerTable({
         </tbody>
       </table>
     </div>
+
+    <ConfirmDialog
+      open={pending !== null}
+      onClose={() => setPending(null)}
+      onConfirm={handleConfirm}
+      title={
+        pending?.action === 'start'
+          ? '컨테이너 시작'
+          : pending?.action === 'stop'
+            ? '컨테이너 정지'
+            : pending?.force
+              ? '컨테이너 강제 삭제'
+              : '컨테이너 삭제'
+      }
+      confirmLabel={pending?.action === 'start' ? '시작' : pending?.action === 'stop' ? '정지' : '삭제'}
+      danger={pending?.action === 'remove'}
+    >
+      {pending?.action === 'start' && <p>&quot;{pending.container.names}&quot; 컨테이너를 시작하시겠습니까?</p>}
+      {pending?.action === 'stop' && <p>&quot;{pending.container.names}&quot; 컨테이너를 정지하시겠습니까?</p>}
+      {pending?.action === 'remove' && pending.force && (
+        <>
+          <p>&quot;{pending.container.names}&quot; 컨테이너가 실행 중입니다.</p>
+          <p>
+            강제 삭제를 진행하면 컨테이너를 즉시 종료(kill)한 뒤 삭제합니다. 안전하게 종료하려면 먼저 &quot;정지&quot;
+            버튼으로 정지한 후 삭제하세요.
+          </p>
+          <p>그래도 강제로 삭제하시겠습니까?</p>
+        </>
+      )}
+      {pending?.action === 'remove' && !pending.force && (
+        <>
+          <p>&quot;{pending.container.names}&quot; 컨테이너를 삭제하시겠습니까?</p>
+          <p>이 작업은 되돌릴 수 없습니다.</p>
+        </>
+      )}
+    </ConfirmDialog>
+    </>
   )
 }

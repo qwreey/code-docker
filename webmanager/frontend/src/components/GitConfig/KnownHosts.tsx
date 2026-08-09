@@ -3,6 +3,7 @@ import { api, errorMessage } from '../../api/client'
 import type { KnownHostEntry } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { withViewTransition } from '../../utils/viewTransition'
 
 export function KnownHosts() {
@@ -13,6 +14,7 @@ export function KnownHosts() {
   const [line, setLine] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<{ index: number; host: string } | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -45,8 +47,7 @@ export function KnownHosts() {
     }
   }
 
-  async function handleDelete(index: number, host: string) {
-    if (!window.confirm(`"${host}" known_hosts 항목을 삭제하시겠습니까?`)) return
+  async function handleDelete(index: number) {
     setDeleting(index)
     try {
       await api.del(`/git/known-hosts/${index}`)
@@ -55,6 +56,7 @@ export function KnownHosts() {
       setError(errorMessage(e))
     } finally {
       setDeleting(null)
+      setConfirmDelete(null)
     }
   }
 
@@ -93,7 +95,7 @@ export function KnownHosts() {
                       type="button"
                       className="btn btn-danger btn-small"
                       disabled={deleting === index}
-                      onClick={() => handleDelete(index, entry.host)}
+                      onClick={() => setConfirmDelete({ index, host: entry.host })}
                     >
                       삭제
                     </button>
@@ -123,6 +125,17 @@ export function KnownHosts() {
           {submitting ? '추가하는 중...' : '항목 추가'}
         </button>
       </form>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete !== null && handleDelete(confirmDelete.index)}
+        title="known_hosts 항목 삭제"
+        confirmLabel="삭제"
+        busy={deleting !== null}
+      >
+        &quot;{confirmDelete?.host}&quot; known_hosts 항목을 삭제하시겠습니까?
+      </ConfirmDialog>
     </div>
   )
 }

@@ -53,7 +53,7 @@ export function Dns() {
       </div>
       <p className="section-description">
         {tab === 'blocklist'
-          ? 'code-docker/dind이 이 컨테이너를 거쳐 나가는 요청 중 차단할 도메인 목록을 관리합니다.'
+          ? '이 라우터를 게이트웨이로 사용하는 컨테이너가 거쳐 나가는 요청 중 차단할 도메인 목록을 관리합니다.'
           : tab === 'custom-hosts'
             ? '특정 호스트 이름을 실제 IP로 직접 매핑합니다.'
             : tab === 'resolver'

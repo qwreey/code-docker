@@ -1,0 +1,33 @@
+.confirm-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 1.5rem;
+}
+
+.confirm-dialog-card {
+  width: 100%;
+  max-width: 420px;
+  margin-top: 0;
+}
+
+.confirm-dialog-message {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: -0.25rem 0 0.9rem;
+}
+
+.confirm-dialog-message:last-child {
+  margin-bottom: 0;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}

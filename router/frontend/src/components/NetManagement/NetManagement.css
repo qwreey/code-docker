@@ -1,0 +1,12 @@
+/* Not defined in common.css - Tailscale.css/AppRoutes.css/GitConfig.css each
+   carry their own identical copy for the same reason (no shared "forms"
+   stylesheet exists yet). This one has to actually live somewhere reachable
+   from NetManagement.tsx's own import graph, unlike Outbound.tsx/Forwards.tsx
+   which used to reference the class name without ever importing a
+   stylesheet that defines it — it only "worked" when some other tab's CSS
+   (e.g. Tailscale.css) happened to already be loaded on the page. */
+.form-grid-inline {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}

@@ -3,6 +3,7 @@ import { api, errorMessage } from '../../api/client'
 import type { DevProxyInfo, DevProxyRoute } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { RouteDialog } from './RouteDialog'
 import { withViewTransition } from '../../utils/viewTransition'
 import './DevProxy.css'
@@ -141,6 +142,7 @@ function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?
   const [submitting, setSubmitting] = useState(false)
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null)
   const [showRaw, setShowRaw] = useState(false)
+  const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null)
 
   async function putRoutes(next: DevProxyRoute[]) {
     await api.put(`/exposes/${encodeURIComponent(info.name)}`, { host, routes: next })
@@ -167,13 +169,13 @@ function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?
   }
 
   async function handleDeleteRoute(index: number) {
-    if (!window.confirm('이 라우트를 삭제하시겠습니까?')) return
     setDeletingIndex(index)
     try {
       await putRoutes(routes.filter((_, i) => i !== index))
       onSaved()
     } finally {
       setDeletingIndex(null)
+      setConfirmDeleteIndex(null)
     }
   }
 
@@ -212,7 +214,7 @@ function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?
                 <th>rewrite</th>
                 <th>방식</th>
                 <th>인증</th>
-                <th aria-label="동작" />
+                <th aria-label="동작" className="table-actions-col" />
               </tr>
             </thead>
             <tbody>
@@ -224,7 +226,7 @@ function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?
                   <td>{rt.rewritePrefix || '-'}</td>
                   <td>{rt.mode}</td>
                   <td>{rt.requireAuth ? '요구' : '없음'}</td>
-                  <td>
+                  <td className="table-actions-col">
                     <button type="button" className="btn btn-small" onClick={() => setDialog({ index: i })}>
                       편집
                     </button>{' '}
@@ -232,7 +234,7 @@ function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?
                       type="button"
                       className="btn btn-danger btn-small"
                       disabled={deletingIndex === i}
-                      onClick={() => handleDeleteRoute(i)}
+                      onClick={() => setConfirmDeleteIndex(i)}
                     >
                       삭제
                     </button>
@@ -261,6 +263,17 @@ function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?
           onSave={handleSaveRoute}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteIndex !== null}
+        onClose={() => setConfirmDeleteIndex(null)}
+        onConfirm={() => confirmDeleteIndex !== null && handleDeleteRoute(confirmDeleteIndex)}
+        title="라우트 삭제"
+        confirmLabel="삭제"
+        busy={deletingIndex !== null}
+      >
+        이 라우트를 삭제하시겠습니까?
+      </ConfirmDialog>
     </div>
   )
 }
@@ -276,6 +289,7 @@ export function DevProxy() {
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [expandedName, setExpandedName] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -322,7 +336,6 @@ export function DevProxy() {
   }
 
   async function handleDelete(exposeName: string) {
-    if (!window.confirm(`"${exposeName}" expose를 삭제하시겠습니까?`)) return
     setDeleting(exposeName)
     try {
       await api.del(`/exposes/${encodeURIComponent(exposeName)}`)
@@ -333,6 +346,7 @@ export function DevProxy() {
       setError(errorMessage(e))
     } finally {
       setDeleting(null)
+      setConfirmDelete(null)
     }
   }
 
@@ -384,7 +398,7 @@ export function DevProxy() {
                   <th>host</th>
                   <th>라우트</th>
                   <th>인증</th>
-                  <th aria-label="동작" />
+                  <th aria-label="동작" className="table-actions-col" />
                 </tr>
               </thead>
               <tbody>
@@ -395,7 +409,7 @@ export function DevProxy() {
                       <td>{info.structured?.host ?? <em>raw</em>}</td>
                       <td>{info.structured ? `${(info.structured.routes ?? []).length}개` : <em>raw</em>}</td>
                       <td>{info.structured ? authSummary(info.structured.routes ?? []) : '-'}</td>
-                      <td>
+                      <td className="table-actions-col">
                         <button
                           type="button"
                           className="btn btn-small"
@@ -407,7 +421,7 @@ export function DevProxy() {
                           type="button"
                           className="btn btn-danger btn-small"
                           disabled={deleting === info.name}
-                          onClick={() => handleDelete(info.name)}
+                          onClick={() => setConfirmDelete(info.name)}
                         >
                           삭제
                         </button>
@@ -461,6 +475,17 @@ export function DevProxy() {
           </button>
         </form>
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete !== null && handleDelete(confirmDelete)}
+        title="expose 삭제"
+        confirmLabel="삭제"
+        busy={deleting !== null}
+      >
+        &quot;{confirmDelete}&quot; expose를 삭제하시겠습니까?
+      </ConfirmDialog>
     </section>
   )
 }

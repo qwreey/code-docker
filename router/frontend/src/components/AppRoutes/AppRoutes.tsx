@@ -3,6 +3,7 @@ import { appRoutesApi as api, errorMessage } from '../../api/client'
 import type { AppRouteInfo } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { withViewTransition } from '../../utils/viewTransition'
 import './AppRoutes.css'
 
@@ -173,7 +174,7 @@ function TargetPanel({ info, onSaved }: { info: AppRouteInfo; onSaved: (newName?
       {looksUnreachable(target) && (
         <p className="app-routes-hint">
           <code>{target || '(비어있음)'}</code>은(는) router 컨테이너 안에서 접근 불가능한 주소일 수 있습니다 -
-          code-docker 자신의 loopback이 아니라 compose 서비스 호스트네임(예: <code>code-docker:80</code>)을 쓰세요.
+          대상 컨테이너 자신의 loopback이 아니라 compose 서비스 호스트네임(예: <code>code-docker:80</code>)을 쓰세요.
         </p>
       )}
       <label className="app-routes-checkbox-option">
@@ -209,6 +210,7 @@ export function AppRoutes() {
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [expandedName, setExpandedName] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -255,7 +257,6 @@ export function AppRoutes() {
   }
 
   async function handleDelete(appName: string) {
-    if (!window.confirm(`"${appName}" 앱을 삭제하시겠습니까?`)) return
     setDeleting(appName)
     try {
       await api.del(`/apps/${encodeURIComponent(appName)}`)
@@ -266,6 +267,7 @@ export function AppRoutes() {
       setError(errorMessage(e))
     } finally {
       setDeleting(null)
+      setConfirmDelete(null)
     }
   }
 
@@ -310,7 +312,7 @@ export function AppRoutes() {
                   <th>이름</th>
                   <th>target</th>
                   <th>인증</th>
-                  <th aria-label="동작" />
+                  <th aria-label="동작" className="table-actions-col" />
                 </tr>
               </thead>
               <tbody>
@@ -320,7 +322,7 @@ export function AppRoutes() {
                       <td>{info.name}</td>
                       <td>{info.structured?.target ?? <em>raw</em>}</td>
                       <td>{info.structured ? (info.structured.requireAuth ? '요구' : '없음') : '-'}</td>
-                      <td>
+                      <td className="table-actions-col">
                         <button
                           type="button"
                           className="btn btn-small"
@@ -332,7 +334,7 @@ export function AppRoutes() {
                           type="button"
                           className="btn btn-danger btn-small"
                           disabled={deleting === info.name}
-                          onClick={() => handleDelete(info.name)}
+                          onClick={() => setConfirmDelete(info.name)}
                         >
                           삭제
                         </button>
@@ -386,6 +388,17 @@ export function AppRoutes() {
           </button>
         </form>
         </div>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete !== null && handleDelete(confirmDelete)}
+        title="앱 삭제"
+        confirmLabel="삭제"
+        busy={deleting !== null}
+      >
+        &quot;{confirmDelete}&quot; 앱을 삭제하시겠습니까?
+      </ConfirmDialog>
     </section>
   )
 }

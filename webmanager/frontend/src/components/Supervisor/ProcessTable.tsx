@@ -5,6 +5,7 @@ import type { ProcessInfo, SupervisorProcess } from '../../api/types'
 import { buildProcessTree, type ProcessTreeNode } from '../../utils/processTree'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { StatusBadge } from '../common/StatusBadge'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { ProcessTree } from '../Processes/ProcessTree'
 import { formatDuration } from '../../utils/time'
 import '../Processes/Processes.css'
@@ -42,15 +43,12 @@ function trimDescription(description: string): string {
 // closed and back open quickly, not a real freshness guarantee.
 const TREE_CACHE_MS = 3000
 
-function confirmAction(name: string, action: Action): boolean {
-  if (action === 'stop' && (name === 'webmanager' || name === 'sshd')) {
-    const extra =
-      name === 'webmanager'
-        ? '이 화면(webmanager) 자체가 멈춰서 다시 시작하려면 SSH/터미널 접근이 필요합니다.'
-        : 'sshd가 멈추면 SSH 접근 경로가 끊깁니다.'
-    return window.confirm(`"${name}" 프로세스를 정지하시겠습니까?\n\n주의: ${extra}`)
-  }
-  return window.confirm(`"${name}" 프로세스를 ${ACTION_LABEL[action]}하시겠습니까?`)
+// Extra warning copy for a stop that could lock the user out of this very
+// screen or their SSH access - undefined for anything that doesn't need it.
+function stopWarning(name: string): string | undefined {
+  if (name === 'webmanager') return '이 화면(webmanager) 자체가 멈춰서 다시 시작하려면 SSH/터미널 접근이 필요합니다.'
+  if (name === 'sshd') return 'sshd가 멈추면 SSH 접근 경로가 끊깁니다.'
+  return undefined
 }
 
 // collectSubtree flattens a buildProcessTree(..., rootPid) result (root +
@@ -74,6 +72,7 @@ export function ProcessTable({ processes, busy, onAction, onShowLogs }: ProcessT
   const [treeLoading, setTreeLoading] = useState(false)
   const [treeError, setTreeError] = useState<string | null>(null)
   const [lastFetch, setLastFetch] = useState(0)
+  const [pending, setPending] = useState<{ name: string; action: Action } | null>(null)
 
   async function loadProcesses(force = false) {
     if (!force && allProcesses.length > 0 && Date.now() - lastFetch < TREE_CACHE_MS) return
@@ -107,12 +106,14 @@ export function ProcessTable({ processes, busy, onAction, onShowLogs }: ProcessT
     return <p className="empty-state">등록된 프로세스가 없습니다.</p>
   }
 
-  function handleAction(name: string, action: Action) {
-    if (!confirmAction(name, action)) return
-    onAction(name, action)
+  function handleConfirm() {
+    if (!pending) return
+    onAction(pending.name, pending.action)
+    setPending(null)
   }
 
   return (
+    <>
     <div className="table-wrapper">
       <table className="process-table">
         <thead>
@@ -168,7 +169,7 @@ export function ProcessTable({ processes, busy, onAction, onShowLogs }: ProcessT
                         disabled={startDisabled}
                         title={startTitle}
                         aria-label={startTitle}
-                        onClick={() => handleAction(proc.name, 'start')}
+                        onClick={() => setPending({ name: proc.name, action: 'start' })}
                       >
                         <Play size={14} />
                       </button>
@@ -178,7 +179,7 @@ export function ProcessTable({ processes, busy, onAction, onShowLogs }: ProcessT
                         disabled={stopDisabled}
                         title={stopTitle}
                         aria-label={stopTitle}
-                        onClick={() => handleAction(proc.name, 'stop')}
+                        onClick={() => setPending({ name: proc.name, action: 'stop' })}
                       >
                         <Square size={14} />
                       </button>
@@ -188,7 +189,7 @@ export function ProcessTable({ processes, busy, onAction, onShowLogs }: ProcessT
                         disabled={restartDisabled}
                         title={restartTitle}
                         aria-label={restartTitle}
-                        onClick={() => handleAction(proc.name, 'restart')}
+                        onClick={() => setPending({ name: proc.name, action: 'restart' })}
                       >
                         <RotateCw size={14} />
                       </button>
@@ -256,5 +257,27 @@ export function ProcessTable({ processes, busy, onAction, onShowLogs }: ProcessT
         </tbody>
       </table>
     </div>
+
+    <ConfirmDialog
+      open={pending !== null}
+      onClose={() => setPending(null)}
+      onConfirm={handleConfirm}
+      title={pending ? `프로세스 ${ACTION_LABEL[pending.action]}` : ''}
+      confirmLabel={pending ? ACTION_LABEL[pending.action] : '확인'}
+      danger={pending?.action === 'stop'}
+      busy={pending ? Boolean(busy[pending.name]) : false}
+    >
+      {pending && (
+        <>
+          <p>
+            &quot;{pending.name}&quot; 프로세스를 {ACTION_LABEL[pending.action]}하시겠습니까?
+          </p>
+          {pending.action === 'stop' && stopWarning(pending.name) && (
+            <p>주의: {stopWarning(pending.name)}</p>
+          )}
+        </>
+      )}
+    </ConfirmDialog>
+    </>
   )
 }

@@ -80,9 +80,9 @@ export function Outbound() {
     <div className="card">
       <h2>Outbound 규칙</h2>
       <p className="section-description">
-        code-docker/dind가 내보내는 트래픽을 위에서부터 순서대로 검사합니다(first-match-wins) - 좁은 예외를 넓은
-        차단보다 <strong>먼저</strong> 배치해야 실제로 적용됩니다. 변경사항은 저장 후 최대 30초 내 반영됩니다(재시작
-        불필요).
+        이 라우터를 게이트웨이로 사용하는 컨테이너가 내보내는 트래픽을 위에서부터 순서대로 검사합니다(first-match-wins)
+        - 좁은 예외를 넓은 차단보다 <strong>먼저</strong> 배치해야 실제로 적용됩니다. 변경사항은 저장 후 최대 30초 내
+        반영됩니다(재시작 불필요).
       </p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {notice && <p className="success-note">{notice}</p>}
@@ -94,34 +94,36 @@ export function Outbound() {
           <table className="tailscale-table">
             <thead>
               <tr>
-                <th aria-label="순서" />
+                <th aria-label="순서" className="table-actions-col" />
                 <th>동작</th>
                 <th>CIDR</th>
-                <th aria-label="동작" />
+                <th aria-label="동작" className="table-actions-col" />
               </tr>
             </thead>
             <tbody>
               {rules.map((rule, i) => (
                 <tr key={i}>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-small"
-                      disabled={i === 0}
-                      onClick={() => moveRule(i, -1)}
-                      aria-label="위로 이동"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-small"
-                      disabled={i === rules.length - 1}
-                      onClick={() => moveRule(i, 1)}
-                      aria-label="아래로 이동"
-                    >
-                      ↓
-                    </button>
+                  <td className="table-actions-col">
+                    <div className="dialog-actions">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-small"
+                        disabled={i === 0}
+                        onClick={() => moveRule(i, -1)}
+                        aria-label="위로 이동"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-small"
+                        disabled={i === rules.length - 1}
+                        onClick={() => moveRule(i, 1)}
+                        aria-label="아래로 이동"
+                      >
+                        ↓
+                      </button>
+                    </div>
                   </td>
                   <td>
                     <select value={rule.action} onChange={(e) => updateRule(i, { action: e.target.value as NetgateOutboundRule['action'] })}>
@@ -136,7 +138,7 @@ export function Outbound() {
                       placeholder="10.0.0.0/8"
                     />
                   </td>
-                  <td>
+                  <td className="table-actions-col">
                     <button type="button" className="btn btn-danger btn-small" onClick={() => removeRule(i)}>
                       삭제
                     </button>
@@ -149,13 +151,15 @@ export function Outbound() {
       )}
 
       <div className="form-grid-inline">
-        <button type="button" className="btn btn-secondary" onClick={addRule}>
-          규칙 추가
-        </button>
         {saveError && <ErrorBanner message={saveError} onDismiss={() => setSaveError(null)} />}
-        <button type="button" className="btn btn-primary" disabled={!dirty || saving} onClick={handleSave}>
-          {saving ? '저장하는 중...' : '저장'}
-        </button>
+        <div className="dialog-actions">
+          <button type="button" className="btn btn-secondary" onClick={addRule}>
+            규칙 추가
+          </button>
+          <button type="button" className="btn btn-primary" disabled={!dirty || saving} onClick={handleSave}>
+            {saving ? '저장하는 중...' : '저장'}
+          </button>
+        </div>
       </div>
     </div>
   )
