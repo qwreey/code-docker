@@ -270,7 +270,10 @@ func main() {
 	mux.HandleFunc("GET /api/mise/tools", s.handleListMiseTools)
 	mux.Handle("POST /api/mise/tools", gate.RequirePassword(http.HandlerFunc(s.handleCreateMiseTool)))
 	mux.Handle("DELETE /api/mise/tools", gate.RequirePassword(http.HandlerFunc(s.handleDeleteMiseTool)))
-	mux.HandleFunc("GET /api/mise/env", s.handleMiseEnv)
+	// mise env can echo real secrets a project's mise.toml [env] block
+	// injects (API keys, tokens) - same risk tier as `docker inspect`'s
+	// Config.Env below, gated for the same reason.
+	mux.Handle("GET /api/mise/env", gate.RequirePassword(http.HandlerFunc(s.handleMiseEnv)))
 	mux.HandleFunc("GET /api/mise/registry/search", s.handleMiseRegistrySearch)
 	mux.HandleFunc("GET /api/mise/versions", s.handleMiseVersions)
 	mux.HandleFunc("GET /api/mise/jobs/{id}", s.handleMiseJobStatus)

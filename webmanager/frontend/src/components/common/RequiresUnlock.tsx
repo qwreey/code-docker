@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { api } from '../../api/client'
+import { api, ApiError } from '../../api/client'
 import { ErrorBanner } from './ErrorBanner'
 import { Skeleton } from './Skeleton'
 import { useAuthStatus } from './useAuthStatus'
@@ -26,8 +26,12 @@ export function RequiresUnlock({ children }: { children: ReactNode }) {
       await api.post<{ ok: true }>('/auth/unlock', { password })
       await refresh()
       setPassword('')
-    } catch {
-      setSubmitError('비밀번호가 올바르지 않습니다')
+    } catch (err) {
+      setSubmitError(
+        err instanceof ApiError && err.status === 429
+          ? '시도 횟수가 너무 많습니다. 잠시 후 다시 시도하세요.'
+          : '비밀번호가 올바르지 않습니다',
+      )
     } finally {
       setSubmitting(false)
     }

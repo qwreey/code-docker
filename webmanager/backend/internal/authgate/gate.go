@@ -5,11 +5,34 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
+
+// ErrRateLimited is returned by TryUnlock once a key has failed
+// maxFailuresBeforeLockout times in a row — the caller should surface this
+// as 429 rather than the ambiguous "incorrect password" 401 a real guess
+// gets, so a locked-out client can tell "try again later" from "wrong
+// password".
+var ErrRateLimited = errors.New("authgate: too many failed attempts")
+
+const (
+	maxFailuresBeforeLockout = 5
+	lockoutBase              = 5 * time.Second
+	lockoutMax               = 5 * time.Minute
+)
+
+// attemptState tracks consecutive failures for one key (see TryUnlock's key
+// param) since the last success or process start.
+type attemptState struct {
+	failures    int
+	lockedUntil time.Time
+}
 
 // CookieName is the HttpOnly cookie set on successful unlock and checked by
 // RequirePassword/verify on every gated request.
@@ -28,6 +51,9 @@ const sessionTTL = 10 * time.Minute
 type Gate struct {
 	hash   string
 	secret []byte
+
+	attemptsMu sync.Mutex
+	attempts   map[string]*attemptState
 }
 
 // New creates a Gate. An empty hash means the gate is disabled: Configured
@@ -45,7 +71,53 @@ func New(hash string) *Gate {
 		// unforgeable tokens at all — nothing downstream would work either.
 		panic("authgate: failed to generate HMAC secret: " + err.Error())
 	}
-	return &Gate{hash: hash, secret: secret}
+	return &Gate{hash: hash, secret: secret, attempts: map[string]*attemptState{}}
+}
+
+// rateLimited reports whether key is currently locked out, and for how much
+// longer.
+func (g *Gate) rateLimited(key string) (time.Duration, bool) {
+	g.attemptsMu.Lock()
+	defer g.attemptsMu.Unlock()
+	st := g.attempts[key]
+	if st == nil {
+		return 0, false
+	}
+	if remaining := time.Until(st.lockedUntil); remaining > 0 {
+		return remaining, true
+	}
+	return 0, false
+}
+
+// recordFailure bumps key's consecutive-failure count and, once it reaches
+// maxFailuresBeforeLockout, starts (or extends) an exponential-backoff
+// lockout — doubling per failure beyond the threshold, capped at
+// lockoutMax, so a sustained guessing campaign gets throttled to a handful
+// of attempts per lockoutMax window instead of running at argon2id's raw
+// per-attempt cost.
+func (g *Gate) recordFailure(key string) {
+	g.attemptsMu.Lock()
+	defer g.attemptsMu.Unlock()
+	st := g.attempts[key]
+	if st == nil {
+		st = &attemptState{}
+		g.attempts[key] = st
+	}
+	st.failures++
+	if st.failures >= maxFailuresBeforeLockout {
+		backoff := lockoutBase * time.Duration(1<<uint(st.failures-maxFailuresBeforeLockout))
+		if backoff > lockoutMax {
+			backoff = lockoutMax
+		}
+		st.lockedUntil = time.Now().Add(backoff)
+	}
+}
+
+// recordSuccess clears key's failure history on a correct password.
+func (g *Gate) recordSuccess(key string) {
+	g.attemptsMu.Lock()
+	defer g.attemptsMu.Unlock()
+	delete(g.attempts, key)
 }
 
 // Configured reports whether a password hash is set, i.e. whether the gate
@@ -131,22 +203,31 @@ func (g *Gate) UnlockedUntil(r *http.Request) (time.Time, bool) {
 	return time.Now().Add(sessionTTL - age), true
 }
 
-// TryUnlock verifies plaintext against the configured hash. On success it
-// mints a new signed token; the caller is responsible for setting it as a
-// cookie via SetCookie. Returns ok=false (no error) for a simple wrong
-// password, and ok=false with err set only for unexpected failures (e.g. a
+// TryUnlock verifies plaintext against the configured hash. key identifies
+// the caller for rate-limiting purposes (see recordFailure) — pass a
+// client-address-derived string, not anything attacker-controlled, since a
+// forgeable key lets an attacker reset their own lockout at will. On
+// success it mints a new signed token; the caller is responsible for
+// setting it as a cookie via SetCookie. Returns ok=false (no error) for a
+// simple wrong password, ok=false with err=ErrRateLimited once key is
+// locked out, and ok=false with err set for unexpected failures (e.g. a
 // malformed configured hash).
-func (g *Gate) TryUnlock(plaintext string) (token string, ok bool, err error) {
+func (g *Gate) TryUnlock(key, plaintext string) (token string, ok bool, err error) {
 	if !g.Configured() {
 		return "", false, nil
+	}
+	if remaining, locked := g.rateLimited(key); locked {
+		return "", false, fmt.Errorf("%w: try again in %s", ErrRateLimited, remaining.Round(time.Second))
 	}
 	match, verr := VerifyPassword(plaintext, g.hash)
 	if verr != nil {
 		return "", false, verr
 	}
 	if !match {
+		g.recordFailure(key)
 		return "", false, nil
 	}
+	g.recordSuccess(key)
 	return g.issueToken(), true, nil
 }
 

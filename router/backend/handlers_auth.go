@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -10,6 +11,19 @@ import (
 
 	"router/internal/authgate"
 )
+
+// clientKey identifies the caller for authgate's rate limiting, derived
+// from the TCP peer address rather than X-Forwarded-For/X-Real-IP - router's
+// own nginx doesn't rewrite those on the way in (see the security audit), so
+// an attacker could otherwise reset their own lockout just by sending a
+// different header value on each request.
+func clientKey(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
 
 // handleAuthUnlock verifies a submitted password against the configured
 // gate hash and, on success, issues an unlock cookie. Never itself wrapped
@@ -24,8 +38,12 @@ func handleAuthUnlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, ok, err := gate.TryUnlock(body.Password)
+	token, ok, err := gate.TryUnlock(clientKey(r), body.Password)
 	if err != nil {
+		if errors.Is(err, authgate.ErrRateLimited) {
+			writeError(w, http.StatusTooManyRequests, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

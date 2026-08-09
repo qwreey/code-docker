@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { api, setUnlockPrompter } from '../../api/client'
+import { api, ApiError, setUnlockPrompter } from '../../api/client'
 import { ErrorBanner } from './ErrorBanner'
 import './UnlockModal.css'
 
@@ -59,8 +59,16 @@ export function UnlockModalHost() {
       waitersRef.current = []
       resetForm()
       waiters.forEach((w) => w.resolve())
-    } catch {
-      setSubmitError('비밀번호가 올바르지 않습니다')
+    } catch (err) {
+      // Distinguishes a real wrong-password 401 from a 429 lockout (see
+      // authgate's rate limiting) — both used to show the same generic
+      // "wrong password" text, which hid the actual reason from a
+      // legitimately locked-out user.
+      setSubmitError(
+        err instanceof ApiError && err.status === 429
+          ? '시도 횟수가 너무 많습니다. 잠시 후 다시 시도하세요.'
+          : '비밀번호가 올바르지 않습니다',
+      )
       setSubmitting(false)
     }
   }
