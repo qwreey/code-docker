@@ -27,10 +27,18 @@ type Server struct {
 	// instances from resourceHistory's own internal HostCPUSampler for the
 	// same reason cgroupSampler and resourceHistory's cpu Sampler are kept
 	// apart (see cgroup.HistorySampler's doc comment).
-	hostCPUSampler    *cgroup.HostCPUSampler
-	hostSensors       *cgroup.HostSensors
-	projectScanner    *projects.Scanner
-	miseJobs          *mise.JobStore
+	hostCPUSampler *cgroup.HostCPUSampler
+	hostSensors    *cgroup.HostSensors
+	projectScanner *projects.Scanner
+	miseJobs       *mise.JobStore
+	// projectJobs backs POST /api/projects/clone's background `git clone` —
+	// a separate *mise.JobStore instance from miseJobs (same reusable type,
+	// see internal/mise/jobs.go's doc comment: nothing about it is actually
+	// mise-specific except the package name) so a clone job's id/TTL/cap
+	// never intermixes with mise's own install/uninstall jobs, and its
+	// polling route can live under /api/projects/... instead of the
+	// mise-specific /api/mise/jobs/{id} path.
+	projectJobs       *mise.JobStore
 	loginMgr          *claudecode.LoginManager
 	diskUsage         *diskusage.Analyzer
 	termSessions      *termsession.Registry

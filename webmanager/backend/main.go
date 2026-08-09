@@ -127,6 +127,7 @@ func main() {
 			cfg.CodeServerURL,
 		),
 		miseJobs:           mise.NewJobStore(),
+		projectJobs:        mise.NewJobStore(),
 		loginMgr:           claudecode.NewLoginManager(),
 		diskUsage:          diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
 		termSessions:       termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
@@ -252,6 +253,12 @@ func main() {
 	mux.Handle("POST /api/projects/delete-reclaimable", gate.RequirePassword(http.HandlerFunc(s.handleDeleteReclaimable)))
 	// Whole-project-folder delete, distinct from delete-reclaimable above — gated.
 	mux.Handle("POST /api/projects/delete", gate.RequirePassword(http.HandlerFunc(s.handleDeleteProject)))
+	// `git clone` as a background job (network op, can take real time) —
+	// gated like every other project mutation above. Polling its progress
+	// is a plain read, so that route stays ungated, same convention as
+	// GET /api/mise/jobs/{id}.
+	mux.Handle("POST /api/projects/clone", gate.RequirePassword(http.HandlerFunc(s.handleCloneProject)))
+	mux.HandleFunc("GET /api/projects/jobs/{id}", s.handleProjectJobStatus)
 
 	// Git status/history — all reads (staging/commit/push/pull/merge are out
 	// of scope for this round), so none of these are gated. See

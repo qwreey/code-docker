@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { GitBranchPlus, RefreshCw } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
 import type { ProjectInfo, ProjectsResponse } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
+import { CloneProjectDialog } from './CloneProjectDialog'
 import { ProjectTable } from './ProjectTable'
 import '../common/common.css'
 import './Projects.css'
@@ -21,6 +22,7 @@ export function Projects({
   const [data, setData] = useState<ProjectsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [cloneOpen, setCloneOpen] = useState(false)
 
   const loadingRef = useRef(false)
 
@@ -87,9 +89,14 @@ export function Projects({
     <section>
       <div className="section-header">
         <h1>Projects</h1>
-        <button type="button" className="btn btn-secondary btn-small" onClick={rescanAll} disabled={loading}>
-          <RefreshCw size={14} className={loading ? 'icon-spin' : undefined} /> 전체 다시 스캔
-        </button>
+        <div className="projects-header-actions">
+          <button type="button" className="btn btn-secondary btn-small" onClick={() => setCloneOpen(true)}>
+            <GitBranchPlus size={14} /> git clone
+          </button>
+          <button type="button" className="btn btn-secondary btn-small" onClick={rescanAll} disabled={loading}>
+            <RefreshCw size={14} className={loading ? 'icon-spin' : undefined} /> 전체 다시 스캔
+          </button>
+        </div>
       </div>
       <p className="section-description">
         {data?.roots.length ? data.roots.join(', ') : '설정된 경로'} 아래 프로젝트별 용량과 재생성 가능한
@@ -122,6 +129,13 @@ export function Projects({
           />
         )
       )}
+
+      <CloneProjectDialog
+        open={cloneOpen}
+        onClose={() => setCloneOpen(false)}
+        roots={data?.roots ?? []}
+        onCloned={load}
+      />
     </section>
   )
 }
