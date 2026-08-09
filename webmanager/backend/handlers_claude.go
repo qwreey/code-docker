@@ -294,11 +294,19 @@ type claudeSessionsResponse struct {
 // Manager/Logs since this is conversation content, not passive read like
 // most of the app. A scan failure degrades to an empty list rather than a
 // 5xx: a missing/unreadable projects directory just means "no sessions
-// yet," not an error.
+// yet," not an error. An optional ?project=<absolute path> query param
+// narrows the result to just that project (and its subdirectories/worktrees)
+// via claudecode.FilterSessionsByProject — added for the Projects tab's own
+// per-project session history section, purely additive: omitting it keeps
+// the original "every session on this instance" behavior the main Claude
+// tab relies on.
 func (s *Server) handleClaudeSessions(w http.ResponseWriter, r *http.Request) {
 	sessions, err := claudecode.ListSessions(s.cfg.ClaudeConfigDir)
 	if err != nil {
 		sessions = []claudecode.SessionInfo{}
+	}
+	if project := r.URL.Query().Get("project"); project != "" {
+		sessions = claudecode.FilterSessionsByProject(sessions, project)
 	}
 	writeJSON(w, http.StatusOK, claudeSessionsResponse{Sessions: sessions})
 }

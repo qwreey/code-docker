@@ -104,6 +104,47 @@ func ListSessions(configDir string) ([]SessionInfo, error) {
 	return sessions, nil
 }
 
+// slugify mirrors Claude Code's own project-directory naming: an absolute
+// path with every "/" and "." replaced by "-" (see SessionInfo.Project's own
+// doc comment / ListSessions above).
+func slugify(path string) string {
+	replacer := strings.NewReplacer("/", "-", ".", "-")
+	return replacer.Replace(path)
+}
+
+// FilterSessionsByProject narrows sessions down to only the ones belonging
+// to projectPath (an absolute filesystem path, e.g. one Projects-tab entry)
+// or one of its subdirectories. Worktrees/subdirs get their own project
+// slug and a Cwd scraped from inside them, so neither a bare slug-equality
+// check nor a bare Cwd-equality check alone is reliable — this matches on
+// either: the session's Project slug equals or is a slug-prefixed child of
+// projectPath's own slug, or its Cwd equals or is a path-prefixed child of
+// projectPath. Because "/" and "." both collapse to the same "-" character
+// during slugification, the slug-prefix check can in rare cases
+// false-positive on an unrelated sibling directory whose name happens to
+// extend projectPath's own basename (e.g. "code" vs "code-docker") — an
+// accepted, inherent ambiguity of the naming scheme itself, not something
+// this function can fully resolve without the original path.
+func FilterSessionsByProject(sessions []SessionInfo, projectPath string) []SessionInfo {
+	projectPath = strings.TrimRight(projectPath, "/")
+	out := make([]SessionInfo, 0)
+	if projectPath == "" {
+		return out
+	}
+	slug := slugify(projectPath)
+
+	for _, s := range sessions {
+		if s.Project == slug || strings.HasPrefix(s.Project, slug+"-") {
+			out = append(out, s)
+			continue
+		}
+		if s.Cwd == projectPath || strings.HasPrefix(s.Cwd, projectPath+"/") {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // entryHeader is the minimal subset of one transcript line's fields
 // scanPreview needs — deliberately not the full schema (that lives in the
 // vendored frontend module).

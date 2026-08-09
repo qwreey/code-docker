@@ -44,7 +44,19 @@ function formatModifiedAt(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
 }
 
-export function SessionList({ onSelect }: { onSelect: (session: ClaudeSessionInfo) => void }) {
+export function SessionList({
+  onSelect,
+  projectFilter,
+  emptyMessage = '대화 로그가 없습니다.',
+}: {
+  onSelect: (session: ClaudeSessionInfo) => void
+  // Absolute project path — when set, scopes the fetch to GET
+  // /claude/sessions?project=<path> instead of every session on this
+  // instance (see internal/claudecode.FilterSessionsByProject). Used by
+  // Projects/ProjectSessionHistory.tsx via SessionLog's own pass-through.
+  projectFilter?: string
+  emptyMessage?: string
+}) {
   const [sessions, setSessions] = useState<ClaudeSessionInfo[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed())
@@ -52,8 +64,10 @@ export function SessionList({ onSelect }: { onSelect: (session: ClaudeSessionInf
 
   useEffect(() => {
     let cancelled = false
+    setSessions(null)
+    const query = projectFilter ? `?project=${encodeURIComponent(projectFilter)}` : ''
     api
-      .get<ClaudeSessionsResponse>('/claude/sessions')
+      .get<ClaudeSessionsResponse>(`/claude/sessions${query}`)
       .then((res) => {
         if (!cancelled) withViewTransition(() => setSessions(res.sessions))
       })
@@ -63,7 +77,7 @@ export function SessionList({ onSelect }: { onSelect: (session: ClaudeSessionInf
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [projectFilter])
 
   function toggleCollapsed(project: string) {
     setCollapsed((prev) => {
@@ -81,7 +95,7 @@ export function SessionList({ onSelect }: { onSelect: (session: ClaudeSessionInf
 
   if (error) return <ErrorBanner message={error} onDismiss={() => setError(null)} />
   if (!sessions) return <Skeleton />
-  if (sessions.length === 0) return <p className="empty-state">대화 로그가 없습니다.</p>
+  if (sessions.length === 0) return <p className="empty-state">{emptyMessage}</p>
 
   const byProject = new Map<string, ClaudeSessionInfo[]>()
   for (const s of sessions) {

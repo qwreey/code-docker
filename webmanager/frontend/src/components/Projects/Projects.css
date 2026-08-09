@@ -125,6 +125,35 @@
   margin-bottom: 0.6rem;
 }
 
+.projects-detail-header-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0 0 0.6rem;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+
+.projects-detail-header-toggle .projects-detail-header {
+  margin-bottom: 0;
+}
+
+.projects-session-chevron {
+  display: inline-flex;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: transform 0.12s ease;
+}
+
+.projects-session-chevron-open {
+  transform: rotate(90deg);
+}
+
 .projects-reclaimable-table {
   width: 100%;
   border-collapse: collapse;

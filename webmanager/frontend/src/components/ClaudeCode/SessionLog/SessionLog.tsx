@@ -15,12 +15,16 @@ import './SessionLog.css'
 // overlay on top of it instead of replacing it inline - this is what keeps
 // the list's scroll position intact across open/close (it used to reset
 // because selecting a session unmounted SessionList entirely).
-export function SessionLog() {
+//
+// projectFilter/emptyMessage pass straight through to SessionList - added so
+// Projects/ProjectSessionHistory.tsx can reuse this exact list+viewer+gate
+// wiring scoped to one project instead of duplicating it.
+export function SessionLog({ projectFilter, emptyMessage }: { projectFilter?: string; emptyMessage?: string }) {
   const [selected, setSelected] = useState<ClaudeSessionInfo | null>(null)
 
   return (
     <RequiresUnlock>
-      <SessionList onSelect={setSelected} />
+      <SessionList onSelect={setSelected} projectFilter={projectFilter} emptyMessage={emptyMessage} />
       <Sheet
         open={selected !== null}
         onClose={() => setSelected(null)}
