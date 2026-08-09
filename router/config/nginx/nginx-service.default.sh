@@ -69,24 +69,52 @@ if [ -n "${TRUSTED_PROXIES:-}" ]; then
 fi
 export NGINX_TRUSTED_PROXIES_DIRECTIVES="$directives"
 
+# detect_internal_subnet - code-docker-internal has no pinned subnet in
+# docker-compose.yml (Docker auto-assigns it, so multiple PREFIX instances
+# on one host never fight over the same hardcoded CIDR). router sits on
+# both code-docker-internal and code-docker-external, so it can find
+# code-docker-internal's live CIDR itself: the interface NOT carrying the
+# default route is always code-docker-external (the only network with a
+# real gateway - code-docker-internal is `internal: true`), so the *other*
+# connected/kernel-scope route belongs to code-docker-internal. This is the
+# same "no default route = internal-side interface" heuristic
+# dind-entrypoint.sh already uses to find its own IP. Only reliable while
+# router has exactly these two networks - if a third one is ever added,
+# fall back to setting ROUTER_INTERNAL_SUBNET explicitly.
+detect_internal_subnet() {
+    default_dev="$(ip -4 route show default 2>/dev/null \
+        | awk '{for (i=1;i<=NF;i++) if ($i=="dev") { print $(i+1); exit }}')"
+    [ -n "$default_dev" ] || return 1
+    ip -4 route show scope link 2>/dev/null \
+        | awk -v skip="$default_dev" '
+            {
+                dev=""
+                for (i=1;i<=NF;i++) if ($i=="dev") dev=$(i+1)
+                if (dev != "" && dev != skip) { print $1; exit }
+            }'
+}
+
 # ROUTER_NGINX_DENY_INTERNAL_EXPORTS (default "true") - denies
 # code-docker-internal source addresses from reaching /exports/ directly,
-# using the subnet docker-compose.yml pins for that network
-# (ROUTER_INTERNAL_SUBNET, set from the network's own ipam.config -
-# see docker-compose.yml). "false" disables the check entirely (empty
-# directive = nginx's own default, allow all) - the escape hatch for a
-# topology where a trusted proxy (e.g. a user's own Caddy) legitimately
-# reaches router *from inside* code-docker-internal instead of from outside.
+# using ROUTER_INTERNAL_SUBNET if set, else the CIDR detect_internal_subnet
+# finds live above. "false" disables the check entirely (empty directive =
+# nginx's own default, allow all) - the escape hatch for a topology where a
+# trusted proxy (e.g. a user's own Caddy) legitimately reaches router *from
+# inside* code-docker-internal instead of from outside.
 case "${ROUTER_NGINX_DENY_INTERNAL_EXPORTS:-true}" in
     false)
         export NGINX_DENY_INTERNAL_EXPORTS_DIRECTIVE=""
         ;;
     *)
-        if [ -n "${ROUTER_INTERNAL_SUBNET:-}" ]; then
-            export NGINX_DENY_INTERNAL_EXPORTS_DIRECTIVE="deny ${ROUTER_INTERNAL_SUBNET};
+        internal_subnet="${ROUTER_INTERNAL_SUBNET:-}"
+        if [ -z "$internal_subnet" ]; then
+            internal_subnet="$(detect_internal_subnet || true)"
+        fi
+        if [ -n "$internal_subnet" ]; then
+            export NGINX_DENY_INTERNAL_EXPORTS_DIRECTIVE="deny ${internal_subnet};
             allow all;"
         else
-            echo "nginx-service: ROUTER_NGINX_DENY_INTERNAL_EXPORTS is on but ROUTER_INTERNAL_SUBNET is unset - skipping the deny (nothing to match against)" >&2
+            echo "nginx-service: ROUTER_NGINX_DENY_INTERNAL_EXPORTS is on but couldn't determine code-docker-internal's subnet (ROUTER_INTERNAL_SUBNET unset and auto-detection failed) - skipping the deny" >&2
             export NGINX_DENY_INTERNAL_EXPORTS_DIRECTIVE=""
         fi
         ;;

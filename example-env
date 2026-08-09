@@ -219,10 +219,12 @@
 # 이름을 다른 값으로 바꾸고 싶을 때만 설정하세요.
 #ROUTER_HOSTNAME="router"
 
-# code-docker-internal 네트워크의 IPAM subnet이자, router의 /exports/
-# internal-source deny(ROUTER_NGINX_DENY_INTERNAL_EXPORTS)가 참조하는 CIDR
-# 입니다 - docker-compose.yml의 두 곳(네트워크 정의, code-docker-router의
-# environment:)이 이 값 하나를 같이 참조하므로 여기서 한 번만 바꾸면 둘 다
-# 어긋나지 않습니다. 이 값을 바꿔야 하는 경우는 거의 없습니다(다른
-# 172.30.0.0/24 사용자와 호스트 네트워크가 실제로 충돌할 때 정도).
-#ROUTER_INTERNAL_SUBNET="172.30.0.0/24"
+# router의 /exports/ internal-source deny(ROUTER_NGINX_DENY_INTERNAL_EXPORTS)가
+# 참조하는, code-docker-internal 네트워크의 CIDR입니다. 기본적으로 비워두면
+# router가 자기 라우팅 테이블에서 직접 감지합니다(nginx-service.default.sh의
+# detect_internal_subnet) - code-docker-internal은 docker-compose.yml에 subnet이
+# 고정되어 있지 않고 Docker가 매번 자동 할당하므로(여러 PREFIX 인스턴스를 한
+# 호스트에 띄워도 서로 CIDR이 충돌하지 않도록), 감지가 곧 실제 값입니다. 이
+# 값을 직접 설정해야 하는 경우는 router가 세 번째 네트워크에 붙는 등
+# 자동 감지 전제가 깨지는 드문 상황뿐입니다.
+#ROUTER_INTERNAL_SUBNET=""

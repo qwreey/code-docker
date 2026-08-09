@@ -5,16 +5,17 @@ networks:
     # Requires ipv6 support enabled in the docker engine daemon.json - see
     # example-env before enabling.
     enable_ipv6: ${ENABLE_IPV6:-false}
-    # Pinned (rather than Docker's usual auto-assigned subnet) so router's
-    # own nginx has a stable CIDR to reference for its /exports/
-    # internal-source deny (see ROUTER_INTERNAL_SUBNET below and
-    # router/.claude/router-nginx-hardening-plan.md) - without this the
-    # subnet could differ across recreations, silently breaking that ACL.
-    # Single source of truth shared with router's own environment: below -
-    # override once here via .env and both stay in sync.
-    ipam:
-      config:
-        - subnet: ${ROUTER_INTERNAL_SUBNET:-172.30.0.0/24}
+    # Deliberately left on Docker's usual auto-assigned subnet (no ipam.config
+    # pin) - a hardcoded subnet here used to collide across multiple PREFIX
+    # instances on one host (each got its own network by name, but they all
+    # wanted the same fixed CIDR). router's own nginx needs this network's
+    # CIDR for its /exports/ internal-source deny (see ROUTER_INTERNAL_SUBNET
+    # below and router/.claude/router-nginx-hardening-plan.md), but it now
+    # detects it live from its own routing table at startup instead of
+    # relying on a value pinned here - see nginx-service.default.sh's
+    # detect_internal_subnet. Set ROUTER_INTERNAL_SUBNET explicitly only if
+    # that detection ever needs overriding (e.g. router attached to a third
+    # network).
   code-docker-external:
     name: "${PREFIX:-}code-docker-external"
     internal: false
@@ -315,7 +316,11 @@ services:
       NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
       NGINX_LOG_LEVEL: "${NGINX_LOG_LEVEL:-errors}"
-      ROUTER_INTERNAL_SUBNET: "${ROUTER_INTERNAL_SUBNET:-172.30.0.0/24}"
+      # Optional manual override - left unset by default so router
+      # auto-detects code-docker-internal's live CIDR from its own routing
+      # table instead (see the code-docker-internal network's own comment
+      # above, and nginx-service.default.sh's detect_internal_subnet).
+      ROUTER_INTERNAL_SUBNET: "${ROUTER_INTERNAL_SUBNET:-}"
       # `router-manager --env-migrate`/the startup version-mismatch check
       # read the current router/example-env.router template from here - same
       # pattern as code-docker's own WEBMANAGER_ENV_TEMPLATE_PATH above.
