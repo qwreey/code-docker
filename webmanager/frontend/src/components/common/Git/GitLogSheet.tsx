@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { api, errorMessage } from '../../../api/client'
 import type { GitCommit, GitDiffResponse, GitLogResponse } from '../../../api/types'
@@ -25,6 +25,11 @@ export function GitLogSheet({ path, onClose }: { path: string; onClose: () => vo
   const [selected, setSelected] = useState<GitCommit | null>(null)
   const [diffText, setDiffText] = useState<string | null>(null)
   const [diffLoading, setDiffLoading] = useState(false)
+  // Guards against a stale diff response landing after a newer one was
+  // requested: view commit A, go back, view commit B - if A's fetch
+  // resolves after B's starts, an unguarded .then would overwrite B's diff
+  // with A's, while the header already shows B (mismatch).
+  const diffRequestIdRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -68,6 +73,7 @@ export function GitLogSheet({ path, onClose }: { path: string; onClose: () => vo
   }
 
   function openCommit(commit: GitCommit) {
+    const requestId = ++diffRequestIdRef.current
     setSelected(commit)
     setDiffText(null)
     setDiffLoading(true)
@@ -75,9 +81,18 @@ export function GitLogSheet({ path, onClose }: { path: string; onClose: () => vo
       .get<GitDiffResponse>(
         `/projects/git/diff/commit?path=${encodeURIComponent(path)}&hash=${encodeURIComponent(commit.hash)}`,
       )
-      .then((res) => setDiffText(res.text))
-      .catch((e) => setError(errorMessage(e)))
-      .finally(() => setDiffLoading(false))
+      .then((res) => {
+        if (diffRequestIdRef.current !== requestId) return
+        setDiffText(res.text)
+      })
+      .catch((e) => {
+        if (diffRequestIdRef.current !== requestId) return
+        setError(errorMessage(e))
+      })
+      .finally(() => {
+        if (diffRequestIdRef.current !== requestId) return
+        setDiffLoading(false)
+      })
   }
 
   return (

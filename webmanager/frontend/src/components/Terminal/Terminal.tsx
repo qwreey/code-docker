@@ -401,7 +401,17 @@ export function Terminal({
     // hypothetical — closing that ghost tab then 404s since the backend
     // already GC'd the session, and only a full reload reset activeSession
     // back to HOME_TAB_ID).
+    // Both handlers guard on wsRef.current === ws (same check the cleanup
+    // below uses) since they can fire asynchronously after this effect has
+    // already been superseded — switching tabs quickly triggers this
+    // effect's own cleanup (ws.close()) for the OLD socket while a NEW
+    // effect run has already set wsRef.current to a different socket and
+    // possibly already reached 'connecting'/'connected'; without this
+    // guard the old socket's delayed onclose/onerror would clobber the new
+    // tab's real status back to 'disconnected'. Same bug class as the
+    // Ctrl+D ghost-tab fix above (activeSessionRef).
     ws.onclose = () => {
+      if (wsRef.current !== ws) return
       setState('disconnected')
       refreshSessions().then((data) => {
         if (data && activeSessionRef.current === activeSession && !data.some((s) => s.name === activeSession)) {
@@ -409,7 +419,10 @@ export function Terminal({
         }
       })
     }
-    ws.onerror = () => setState('disconnected')
+    ws.onerror = () => {
+      if (wsRef.current !== ws) return
+      setState('disconnected')
+    }
     ws.onmessage = (event) => {
       if (event.data instanceof ArrayBuffer) {
         term.write(new Uint8Array(event.data))

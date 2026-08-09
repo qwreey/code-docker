@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { MiseRegistryEntry, MiseRegistrySearchResponse, MiseToolEntry, MiseVersionsResponse } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
@@ -34,6 +34,13 @@ export function ToolSearchDialog({ open, onClose, installedTools, onInstall }: T
   const [versionsError, setVersionsError] = useState<string | null>(null)
   const [versionFilter, setVersionFilter] = useState('')
 
+  // Guard against a stale response landing after a newer request was
+  // issued (rapid resubmit of the search box, or "버전 보기" on tool A then
+  // tool B before A's fetch resolves) - each ref is bumped by its own
+  // request and only the still-latest one's response is applied.
+  const searchRequestIdRef = useRef(0)
+  const versionsRequestIdRef = useRef(0)
+
   useEffect(() => {
     if (!open) return
     setQuery('')
@@ -68,14 +75,17 @@ export function ToolSearchDialog({ open, onClose, installedTools, onInstall }: T
     setQueryError(null)
     setSearchError(null)
     setSearching(true)
+    const requestId = ++searchRequestIdRef.current
     try {
       const res = await api.get<MiseRegistrySearchResponse>(`/mise/registry/search?q=${encodeURIComponent(trimmed)}`)
+      if (searchRequestIdRef.current !== requestId) return
       setResults(res.entries)
     } catch (e) {
+      if (searchRequestIdRef.current !== requestId) return
       setSearchError(errorMessage(e))
       setResults(null)
     } finally {
-      setSearching(false)
+      if (searchRequestIdRef.current === requestId) setSearching(false)
     }
   }
 
@@ -85,13 +95,16 @@ export function ToolSearchDialog({ open, onClose, installedTools, onInstall }: T
     setVersionsError(null)
     setVersionFilter('')
     setVersionsLoading(true)
+    const requestId = ++versionsRequestIdRef.current
     try {
       const res = await api.get<MiseVersionsResponse>(`/mise/versions?id=${encodeURIComponent(entry.short)}`)
+      if (versionsRequestIdRef.current !== requestId) return
       setVersions([...res.versions].reverse())
     } catch (e) {
+      if (versionsRequestIdRef.current !== requestId) return
       setVersionsError(errorMessage(e))
     } finally {
-      setVersionsLoading(false)
+      if (versionsRequestIdRef.current === requestId) setVersionsLoading(false)
     }
   }
 

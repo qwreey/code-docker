@@ -59,7 +59,20 @@ export function Logs() {
   const [error, setError] = useState<string | null>(null)
   const [liveRefresh, setLiveRefresh] = useState(false)
 
-  const loadingRef = useRef(false)
+  // requestIdRef supersedes (rather than drops) an overlapping loadFirstPage
+  // call: the old loadingRef-as-mutex approach made a filter change issued
+  // while a previous fetch was still in flight silently no-op — the
+  // dropdown updated but the table kept showing stale data until another
+  // change or a manual refresh. Every call claims the next id and only
+  // applies its result if it's still the most recently issued one.
+  const requestIdRef = useRef(0)
+  // Lets loadNewEntries (the live-refresh poller) skip a tick while a full
+  // loadFirstPage reload is in flight, so it doesn't prepend onto a list
+  // that's about to be replaced wholesale.
+  const firstPageLoadingRef = useRef(false)
+  // Guards loadNewEntries against overlapping itself if one poll tick is
+  // still in flight when the next interval fires.
+  const pollingRef = useRef(false)
   // Mirrors `entries` so loadNewEntries (the live-refresh poller) can read
   // the current newest timestamp without depending on `entries` itself —
   // keeping its identity stable across ticks that don't change the list, so
@@ -107,20 +120,24 @@ export function Logs() {
   // by live-refresh. Always replaces the loaded set, which is also how
   // filter changes and live refresh naturally reset pagination.
   const loadFirstPage = useCallback(async () => {
-    if (loadingRef.current) return
-    loadingRef.current = true
+    const requestId = ++requestIdRef.current
+    firstPageLoadingRef.current = true
     setLoading(true)
     try {
       const data = await api.get<LogEntriesResponse>(`/logs/entries?${buildParams().toString()}`)
+      if (requestIdRef.current !== requestId) return // superseded by a newer filter change
       setEntries(data.entries)
       setHasMore(data.hasMore)
       setMock((prev) => prev || data.mock)
       setError(null)
     } catch (e) {
+      if (requestIdRef.current !== requestId) return
       setError(errorMessage(e))
     } finally {
-      setLoading(false)
-      loadingRef.current = false
+      if (requestIdRef.current === requestId) {
+        setLoading(false)
+        firstPageLoadingRef.current = false
+      }
     }
   }, [buildParams])
 
@@ -140,10 +157,10 @@ export function Logs() {
   // can come back in the response; filter it (and anything else not
   // actually newer) out client-side before merging.
   const loadNewEntries = useCallback(async () => {
-    if (loadingRef.current) return
+    if (firstPageLoadingRef.current || pollingRef.current) return
     const current = entriesRef.current
     if (current.length === 0) return
-    loadingRef.current = true
+    pollingRef.current = true
     try {
       const newest = current[0].timestamp
       const data = await api.get<LogEntriesResponse>(`/logs/entries?${buildParams(undefined, newest).toString()}`)
@@ -159,7 +176,7 @@ export function Logs() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      loadingRef.current = false
+      pollingRef.current = false
     }
   }, [buildParams])
 

@@ -29,6 +29,12 @@ function BuiltinCard({
   const [status, setStatus] = useState<DnsBuiltinBlocklistStatus | null>(null)
   const [statusError, setStatusError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'pull' | 'ignore' | null>(null)
+  // Unlike every delete action in this file, this one is only reachable
+  // once the live blocklist has diverged from the shipped default (i.e.
+  // the user has customized it) - clicking it overwrites that
+  // customization immediately. A confirm step matches the convention every
+  // other destructive action here already follows.
+  const [confirmPull, setConfirmPull] = useState(false)
 
   async function loadStatus() {
     try {
@@ -53,6 +59,7 @@ function BuiltinCard({
       setExpanded(false)
       setStatus(null)
       onChanged()
+      setConfirmPull(false)
     } catch (e) {
       setStatusError(errorMessage(e))
     } finally {
@@ -120,8 +127,13 @@ function BuiltinCard({
                     </details>
                   )}
                   <div className="dns-diff-actions">
-                    <button type="button" className="btn btn-primary btn-small" disabled={busy !== null} onClick={handlePull}>
-                      {busy === 'pull' ? '적용하는 중...' : '새 기본값 가져오기'}
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-small"
+                      disabled={busy !== null}
+                      onClick={() => setConfirmPull(true)}
+                    >
+                      새 기본값 가져오기
                     </button>
                     <button type="button" className="btn btn-secondary btn-small" disabled={busy !== null} onClick={handleIgnore}>
                       {busy === 'ignore' ? '처리하는 중...' : '무시 (지금 목록 유지)'}
@@ -133,6 +145,18 @@ function BuiltinCard({
           )}
         </>
       )}
+      <ConfirmDialog
+        open={confirmPull}
+        onClose={() => setConfirmPull(false)}
+        onConfirm={handlePull}
+        title="블록리스트 기본값 덮어쓰기"
+        confirmLabel="가져오기"
+        busy={busy === 'pull'}
+      >
+        지금 목록은 기본값과 다르게 수정된 상태입니다. 새 기본값을 가져오면 현재 목록의 변경 사항이 사라집니다.
+        계속하시겠습니까?
+        {statusError && <ErrorBanner message={statusError} onDismiss={() => setStatusError(null)} />}
+      </ConfirmDialog>
     </div>
   )
 }

@@ -139,6 +139,7 @@ function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?
   const routes = info.structured?.routes ?? []
   const [dialog, setDialog] = useState<{ index: number | null } | null>(null)
   const [dialogError, setDialogError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null)
   const [showRaw, setShowRaw] = useState(false)
@@ -170,12 +171,19 @@ function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?
 
   async function handleDeleteRoute(index: number) {
     setDeletingIndex(index)
+    setDeleteError(null)
     try {
       await putRoutes(routes.filter((_, i) => i !== index))
       onSaved()
+      setConfirmDeleteIndex(null)
+    } catch (e) {
+      // Unlike every other mutation in this file, this one previously had
+      // no catch at all - the finally block below still closed the confirm
+      // dialog on failure, so the user saw it silently disappear and had
+      // no way to tell the delete didn't actually happen.
+      setDeleteError(errorMessage(e))
     } finally {
       setDeletingIndex(null)
-      setConfirmDeleteIndex(null)
     }
   }
 
@@ -266,13 +274,17 @@ function RoutesPanel({ info, onSaved }: { info: DevProxyInfo; onSaved: (newName?
 
       <ConfirmDialog
         open={confirmDeleteIndex !== null}
-        onClose={() => setConfirmDeleteIndex(null)}
+        onClose={() => {
+          setConfirmDeleteIndex(null)
+          setDeleteError(null)
+        }}
         onConfirm={() => confirmDeleteIndex !== null && handleDeleteRoute(confirmDeleteIndex)}
         title="라우트 삭제"
         confirmLabel="삭제"
         busy={deletingIndex !== null}
       >
         이 라우트를 삭제하시겠습니까?
+        {deleteError && <ErrorBanner message={deleteError} onDismiss={() => setDeleteError(null)} />}
       </ConfirmDialog>
     </div>
   )

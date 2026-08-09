@@ -46,8 +46,12 @@ export function Extensions() {
   const [installed, setInstalled] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [installingId, setInstallingId] = useState<string | null>(null)
-  const [uninstallingId, setUninstallingId] = useState<string | null>(null)
+  // Set, not a single id: installing/uninstalling two different extensions
+  // at once (start A, then start B before A resolves) previously clobbered
+  // A's tracked id with B's, silently dropping A's loading state and
+  // letting a second click re-fire an install already in flight.
+  const [installingIds, setInstallingIds] = useState<Set<string>>(new Set())
+  const [uninstallingIds, setUninstallingIds] = useState<Set<string>>(new Set())
   const [uninstallTarget, setUninstallTarget] = useState<string | null>(null)
   const [installedSectionOpen, setInstalledSectionOpen] = useState(false)
   const [categoryOpen, setCategoryOpen] = useState<Record<string, boolean>>({})
@@ -100,7 +104,8 @@ export function Extensions() {
   }
 
   async function handleInstall(id: string) {
-    setInstallingId(id)
+    if (installingIds.has(id)) return
+    setInstallingIds((prev) => new Set(prev).add(id))
     try {
       await api.post<{ ok: true }>('/code-extensions', { id })
       setInstalled((prev) => new Set(prev).add(id))
@@ -110,7 +115,11 @@ export function Extensions() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setInstallingId(null)
+      setInstallingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
     }
   }
 
@@ -122,7 +131,7 @@ export function Extensions() {
     if (!uninstallTarget) return
     const id = uninstallTarget
     setUninstallTarget(null)
-    setUninstallingId(id)
+    setUninstallingIds((prev) => new Set(prev).add(id))
     try {
       await api.del<{ ok: true }>(`/code-extensions/${encodeURIComponent(id)}`)
       setInstalled((prev) => {
@@ -136,7 +145,11 @@ export function Extensions() {
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setUninstallingId(null)
+      setUninstallingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
     }
   }
 
@@ -211,9 +224,9 @@ export function Extensions() {
                     type="button"
                     className="btn btn-danger btn-small"
                     onClick={() => handleUninstall(id)}
-                    disabled={uninstallingId === id}
+                    disabled={uninstallingIds.has(id)}
                   >
-                    {uninstallingId === id ? '삭제 중...' : '삭제'}
+                    {uninstallingIds.has(id) ? '삭제 중...' : '삭제'}
                   </button>
                 </li>
               ))}
@@ -245,7 +258,7 @@ export function Extensions() {
                     <ul className="extensions-list">
                       {group.items.map((ext) => {
                         const isInstalled = installed.has(ext.id)
-                        const isInstalling = installingId === ext.id
+                        const isInstalling = installingIds.has(ext.id)
                         return (
                           <li className="extensions-row" key={ext.id}>
                             <div className="extensions-row-info">
