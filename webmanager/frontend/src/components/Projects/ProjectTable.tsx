@@ -7,6 +7,7 @@ import { ConfirmDialog } from '../common/ConfirmDialog'
 import { GitStatusPanel } from '../common/Git/GitStatusPanel'
 import { Sheet } from '../common/Sheet'
 import { DeleteReclaimableDialog } from './DeleteReclaimableDialog'
+import '../common/common.css'
 import './Projects.css'
 
 const STALE_AFTER_MS = 60 * 60 * 1000
@@ -176,7 +177,7 @@ export function ProjectTable({
             ))}
             <th>기술 스택</th>
             <th>상태</th>
-            <th aria-label="동작" />
+            <th aria-label="동작" className="table-actions-col" />
           </tr>
         </thead>
         <tbody>
@@ -205,7 +206,7 @@ export function ProjectTable({
                   )}
                 </td>
                 <td>{project.stale && <span className="badge badge-yellow">오래됨</span>}</td>
-                <td>
+                <td className="table-actions-col">
                   <div className="projects-actions">
                     <button
                       type="button"
@@ -363,7 +364,7 @@ export function ProjectTable({
                       <th>패턴</th>
                       <th>경로</th>
                       <th>용량</th>
-                      <th aria-label="동작" />
+                      <th aria-label="동작" className="table-actions-col" />
                     </tr>
                   </thead>
                   <tbody>
@@ -374,7 +375,7 @@ export function ProjectTable({
                         </td>
                         <td className="mono-cell">{entry.path}</td>
                         <td>{formatBytes(entry.sizeBytes)}</td>
-                        <td>
+                        <td className="table-actions-col">
                           <button
                             type="button"
                             className="btn btn-danger btn-small"

@@ -4,6 +4,7 @@ import type { PortInfo } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
 import { KillButtons } from './KillButtons'
+import '../common/common.css'
 import './Processes.css'
 import { withViewTransition } from '../../utils/viewTransition'
 
@@ -53,7 +54,7 @@ export function PortTable() {
                 <th>주소</th>
                 <th>PID</th>
                 <th>프로세스명</th>
-                <th aria-label="동작" />
+                <th aria-label="동작" className="table-actions-col" />
               </tr>
             </thead>
             <tbody>
@@ -72,7 +73,7 @@ export function PortTable() {
                     </td>
                     <td>{resolvable ? port.pid : '—'}</td>
                     <td>{resolvable ? port.processName || '-' : '알 수 없음'}</td>
-                    <td>
+                    <td className="table-actions-col">
                       <KillButtons
                         pid={port.pid}
                         label={port.processName || `PID ${port.pid}`}

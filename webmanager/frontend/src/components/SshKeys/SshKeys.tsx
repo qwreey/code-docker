@@ -204,7 +204,7 @@ export function SshKeys() {
                 <th>타입</th>
                 <th>코멘트</th>
                 <th>지문</th>
-                <th aria-label="동작" />
+                <th aria-label="동작" className="table-actions-col" />
               </tr>
             </thead>
             <tbody>
@@ -282,7 +282,7 @@ export function SshKeys() {
                         <td className="mono-cell">{entry.key?.fingerprint}</td>
                       </>
                     )}
-                    <td className="ssh-key-actions">
+                    <td className="ssh-key-actions table-actions-col">
                       <button type="button" className="btn btn-small" onClick={() => startEdit(entry)}>
                         편집
                       </button>

@@ -4,6 +4,7 @@ import type { GitCredential } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
 import { ConfirmDialog } from '../common/ConfirmDialog'
+import '../common/common.css'
 import { withViewTransition } from '../../utils/viewTransition'
 
 export function HttpsCredentials() {
@@ -87,7 +88,7 @@ export function HttpsCredentials() {
               <tr>
                 <th>Host</th>
                 <th>Username</th>
-                <th aria-label="동작" />
+                <th aria-label="동작" className="table-actions-col" />
               </tr>
             </thead>
             <tbody>
@@ -95,7 +96,7 @@ export function HttpsCredentials() {
                 <tr key={c.host}>
                   <td>{c.host}</td>
                   <td>{c.username}</td>
-                  <td>
+                  <td className="table-actions-col">
                     <button
                       type="button"
                       className="btn btn-danger btn-small"

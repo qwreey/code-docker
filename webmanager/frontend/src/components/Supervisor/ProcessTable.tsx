@@ -124,7 +124,7 @@ export function ProcessTable({ processes, busy, onAction, onShowLogs }: ProcessT
             <th>PID</th>
             <th>가동 시간</th>
             <th>설명</th>
-            <th aria-label="동작" />
+            <th aria-label="동작" className="table-actions-col" />
           </tr>
         </thead>
         <tbody>
@@ -161,7 +161,7 @@ export function ProcessTable({ processes, busy, onAction, onShowLogs }: ProcessT
                   <td>{proc.pid || '-'}</td>
                   <td>{uptime}</td>
                   <td className="process-description">{description || null}</td>
-                  <td>
+                  <td className="table-actions-col">
                     <div className="process-actions">
                       <button
                         type="button"
@@ -237,7 +237,7 @@ export function ProcessTable({ processes, busy, onAction, onShowLogs }: ProcessT
                                 <th>MEM</th>
                                 <th>RSS</th>
                                 <th>커맨드</th>
-                                <th aria-label="동작" />
+                                <th aria-label="동작" className="table-actions-col" />
                               </tr>
                             </thead>
                             <ProcessTree

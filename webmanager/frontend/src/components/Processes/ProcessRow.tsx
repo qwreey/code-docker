@@ -81,7 +81,7 @@ export function ProcessRowCells({
       <td className="pf-col-cmd process-cmdline" title={proc.cmdline}>
         <HighlightedText text={proc.cmdline || '-'} match={cmdMatch} />
       </td>
-      <td className="pf-col-actions">
+      <td className="pf-col-actions table-actions-col">
         <KillButtons pid={proc.pid} label={proc.name} onKilled={onKilled} onError={onError} />
       </td>
     </>

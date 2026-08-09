@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Download, File, Folder, Info, Pencil, Trash2, TextCursorInput } from 'lucide-react'
 import type { FileEntry } from '../../api/types'
 import { formatBytes } from '../../utils/format'
+import '../common/common.css'
 import './FileManager.css'
 
 function RenameForm({
@@ -91,7 +92,7 @@ export function FileTable({
             <th>이름</th>
             <th>크기</th>
             <th>수정 시각</th>
-            <th aria-label="동작" />
+            <th aria-label="동작" className="table-actions-col" />
           </tr>
         </thead>
         <tbody>
@@ -134,7 +135,7 @@ export function FileTable({
               </td>
               <td>{entry.isDir ? '-' : formatBytes(entry.size)}</td>
               <td>{new Date(entry.modTime).toLocaleString()}</td>
-              <td>
+              <td className="table-actions-col">
                 <div className="file-manager-actions">
                   <button
                     type="button"

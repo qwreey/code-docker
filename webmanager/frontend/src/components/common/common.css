@@ -196,6 +196,15 @@
   background: var(--surface);
 }
 
+/* A table's rightmost actions column hugs its row buttons instead of
+   stretching to share whatever space is left over - apply to both the
+   header <th> and each row's <td>. */
+.table-actions-col {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
 .mono-cell {
   font-family: var(--mono);
   font-size: 0.82rem;

@@ -5,6 +5,7 @@ import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
 import { CopyButton } from '../common/CopyButton'
 import { ConfirmDialog } from '../common/ConfirmDialog'
+import '../common/common.css'
 import { withViewTransition } from '../../utils/viewTransition'
 
 const NOT_INSTALLED_NOTICE = '컨테이너에 gnupg가 아직 설치되어 있지 않습니다 (다음 이미지 빌드부터 사용 가능합니다).'
@@ -117,7 +118,7 @@ export function GpgKeys({ onUseKey }: { onUseKey: (keyId: string) => void }) {
                 <th>Key ID</th>
                 <th>UID</th>
                 <th>생성일</th>
-                <th aria-label="동작" />
+                <th aria-label="동작" className="table-actions-col" />
               </tr>
             </thead>
             <tbody>
@@ -126,7 +127,7 @@ export function GpgKeys({ onUseKey }: { onUseKey: (keyId: string) => void }) {
                   <td className="mono-cell">{k.keyId}</td>
                   <td>{k.uid}</td>
                   <td>{k.createdAt}</td>
-                  <td>
+                  <td className="table-actions-col">
                     <div className="gpg-key-row-actions">
                       <button type="button" className="btn btn-secondary btn-small" onClick={() => onUseKey(k.keyId)}>
                         이 키를 서명 키로 사용

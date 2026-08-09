@@ -365,7 +365,7 @@ export function Mise() {
                   <th>버전</th>
                   <th>요청 버전</th>
                   <th>상태</th>
-                  <th aria-label="동작" />
+                  <th aria-label="동작" className="table-actions-col" />
                 </tr>
               </thead>
               <tbody>
@@ -390,7 +390,7 @@ export function Mise() {
                           {tool.active && <span className="badge badge-green">활성</span>}
                         </div>
                       </td>
-                      <td>
+                      <td className="table-actions-col">
                         <div className="mise-tool-actions">
                           {declared && tool.installed && (
                             <button

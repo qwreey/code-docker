@@ -4,6 +4,7 @@ import type { KnownHostEntry } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
 import { ConfirmDialog } from '../common/ConfirmDialog'
+import '../common/common.css'
 import { withViewTransition } from '../../utils/viewTransition'
 
 export function KnownHosts() {
@@ -82,7 +83,7 @@ export function KnownHosts() {
                 <th>Host</th>
                 <th>Key Type</th>
                 <th>Fingerprint</th>
-                <th aria-label="동작" />
+                <th aria-label="동작" className="table-actions-col" />
               </tr>
             </thead>
             <tbody>
@@ -91,7 +92,7 @@ export function KnownHosts() {
                   <td>{entry.host}</td>
                   <td>{entry.keyType}</td>
                   <td className="mono-cell">{entry.fingerprint}</td>
-                  <td>
+                  <td className="table-actions-col">
                     <button
                       type="button"
                       className="btn btn-danger btn-small"

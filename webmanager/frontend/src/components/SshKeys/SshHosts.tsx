@@ -5,6 +5,7 @@ import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
 import { CopyButton } from '../common/CopyButton'
 import { ConfirmDialog } from '../common/ConfirmDialog'
+import '../common/common.css'
 import { withViewTransition } from '../../utils/viewTransition'
 
 export function SshHosts() {
@@ -88,7 +89,7 @@ export function SshHosts() {
                 <th>Host</th>
                 <th>HostName</th>
                 <th>User</th>
-                <th aria-label="동작" />
+                <th aria-label="동작" className="table-actions-col" />
               </tr>
             </thead>
             <tbody>
@@ -97,7 +98,7 @@ export function SshHosts() {
                   <td>{h.host}</td>
                   <td>{h.hostname}</td>
                   <td>{h.user}</td>
-                  <td>
+                  <td className="table-actions-col">
                     <button
                       type="button"
                       className="btn btn-danger btn-small"
