@@ -115,6 +115,10 @@ code-docker/dind가 `code-docker-netinit`(및 dind 자신)이 계속 심어주�
 
 자세한 내용은 [egress-netgate.md](egress-netgate.md)를 확인하세요 - 기능 자체를 끄고 싶다면 [당장 인터넷이 필요하다면](egress-netgate.md#당장-인터넷이-필요하다면-기능-자체를-끄기) 절을 먼저 보세요.
 
+## 리소스 제한 (CPU/메모리)
+
+code-docker/code-docker-dind/code-docker-router 각 컨테이너에 CPU/메모리 상한을 걸 수 있습니다 - 컨테이너 안 프로세스(빌드, 에이전트, dind 안에서 띄운 중첩 컨테이너, 혹은 router로 들어오는 외부 트래픽)가 호스트 자원을 무제한으로 소비하는 걸 막기 위한 것입니다. `example-env`의 `CODE_CPU_LIMIT`/`CODE_MEM_LIMIT`, `DIND_CPU_LIMIT`/`DIND_MEM_LIMIT`, `ROUTER_CPU_LIMIT`/`ROUTER_MEM_LIMIT`로 설정하며, 기본값은 전부 `"0"`(제한 없음 - 지금까지와 동일)입니다. `docker compose up -d`로 재생성해야 반영됩니다.
+
 ## 환경 변수 설정 (.env)
 
 `PWA_NAME`, `TZ`, `LANG`, 마운트할 볼륨 경로(`HOME_VOLUME`/`SSHD_VOLUME`/`DIND_VOLUME`/`ROUTER_VOLUME`), 아웃바운드 격리 관련 값(`NETGATE_ENABLED`, `ROUTER_HOSTNAME`), 로그 상세도 등 `docker-compose.yml`이 읽는 값들은 모두 `example-env`에 설명과 함께 정리되어 있습니다. `example-env`를 `.env`로 복사한 뒤 필요한 값만 주석을 풀어 쓰세요 - 전부 합리적인 기본값이 있어 이 파일이 없어도 정상 동작합니다. 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다.

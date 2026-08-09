@@ -88,6 +88,33 @@
 #     소유권을 옮겨야 함) - docs/tips/dind.md의 "추가 경화" 절 참고.
 #DIND_TARGET="dind-authz"
 
+# code-docker/code-docker-dind/code-docker-router 각 컨테이너의 CPU/메모리 상한입니다.
+# 컨테이너 안 프로세스(빌드, 에이전트, 혹은 dind 안에서 띄운 중첩 컨테이너)가
+# 호스트 자원을 무제한으로 소비하는 걸 막기 위한 것입니다 - docker-compose.yml의
+# deploy.resources.limits로 반영되며, docker compose는 swarm이 아니어도 이 값을
+# 그대로 `docker run --cpus/--memory`에 적용합니다.
+#
+# 기본값은 전부 "0"이고, Docker/Compose는 0을 "제한 없음"으로 취급합니다(직접
+# 확인: 값이 0이면 docker-compose.yml의 deploy.resources.limits 블록 자체가
+# 비워져서 나가고, `docker inspect`로 봐도 Memory=0/NanoCpus=0으로 - 지금까지와
+# 동일하게 무제한으로 동작합니다). 즉 이 파일을 안 건드리면 기존 동작이 전혀
+# 바뀌지 않고, 필요할 때만 아래처럼 값을 채우면 됩니다.
+#
+# CPU는 코어 개수(소수점 가능, 예: "2", "0.5"), 메모리는 단위 접미사 포함
+# 문자열(예: "4g", "512m")입니다. 예를 들어 code-docker를 4코어/4GB로 제한하려면:
+#   CODE_CPU_LIMIT="4"
+#   CODE_MEM_LIMIT="4g"
+#CODE_CPU_LIMIT="0"
+#CODE_MEM_LIMIT="0"
+# 중첩 컨테이너(redis, postgres 등)를 포함해 dind 데몬 전체가 공유하는 상한입니다 -
+# dind 안에서 띄운 컨테이너 하나하나가 아니라 dind 자체의 cgroup에 적용됩니다.
+#DIND_CPU_LIMIT="0"
+#DIND_MEM_LIMIT="0"
+# router는 host 80번 포트를 직접 받는 인터넷 대면 컨테이너이므로, 외부에서의
+# 플러딩/DoS가 호스트 자원까지 잠식하지 않도록 하려면 이 값도 같이 설정하세요.
+#ROUTER_CPU_LIMIT="0"
+#ROUTER_MEM_LIMIT="0"
+
 # tailscale, Dev Proxy 노출 정책, router-manager 자체 비밀번호, tinyauth
 # 등 router 전용 기능 설정은 router/example-env.router로 옮겨졌습니다(복사해서
 # router/.env.router로 쓰세요) - 이 파일과 별도로 `router-manager

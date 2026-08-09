@@ -62,6 +62,19 @@ services:
       # match the alias on code-docker-router's own networks: block below.
       # See example-env before overriding.
       ROUTER_HOSTNAME: "${ROUTER_HOSTNAME:-router}"
+    # Resource-exhaustion guard: a process inside code-docker (or an agent
+    # running in it) can otherwise consume unbounded host CPU/RAM. Both
+    # default to "0", which Docker/Compose treat as "no limit" (confirmed:
+    # `docker inspect` shows Memory=0/NanoCpus=0 for an unset limit, and
+    # Compose actually drops an all-zero deploy.resources.limits block
+    # entirely rather than passing 0 through) - so the out-of-the-box
+    # behavior is unchanged from before this existed. Set CODE_CPU_LIMIT/
+    # CODE_MEM_LIMIT in .env to actually cap it - see example-env.
+    deploy:
+      resources:
+        limits:
+          cpus: "${CODE_CPU_LIMIT:-0}"
+          memory: "${CODE_MEM_LIMIT:-0}"
     # webmanager(admin panel, port 81) settings all live in .env.webmanager,
     # not here - copy example-env.webmanager to .env.webmanager and uncomment
     # only what you need (every value already has a sane default). See the
@@ -221,6 +234,16 @@ services:
       # Must match the alias on code-docker-router's own networks: block
       # below - see example-env before overriding.
       ROUTER_HOSTNAME: "${ROUTER_HOSTNAME:-router}"
+    # Same resource-exhaustion guard as code-docker's own deploy: block
+    # above - matters even more here, since containers created *inside*
+    # dind (e.g. a stray `docker run` loop) share this one cgroup and
+    # would otherwise have no ceiling at all. Default "0" (unlimited) -
+    # see CODE_CPU_LIMIT's comment above and example-env.
+    deploy:
+      resources:
+        limits:
+          cpus: "${DIND_CPU_LIMIT:-0}"
+          memory: "${DIND_MEM_LIMIT:-0}"
     volumes:
       # Persist pulled images/containers across restarts
       - "${DIND_VOLUME:-./data/dind}:/var/lib/docker"
@@ -379,6 +402,15 @@ services:
       # pattern as code-docker's own WEBMANAGER_ENV_TEMPLATE_PATH above.
       # Left unset to use the image's own copy.
       ROUTER_ENV_TEMPLATE_PATH: "${ROUTER_ENV_TEMPLATE_PATH:-/etc/router/example-env.router}"
+    # Same resource-exhaustion guard as code-docker's own deploy: block
+    # (see its comment above) - router is the internet-facing hop (port
+    # 80 below), so a flood/DoS aimed at it shouldn't be able to starve
+    # the host either. Default "0" (unlimited) - see example-env.
+    deploy:
+      resources:
+        limits:
+          cpus: "${ROUTER_CPU_LIMIT:-0}"
+          memory: "${ROUTER_MEM_LIMIT:-0}"
     # router's own feature-specific settings (tailscale, Dev Proxy exposure
     # policy, router-manager's own admin-API password, tinyauth, /exports/
     # allowlists) all live in .env.router, not here - copy
