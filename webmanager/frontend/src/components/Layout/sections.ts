@@ -7,6 +7,7 @@ export type SectionId =
   | 'tailscale'
   | 'dns'
   | 'net'
+  | 'tinyauth'
   | 'logs'
   | 'processes'
   | 'projects'
@@ -33,6 +34,7 @@ export const SECTIONS: SectionMeta[] = [
   { id: 'tailscale', label: 'Tailscale', implemented: true },
   { id: 'dns', label: 'DNS', implemented: true },
   { id: 'net', label: 'Net 관리', implemented: true },
+  { id: 'tinyauth', label: 'tinyauth', implemented: true },
   { id: 'logs', label: 'Logs', implemented: true },
   { id: 'processes', label: 'Task Manager', implemented: true },
   { id: 'projects', label: 'Projects', implemented: true },

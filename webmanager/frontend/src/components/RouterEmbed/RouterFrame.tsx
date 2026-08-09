@@ -24,7 +24,7 @@ const LOAD_SETTLE_MS = 200
 const LOAD_HARD_CAP_MS = 3000
 
 interface RouterFrameProps {
-  tab: 'dev-proxy' | 'app-routes' | 'tailscale' | 'dns' | 'net'
+  tab: 'dev-proxy' | 'app-routes' | 'tailscale' | 'dns' | 'net' | 'tinyauth'
 }
 
 /**

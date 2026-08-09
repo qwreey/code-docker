@@ -1,0 +1,225 @@
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0.75rem;
+}
+
+.sidebar-title {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  padding: 0.4rem 0.5rem 1rem;
+  color: var(--text-heading);
+}
+
+.sidebar-title-mark {
+  flex: none;
+  color: var(--accent);
+}
+
+/* Scrolls independently from the footer below it (theme toggle + lock
+   status) - overflow-y used to live on .sidebar itself, which meant a
+   long/overflowing tab list would scroll the footer away with it instead
+   of keeping it pinned at the bottom. */
+.sidebar-list-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sidebar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sidebar-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.7rem;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Reserves one icon-sized slot per row. The section icon and the drag
+   handle both sit stacked in this same slot (absolutely positioned) and
+   crossfade between each other on hover/focus, instead of the label
+   shifting sideways or a second slot being added. */
+.sidebar-icon-slot {
+  position: relative;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+}
+
+.sidebar-icon-slot > svg {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.12s ease;
+}
+
+.sidebar-item-icon {
+  opacity: 1;
+}
+
+.sidebar-drag-handle {
+  cursor: grab;
+  /* only shown on hover/focus - always-visible handles looked noisy since
+     every row has one */
+  opacity: 0;
+}
+
+.sidebar-item:hover .sidebar-item-icon,
+.sidebar-item:focus-visible .sidebar-item-icon {
+  opacity: 0;
+}
+
+.sidebar-item:hover .sidebar-drag-handle,
+.sidebar-item:focus-visible .sidebar-drag-handle {
+  opacity: 1;
+}
+
+.sidebar-item:hover {
+  background: var(--surface-hover);
+}
+
+.sidebar-item-active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sidebar-item-disabled {
+  color: var(--text-muted);
+}
+
+.sidebar-item-disabled:hover {
+  background: var(--surface-hover);
+}
+
+.sidebar-badge {
+  margin-left: auto;
+  font-size: 0.65rem;
+  padding: 0.1em 0.45em;
+  border-radius: 999px;
+  background: var(--color-gray-bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+.sidebar-drag-over {
+  outline: 2px dashed var(--accent-border, var(--accent));
+  outline-offset: -2px;
+  border-radius: var(--radius);
+}
+
+/* ── sidebar footer: lock status (left) + theme toggle (right) ───────── */
+
+.sidebar-footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Single icon button that cycles 자동→라이트→다크→자동 on click (see
+   SidebarFooter.tsx) — margin-left: auto keeps it pinned to the right edge
+   even when the lock status on the left isn't rendered at all (password
+   gate not configured). */
+.sidebar-theme-btn {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.sidebar-theme-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.sidebar-lock-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--color-yellow-border);
+  border-radius: var(--radius);
+  background: var(--color-yellow-bg);
+  color: var(--color-yellow-fg);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sidebar-lock-status:hover {
+  filter: brightness(0.97);
+}
+
+.sidebar-lock-status-unlocked {
+  border-color: var(--color-green-border);
+  background: var(--color-green-bg);
+  color: var(--color-green-fg);
+  cursor: default;
+}
+
+@media (max-width: 720px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.25);
+  }
+
+  .sidebar-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 40;
+  }
+}

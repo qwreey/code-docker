@@ -35,21 +35,78 @@
   }
 }
 
-.router-app-header {
+/* Standalone (non-embed) shell: sidebar (components/Layout/, hand-kept
+   duplicate of webmanager's own Sidebar) + scrollable content area -
+   mirrors webmanager's own App.css .app-shell/.app-content/.mobile-topbar
+   almost exactly (same class-naming idiom, "router-" prefixed only where a
+   bare name could otherwise clash with this file's pre-existing .router-app
+   classes above, which stay reserved for the embed-mode wrapper). */
+.router-app-shell {
   display: flex;
+  height: 100vh;
+}
+
+.router-app-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 2rem 2.5rem;
+  overflow-y: auto;
+}
+
+.router-mobile-topbar {
+  display: none;
+}
+
+.router-mobile-topbar-title {
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.hamburger-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.router-app-header h1 {
-  margin: 0;
+.hamburger-btn:hover {
+  background: var(--surface-hover);
 }
 
-.router-app-tabs {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+@media (max-width: 720px) {
+  .router-app-shell {
+    flex-direction: column;
+  }
+
+  .router-mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+
+  .router-app-content {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .router-app-content {
+    padding: 1rem 0.85rem;
+  }
 }

@@ -13,6 +13,34 @@ export function setUnlockPrompter(fn: UnlockPrompter | null) {
   unlockPrompter = fn
 }
 
+// Proactive unlock trigger (e.g. the sidebar footer's lock-status button) -
+// shares the exact same modal/queue (RouterUnlockModalHost) as a
+// 401-triggered prompt, so a concurrent manual click and an in-flight 401
+// share one prompt rather than stacking two. Mirrors webmanager's own
+// api/client.ts requestUnlock().
+export function requestUnlock(): Promise<void> {
+  if (!unlockPrompter) return Promise.reject(new Error('unlock prompter not mounted'))
+  return unlockPrompter()
+}
+
+// Each useAuthStatus() consumer (sidebar footer, RouterAuthPanel, ...) keeps
+// its own independent status copy, refreshed only when its own caller
+// triggers it - so a successful unlock in one place (a 401-triggered prompt
+// elsewhere) would otherwise leave every other consumer's copy stale.
+// Notified from request() below on a successful POST /unlock, the one place
+// every unlock path (proactive click or 401-triggered retry) funnels
+// through - mirrors webmanager's own onAuthStatusChange/notifyAuthStatusChange.
+const authStatusListeners = new Set<() => void>()
+
+export function onAuthStatusChange(cb: () => void): () => void {
+  authStatusListeners.add(cb)
+  return () => authStatusListeners.delete(cb)
+}
+
+function notifyAuthStatusChange() {
+  authStatusListeners.forEach((cb) => cb())
+}
+
 export class ApiError extends Error {
   status: number
 
@@ -60,6 +88,14 @@ export function createApiClient(prefix: string, opts: { skipUnlockRetry?: boolea
 
   async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
     const res = await fetch(apiUrl(path), init)
+
+    // Only ever true for the auth client's own POST /unlock (it's the only
+    // createApiClient instance with skipUnlockRetry set) - notifies every
+    // mounted useAuthStatus() consumer to self-refresh once the gate state
+    // actually changed.
+    if (opts.skipUnlockRetry && path === '/unlock' && res.ok) {
+      notifyAuthStatusChange()
+    }
 
     if (res.status === 204) {
       return undefined as T

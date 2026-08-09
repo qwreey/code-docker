@@ -132,6 +132,21 @@ router/frontend, webmanager 둘 다 `useState`로만 탭을 관리해 새로고�
   정도는 아니라고 판단, 필요해지면 이 컴포넌트를 같은 "hand-kept duplicate"
   방식으로 router/frontend에도 복사하면 됨).
 
+  **후속 (2026-08-09)**: 탭이 7개(App Routes/Dev Proxy/Tailscale/DNS/Net
+  관리/tinyauth/설정)로 늘고 사용자가 "router도 사이드바 못 씀?"이라고
+  재요청하면서, 위에서 미룬 그대로 `Sidebar.tsx`/`Layout.css`를 router/frontend에
+  hand-kept-duplicate로 실제 복사(`router/frontend/src/components/Layout/`) —
+  `SidebarContainer.tsx`는 router 쪽만 order 영속화 없이 로컬 `useState`로
+  단순화(탭 7개엔 아직 새 백엔드 엔드포인트까지는 과함). 요청에 포함된 "로그인
+  상태/테마 버튼도 같이 가져올만하지 않냐"까지 반영 — `theme.ts`/`useTheme.ts`도
+  hand-kept-duplicate로 복사(localStorage 키만 `router-theme`로 분리, standalone
+  방문에서만 씀 - embed 모드는 여전히 `embedTheme.ts`의 parent-postMessage 방식,
+  `main.tsx`가 `?embed=1` 여부로 둘 중 하나만 초기화), `SidebarFooter.tsx`도 복사해
+  `GET /api/auth/status`(잠금 상태 - 이미 응답에 `unlocked`/`unlockedUntil`
+  필드가 있었는데 프론트 로컬 타입만 그걸 안 쓰고 있었음) 기반 잠금 표시 + 클릭
+  시 언락 모달을 추가. `api/client.ts`에 `requestUnlock`/`onAuthStatusChange`를
+  webmanager 것과 같은 패턴으로 추가(기존 `unlockPrompter` 전역을 재사용).
+
 **검증**: 양쪽 프론트엔드 `tsc --noEmit`/`vite build`/`oxlint` 통과, router
 이미지 `docker compose build`(handlers_netgate.go Dockerfile 누락 수정 포함,
 아래 참고) 통과. code-docker 메인 이미지의 `webmanager-frontend` 스테이지는
@@ -150,7 +165,21 @@ code-docker` 확인 권장.
 함정 - 앞으로 `router/backend/handlers_*.go`를 추가할 때는 반드시
 `router/Dockerfile`의 `COPY backend/handlers_*.go` 목록도 같이 갱신할 것.
 
-## 6. tinyauth 탭 신설 + ACL(유저/그룹) + OIDC provider + well-known 노출 + email — 설계만, 미구현
+## 6. tinyauth 탭 신설 + ACL(유저/그룹) + OIDC provider + well-known 노출 + email — 1번(탭 분리)만 구현 완료(2026-08-09), 나머지는 보류
+
+**2026-08-09 결정**: ACL/OIDC provider/well-known/email/그룹은 로컬 유저만
+쓰는 지금 배포엔 애초에 적용 불가(그룹은 LDAP/OIDC 없이 원천적으로 없는
+개념)라는 아래 리서치 결과를 재확인하고, 실제 필요(Authentik 테스트 등)가
+생기기 전까진 보류하기로 함 - "말 그대로 지금 못 함. ldap 같은거 필요해서
+안하면 됨". 아래 "제안 순서"의 1번(tinyauth 전용 탭 신설)만 이번에 구현:
+`router/frontend/src/App.tsx`의 '설정' 탭에 얹혀 있던 `<TinyauthUsers />`를
+독립 탭(`tinyauth`)으로 분리(`RouterAuthPanel`/`RouterTrustedHostsPanel`만
+'설정'에 남음), webmanager 쪽에서도 편집 가능해야 한다는 요청에 따라
+`RouterFrame.tsx`의 `tab` 유니온에 `'tinyauth'` 추가 + webmanager
+`sections.ts`/`SidebarContainer.tsx`/`App.tsx`에도 새 사이드바 항목으로
+배선(`RouterFrame tab="tinyauth"`) - §5 후속에서 router 자신도 사이드바를
+갖게 된 것과 같은 세션. email attribute 필드 추가는 이번엔 범위 밖(탭 분리만
+요청받음).
 
 **요청 원문 요약**: App Routes/Dev Proxy에 유저별/그룹별 접근 제어를 걸 수 있나,
 그룹 멤버십 설정도 되나? tinyauth가 OIDC provider로도 동작해서 Authentik 같은
@@ -207,7 +236,7 @@ code-docker` 확인 권장.
    로컬 유저만 쓰는 배포에는 애초에 적용할 수 없는 기능이라는 점을 UI에도
    명시해야 함(예: "그룹은 OIDC/LDAP 로그인에서만 동작합니다" 안내).
 
-## 7. DNS dig형 조회 도구 — 설계만, 미구현
+## 7. DNS dig형 조회 도구 — 구현 완료 (2026-08-09)
 
 **요청**: nameserver 관리자에서 dig처럼 도메인 조회를 해볼 수 있으면 디버깅에
 유용할 듯 - 캐시 상태 보는 것도 유용. 캐시 지우기는 호스트사이드와 밀접해서
@@ -220,21 +249,39 @@ debug 엔드포인트 전무. dnsmasq에 훅킹할 방법으로 두 가지가 �
 파싱(실시간성 낮고 vector 파이프라인과 얽힘). 이미 배선된 stats/DBus 연동은
 없음.
 
-**제안**: `POST /api/dns/query {domain}` - 컨테이너 안에서 `dig +short @127.0.0.1
--p <dnsmasq 포트> <domain>`(또는 `bind-utils`/`dnsutils` 패키지의 `dig`, 없으면
-`getent hosts`로 폴백) 실행 후 결과(레코드, 응답 시간, 어느 addn-hosts 소스가
-매치됐는지는 별도 파싱 필요해 1차 구현에선 생략 가능)를 반환. 프론트에
-DNS 탭 안 새 서브섹션으로 입력창 + 결과 테이블. 캐시 상태는 요청자가 스코프
-아웃했으므로 미포함. `dig` 바이너리는 router 이미지에 **아직 없음**(확인 완료 -
-`router/Dockerfile`의 `pacman -Suy` 목록엔 `dnsmasq`만 있고 `bind`(Arch에서 `dig`를
-제공하는 패키지)는 없음) - Dockerfile에 `bind`를 추가하거나, 별도 패키지 없이
-`getent hosts <domain>`(glibc NSS 경유, dnsmasq를 포함해 `/etc/resolv.conf`가
-가리키는 리졸버를 그대로 타므로 addn-hosts 블록 여부까지 확인 가능하지만 dig처럼
-TTL/레코드 타입별 조회는 안 됨)로 최소 기능만 우선 구현하는 것도 선택지.
+**구현**: 제안했던 두 선택지 중 `bind` 패키지 추가 쪽 채택(`getent hosts` 폴백은
+TTL/레코드 타입 조회가 안 돼 dig 대체로는 부족하다고 판단, 요청자도 "bind 패키지
+추가해도 될듯"으로 확정) - `router/Dockerfile`의 `pacman -Suy` 목록에 `bind` 추가
+(Arch에서 `bind-tools`/`dig`를 흡수한 패키지, `pacman -Si bind`로 `Provides:
+bind-tools dnsutils`, `Replaces: bind-tools dnsutils host` 확인). `router/backend/
+internal/dns/query.go`(신규) - `Query(ctx, domain, recordType)`가 레코드 타입을
+고정 allowlist(A/AAAA/CNAME/MX/TXT/NS/SOA/PTR/SRV/ANY)로 검증한 뒤
+`dig +noall +answer +comments +stats @127.0.0.1 <domain> <type>` 실행, 소요 시간과
+dig의 원본 텍스트 출력을 그대로 반환(요청자가 "실행 결과 그냥 띄워줘도 될듯"이라고
+스코프를 명시했으므로 answer section을 구조화 파싱하지 않음 - 레코드/TTL/값과 dig
+자체의 Query time 푸터가 원문에 이미 다 들어있음). `GET /api/dns/query?domain=&type=`
+(다른 GET `/api/dns/*`와 같이 읽기 전용이라 `gate.RequirePassword` 밖 - 도메인/타입은
+`exec.Command`에 개별 인자로 전달되므로 셸 인젝션 여지 없음, 5초 타임아웃으로 응답
+없는 업스트림에 요청이 무한정 블록되지 않도록 함). 프론트: DNS 탭에 새
+"조회" 서브탭(`Query.tsx`) - 도메인/타입 입력 + `<pre>`로 dig 원본 출력 표시.
+캐시 상태/지우기는 요청자가 처음부터 스코프 아웃했으므로 미구현.
 
-## 남은 작업 우선순위 제안
+**후속 (같은 날)**: "dig에서 A AAAA처럼 여러 레코드를 한번에 조회 못 하나,
+ALL/\* 선택지는?"라는 재요청 - 확인해보니 `dig domain A AAAA MX`처럼 타입을
+여러 개 나열하면 dig가 마지막 타입만 남기고 나머진 "extra type option"
+경고와 함께 버림(로컬 `dig` 바이너리로 직접 재현 확인). 대신
+`dig domain A domain AAAA domain MX ...`처럼 "도메인 타입" 쌍을 반복하면
+한 번의 dig 프로세스 안에서 쌍마다 독립된 조회를 순서대로 실행한다는 걸
+확인 - 이 방식으로 `recordType == "ALL"`을 특수 케이스로 추가(`allTypes =
+[A, AAAA, CNAME, MX, TXT, NS, SOA, SRV]`, PTR은 역방향 이름이 필요해 제외,
+ANY는 그대로 별개 선택지로 유지 - RFC 8482 때문에 리졸버가 ANY에 축소된
+응답만 주는 경우가 많아 ALL의 대체가 안 됨). 프론트 드롭다운에 "ALL
+(A/AAAA/CNAME/MX/TXT/NS/SOA/SRV)" 옵션 추가.
 
-5, 6-1(tinyauth 탭 분리), 7 순서를 권장 - 셋 다 서로 독립적이고 비교적 작음.
-6의 나머지(ACL, OIDC provider, 그룹)는 실제 필요가 생기는 시점(예: Authentik
-테스트를 실제로 시작할 때)에 다시 우선순위를 매기는 게 낫다고 판단 - 지금
-당장 구현해도 검증할 시나리오가 없음.
+## 남은 작업
+
+5(router 자신도 사이드바), 6-1(tinyauth 탭 분리), 7(DNS dig 도구 + ALL 옵션)
+모두 2026-08-09 기준 구현 완료. 남은 건 6의 나머지(ACL, OIDC provider, 그룹,
+well-known, email 필드)뿐 - 실제 필요가 생기는 시점(예: Authentik 테스트를
+실제로 시작할 때)에 다시 우선순위를 매기기로 보류 결정(사용자 확인:
+"ldap 같은거 필요해서 안하면 됨").
