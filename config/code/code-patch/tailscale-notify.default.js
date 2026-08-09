@@ -52,7 +52,7 @@
 
     // Shared closing line on every banner variant - the actual fix for
     // repeated sign-in prompts piling up is not using tailscale at all.
-    const disableHintLine = "Tailscale를 사용하지 않으실 거면 .env의 TAILSCALE_ENABLED=false로 끄실 수 있습니다.";
+    const disableHintLine = "Tailscale를 사용하지 않으실 거면 router의 .env.router에서 TAILSCALE_ENABLED=false로 끄실 수 있습니다.";
 
     let notifiedUrl = null;
     // null = not known yet, so the first poll never fires a false

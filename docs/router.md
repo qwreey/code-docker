@@ -315,8 +315,10 @@ router-frontend 전용이 아닌 범용 UI 컴포넌트는 webmanager 자체 코
 
 tailscale/Dev Proxy/App Routes 노출 정책/router-manager 자체 비밀번호/tinyauth
 같은 router 전용 기능 설정은 저장소 루트가 아니라 `router/example-env.router`
-(런타임 템플릿)에 정리되어 있습니다 — `router/.env.router`로 복사해서
-필요한 값만 주석을 풀어 쓰세요. NETGATE_ENABLED, ROUTER_HOSTNAME,
+(런타임 템플릿)에 정리되어 있습니다 — `.env.router`로 복사해서(`router/` 안이
+아니라 `docker-compose.yml`과 같은 위치입니다 - `builds/code-docker`에 클론해
+쓰는 배포 구조에서는 `router/` 안에 두면 env_file 경로가 어긋나 컨테이너에
+전달되지 않습니다) 필요한 값만 주석을 풀어 쓰세요. NETGATE_ENABLED, ROUTER_HOSTNAME,
 CADDY_ADAPTER_*, ALLOWED_HOSTS류처럼 code-docker와 값을 공유하거나
 docker-compose.yml 토폴로지에 관련된 값은 그대로 저장소 루트
 `example-env`에 남아 있습니다.
@@ -326,8 +328,8 @@ webmanager의 `--env-migrate`와 완전히 같은 도구(공유 Go 모듈
 `.env.router`를 최신 키 구조로 재구성하려면:
 
 ```sh
-cat router/.env.router | tee -a router/.env.router.bak | docker compose exec -T code-docker-router \
-  router-manager --env-migrate > router/.env.router
+cat .env.router | tee -a .env.router.bak | docker compose exec -T code-docker-router \
+  router-manager --env-migrate > .env.router
 ```
 
 (`tee -a`로 백업 파일에 매번 이어붙이는 이유는 webmanager 쪽과 동일 —
@@ -344,7 +346,7 @@ cat router/.env.router | tee -a router/.env.router.bak | docker compose exec -T 
 
 `--env-migrate`/이 버전 불일치 검사가 비교 기준으로 읽는 최신
 `example-env.router` 템플릿의 경로는 저장소 루트 `example-env`의
-`ROUTER_ENV_TEMPLATE_PATH`(기본은 이미지 안 경로, `router/.env.router` 자신에는
+`ROUTER_ENV_TEMPLATE_PATH`(기본은 이미지 안 경로, `.env.router` 자신에는
 설정할 수 없습니다 - 자기참조가 되므로)로 바꿀 수 있습니다 - webmanager의
 `WEBMANAGER_ENV_TEMPLATE_PATH`와 완전히 같은 용도로, 여러 인스턴스에 조직
 공통 템플릿을 볼륨 마운트로 강제하고 싶을 때만 씁니다.

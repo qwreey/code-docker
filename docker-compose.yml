@@ -381,14 +381,25 @@ services:
       ROUTER_ENV_TEMPLATE_PATH: "${ROUTER_ENV_TEMPLATE_PATH:-/etc/router/example-env.router}"
     # router's own feature-specific settings (tailscale, Dev Proxy exposure
     # policy, router-manager's own admin-API password, tinyauth, /exports/
-    # allowlists) all live in router/.env.router, not here - copy
-    # router/example-env.router to router/.env.router and uncomment only
-    # what you need (every value already has a sane default), same pattern
-    # as code-docker's own .env.webmanager above. Migrated the same way too
-    # (`router-manager --env-migrate`, see router/example-env.router's own
-    # doc comment).
+    # allowlists) all live in .env.router, not here - copy
+    # router/example-env.router to .env.router and uncomment only what you
+    # need (every value already has a sane default), same pattern as
+    # code-docker's own .env.webmanager below/above. Migrated the same way
+    # too (`router-manager --env-migrate`, see router/example-env.router's
+    # own doc comment).
+    #
+    # Deliberately NOT "router/.env.router" (what you'd naively write given
+    # the template file it's copied from lives under router/) - env_file
+    # paths are relative to wherever this docker-compose.yml itself lives,
+    # which in the recommended split-directory deploy (docs/index.md: clone
+    # into builds/code-docker/, copy docker-compose.yml out one level) is a
+    # different directory than the router/ subtree - and required: false
+    # means a missing file there is never reported, so a "router/.env.router"
+    # path would silently never be read. Flat and colocated with .env/
+    # .env.webmanager instead: nothing under builds/ needs touching to set a
+    # router value, matching how those two are already handled.
     env_file:
-      - path: router/.env.router
+      - path: .env.router
         required: false
     volumes:
       # Persistent state for router's own features (tailscale login

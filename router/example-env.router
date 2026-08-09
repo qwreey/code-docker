@@ -5,11 +5,14 @@
 #. 그대로 있습니다 - 여긴 router 전용 기능(tailscale/tinyauth/router-manager
 #. 자체 인증/Dev Proxy 세부 설정)만 다룹니다.
 #.
-#. 이 파일을 router/.env.router 로 복사한 뒤, 필요한 값만 주석을 풀어
-#. 사용하세요. 전부 코드 상 합리적인 기본값이 있으므로 대부분은 건드릴
-#. 필요가 없습니다.
+#. 이 파일을 (docker-compose.yml과 같은 디렉토리에) .env.router 로 복사한 뒤,
+#. 필요한 값만 주석을 풀어 사용하세요 - router/.env.router가 아닙니다:
+#. docker-compose.yml을 builds/code-docker 밖으로 복사해 쓰는 권장 배포 구조
+#. (docs/index.md 참고)에서는 env_file 경로가 docker-compose.yml 기준으로
+#. 풀리기 때문에, builds/ 안에 파일을 두면 컨테이너에 전달되지 않습니다.
+#. 전부 코드 상 합리적인 기본값이 있으므로 대부분은 건드릴 필요가 없습니다.
 #.
-#.   cp router/example-env.router router/.env.router
+#.   cp router/example-env.router .env.router
 #.
 #. 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다
 #. (`docker compose restart`로는 환경변수 변경이 적용되지 않습니다). 이 파일이

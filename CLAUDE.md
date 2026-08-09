@@ -368,8 +368,13 @@ directly the way a same-origin embed implicitly could.
 router's own feature-specific env vars (tailscale, Dev Proxy exposure policy,
 `ROUTER_MANAGER_AUTH_PASSWORD_HASH`, tinyauth, `/exports/` allowlists — everything above
 that isn't shared with code-docker or tied to compose topology) live in
-`router/example-env.router` (copy to `router/.env.router`), not the repo-root
-`example-env` — mirrors webmanager's `.env.webmanager` pattern, including a
+`router/example-env.router` (copy to `.env.router` — deliberately flat, alongside
+`docker-compose.yml`/`.env`/`.env.webmanager`, not `router/.env.router`: `docker-compose.yml`'s
+`env_file:` path is resolved relative to wherever the compose file itself lives, which in the
+recommended split-directory deploy — clone into `builds/code-docker/`, copy `docker-compose.yml`
+out one level, see `docs/index.md` — is not the same directory as the `router/` subtree, and
+`required: false` means a file left under `builds/code-docker/router/` is silently never read),
+not the repo-root `example-env` — mirrors webmanager's `.env.webmanager` pattern, including a
 `router-manager --env-migrate` CLI and startup version-mismatch warning
 (`ROUTER_ENV_VERSION`/`ROUTER_ENV_TEMPLATE_PATH`). The migration logic itself
 (reconcile-against-template, `#!important`/`#!` markers, `#~` dead-key archival) is a

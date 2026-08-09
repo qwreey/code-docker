@@ -129,9 +129,9 @@ cp example-env .env
   ```sh
   cp example-env.webmanager .env.webmanager
   ```
-- **router**(네트워크 경계 컨테이너, `router/.env.router`) - tailscale, Dev Proxy/App Routes 노출 정책, router-manager 자체 비밀번호(`ROUTER_MANAGER_AUTH_PASSWORD_HASH`), 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`, 아래 "router" 절 참고), tinyauth 등. 자세한 내용은 [router.md](router.md) 참고.
+- **router**(네트워크 경계 컨테이너, `.env.router`) - tailscale, Dev Proxy/App Routes 노출 정책, router-manager 자체 비밀번호(`ROUTER_MANAGER_AUTH_PASSWORD_HASH`), 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`, 아래 "router" 절 참고), tinyauth 등. 자세한 내용은 [router.md](router.md) 참고. 템플릿 파일 자체는 `router/example-env.router`에 있지만, 복사한 결과물은 `router/` 안이 아니라 `.env`/`.env.webmanager`와 같은 위치(`docker-compose.yml` 옆)에 `.env.router`로 둡니다 - `builds/code-docker`에 클론해 쓰는 배포 구조에서는 `router/` 안에 두면 컨테이너에 전달되지 않습니다.
   ```sh
-  cp router/example-env.router router/.env.router
+  cp router/example-env.router .env.router
   ```
 
 ## 여러 code-docker 인스턴스 사용
@@ -220,8 +220,8 @@ router 컨테이너(`router/` 서브트리) 자체의 override 파일 목록은 
 확인하세요 — `router/config/netgate/`, `router/config/tailscale/`,
 `router/config/caddy-adapter/`에 나뉘어 있습니다. router 전용 기능
 환경변수(tailscale/Dev Proxy/router-manager 자체 비밀번호/tinyauth)는
-`router/example-env.router`(런타임 템플릿, `router/.env.router`로 복사해
-사용) — webmanager와 같은 `--env-migrate` 마이그레이션 도구를 공유합니다,
+`router/example-env.router`(런타임 템플릿, `.env.router`로 복사해
+사용 - `router/` 안이 아니라 `docker-compose.yml` 옆) — webmanager와 같은 `--env-migrate` 마이그레이션 도구를 공유합니다,
 자세한 내용은 [router.md#router-환경변수-마이그레이션](router.md#router-환경변수-마이그레이션) 참고.
 
 # 코드 서버 패치

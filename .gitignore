@@ -3,5 +3,6 @@
 .allow-test
 .env
 .env.webmanager
+.env.router
 config/**/*-override*
 config/**/*.override*

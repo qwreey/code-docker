@@ -16,7 +16,7 @@ type EnvVersionStatus = {
 // backups aren't lost either. Same command shape as webmanager's own
 // EnvVersionBanner.tsx.
 const MIGRATE_CMD =
-  'cat router/.env.router | tee -a router/.env.router.bak | docker compose exec -T code-docker-router router-manager --env-migrate > router/.env.router'
+  'cat .env.router | tee -a .env.router.bak | docker compose exec -T code-docker-router router-manager --env-migrate > .env.router'
 
 // Hand-ported from webmanager/frontend/src/components/common/
 // EnvVersionBanner.tsx (GET/POST /api/system/env-version[/dismiss] - see

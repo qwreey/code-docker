@@ -1,4 +1,3 @@
-.env.router
 config/netgate/*.override.*
 config/netgate/supervisord/*.conf
 config/tailscale/*.override.*
