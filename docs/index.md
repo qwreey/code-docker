@@ -93,9 +93,21 @@ vscord 확장으로 Discord Rich Presence를 연동하고, ssh 소켓 포워딩�
 
 code-docker보다 신뢰 수준이 높은 별도 컨테이너(`code-docker-router`)가 code-docker의
 네트워크 경계와 관련된 기능을 전담합니다 — 아웃바운드 격리(netgate), tailscale, Dev
-Proxy(내부 Caddy), tinyauth(Dev Proxy 라우트별 인증) 네 가지입니다.
+Proxy(내부 Caddy), tinyauth(Dev Proxy 라우트별 인증) 네 가지입니다. host에 퍼블리시된
+80번 포트도 이제 code-docker가 아니라 이 router 컨테이너에 있으므로, 앞단
+리버스 프록시(Caddy/nginx 등)는 code-docker가 아니라 **router 컨테이너 하나**만
+바라보면 됩니다 - 설정 예시는 [security-login.md의 "Caddy
+예시"](security-login.md#caddy-예시) 참고.
 
-자세한 내용은 [router.md](router.md)를 확인하세요.
+자세한 내용은 [router.md](router.md)를 확인하세요. router-manager(설정 UI +
+API)를 code-server/webmanager와 같은 공유 origin이 아니라 별도 전용 도메인으로
+분리하는 `ROUTER_MANAGER_HOSTS` 설정도 프로덕션에서는 권장됩니다 - [router.md의
+"공유 origin과 전용
+도메인"](router.md#보안-공유-origin과-전용-도메인routermanagerhosts) 참고. 이
+전용 도메인까지 앞단 SSO로 같이 보호하면서 로그인을 한 번만 하고 싶다면
+[security-login.md의 "여러 서브도메인 한 번에 로그인
+(SSO)"](security-login.md#여러-서브도메인-한-번에-로그인-sso--router_manager_hosts-등)를
+참고하세요.
 
 ### 아웃바운드 네트워크 격리 (netgate)
 
@@ -105,11 +117,22 @@ code-docker/dind가 `code-docker-netinit`(및 dind 자신)이 계속 심어주�
 
 ## 환경 변수 설정 (.env)
 
-`PWA_NAME`, `TZ`, `LANG`, 마운트할 볼륨 경로(`HOME_VOLUME`/`SSHD_VOLUME`/`DIND_VOLUME`/`ROUTER_VOLUME`), 아웃바운드 격리 관련 값(`NETGATE_ENABLED`, `ROUTER_HOSTNAME`), 로그 상세도 등 `docker-compose.yml`이 읽는 값들은 모두 `example-env`에 설명과 함께 정리되어 있습니다 (tailscale/Dev Proxy/tinyauth 등 router 전용 기능 설정은 `router/example-env.router`에 별도로 있습니다 — [router.md](router.md) 참고). `example-env`를 `.env`로 복사한 뒤 필요한 값만 주석을 풀어 쓰세요 - 전부 합리적인 기본값이 있어 이 파일이 없어도 정상 동작합니다. 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다.
+`PWA_NAME`, `TZ`, `LANG`, 마운트할 볼륨 경로(`HOME_VOLUME`/`SSHD_VOLUME`/`DIND_VOLUME`/`ROUTER_VOLUME`), 아웃바운드 격리 관련 값(`NETGATE_ENABLED`, `ROUTER_HOSTNAME`), 로그 상세도 등 `docker-compose.yml`이 읽는 값들은 모두 `example-env`에 설명과 함께 정리되어 있습니다. `example-env`를 `.env`로 복사한 뒤 필요한 값만 주석을 풀어 쓰세요 - 전부 합리적인 기본값이 있어 이 파일이 없어도 정상 동작합니다. 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다.
 
 ```sh
 cp example-env .env
 ```
+
+이 외에도 컨테이너별로 각자 관리하는 env 파일이 두 개 더 있습니다 - 셋 다 없어도 전부 기본값으로 정상 동작하지만, 아래처럼 미리 복사해두면 값을 바꿀 때 매번 파일을 새로 만들 필요가 없습니다.
+
+- **webmanager**(관리자 패널, `.env.webmanager`) - `WEBMANAGER_AUTH_PASSWORD_HASH`, File Manager 루트, Projects 스캔 경로 등. 자세한 내용은 [webmanager-config.md](webmanager-config.md) 참고.
+  ```sh
+  cp example-env.webmanager .env.webmanager
+  ```
+- **router**(네트워크 경계 컨테이너, `router/.env.router`) - tailscale, Dev Proxy/App Routes 노출 정책, router-manager 자체 비밀번호(`ROUTER_MANAGER_AUTH_PASSWORD_HASH`), 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`, 아래 "router" 절 참고), tinyauth 등. 자세한 내용은 [router.md](router.md) 참고.
+  ```sh
+  cp router/example-env.router router/.env.router
+  ```
 
 ## 여러 code-docker 인스턴스 사용
 

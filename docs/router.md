@@ -268,6 +268,12 @@ router-manager에 직접 연결합니다(SPA + API 전부) — 그 도메인에�
 접근 중이거나 전용 도메인이 있는데 공유 경로로 접근 중이면 배너로
 안내합니다.
 
+앞단 SSO(Authentik 등)로 code-server와 이 전용 도메인을 둘 다 보호하면서
+로그인을 한 번만 하고 싶다면 —
+[security-login.md의 "여러 서브도메인 한 번에 로그인
+(SSO)"](security-login.md#여러-서브도메인-한-번에-로그인-sso--router_manager_hosts-등)
+참고.
+
 **webmanager에 내장된 Dev Proxy/App Routes/Tailscale/DNS/Net 관리/tinyauth 탭은 항상
 `<iframe>`으로 router의 `/router/` 페이지를 그대로 embed합니다**
 (`components/RouterEmbed/RouterFrame.tsx`, 2026-08-08부터 — 그 전에는

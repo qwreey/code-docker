@@ -83,6 +83,77 @@ server {
 
 </details>
 
+## 여러 서브도메인 한 번에 로그인 (SSO) — `ROUTER_MANAGER_HOSTS` 등
+
+[router.md의 "공유 origin과 전용
+도메인"](router.md#보안-공유-origin과-전용-도메인routermanagerhosts)에서 설명하는
+`ROUTER_MANAGER_HOSTS`(예: `router.code.yaeji.moe`)처럼, code-docker 관련
+서비스를 완전히 별도 서브도메인으로 분리해서 노출하는 경우가 있습니다. 위
+Caddy/nginx 예시는 `code.yaeji.moe` 한 도메인만 다루므로, 이런 서브도메인을
+추가할 때마다 forward-auth 설정을 새로 붙여야 합니다 — 그리고 기본
+forward-auth 방식(위 예시가 쓰는 "단일 애플리케이션" 모드)으로 그냥 도메인만
+늘리면, 각 서브도메인이 서로 다른 세션 쿠키를 발급받아서 `code.yaeji.moe`에
+로그인해도 `router.code.yaeji.moe`에서 다시 로그인해야 하는 상황이 됩니다.
+
+한 번 로그인으로 여러 서브도메인을 동시에 통과하고 싶다면(예: `code.yaeji.moe`와
+그 아래 `router.code.yaeji.moe`), Authentik의 프록시 프로바이더를 "단일
+애플리케이션(single application)" 모드가 아니라 **"도메인 레벨(domain
+level)" 모드**로 만들어야 합니다 — 각 서브도메인마다 애플리케이션/프로바이더를
+따로 만들 필요 없이 프로바이더 하나로 같은 부모 도메인 아래 전부를
+보호하고, "Cookie domain"을 두 서브도메인이 공유하는 부모 도메인(예:
+`code.yaeji.moe` — `router.code.yaeji.moe`가 그 아래에 있으므로)으로 지정하면,
+그 도메인으로 발급되는 세션 쿠키가 양쪽 서브도메인에 모두 전달되어 한 번만
+로그인하면 됩니다. Caddy 쪽 `forward_auth` 지시문 자체는 도메인별로 거의
+동일하게 반복하되(각 서브도메인의 site block에 하나씩), Authentik 쪽 provider
+설정만 도메인 레벨 모드로 바꾸면 됩니다. 정확한 필드 이름/화면은 버전마다
+바뀔 수 있으니 [Authentik 공식 문서의 Forward
+auth](https://docs.goauthentik.io/add-secure-apps/providers/proxy/forward_auth/)에서
+"domain level" 모드 절을 참고하세요 - Caddyfile의 `forward_auth` 지시문 문법
+자체는 단일 애플리케이션/도메인 레벨 두 모드가 동일하고(Authentik 공식
+Caddy 문서도 같은 지시문을 그대로 씁니다), SSO 여부를 가르는 건 오직
+Authentik provider의 Cookie domain/모드 설정입니다.
+
+위 [Caddy 예시](#caddy-예시)에 `router.code.yaeji.moe` 사이트 블록을 그대로
+하나 더 추가하면 됩니다 - target은 여전히 `routerip:80` 하나입니다(router
+자신의 nginx가 `ROUTER_MANAGER_HOSTS`로 지정된 Host를 보고 이 도메인 전용
+`server{}` 블록으로 갈라태우므로, 바깥 Caddy는 도메인 하나가 늘었다는 것
+말고는 신경 쓸 게 없습니다):
+
+```Caddy
+code.yaeji.moe {
+  @not_pwa_public {
+    not path /manifest.json /_static/out/browser/serviceWorker.js /_static/src/browser/media/pwa-icon-*.png /_static/lib/vscode/out/vs/patch/*
+  }
+  forward_auth @not_pwa_public http://authentik:9000 {
+    uri /outpost.goauthentik.io/auth/caddy
+    trusted_proxies private_ranges
+  }
+  reverse_proxy /outpost.goauthentik.io/* http://authentik:9000
+  reverse_proxy http://routerip:80
+}
+
+router.code.yaeji.moe {
+  # router-manager 자신은 PWA 설치 경로가 없으므로 예외 경로 없이 전체를
+  # forward-auth로 덮습니다 - 같은 Authentik provider(도메인 레벨 모드, Cookie
+  # domain=code.yaeji.moe)를 가리키므로 code.yaeji.moe에서 이미 로그인했다면
+  # 여기서 다시 로그인 화면을 보지 않습니다.
+  forward_auth http://authentik:9000 {
+    uri /outpost.goauthentik.io/auth/caddy
+    trusted_proxies private_ranges
+  }
+  reverse_proxy /outpost.goauthentik.io/* http://authentik:9000
+  reverse_proxy http://routerip:80   # 같은 routerip:80 - Host 헤더로 router 자신의 nginx가 ROUTER_MANAGER_HOSTS 전용 server{} 블록으로 갈라줍니다
+}
+```
+
+`ROUTER_MANAGER_HOSTS`로 분리한 도메인을 이 SSO 뒤에 두는 것도 이 문서
+서두의 원칙과 동일합니다 - 앞단 SSO를 켠다고 router-manager 자체 비밀번호
+게이트(`ROUTER_MANAGER_AUTH_PASSWORD_HASH`)가 자동으로 켜지거나 대체되지
+않으므로, 둘 다 각자 필요에 따라 따로 설정하세요. 다만 router-manager는
+자기 자신을 향한 PWA 설치 경로가 없으므로(위 "PWA 설치가 안 되는 이유"는
+code-server 전용), 이 도메인은 예외 경로 없이 forward-auth로 전체를 덮어도
+됩니다.
+
 ## 주의사항
 
 **주의**: `/_static/lib/vscode/out/vs/patch/*` 는 `config/code/code-patch/`로 주입되는 파일 전체(코드 패치 스크립트, 커스텀 PWA 아이콘 등)를 통째로 인증 없이 공개합니다. 이 폴더에는 애초에 비밀번호/토큰 같은 민감한 값을 절대 넣지 않는 것을 전제로 하므로 위험하지 않지만, 직접 만든 override 스크립트에 실수로 민감한 값을 하드코딩하지 마세요 - **이 경로 아래 파일은 전부 누구나 볼 수 있습니다.**
