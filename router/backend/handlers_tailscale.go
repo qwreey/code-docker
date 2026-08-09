@@ -50,8 +50,22 @@ func restartTailscalePublish(ctx context.Context) error {
 	return restartSupervisorProgram(ctx, "tailscale-publish")
 }
 
+// writeSupervisorErr responds to a supervisord restart failure that happens
+// AFTER the underlying config change was already persisted successfully -
+// every caller only reaches this after its own mutation (dns.CreateSource,
+// tailscale.AddForward, tinyauthusers.AddUser, etc.) already wrote to disk.
+// Without the explicit "saved" field and clarified message, a client can't
+// tell "nothing happened, safe to retry" from "the change is saved but the
+// affected program failed to restart, so it may not be live yet" - blindly
+// retrying the latter can spuriously 409 on a create that already
+// succeeded. See root CLAUDE.md's code-quality audit.
 func writeSupervisorErr(w http.ResponseWriter, err error) {
-	writeError(w, http.StatusInternalServerError, err.Error())
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusInternalServerError)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"error": "change saved, but restarting the affected program failed: " + err.Error(),
+		"saved": true,
+	})
 }
 
 func handleGetTailscaleConfig(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +84,11 @@ func handlePutTailscaleConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := tailscale.SetGlobalConfig(tailscale.ConfigPath, body); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		status := http.StatusInternalServerError
+		if errors.Is(err, tailscale.ErrValidation) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 	if err := restartTailscaleForward(r.Context()); err != nil {
@@ -101,7 +119,11 @@ func handleAddTailscaleForward(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
-		writeError(w, http.StatusBadRequest, err.Error())
+		status := http.StatusInternalServerError
+		if errors.Is(err, tailscale.ErrValidation) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 	if err := restartTailscaleForward(r.Context()); err != nil {
@@ -124,7 +146,11 @@ func handleUpdateTailscaleForward(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "forward not found")
 			return
 		}
-		writeError(w, http.StatusBadRequest, err.Error())
+		status := http.StatusInternalServerError
+		if errors.Is(err, tailscale.ErrValidation) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 	if err := restartTailscaleForward(r.Context()); err != nil {
@@ -172,7 +198,11 @@ func handleAddTailscalePublish(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
-		writeError(w, http.StatusBadRequest, err.Error())
+		status := http.StatusInternalServerError
+		if errors.Is(err, tailscale.ErrValidation) || errors.Is(err, tailscale.ErrInvalidMode) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 	if err := restartTailscalePublish(r.Context()); err != nil {
@@ -195,7 +225,11 @@ func handleUpdateTailscalePublish(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "publish not found")
 			return
 		}
-		writeError(w, http.StatusBadRequest, err.Error())
+		status := http.StatusInternalServerError
+		if errors.Is(err, tailscale.ErrValidation) || errors.Is(err, tailscale.ErrInvalidMode) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 	if err := restartTailscalePublish(r.Context()); err != nil {

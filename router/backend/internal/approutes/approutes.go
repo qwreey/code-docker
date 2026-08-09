@@ -46,6 +46,10 @@ const ManagedDir = "/var/lib/code-docker-router/caddy-adapter/apps"
 var (
 	ErrAppExists   = errors.New("app already exists")
 	ErrAppNotFound = errors.New("app not found")
+	// ErrReloadFailed wraps a Reload failure that happens AFTER the
+	// fragment was already written and validated - see devproxy's
+	// identical ErrReloadFailed for the full reasoning.
+	ErrReloadFailed = errors.New("saved, but reloading Caddy failed")
 )
 
 // App is one App Routes entry — Name is both the managed *.caddy filename
@@ -256,6 +260,15 @@ func Reload(ctx context.Context) error {
 	return runCaddy(ctx, "reload", "--config", devproxy.CaddyfilePath, "--adapter", "caddyfile", "--address", devproxy.AdminAddr)
 }
 
+// reloadAfterWrite calls Reload and, on failure, wraps the error as
+// ErrReloadFailed - see devproxy's identical helper for the full reasoning.
+func reloadAfterWrite(ctx context.Context) error {
+	if err := Reload(ctx); err != nil {
+		return fmt.Errorf("%w: %v", ErrReloadFailed, err)
+	}
+	return nil
+}
+
 func validateApp(a App) error {
 	if err := devproxy.ValidateName(a.Name); err != nil {
 		return err
@@ -277,7 +290,7 @@ func Create(ctx context.Context, a App) error {
 	if err := writeAndValidate(ctx, a.Name, Render(a)); err != nil {
 		return err
 	}
-	return Reload(ctx)
+	return reloadAfterWrite(ctx)
 }
 
 // UpdateStructured overwrites oldName's fragment with a freshly rendered
@@ -306,7 +319,7 @@ func UpdateStructured(ctx context.Context, oldName string, a App) error {
 			return err
 		}
 	}
-	return Reload(ctx)
+	return reloadAfterWrite(ctx)
 }
 
 // UpdateRaw overwrites name's fragment with arbitrary Caddyfile text (the
@@ -322,7 +335,7 @@ func UpdateRaw(ctx context.Context, name, raw string) error {
 	if err := writeAndValidate(ctx, name, raw); err != nil {
 		return err
 	}
-	return Reload(ctx)
+	return reloadAfterWrite(ctx)
 }
 
 // Delete removes name's fragment and reloads.
@@ -340,5 +353,5 @@ func Delete(ctx context.Context, name string) error {
 	if err := runCaddy(ctx, "adapt", "--config", devproxy.CaddyfilePath, "--adapter", "caddyfile"); err != nil {
 		return fmt.Errorf("remaining Caddyfile invalid after delete: %w", err)
 	}
-	return Reload(ctx)
+	return reloadAfterWrite(ctx)
 }

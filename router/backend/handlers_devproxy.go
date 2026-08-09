@@ -95,6 +95,11 @@ func writeDevProxyError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, devproxy.ErrExposeNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, devproxy.ErrReloadFailed):
+		// The write already succeeded - this is an infrastructure/apply
+		// failure, not a client input problem, so it gets a 500 instead
+		// of falling into the generic 400 default below.
+		writeError(w, http.StatusInternalServerError, err.Error())
 	default:
 		writeError(w, http.StatusBadRequest, err.Error())
 	}

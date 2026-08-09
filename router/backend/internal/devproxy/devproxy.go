@@ -62,6 +62,14 @@ const (
 var (
 	ErrExposeExists   = errors.New("expose already exists")
 	ErrExposeNotFound = errors.New("expose not found")
+	// ErrReloadFailed wraps a Reload failure that happens AFTER the
+	// fragment was already written and validated - the change is
+	// persisted on disk, but the running Caddy instance may still be
+	// serving the old config. Distinguishing this from a validation
+	// error (both of which previously surfaced identically to
+	// writeDevProxyError, mapped to a misleading 400) lets the handler
+	// report a 500 instead - see root CLAUDE.md's code-quality audit.
+	ErrReloadFailed = errors.New("saved, but reloading Caddy failed")
 )
 
 // Expose is one dev-proxy entry — an internal identifier (Name, used only
@@ -387,6 +395,16 @@ func Reload(ctx context.Context) error {
 	return runCaddy(ctx, "reload", "--config", CaddyfilePath, "--adapter", "caddyfile", "--address", AdminAddr)
 }
 
+// reloadAfterWrite calls Reload and, on failure, wraps the error as
+// ErrReloadFailed - used by every mutator below, all of which only ever
+// call this after their own write already succeeded.
+func reloadAfterWrite(ctx context.Context) error {
+	if err := Reload(ctx); err != nil {
+		return fmt.Errorf("%w: %v", ErrReloadFailed, err)
+	}
+	return nil
+}
+
 func validateExpose(e Expose) error {
 	if err := ValidateName(e.Name); err != nil {
 		return err
@@ -425,7 +443,7 @@ func Create(ctx context.Context, e Expose) error {
 	if err := writeAndValidate(ctx, e.Name, Render(e)); err != nil {
 		return err
 	}
-	return Reload(ctx)
+	return reloadAfterWrite(ctx)
 }
 
 // UpdateStructured overwrites oldName's fragment with a freshly rendered
@@ -454,7 +472,7 @@ func UpdateStructured(ctx context.Context, oldName string, e Expose) error {
 			return err
 		}
 	}
-	return Reload(ctx)
+	return reloadAfterWrite(ctx)
 }
 
 // UpdateRaw overwrites name's fragment with arbitrary Caddyfile text (the
@@ -470,7 +488,7 @@ func UpdateRaw(ctx context.Context, name, raw string) error {
 	if err := writeAndValidate(ctx, name, raw); err != nil {
 		return err
 	}
-	return Reload(ctx)
+	return reloadAfterWrite(ctx)
 }
 
 // Delete removes name's fragment and reloads.
@@ -488,5 +506,5 @@ func Delete(ctx context.Context, name string) error {
 	if err := runCaddy(ctx, "adapt", "--config", CaddyfilePath, "--adapter", "caddyfile"); err != nil {
 		return fmt.Errorf("remaining Caddyfile invalid after delete: %w", err)
 	}
-	return Reload(ctx)
+	return reloadAfterWrite(ctx)
 }

@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	"router/internal/atomicfile"
 )
 
 // ResolverConfigPath drives dns.default.sh's upstream resolver choice - see
@@ -69,12 +70,11 @@ func SetResolverConfig(cfg ResolverConfig) error {
 			}
 		}
 	}
-	if err := os.MkdirAll(filepath.Dir(ResolverConfigPath), 0o755); err != nil {
-		return err
-	}
 	data, err := yaml.Marshal(resolverFile{Resolver: cfg})
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(ResolverConfigPath, data, 0o644)
+	mu.Lock()
+	defer mu.Unlock()
+	return atomicfile.Write(ResolverConfigPath, data, 0o644, 0o755)
 }

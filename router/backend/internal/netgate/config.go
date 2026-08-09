@@ -24,11 +24,43 @@ package netgate
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sync"
 
 	"gopkg.in/yaml.v3"
+
+	"router/internal/atomicfile"
 )
+
+// mu serializes every read-modify-write below - without it, two concurrent
+// requests touching the same file (e.g. two browser tabs) can both read the
+// same pre-mutation content and the second writer's save() silently
+// discards the first writer's change.
+var mu sync.Mutex
+
+// hostRe restricts Forward.TargetHost to a plain hostname/IPv4 literal.
+// firewall.default.sh resolves it via `getent` before ever reaching
+// iptables, so a malformed value mostly just fails to resolve (low risk on
+// its own) - this is defense-in-depth plus a clean 400 at write time
+// instead of a silent per-cycle "does not resolve yet, skipping" log line.
+var hostRe = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$`)
+
+func validateHost(field, host string) error {
+	if host == "" || !hostRe.MatchString(host) {
+		return fmt.Errorf("%w: %s must be a plain hostname or IPv4 address", ErrValidation, field)
+	}
+	return nil
+}
+
+func validatePort(field string, port int) error {
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("%w: %s must be between 1 and 65535", ErrValidation, field)
+	}
+	return nil
+}
 
 const (
 	// LiveConfigPath is what router-manager's own CRUD reads/writes, and
@@ -68,6 +100,13 @@ var (
 	ErrInvalidAction   = errors.New("action must be allow or block")
 	ErrForwardExists   = errors.New("a forward for this host_port already exists")
 	ErrForwardNotFound = errors.New("forward not found")
+	// ErrValidation wraps every plain input-validation rejection below
+	// (validateHost, validatePort, "cidr is required") so handlers can
+	// distinguish "the request was malformed" (400) from an I/O failure
+	// in load()/save() (500) - previously both fell through to the same
+	// default 400, misreporting a real server-side problem as bad input.
+	// See root CLAUDE.md's code-quality audit.
+	ErrValidation = errors.New("invalid input")
 )
 
 func load(path string) (fileConfig, error) {
@@ -90,10 +129,7 @@ func save(path string, cfg fileConfig) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o644)
+	return atomicfile.Write(path, data, 0o644, 0o755)
 }
 
 // EnsureSeeded copies OverrideConfigPath (if present) or DefaultConfigPath
@@ -145,9 +181,11 @@ func ReplaceOutbound(path string, rules []OutboundRule) ([]OutboundRule, error) 
 			return nil, ErrInvalidAction
 		}
 		if r.CIDR == "" {
-			return nil, errors.New("cidr is required")
+			return nil, fmt.Errorf("%w: cidr is required", ErrValidation)
 		}
 	}
+	mu.Lock()
+	defer mu.Unlock()
 	cfg, err := load(path)
 	if err != nil {
 		return nil, err
@@ -174,9 +212,17 @@ func ListForwards(path string) ([]Forward, error) {
 }
 
 func AddForward(path string, f Forward) (Forward, error) {
-	if f.HostPort == 0 || f.TargetHost == "" || f.TargetPort == 0 {
-		return Forward{}, errors.New("hostPort, targetHost and targetPort are required")
+	if err := validatePort("hostPort", f.HostPort); err != nil {
+		return Forward{}, err
 	}
+	if err := validateHost("targetHost", f.TargetHost); err != nil {
+		return Forward{}, err
+	}
+	if err := validatePort("targetPort", f.TargetPort); err != nil {
+		return Forward{}, err
+	}
+	mu.Lock()
+	defer mu.Unlock()
 	cfg, err := load(path)
 	if err != nil {
 		return Forward{}, err
@@ -194,6 +240,8 @@ func AddForward(path string, f Forward) (Forward, error) {
 }
 
 func DeleteForward(path string, hostPort int) error {
+	mu.Lock()
+	defer mu.Unlock()
 	cfg, err := load(path)
 	if err != nil {
 		return err

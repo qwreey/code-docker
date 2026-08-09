@@ -8,7 +8,19 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
+
+	"router/internal/atomicfile"
 )
+
+// mu serializes every read-modify-write in this package (blocklist sources,
+// the shared manifest, custom-hosts, and the resolver config all live under
+// `package dns`) - without it, two concurrent requests touching the same
+// file can each read stale content and the second writer's save silently
+// discards the first's change. Most consequential for the manifest
+// (LoadManifest/SaveManifest in reconcile.go): CreateSource/BuiltinPull/
+// BuiltinIgnore all read-modify-write it independently.
+var mu sync.Mutex
 
 const (
 	// SourcesDir holds one hosts-format file per blocklist source - dns.
@@ -233,13 +245,12 @@ func CreateSource(name string, hosts []string) error {
 			return err
 		}
 	}
+	mu.Lock()
+	defer mu.Unlock()
 	if _, err := os.Stat(customPath(name)); err == nil {
 		return ErrSourceExists
 	}
-	if err := os.MkdirAll(SourcesDir, 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(customPath(name), []byte(renderHostsFile(dedupe(hosts))), 0o644)
+	return atomicfile.Write(customPath(name), []byte(renderHostsFile(dedupe(hosts))), 0o644, 0o755)
 }
 
 // UpdateSource overwrites an existing custom source's host list.
@@ -252,10 +263,12 @@ func UpdateSource(name string, hosts []string) error {
 			return err
 		}
 	}
+	mu.Lock()
+	defer mu.Unlock()
 	if _, err := os.Stat(customPath(name)); err != nil {
 		return ErrSourceNotFound
 	}
-	return os.WriteFile(customPath(name), []byte(renderHostsFile(dedupe(hosts))), 0o644)
+	return atomicfile.Write(customPath(name), []byte(renderHostsFile(dedupe(hosts))), 0o644, 0o755)
 }
 
 // DeleteSource removes a custom source.
@@ -263,6 +276,8 @@ func DeleteSource(name string) error {
 	if name == BuiltinName {
 		return ErrBuiltinImmutable
 	}
+	mu.Lock()
+	defer mu.Unlock()
 	p := customPath(name)
 	if _, err := os.Stat(p); err != nil {
 		return ErrSourceNotFound
@@ -373,14 +388,13 @@ func GetBuiltinStatus() (BuiltinStatus, error) {
 // time a human sees UpdateAvailable=true here, it's always the diverged
 // case).
 func BuiltinPull() error {
+	mu.Lock()
+	defer mu.Unlock()
 	shipped, err := os.ReadFile(ShippedDefaultPath())
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(SourcesDir, 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(BuiltinPath(), shipped, 0o644); err != nil {
+	if err := atomicfile.Write(BuiltinPath(), shipped, 0o644, 0o755); err != nil {
 		return err
 	}
 	manifest, err := LoadManifest(ManifestPath)
@@ -396,6 +410,8 @@ func BuiltinPull() error {
 // from reappearing for this same shipped version, but keeps whatever the
 // user has customized.
 func BuiltinIgnore() error {
+	mu.Lock()
+	defer mu.Unlock()
 	shipped, err := os.ReadFile(ShippedDefaultPath())
 	if err != nil {
 		return err

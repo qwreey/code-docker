@@ -19,8 +19,9 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"os"
-	"path/filepath"
 	"strings"
+
+	"router/internal/atomicfile"
 )
 
 // ManifestPath tracks, per hash-tracked builtin source, the shipped-content
@@ -68,8 +69,5 @@ func SaveManifest(path string, m map[string]string) error {
 		b.WriteString(hash)
 		b.WriteByte('\n')
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, []byte(b.String()), 0o644)
+	return atomicfile.Write(path, []byte(b.String()), 0o644, 0o755)
 }

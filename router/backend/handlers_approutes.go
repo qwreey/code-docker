@@ -90,6 +90,10 @@ func writeAppRouteError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, approutes.ErrAppNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, approutes.ErrReloadFailed):
+		// The write already succeeded - this is an infrastructure/apply
+		// failure, not a client input problem.
+		writeError(w, http.StatusInternalServerError, err.Error())
 	default:
 		writeError(w, http.StatusBadRequest, err.Error())
 	}

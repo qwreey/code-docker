@@ -51,6 +51,12 @@ func validateName(name string) error {
 	return nil
 }
 
+// shellQuote wraps s in single quotes for safe embedding in a POSIX shell
+// `source`d file, escaping any embedded single quote as '\''.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
 // bcryptCost matches tinyauth's own `user create --docker` default (cost 10,
 // $2a$ hashes - see docs/router.md/router/example-env.router).
 const bcryptCost = 10
@@ -189,7 +195,13 @@ func RenderEnvFile(envPath string, users []User) error {
 	for _, u := range users {
 		pairs = append(pairs, u.Name+":"+u.PasswordHash)
 	}
-	line := "TINYAUTH_AUTH_USERS=" + strings.Join(pairs, ",") + "\n"
+	// Single-quoted: a bcrypt hash's own `$2a$10$...` prefix is otherwise
+	// parsed as shell parameter expansion the moment tinyauth.default.sh
+	// `source`s this file, silently mangling every hash into garbage that
+	// can never match. shellQuote defends against a stray `'` even though
+	// neither the name charset (validateName) nor a bcrypt hash's alphabet
+	// can currently produce one.
+	line := "TINYAUTH_AUTH_USERS=" + shellQuote(strings.Join(pairs, ",")) + "\n"
 	if err := os.MkdirAll(filepath.Dir(envPath), 0o700); err != nil {
 		return err
 	}

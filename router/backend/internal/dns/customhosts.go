@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"router/internal/atomicfile"
 )
 
 const (
@@ -81,14 +82,14 @@ func SetCustomHosts(entries []HostEntry) error {
 		seen[e.Host] = true
 	}
 
-	if err := os.MkdirAll(filepath.Dir(CustomHostsConfigPath), 0o755); err != nil {
-		return err
-	}
 	data, err := yaml.Marshal(customHostsFile{Entries: entries})
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(CustomHostsConfigPath, data, 0o644); err != nil {
+
+	mu.Lock()
+	defer mu.Unlock()
+	if err := atomicfile.Write(CustomHostsConfigPath, data, 0o644, 0o755); err != nil {
 		return err
 	}
 
@@ -109,5 +110,5 @@ func SetCustomHosts(entries []HostEntry) error {
 		b.WriteString(e.Host)
 		b.WriteByte('\n')
 	}
-	return os.WriteFile(CustomHostsRenderedPath, []byte(b.String()), 0o644)
+	return atomicfile.Write(CustomHostsRenderedPath, []byte(b.String()), 0o644, 0o755)
 }

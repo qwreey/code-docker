@@ -31,7 +31,11 @@ func handleReplaceNetgateOutbound(w http.ResponseWriter, r *http.Request) {
 	}
 	rules, err := netgate.ReplaceOutbound(netgate.LiveConfigPath, body)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		status := http.StatusInternalServerError
+		if errors.Is(err, netgate.ErrInvalidAction) || errors.Is(err, netgate.ErrValidation) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, rules)
@@ -58,7 +62,11 @@ func handleAddNetgateForward(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
-		writeError(w, http.StatusBadRequest, err.Error())
+		status := http.StatusInternalServerError
+		if errors.Is(err, netgate.ErrValidation) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusCreated, forward)
