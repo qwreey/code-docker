@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ExternalLink, RefreshCw, Trash2 } from 'lucide-react'
+import { ExternalLink, FolderOpen, RefreshCw, Terminal as TerminalIcon, Trash2 } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
 import type { MiseToolEntry, MiseToolsResponse, ProjectInfo, ReclaimableEntry } from '../../api/types'
 import { formatBytes } from '../../utils/format'
@@ -29,12 +29,16 @@ export function ProjectTable({
   onProjectUpdated,
   onProjectDeleted,
   onError,
+  onOpenTerminal,
+  onOpenFileManager,
 }: {
   projects: ProjectInfo[]
   codeServerUrl: string
   onProjectUpdated: (project: ProjectInfo) => void
   onProjectDeleted: (path: string) => void
   onError: (message: string) => void
+  onOpenTerminal?: (cwd: string) => void
+  onOpenFileManager?: (path: string) => void
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('lastModified')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -227,6 +231,34 @@ export function ProjectTable({
                     >
                       <ExternalLink size={14} />
                     </a>
+                    {onOpenTerminal && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-small btn-icon"
+                        title="터미널에서 열기"
+                        aria-label="터미널에서 열기"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onOpenTerminal(project.path)
+                        }}
+                      >
+                        <TerminalIcon size={14} />
+                      </button>
+                    )}
+                    {onOpenFileManager && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-small btn-icon"
+                        title="파일 브라우저에서 열기"
+                        aria-label="파일 브라우저에서 열기"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onOpenFileManager(project.path)
+                        }}
+                      >
+                        <FolderOpen size={14} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn btn-danger btn-small btn-icon"
@@ -253,15 +285,39 @@ export function ProjectTable({
           onClose={() => setDetailsPath(null)}
           title={detailsProject.name}
           headerActions={
-            <button
-              type="button"
-              className="btn btn-danger btn-small btn-icon"
-              title="프로젝트 삭제"
-              aria-label="프로젝트 삭제"
-              onClick={() => setPendingDeleteProject(detailsProject)}
-            >
-              <Trash2 size={14} />
-            </button>
+            <>
+              {onOpenTerminal && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small btn-icon"
+                  title="터미널에서 열기"
+                  aria-label="터미널에서 열기"
+                  onClick={() => onOpenTerminal(detailsProject.path)}
+                >
+                  <TerminalIcon size={14} />
+                </button>
+              )}
+              {onOpenFileManager && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small btn-icon"
+                  title="파일 브라우저에서 열기"
+                  aria-label="파일 브라우저에서 열기"
+                  onClick={() => onOpenFileManager(detailsProject.path)}
+                >
+                  <FolderOpen size={14} />
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-danger btn-small btn-icon"
+                title="프로젝트 삭제"
+                aria-label="프로젝트 삭제"
+                onClick={() => setPendingDeleteProject(detailsProject)}
+              >
+                <Trash2 size={14} />
+              </button>
+            </>
           }
         >
           <div className="projects-detail-sections">

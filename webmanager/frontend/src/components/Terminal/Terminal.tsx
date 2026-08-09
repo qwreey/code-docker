@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
+import { FolderOpen } from 'lucide-react'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
@@ -76,7 +77,15 @@ function nextSessionName(existing: TerminalSessionInfo[], alsoTaken: string, lab
   return `${base} ${n}`
 }
 
-export function Terminal() {
+export function Terminal({
+  initialOpen,
+  onInitialOpenConsumed,
+  onOpenFileManager,
+}: {
+  initialOpen?: { cwd?: string; label?: string } | null
+  onInitialOpenConsumed?: () => void
+  onOpenFileManager?: (path: string) => void
+} = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -407,6 +416,28 @@ export function Terminal() {
     [sessions, activeSession],
   )
 
+  // Consumes an "open in terminal" request handed down from another tab
+  // (Projects/Files, see App.tsx's openInTerminal) - runs once on mount only,
+  // since Terminal fully unmounts whenever its tab isn't active, so a fresh
+  // mount is exactly the one moment a still-pending request should apply.
+  useEffect(() => {
+    if (initialOpen) {
+      addSession(initialOpen)
+      onInitialOpenConsumed?.()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const openFileManagerHere = useCallback(async () => {
+    if (activeSession === HOME_TAB_ID || !onOpenFileManager) return
+    try {
+      const res = await api.get<{ cwd: string }>(`/terminal/sessions/${encodeURIComponent(activeSession)}/cwd`)
+      onOpenFileManager(res.cwd)
+    } catch (e) {
+      setSessionActionError(errorMessage(e))
+    }
+  }, [activeSession, onOpenFileManager])
+
   const openProfile = useCallback(
     (profile: TerminalProfile) => {
       addSession({ label: profile.label, cwd: profile.cwd, command: profile.command })
@@ -538,6 +569,16 @@ export function Terminal() {
         <div className="terminal-header-actions">
           {activeSession !== HOME_TAB_ID && (
             <span className={`badge ${STATE_BADGE_CLASS[state]}`}>{STATE_LABEL[state]}</span>
+          )}
+          {activeSession !== HOME_TAB_ID && onOpenFileManager && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              onClick={openFileManagerHere}
+              title="현재 디렉토리를 파일 브라우저에서 열기"
+            >
+              <FolderOpen size={14} /> 파일 브라우저에서 열기
+            </button>
           )}
           <button type="button" className="btn btn-secondary btn-small" onClick={() => setSettingsOpen(true)}>
             설정

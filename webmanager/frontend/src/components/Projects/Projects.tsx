@@ -11,7 +11,13 @@ import { withViewTransition } from '../../utils/viewTransition'
 
 const SCAN_POLL_INTERVAL_MS = 2000
 
-export function Projects() {
+export function Projects({
+  onOpenTerminal,
+  onOpenFileManager,
+}: {
+  onOpenTerminal?: (cwd: string) => void
+  onOpenFileManager?: (path: string) => void
+} = {}) {
   const [data, setData] = useState<ProjectsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -111,6 +117,8 @@ export function Projects() {
             onProjectUpdated={handleProjectUpdated}
             onProjectDeleted={handleProjectDeleted}
             onError={setError}
+            onOpenTerminal={onOpenTerminal}
+            onOpenFileManager={onOpenFileManager}
           />
         )
       )}

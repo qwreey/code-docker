@@ -294,6 +294,20 @@ func (s *Session) info() Info {
 	}
 }
 
+// Cwd resolves the shell process's live working directory via /proc/<pid>/cwd
+// — unlike CreateOptions.Cwd (only meaningful at creation), this reflects
+// wherever the shell has since `cd`'d to. Used by the "open in file manager
+// at this session's current directory" frontend action.
+func (s *Session) Cwd() (string, error) {
+	s.mu.Lock()
+	closed := s.closed
+	s.mu.Unlock()
+	if closed || s.cmd.Process == nil {
+		return "", ErrSessionGone
+	}
+	return os.Readlink(fmt.Sprintf("/proc/%d/cwd", s.cmd.Process.Pid))
+}
+
 // Done returns a channel that's closed once this session has actually shut
 // down (whether via pump() noticing PTY EOF — e.g. the shell exited via
 // Ctrl+D — an explicit Registry.Remove, or idle GC). A currently-attached

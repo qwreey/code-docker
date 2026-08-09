@@ -317,6 +317,7 @@ func main() {
 	mux.Handle("GET /api/terminal/sessions", gate.RequirePassword(http.HandlerFunc(s.handleListTerminalSessions)))
 	mux.Handle("PATCH /api/terminal/sessions/{name}", gate.RequirePassword(http.HandlerFunc(s.handlePatchTerminalSession)))
 	mux.Handle("DELETE /api/terminal/sessions/{name}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteTerminalSession)))
+	mux.Handle("GET /api/terminal/sessions/{name}/cwd", gate.RequirePassword(http.HandlerFunc(s.handleGetTerminalSessionCwd)))
 
 	// Home tab launch profiles (internal/terminalprofiles) — same gate as
 	// the rest of the terminal feature.

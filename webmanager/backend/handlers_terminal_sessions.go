@@ -74,6 +74,19 @@ func (s *Server) handlePatchTerminalSession(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
+// handleGetTerminalSessionCwd backs the "open in file manager at this
+// session's current directory" action — resolves the shell's live cwd via
+// /proc/<pid>/cwd rather than whatever CreateOptions.Cwd it started with.
+func (s *Server) handleGetTerminalSessionCwd(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	cwd, err := s.termSessions.Cwd(name)
+	if err != nil {
+		writeTermSessionErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"cwd": cwd})
+}
+
 func (s *Server) handleDeleteTerminalSession(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if err := s.termSessions.Remove(name); err != nil {

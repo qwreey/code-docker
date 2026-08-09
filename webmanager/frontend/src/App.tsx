@@ -69,6 +69,24 @@ function App() {
     window.history.pushState(null, '', rootPath + id)
   }
 
+  // Cross-tab "open in ..." actions (Projects/Files/Terminal) - each just
+  // stashes a one-shot payload here and switches tabs; the target tab
+  // consumes it once on mount (it fully unmounts when not active, see the
+  // conditional renders below) and reports back so the payload doesn't
+  // linger and reapply on some unrelated later visit to the same tab.
+  const [pendingTerminalOpen, setPendingTerminalOpen] = useState<{ cwd?: string; label?: string } | null>(null)
+  const [pendingFilesPath, setPendingFilesPath] = useState<string | null>(null)
+
+  function openInTerminal(cwd: string, label?: string) {
+    setPendingTerminalOpen({ cwd, label })
+    withViewTransition(() => setActive('terminal'))
+  }
+
+  function openInFileManager(path: string) {
+    setPendingFilesPath(path)
+    withViewTransition(() => setActive('files'))
+  }
+
   useEffect(() => {
     function onPopState() {
       setActiveState(splitPath(window.location.pathname).section ?? 'supervisor')
@@ -124,20 +142,28 @@ function App() {
             </RequiresUnlock>
           )}
           {active === 'processes' && <Processes />}
-          {active === 'projects' && <Projects />}
+          {active === 'projects' && <Projects onOpenTerminal={openInTerminal} onOpenFileManager={openInFileManager} />}
           {active === 'mise' && <Mise />}
           {active === 'dind' && <Dind />}
           {active === 'claude' && <ClaudeCode />}
           {active === 'extensions' && <Extensions />}
           {active === 'terminal' && (
             <RequiresUnlock>
-              <Terminal />
+              <Terminal
+                initialOpen={pendingTerminalOpen}
+                onInitialOpenConsumed={() => setPendingTerminalOpen(null)}
+                onOpenFileManager={openInFileManager}
+              />
             </RequiresUnlock>
           )}
           {active === 'files' && (
             <Suspense fallback={<Skeleton />}>
               <RequiresUnlock>
-                <FileManager />
+                <FileManager
+                  initialPath={pendingFilesPath}
+                  onInitialPathConsumed={() => setPendingFilesPath(null)}
+                  onOpenTerminal={openInTerminal}
+                />
               </RequiresUnlock>
             </Suspense>
           )}

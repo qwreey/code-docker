@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Terminal as TerminalIcon } from 'lucide-react'
 import { api, apiUrl, errorMessage } from '../../api/client'
 import type { FileEntry, FileOpResult, FileUploadResult } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
@@ -26,14 +27,29 @@ function joinPath(dir: string, name: string): string {
   return dir === '/' ? `/${name}` : `${dir}/${name}`
 }
 
+function basenamePosix(p: string): string {
+  const idx = p.lastIndexOf('/')
+  return idx >= 0 ? p.slice(idx + 1) || p : p
+}
+
 function summarizeFailures(results: FileOpResult[]): string | null {
   const failed = results.filter((r) => !r.ok)
   if (failed.length === 0) return null
   return `${failed.length}개 실패: ${failed.map((f) => `${f.path} (${f.error ?? '알 수 없는 오류'})`).join(', ')}`
 }
 
-export function FileManager() {
-  const [pathStack, setPathStack] = useState<Crumb[]>([{ label: '홈', path: null }])
+export function FileManager({
+  initialPath,
+  onInitialPathConsumed,
+  onOpenTerminal,
+}: {
+  initialPath?: string | null
+  onInitialPathConsumed?: () => void
+  onOpenTerminal?: (cwd: string) => void
+} = {}) {
+  const [pathStack, setPathStack] = useState<Crumb[]>(() =>
+    initialPath ? [{ label: '홈', path: null }, { label: basenamePosix(initialPath), path: initialPath }] : [{ label: '홈', path: null }],
+  )
   const [entries, setEntries] = useState<FileEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -78,6 +94,17 @@ export function FileManager() {
   useEffect(() => {
     load()
   }, [load])
+
+  // Consumes an "open in file manager" request handed down from another tab
+  // (Projects/Terminal, see App.tsx's openInFileManager) - runs once on
+  // mount only, since FileManager fully unmounts whenever its tab isn't
+  // active (see App.tsx), so a fresh mount is exactly the one moment a
+  // still-pending request should apply; pathStack's own initializer above
+  // already consumed initialPath itself, this just lets App.tsx clear it.
+  useEffect(() => {
+    if (initialPath) onInitialPathConsumed?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     setSelected(new Set())
@@ -233,6 +260,17 @@ export function FileManager() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       <div className="file-manager-toolbar">
+        {onOpenTerminal && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-small"
+            disabled={currentDirPath === null}
+            onClick={() => currentDirPath !== null && onOpenTerminal(currentDirPath)}
+            title="현재 디렉토리를 터미널에서 열기"
+          >
+            <TerminalIcon size={14} /> 터미널에서 열기
+          </button>
+        )}
         <button
           type="button"
           className="btn btn-secondary btn-small"

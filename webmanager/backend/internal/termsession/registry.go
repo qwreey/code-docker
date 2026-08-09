@@ -148,6 +148,17 @@ func (r *Registry) SetPinned(name string, pinned bool) error {
 	return nil
 }
 
+// Cwd resolves the named session's live working directory (see Session.Cwd).
+func (r *Registry) Cwd(name string) (string, error) {
+	r.mu.Lock()
+	s, ok := r.sessions[name]
+	r.mu.Unlock()
+	if !ok {
+		return "", ErrSessionGone
+	}
+	return s.Cwd()
+}
+
 // Remove kills and forgets the named session (an explicit "close this tab
 // for good" action, distinct from a client merely disconnecting).
 func (r *Registry) Remove(name string) error {
