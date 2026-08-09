@@ -111,6 +111,29 @@ func handleAddTailscaleForward(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, forward)
 }
 
+func handleUpdateTailscaleForward(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	var body tailscale.Forward
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	forward, err := tailscale.UpdateForward(tailscale.ConfigPath, name, body)
+	if err != nil {
+		if errors.Is(err, tailscale.ErrForwardNotFound) {
+			writeError(w, http.StatusNotFound, "forward not found")
+			return
+		}
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := restartTailscaleForward(r.Context()); err != nil {
+		writeSupervisorErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, forward)
+}
+
 func handleDeleteTailscaleForward(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if err := tailscale.DeleteForward(tailscale.ConfigPath, name); err != nil {
@@ -157,6 +180,29 @@ func handleAddTailscalePublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, publish)
+}
+
+func handleUpdateTailscalePublish(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	var body tailscale.Publish
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	publish, err := tailscale.UpdatePublish(tailscale.ConfigPath, name, body)
+	if err != nil {
+		if errors.Is(err, tailscale.ErrPublishNotFound) {
+			writeError(w, http.StatusNotFound, "publish not found")
+			return
+		}
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := restartTailscalePublish(r.Context()); err != nil {
+		writeSupervisorErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, publish)
 }
 
 func handleDeleteTailscalePublish(w http.ResponseWriter, r *http.Request) {

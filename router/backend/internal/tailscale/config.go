@@ -146,6 +146,35 @@ func AddForward(path string, f Forward) (Forward, error) {
 	return f, nil
 }
 
+// UpdateForward overwrites an existing forward's fields, keyed by its
+// current name - renaming isn't supported through this path (the frontend
+// disables the name field on edit, same as dns.UpdateSource).
+func UpdateForward(path, name string, f Forward) (Forward, error) {
+	f.Name = name
+	if f.LocalPort == 0 || f.RemoteHost == "" || f.RemotePort == 0 {
+		return Forward{}, errors.New("localPort, remoteHost and remotePort are required")
+	}
+	cfg, err := load(path)
+	if err != nil {
+		return Forward{}, err
+	}
+	found := false
+	for i, e := range cfg.Forwards {
+		if e.Name == name {
+			cfg.Forwards[i] = f
+			found = true
+			break
+		}
+	}
+	if !found {
+		return Forward{}, ErrForwardNotFound
+	}
+	if err := save(path, cfg); err != nil {
+		return Forward{}, err
+	}
+	return f, nil
+}
+
 func DeleteForward(path, name string) error {
 	cfg, err := load(path)
 	if err != nil {
@@ -201,6 +230,43 @@ func AddPublish(path string, p Publish) (Publish, error) {
 		}
 	}
 	cfg.Publish = append(cfg.Publish, p)
+	if err := save(path, cfg); err != nil {
+		return Publish{}, err
+	}
+	return p, nil
+}
+
+// UpdatePublish overwrites an existing publish's fields, keyed by its
+// current name - same rename restriction as UpdateForward.
+func UpdatePublish(path, name string, p Publish) (Publish, error) {
+	p.Name = name
+	if p.Mode == "" {
+		p.Mode = "tcp"
+	}
+	if p.Mode != "tcp" && p.Mode != "tls-terminated-tcp" {
+		return Publish{}, ErrInvalidMode
+	}
+	if p.TargetHost == "" {
+		p.TargetHost = "code-docker"
+	}
+	if p.TailscalePort == 0 || p.LocalPort == 0 {
+		return Publish{}, errors.New("tailscalePort and localPort are required")
+	}
+	cfg, err := load(path)
+	if err != nil {
+		return Publish{}, err
+	}
+	found := false
+	for i, e := range cfg.Publish {
+		if e.Name == name {
+			cfg.Publish[i] = p
+			found = true
+			break
+		}
+	}
+	if !found {
+		return Publish{}, ErrPublishNotFound
+	}
 	if err := save(path, cfg); err != nil {
 		return Publish{}, err
 	}
