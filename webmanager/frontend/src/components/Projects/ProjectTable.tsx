@@ -5,8 +5,11 @@ import type { MiseToolEntry, MiseToolsResponse, ProjectInfo, ReclaimableEntry } 
 import { formatBytes } from '../../utils/format'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { GitStatusPanel } from '../common/Git/GitStatusPanel'
+import { WorktreesPanel } from '../common/Git/WorktreesPanel'
 import { Sheet } from '../common/Sheet'
 import { DeleteReclaimableDialog } from './DeleteReclaimableDialog'
+import ProjectMemoryPanel from './ProjectMemoryPanel'
+import ProjectSessionHistory from './ProjectSessionHistory'
 import '../common/common.css'
 import './Projects.css'
 
@@ -416,6 +419,9 @@ export function ProjectTable({
             </section>
 
             <GitStatusPanel path={detailsProject.path} />
+            <WorktreesPanel path={detailsProject.path} />
+            <ProjectSessionHistory path={detailsProject.path} />
+            <ProjectMemoryPanel path={detailsProject.path} />
           </div>
         </Sheet>
       )}
