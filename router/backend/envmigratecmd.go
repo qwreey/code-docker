@@ -24,8 +24,7 @@ var envMigrateOpts = envmigrate.Options{
 // envmigratecmd.go exactly - see code-docker/envmigrate's package doc for
 // the full behavior. Meant to be run roughly like:
 //
-//	cp .env.router .env.router.bak
-//	cat .env.router | docker compose exec -T code-docker-router \
+//	cat .env.router | tee -a .env.router.bak | docker compose exec -T code-docker-router \
 //	  router-manager --env-migrate > .env.router
 //
 // Always exits 0 once it has a template to work from, even on a weirdly-

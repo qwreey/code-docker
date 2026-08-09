@@ -166,3 +166,7 @@ export const { api: tinyauthApi } = createApiClient('router/api/tinyauth')
 
 // netgate outbound/forwards CRUD's own bound client - same pattern as appRoutesApi.
 export const { api: netgateApi } = createApiClient('router/api/netgate')
+
+// GET /api/system/env-version + POST its /dismiss - same pattern as
+// appRoutesApi. Used by EnvVersionBanner.tsx.
+export const { api: systemApi } = createApiClient('router/api/system')

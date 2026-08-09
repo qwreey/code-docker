@@ -326,15 +326,21 @@ webmanager의 `--env-migrate`와 완전히 같은 도구(공유 Go 모듈
 `.env.router`를 최신 키 구조로 재구성하려면:
 
 ```sh
-cp router/.env.router router/.env.router.bak
-cat router/.env.router | docker compose exec -T code-docker-router \
+cat router/.env.router | tee -a router/.env.router.bak | docker compose exec -T code-docker-router \
   router-manager --env-migrate > router/.env.router
 ```
+
+(`tee -a`로 백업 파일에 매번 이어붙이는 이유는 webmanager 쪽과 동일 —
+`docs/webmanager-config.md`의 마이그레이션 절 참고.)
 
 활성화(주석 해제)해둔 값과 직접 남긴 코멘트는 그대로 보존되고, 더 이상 안
 쓰이는 키는 지우지 않고 파일 맨 아래 "더 이상 쓰이지 않는 키" 섹션으로
 옮겨집니다. `.env.router`가 낡은 버전이면(`ROUTER_ENV_VERSION` 불일치)
-router-manager가 시작 시 로그에 경고를 남깁니다 — 시작을 막지는 않습니다.
+컨테이너 로그와 router 웹 UI(그리고 이를 iframe으로 embed하는 webmanager
+사이드바) 양쪽에 알림이 뜹니다 — 시작을 막지는 않습니다. 배너의 "닫기"는
+`ROUTER_ENV_VERSION_DISMISS_PATH`(기본
+`/var/lib/code-docker-router/env-version-dismiss.json`)에 저장되고, 그
+이후 이미지가 다시 업데이트되면 자동으로 다시 뜹니다.
 
 `--env-migrate`/이 버전 불일치 검사가 비교 기준으로 읽는 최신
 `example-env.router` 템플릿의 경로는 저장소 루트 `example-env`의

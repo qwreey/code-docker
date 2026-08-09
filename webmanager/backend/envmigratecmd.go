@@ -16,8 +16,7 @@ import (
 // webmanager/.claude/env-migration-plan.md for the full behavior. Meant to
 // be run roughly like:
 //
-//	cp .env.webmanager .env.webmanager.bak
-//	cat .env.webmanager | docker compose exec -T code-docker \
+//	cat .env.webmanager | tee -a .env.webmanager.bak | docker compose exec -T code-docker \
 //	  /etc/code-docker/webmanager/webmanager --env-migrate > .env.webmanager
 //
 // (`-T` because this is non-interactive piped stdin/stdout — same reason

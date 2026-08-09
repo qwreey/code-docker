@@ -25,10 +25,12 @@ cp example-env.webmanager .env.webmanager
 있습니다:
 
 ```sh
-cp .env.webmanager .env.webmanager.bak
-cat .env.webmanager | docker compose exec -T code-docker \
+cat .env.webmanager | tee -a .env.webmanager.bak | docker compose exec -T code-docker \
   /etc/code-docker/webmanager/webmanager --env-migrate > .env.webmanager
 ```
+
+(`tee -a`로 백업 파일에 매번 이어붙이는 이유: 두 줄로 나누면 백업을 깜빡하기 쉽고, 이렇게
+합쳐두면 실행할 때마다 과거 내용이 `.env.webmanager.bak`에 계속 누적되어 남습니다.)
 
 활성화(주석 해제)해둔 값과 직접 남긴 코멘트는 보존되고, 더 이상 안 쓰이는 키는
 지우지 않고 파일 맨 아래 "더 이상 쓰이지 않는 키" 섹션으로 옮겨집니다. `#.`로

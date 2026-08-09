@@ -8,6 +8,7 @@ import { RouterAuthPanel, RouterTrustedHostsPanel } from './components/common/Ro
 import { TinyauthUsers } from './components/Tinyauth/TinyauthUsers'
 import { RouterUnlockModalHost } from './components/common/UnlockModal'
 import { OriginWarningBanner } from './components/common/OriginWarningBanner'
+import { EnvVersionBanner } from './components/common/EnvVersionBanner'
 import { SidebarContainer } from './components/Layout/SidebarContainer'
 import { listenForEmbedThemeMessages, notifyEmbedReady } from './embedTheme'
 import { withViewTransition } from './utils/viewTransition'
@@ -112,6 +113,7 @@ function App() {
   const content = (
     <>
       <OriginWarningBanner />
+      <EnvVersionBanner />
       {tab === 'dev-proxy' && <DevProxy />}
       {tab === 'app-routes' && <AppRoutes />}
       {tab === 'tailscale' && <Tailscale />}

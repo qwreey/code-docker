@@ -19,8 +19,7 @@
 #. 이미지가 업데이트되면 아래 키 목록이 바뀔 수 있습니다. 기존 .env.router를
 #. 최신 구조에 맞게 재구성하려면:
 #.
-#.   cp .env.router .env.router.bak
-#.   cat .env.router | docker compose exec -T code-docker-router \
+#.   cat .env.router | tee -a .env.router.bak | docker compose exec -T code-docker-router \
 #.     router-manager --env-migrate > .env.router
 #.
 #. 활성화(주석 해제)해둔 값과 직접 남긴 코멘트는 그대로 보존되고, 더 이상
@@ -39,6 +38,13 @@
 ROUTER_ENV_VERSION=5
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
+
+#. 위 버전이 이 파일의 버전보다 최신이면 router 상단(그리고 이를 iframe으로
+#. embed하는 webmanager 사이드바)에 뜨는 "환경변수 업데이트 필요" 배너를 한
+#. 번 닫으면(다시 알림 안 받기) 그 상태를 저장하는 경로입니다 - 잘 안
+#. 건드리는 값이라 아래 "잘 안 건드리는 값들" 묶음에 넣지 않고 여기 바로
+#. 아래 뒀습니다.
+#ROUTER_ENV_VERSION_DISMISS_PATH=
 
 #. --- tailscale (daemon+login+forwards+publish) ---
 #. "false"로 끄면 세 supervisord 프로그램은 계속 떠 있지만 아무 것도 하지

@@ -13,8 +13,7 @@
 #. 이미지가 업데이트되면 아래 키 목록이 바뀔 수 있습니다. 기존
 #. .env.webmanager를 최신 구조에 맞게 재구성하려면:
 #.
-#.   cp .env.webmanager .env.webmanager.bak
-#.   cat .env.webmanager | docker compose exec -T code-docker \
+#.   cat .env.webmanager | tee -a .env.webmanager.bak | docker compose exec -T code-docker \
 #.     /etc/code-docker/webmanager/webmanager --env-migrate > .env.webmanager
 #.
 #. 활성화(주석 해제)해둔 값과 직접 남긴 코멘트는 그대로 보존되고, 더 이상

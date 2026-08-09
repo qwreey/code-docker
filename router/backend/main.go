@@ -30,6 +30,18 @@ import (
 // / handlers_devproxy.go's supervisorClient/tailscaleLogin package vars).
 var gate *authgate.Gate
 
+// envTemplateVersion/envVersion/envVersionDismissPath back
+// handlers_envversion.go's GET /api/system/env-version - computed once here
+// in main() (same values already used for the startup log warning below)
+// rather than re-read per request, mirroring webmanager/backend/main.go's
+// own s.envTemplateVersion field. Package-level rather than a server struct
+// field for the same reason `gate` is, above.
+var (
+	envTemplateVersion    string
+	envVersion            string
+	envVersionDismissPath string
+)
+
 func main() {
 	// CLI helper mode: `router-manager --hash-password` computes an argon2id
 	// hash for ROUTER_MANAGER_AUTH_PASSWORD_HASH and exits - never starts the
@@ -52,14 +64,18 @@ func main() {
 	if envTemplatePath == "" {
 		envTemplatePath = "/etc/router/example-env.router"
 	}
+	envVersion = os.Getenv("ROUTER_ENV_VERSION")
 	if data, err := os.ReadFile(envTemplatePath); err != nil {
 		log.Printf("main: couldn't read env template at %s for version check: %v", envTemplatePath, err)
 	} else {
-		envTemplateVersion := envmigrate.ParseVersion(string(data), envMigrateOpts.VersionKey)
-		envVersion := os.Getenv("ROUTER_ENV_VERSION")
+		envTemplateVersion = envmigrate.ParseVersion(string(data), envMigrateOpts.VersionKey)
 		if envTemplateVersion != "" && envTemplateVersion != envVersion {
 			log.Printf("main: ⚠️ .env.router version is %q but this image's example-env.router is at %q - run `router-manager --env-migrate` to pick up added/changed settings", envVersion, envTemplateVersion)
 		}
+	}
+	envVersionDismissPath = os.Getenv("ROUTER_ENV_VERSION_DISMISS_PATH")
+	if envVersionDismissPath == "" {
+		envVersionDismissPath = "/var/lib/code-docker-router/env-version-dismiss.json"
 	}
 
 	// Cross-check against /etc/environment: storing this hash only in a
@@ -86,6 +102,9 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/system/env-version", handleEnvVersion)
+	mux.HandleFunc("POST /api/system/env-version/dismiss", handleDismissEnvVersion)
+
 	mux.HandleFunc("POST /api/auth/unlock", handleAuthUnlock)
 	mux.HandleFunc("GET /api/auth/status", handleAuthStatus)
 	mux.HandleFunc("POST /api/auth/setup", handleAuthSetup)
