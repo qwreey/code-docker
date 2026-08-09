@@ -119,6 +119,30 @@ nginx/[Dev Proxy](dev-proxy.md) 메커니즘을 쓰세요 - 새 브리징 컨테
 체인)이 담당합니다. 내부자(오염된 에이전트)가 작정하고 우회하려면(IP 직접 지정, 리스트에
 없는 새 도메인 등) 얼마든지 우회 가능합니다.
 
+## 대역폭 제한 (네트워크 소진 공격 방어)
+
+`outbound:`/`forwards:`는 트래픽이 **어디로** 가는지를 통제하고, `bandwidth:`는 **얼마나
+빠르게** 나가는지를 통제합니다 - 목적지 기준 방어(CIDR allow/block)와는 별개로, code-docker
+안에서 실행되는 무언가(오염된 에이전트 포함)가 대량의 아웃바운드 트래픽을 만들어 이
+컨테이너가 물려있는 네트워크/회선 대역폭을 소진시키는 공격을 막기 위한 기능입니다.
+
+router의 `netgate-shaping` supervisord 프로그램(`router/config/netgate/shaping.default.sh`)이
+`netgate-firewall`과 별도로, 30초마다 `config.yaml`의 `bandwidth:` 섹션을 읽어 기본
+인터페이스(`code-docker-external` 쪽) 위에 `tc`(Linux traffic control) HTB 큐잉
+디시플린을 다시 적용합니다. 이 인터페이스로 나가는 **모든** 패킷(코드docker/dind에서
+FORWARD되는 트래픽뿐 아니라 router 자기 자신이 만드는 트래픽까지)이 이 큐잉 규칙의
+적용을 받습니다 - `outbound:`가 netfilter FORWARD 체인만 보는 것과 다른 지점입니다.
+
+- `total_mbps` - 이 라우터가 내보내는 **전체** 트래픽 총합에 대한 하드 리밋(0 = 무제한).
+- `services[]` - `target_host`(forwards의 `target_host`와 동일하게 해석 - hostname을
+  `getent`로 resolve)별 **독립적인** 하드 리밋. `total_mbps`나 다른 서비스로부터
+  빌려오지 않습니다 - 예를 들어 `code-docker`에 50Mbps, `dind`에 50Mbps를 설정하면
+  둘 다 여유가 남아도 서로의 몫을 나눠쓰지 않고 각자 정확히 50Mbps에서 막힙니다.
+
+같은 서브넷 안(code-docker↔dind, code-docker↔router)의 트래픽은 위 "같은 서브넷은
+게이트웨이를 거치지 않는다" 절과 동일한 이유로 이 큐잉 규칙도 거치지 않습니다 - 오직
+router의 기본 인터페이스를 실제로 통과하는(즉 외부로 나가는) 트래픽만 대상입니다.
+
 ## 운영상 알려진 함정 (moby/moby#50326)
 
 `code-docker-netinit`은 `network_mode: service:code-docker`로 code-docker의 네트워크
@@ -242,6 +266,11 @@ DNS 탭이 도입한 것과 같은 "라이브 카피" 방식으로, router-manag
 컨테이너끼리(code-docker↔dind, code-docker↔router)의 트래픽은 커넥티드 라우트를 타고
 FORWARD 체인 자체를 거치지 않으므로, 이 outbound 규칙으로 절대 제어할 수 없습니다 - 이
 탭의 로직에도 그 사실이 경고 배너로 노출됩니다.
+
+같은 "Net 관리" 탭 안, outbound/forwards 아래에 **대역폭 제한** 카드가 있습니다 - 위
+"대역폭 제한" 절에서 설명한 `bandwidth.total_mbps`/`bandwidth.services[]`를 여기서
+편집합니다(`GET`/`PUT /api/netgate/bandwidth`). 같은 라이브 카피/30초 반영 방식을
+그대로 씁니다.
 
 파일로 직접 다루고 싶다면 여전히 가능합니다: `router/config/netgate/config.default.yaml`을
 참고해서 `router/config/netgate/config.override.yaml`을 만들면(override 패턴,

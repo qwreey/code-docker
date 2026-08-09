@@ -91,9 +91,30 @@ type Forward struct {
 	TargetPort int    `yaml:"target_port" json:"targetPort"`
 }
 
+// ServiceLimit is one hard per-container bandwidth cap - TargetHost is
+// resolved via `getent` the same way Forward.TargetHost is (see
+// shaping.default.sh), so this reuses the same hostname/IPv4 validation.
+type ServiceLimit struct {
+	TargetHost string `yaml:"target_host" json:"targetHost"`
+	LimitMbps  int    `yaml:"limit_mbps" json:"limitMbps"`
+}
+
+// Bandwidth is netgate's tc-based egress shaping config, read by
+// shaping.default.sh every reapply cycle (same 30s poll idiom
+// firewall.default.sh uses for Outbound/Forwards). TotalMbps is a hard cap
+// on everything this router forwards *and* originates on the default
+// interface (0 = unlimited); each ServiceLimit is an independent hard cap
+// on one container's own share, not a share of TotalMbps - see
+// shaping.default.sh's own comment on why rate==ceil for both.
+type Bandwidth struct {
+	TotalMbps int            `yaml:"total_mbps" json:"totalMbps"`
+	Services  []ServiceLimit `yaml:"services" json:"services"`
+}
+
 type fileConfig struct {
-	Outbound []OutboundRule `yaml:"outbound"`
-	Forwards []Forward      `yaml:"forwards"`
+	Outbound  []OutboundRule `yaml:"outbound"`
+	Forwards  []Forward      `yaml:"forwards"`
+	Bandwidth Bandwidth      `yaml:"bandwidth"`
 }
 
 var (
@@ -237,6 +258,54 @@ func AddForward(path string, f Forward) (Forward, error) {
 		return Forward{}, err
 	}
 	return f, nil
+}
+
+func GetBandwidth(path string) (Bandwidth, error) {
+	cfg, err := load(path)
+	if err != nil {
+		return Bandwidth{}, err
+	}
+	if cfg.Bandwidth.Services == nil {
+		cfg.Bandwidth.Services = []ServiceLimit{}
+	}
+	return cfg.Bandwidth, nil
+}
+
+// SetBandwidth overwrites the whole bandwidth document in one call - same
+// whole-document-replace idiom ReplaceOutbound uses, since TotalMbps and
+// Services are reviewed together in the UI (a service limit only means
+// anything relative to the shared total cap it sits under).
+func SetBandwidth(path string, bw Bandwidth) (Bandwidth, error) {
+	if bw.TotalMbps < 0 {
+		return Bandwidth{}, fmt.Errorf("%w: total_mbps must be 0 or greater", ErrValidation)
+	}
+	seen := make(map[string]bool, len(bw.Services))
+	for _, s := range bw.Services {
+		if err := validateHost("targetHost", s.TargetHost); err != nil {
+			return Bandwidth{}, err
+		}
+		if s.LimitMbps < 1 {
+			return Bandwidth{}, fmt.Errorf("%w: limit_mbps must be at least 1", ErrValidation)
+		}
+		if seen[s.TargetHost] {
+			return Bandwidth{}, fmt.Errorf("%w: duplicate target_host %s", ErrValidation, s.TargetHost)
+		}
+		seen[s.TargetHost] = true
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	cfg, err := load(path)
+	if err != nil {
+		return Bandwidth{}, err
+	}
+	cfg.Bandwidth = bw
+	if err := save(path, cfg); err != nil {
+		return Bandwidth{}, err
+	}
+	if cfg.Bandwidth.Services == nil {
+		cfg.Bandwidth.Services = []ServiceLimit{}
+	}
+	return cfg.Bandwidth, nil
 }
 
 func DeleteForward(path string, hostPort int) error {

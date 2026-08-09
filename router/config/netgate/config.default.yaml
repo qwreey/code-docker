@@ -57,3 +57,27 @@ outbound:
 #     target_host: some-other-container
 #     target_port: 443
 forwards: []
+
+# Egress bandwidth shaping (tc HTB, see shaping.default.sh) - a network-
+# exhaustion defense distinct from outbound:'s destination-based allow/block
+# above (that controls *where* traffic can go, this controls *how fast*).
+# Applies to every packet leaving this container's default_iface, both
+# FORWARDed (code-docker/dind) and locally-originated (router's own
+# traffic) - a qdisc shapes the interface itself, not a netfilter chain.
+#
+# total_mbps is a hard cap on the sum of everything (0 = unlimited).
+# Each services[] entry is an *independent* hard cap on one
+# code-docker-internal container's own share (matched by target_host,
+# resolved the same way forwards[].target_host is) - it does not borrow
+# spare capacity from total_mbps or from other services, and unused total
+# capacity is not redistributed to it. Both default to no limit at all:
+#
+# total_mbps: 100
+# services:
+#   - target_host: code-docker
+#     limit_mbps: 50
+#   - target_host: dind
+#     limit_mbps: 50
+bandwidth:
+  total_mbps: 0
+  services: []

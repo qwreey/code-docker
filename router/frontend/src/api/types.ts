@@ -173,6 +173,21 @@ export interface NetgateForward {
   targetPort: number
 }
 
+// Mirrors router/backend/internal/netgate.ServiceLimit - an independent
+// hard cap on one container's own share, not a slice of totalMbps below.
+export interface NetgateServiceLimit {
+  targetHost: string
+  limitMbps: number
+}
+
+// Mirrors router/backend/internal/netgate.Bandwidth, GET/PUT
+// /api/netgate/bandwidth - same whole-document-replace idiom
+// GET/PUT /api/dns/custom-hosts already uses.
+export interface NetgateBandwidth {
+  totalMbps: number
+  services: NetgateServiceLimit[]
+}
+
 // Mirrors router/backend/handlers_auth.go's authStatusResponse, GET
 // /api/auth/status. RouterAuthPanel.tsx keeps its own narrower local
 // interface (it never needs unlocked/unlockedUntil) - this full shape is for

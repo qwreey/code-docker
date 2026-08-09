@@ -41,7 +41,15 @@ function isSectionId(v: string | null): v is SectionId {
 // the DOM as it exists at call time, before the update runs) - so this
 // direction needs an explicit check here instead. See viewTransition.ts's
 // own comment for the crash this works around.
-const IFRAME_SECTIONS = new Set<SectionId>(['dev-proxy', 'app-routes', 'tailscale', 'dns', 'net', 'tinyauth'])
+const IFRAME_SECTIONS = new Set<SectionId>([
+  'dev-proxy',
+  'app-routes',
+  'tailscale',
+  'dns',
+  'net',
+  'tinyauth',
+  'router-settings',
+])
 
 // Splits pathname into {root, section} the same way router/frontend's own
 // App.tsx does (see its splitPath doc comment for the full reasoning) - only
@@ -142,6 +150,7 @@ function App() {
           {active === 'dns' && <RouterFrame tab="dns" />}
           {active === 'net' && <RouterFrame tab="net" />}
           {active === 'tinyauth' && <RouterFrame tab="tinyauth" />}
+          {active === 'router-settings' && <RouterFrame tab="settings" />}
           {active === 'logs' && (
             <RequiresUnlock>
               <Logs />

@@ -102,7 +102,7 @@ RUN pacman -Suy --noconfirm --needed \
         iptables iproute2 supervisor yq gettext curl \
         tailscale socat caddy dnsmasq nginx bind && \
     pacman -Scc --noconfirm
-RUN mkdir -p /var/log/netgate-firewall \
+RUN mkdir -p /var/log/netgate-firewall /var/log/netgate-shaping \
         /var/log/tailscaled /var/log/tailscale-forward /var/log/tailscale-publish \
         /var/log/router-manager /var/log/caddy-adapter /var/log/dns /var/log/nginx \
         /var/log/tinyauth \
@@ -115,6 +115,7 @@ COPY --chown=root:root config/supervisord.d /etc/router/supervisord.d
 COPY --chown=root:root config/tailscale/tailscale-config.default.yaml \
     /etc/router/tailscale-config.default.yaml
 COPY --chown=root:root script/netgate-entrypoint.sh script/netgate-firewall.sh \
+    script/netgate-shaping.sh \
     script/tailscale-service.sh script/tailscale-forward.sh \
     script/tailscale-publish.sh script/caddy-adapter.sh script/dns.sh \
     script/nginx-service.sh script/tinyauth.sh /etc/router/
