@@ -42,6 +42,7 @@ COPY backend/handlers_tailscale.go ./
 COPY backend/handlers_tinyauth.go ./
 COPY backend/handlers_dns.go ./
 COPY backend/handlers_netgate.go ./
+COPY backend/handlers_envversion.go ./
 COPY backend/static.go ./
 COPY backend/internal ./internal
 # router's build context is router/ only (see router/CLAUDE.md), so it can't
