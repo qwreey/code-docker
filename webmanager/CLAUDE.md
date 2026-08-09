@@ -30,13 +30,19 @@ are actually git-specific), a Git Config tab (name/email, SSH+GPG signing,
 HTTPS credentials, git-lfs install, raw `.gitconfig` editing) — a Tailscale tab
 also lives here (forwards/publish CRUD, status, login trigger), and a DNS tab
 (blocklist sources, MagicDNS-style custom hosts, resolver override — see root
-`CLAUDE.md`'s "DNS management") the same way, but neither is webmanager's own
-feature: both render `@code-docker/router-frontend`
-components calling router-manager's API, same as the Dev Proxy tab below —
-via `components/RouterEmbed/RouterFrame.tsx`, which picks same-origin direct
-rendering or a cross-origin iframe into a dedicated `ROUTER_MANAGER_HOSTS`
-domain depending on whether one's configured (see `docs/router.md`'s "보안:
-공유 origin과 전용 도메인"). webmanager's own `internal/tailscale` backend
+`CLAUDE.md`'s "DNS management"), Net 관리(netgate outbound/forwards), and
+tinyauth (user CRUD) — six tabs total — the same way, but none of them are
+webmanager's own feature: each always `<iframe>`-embeds router's own
+`/router/` page (`components/RouterEmbed/RouterFrame.tsx`), pointed at the
+same-origin `/router/` path by default or, when `ROUTER_MANAGER_HOSTS` is
+configured, a cross-origin `<iframe>` into that dedicated domain instead (see
+`docs/router.md`'s "보안: 공유 origin과 전용 도메인") — both cases are an
+iframe, there is no same-origin direct-render fallback anymore. As of the
+2026-08-08 decoupling (`router/CLAUDE.md`, `.claude/archive/router-frontend-decouple-plan-done.md`)
+webmanager's frontend has zero `@code-docker/router-frontend` dependency at
+all — the handful of generic UI primitives it still needs (`ErrorBanner`/
+`Sheet`/`Skeleton`) are hand-duplicated locally instead of imported from that
+package. webmanager's own `internal/tailscale` backend
 package (config CRUD, status,
 login) was fully deleted when tailscale moved to the `router/` container —
 see `router/CLAUDE.md` and `docs/router.md#tailscale` for the current
@@ -198,10 +204,10 @@ ungated, a documented exception to the
 reads-open/writes-gated convention since code-server runs with `auth: none`
 and has no credential to attach to that request in the first place. A Dev
 Proxy tab (`.claude/qa-request/caddy-plan-done.md` — historical only, see
-below) renders `@code-docker/router-frontend` components (through
-`RouterFrame`, see the Tailscale tab entry above) against router-manager's
-`/api/dev-proxy/*` for expose CRUD (structured route editor + raw `.caddy`
-fragment fallback). App Routes works the same way. webmanager's own `internal/
+below) `<iframe>`-embeds router's `/router/` page (`RouterFrame`, see the
+Tailscale tab entry above) for expose CRUD (structured route editor + raw
+`.caddy` fragment fallback) against router-manager's `/api/dev-proxy/*`. App
+Routes works the same way. webmanager's own `internal/
 devproxy` package, the `caddy-adapter` supervisord program, and
 `internal/authgate`'s `forward_auth`/`/manager/dev-auth` wiring described in
 that archive doc were all deleted — Caddy now lives on the `router`

@@ -199,8 +199,11 @@ SPA에만 있습니다).
 ### router-manager 자체 인증
 
 router-manager 자신의 관리 API(tailscale config `PUT`, forwards/publish/login의
-`POST`/`DELETE`, dev-proxy expose와 app-routes 앱의 `POST`/`PUT`/`DELETE`)는 비밀번호 게이트로
-보호할 수 있습니다. 읽기 라우트(state/config/list/status)는 항상 열려 있습니다
+`POST`/`DELETE`, dev-proxy expose와 app-routes 앱의 `POST`/`PUT`/`DELETE`, tinyauth
+사용자 CRUD, DNS 블록리스트 소스/custom hosts/resolver의 `POST`/`PUT`/`DELETE`, netgate
+"Net 관리" 탭의 outbound/forwards `PUT`/`POST`/`DELETE`)는 비밀번호 게이트로
+보호할 수 있습니다. 읽기 라우트(state/config/list/status, DNS의 `/api/dns/query`
+포함)는 항상 열려 있습니다
 — webmanager 자체 게이트와 같은 "읽기는 열어두고 쓰기만 잠근다" 관례입니다.
 webmanager와는 별도의 프로세스/비밀(argon2id 해시 + HMAC 서명 쿠키)이라서
 webmanager 자체 잠금과 독립적으로 켜고 끌 수 있고, 잠긴 쓰기 요청이 401을
@@ -281,7 +284,7 @@ router-manager에 직접 연결합니다(SPA + API 전부) — 그 도메인에�
 webmanager 쪽에서 같은 origin으로 직접 렌더링하는 `Direct` 폴백이 있었지만,
 router와 webmanager를 완전히 독립적인 배포 단위로 만들기 위해
 제거했습니다 — 자세한 배경은
-[`.claude/backlog/router-frontend-decouple-plan.md`](../.claude/backlog/router-frontend-decouple-plan.md)와
+[`.claude/archive/router-frontend-decouple-plan-done.md`](../.claude/archive/router-frontend-decouple-plan-done.md)와
 [`router/.claude/net-auth-expansion-plan.md`](../router/.claude/net-auth-expansion-plan.md)의
 6번 항목). `GET /router/api/auth/status`의 `trustedHosts`를 읽어 `ROUTER_MANAGER_HOSTS`가
 설정되어 있으면 그 전용 도메인으로 향하는 cross-origin iframe을, 비어있으면(기본)
@@ -329,3 +332,10 @@ cat router/.env.router | docker compose exec -T code-docker-router \
 쓰이는 키는 지우지 않고 파일 맨 아래 "더 이상 쓰이지 않는 키" 섹션으로
 옮겨집니다. `.env.router`가 낡은 버전이면(`ROUTER_ENV_VERSION` 불일치)
 router-manager가 시작 시 로그에 경고를 남깁니다 — 시작을 막지는 않습니다.
+
+`--env-migrate`/이 버전 불일치 검사가 비교 기준으로 읽는 최신
+`example-env.router` 템플릿의 경로는 저장소 루트 `example-env`의
+`ROUTER_ENV_TEMPLATE_PATH`(기본은 이미지 안 경로, `router/.env.router` 자신에는
+설정할 수 없습니다 - 자기참조가 되므로)로 바꿀 수 있습니다 - webmanager의
+`WEBMANAGER_ENV_TEMPLATE_PATH`와 완전히 같은 용도로, 여러 인스턴스에 조직
+공통 템플릿을 볼륨 마운트로 강제하고 싶을 때만 씁니다.

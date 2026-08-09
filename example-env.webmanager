@@ -29,9 +29,15 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=11
+WEBMANAGER_ENV_VERSION=12
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
+
+#. 위 버전이 이 파일의 버전보다 최신이면 webmanager 상단에 뜨는 "환경변수
+#. 업데이트 필요" 배너를 한 번 닫으면(다시 알림 안 받기) 그 상태를 저장하는
+#. 경로입니다 - 잘 안 건드리는 값이라 아래 "잘 안 건드리는 값들" 묶음에
+#. 넣지 않고 여기 바로 아래 뒀습니다.
+#WEBMANAGER_ENV_VERSION_DISMISS_PATH=
 
 #. --- 비밀번호 게이트 (선택, 기본 꺼짐) ---
 #. 설정하면 Terminal/File Manager 탭 전체가 잠기고, 다른 탭의 쓰기(추가/수정/삭제)
@@ -145,8 +151,6 @@ WEBMANAGER_ENV_VERSION=11
 #WEBMANAGER_SSH_KNOWN_HOSTS_PATH=
 #GIT_CREDENTIALS_PATH=
 #WEBMANAGER_STATIC_DIR=
-#. tailscale-forward 프로그램 자신의 CONFIG= 경로와 같이 바꿔야 합니다.
-#TAILSCALE_CONFIG_PATH=
 #SSH_SIGNING_KEY_PATH=
 #SSH_DEFAULT_KEY_PATH=
 #VECTOR_LOG_DIR=

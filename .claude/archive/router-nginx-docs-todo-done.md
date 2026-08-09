@@ -19,12 +19,21 @@
 - [x] `docs/egress-netgate.md` — already done by the time this pass started
   (found already describing router's own nginx terminating host:80 directly,
   no more PREROUTING DNAT-to-code-docker claim).
-- [ ] `example-env` — still pending: `ROUTER_MANAGER_ADDR`(TCP escape hatch),
-  `ROUTER_NGINX_DENY_INTERNAL_EXPORTS`, `DEVPROXY_ALLOW_EXTERNAL_TARGETS` 등
-  새 env var 문서화. `ROUTER_MANAGER_AUTH_PASSWORD_HASH` 코멘트를 "이제
-  선택사항, 기본은 인앱 설정"으로 갱신.
-- [ ] 루트 `CLAUDE.md`의 "router" 절 — still pending: nginx 서브시스템 추가,
-  router-manager 바인딩이 유닉스 소켓으로 바뀐 점, 인증 모델 변경.
+- [x] `example-env` — done (2026-08-10): `ROUTER_MANAGER_ADDR`/`ROUTER_MANAGER_SOCK`
+  now documented in `router/example-env.router`'s own "잘 안 건드리는 값들"
+  block (`ROUTER_ENV_VERSION` bumped 4→5). `ROUTER_NGINX_DENY_INTERNAL_EXPORTS`
+  and `DEVPROXY_ALLOW_EXTERNAL_TARGETS` turned out to already be documented
+  there (checked, not actually missing). `ROUTER_MANAGER_AUTH_PASSWORD_HASH`
+  comment already reads "선택, 기본은 인앱 설정" (checked, already updated
+  before this pass).
+- [x] 루트 `CLAUDE.md`의 "router" 절 — done (2026-08-10): the router-manager
+  paragraph now describes router's own nginx terminating host:80 directly
+  over a unix socket (not code-docker's nginx proxying `/tailscale/`
+  /`/dev-proxy/`/`/router-auth/`), and the router-frontend/webmanager
+  integration paragraphs now describe the 2026-08-08 always-iframe model
+  (no more same-origin direct-render fallback, no more
+  `@code-docker/router-frontend` webmanager dependency) — `webmanager/CLAUDE.md`
+  had the same staleness and was fixed in the same pass.
 - [x] `router/plan.md` — already done by the time this pass started (the
   "구현 완료" table already has the nginx/socket/target-validation/in-app-auth
   row, first row of the table).

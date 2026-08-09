@@ -1,4 +1,16 @@
-# webmanager에서 @code-docker/router-frontend 의존 제거 (아이디어 단계 — 착수 전)
+# webmanager에서 @code-docker/router-frontend 의존 제거 (완료됨 — 아래 "결론"은 낡은 내용)
+
+> **완료됨 (2026-08-08 데카플링으로 실제 실행됨)**: 이 문서의 "지금 당장은
+> 못 뗀다"/"결론: 지금은 실행하지 않고"는 이 문서를 쓴 시점의 조사 결과일
+> 뿐, 실제로는 이후 바로 두 가지 다 처리됐다 — `RouterFrame.tsx`의 `Direct`
+> fallback이 제거되어 항상 iframe으로만 렌더링하고(`ROUTER_MANAGER_HOSTS`
+> 유무는 iframe이 same-origin이냐 cross-origin이냐만 가름), `ErrorBanner`/
+> `Sheet`/`Skeleton`은 webmanager 자체 코드로 복제됐다. 현재
+> `webmanager/frontend/src`에는 `@code-docker/router-frontend` import가
+> 전혀 없고, `webmanager/frontend/package.json`도 그 의존성을 갖지 않는다
+> (직접 grep으로 확인, 2026-08-10). 최신 설계는 `router/CLAUDE.md`와
+> `webmanager/CLAUDE.md`의 Tailscale/DNS 탭 절 참고 — 아래 본문은 역사적
+> 기록으로만 남겨둔다.
 
 ## 배경
 

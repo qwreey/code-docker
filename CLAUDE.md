@@ -218,24 +218,33 @@ user overrides, same auto-include idiom as the main image's `config/supervisord.
   in that case.
 
 router-manager is router's own Go backend (`router/backend`, mirrors webmanager's own
-backend pattern) — proxied in by code-docker's nginx (`config/nginx/nginx.default.conf`'s
-`/tailscale/`/`/dev-proxy/`/`/router-auth/` locations, private-by-default — no
-host-published port on router-manager itself): full tailscale CRUD (`GET`/`PUT
+backend pattern) — router's own nginx (not code-docker's) terminates host:80 directly and
+proxies to it over a unix socket (`/run/router-manager.sock`) under one unified `/router/`
+location (`router/config/nginx/nginx.default.conf`, also serving the built SPA — see
+"router's own frontend" below); router-manager itself opens no TCP port by default
+(`ROUTER_MANAGER_ADDR` is an opt-in TCP escape hatch for local dev outside the container).
+The old per-feature code-docker-nginx locations (`/tailscale/`, `/dev-proxy/`,
+`/router-auth/`) are gone — code-docker isn't even attached to `code-docker-external`
+anymore, so it was never a legitimate proxy point for this. Routes router-manager serves:
+full tailscale CRUD (`GET`/`PUT
 /api/tailscale/config`, `GET`/`POST`/`DELETE /api/tailscale/forwards[/{name}]`,
 same for `/publish`, `GET /api/tailscale/status`, `POST /api/tailscale/login/
 {start,cancel}`, plus the original read-only `GET /api/tailscale/state`
 — `{backendState, authUrl}`, same shape the old status-polling script wrote —
 code-server's sign-in banner, `config/code/code-patch/tailscale-notify.default.js`,
-polls this now instead of a static file), the Dev Proxy expose CRUD webmanager's
-Dev Proxy tab calls, DNS management (`router/backend/internal/dns`,
+polls this now instead of a static file), the Dev Proxy expose CRUD, the App Routes expose
+CRUD (`router/backend/internal/approutes`, sharing self-SSRF target validation with Dev
+Proxy via `internal/targetguard`), netgate's outbound/forwards CRUD ("Net 관리" tab,
+`router/backend/internal/netgate`), tinyauth user CRUD (`router/backend/internal/
+tinyauthusers`, "설정" tab), DNS management (`router/backend/internal/dns`,
 `GET /api/dns/blocklist-sources` + `POST`/`PUT`/`DELETE` for custom sources +
 `GET`/`POST /api/dns/blocklist-sources/builtin/{status,pull,ignore}` for the
 hash-tracked builtin source, `GET`/`PUT /api/dns/custom-hosts`,
 `GET`/`PUT /api/dns/resolver` — see "DNS management" below), and
 `POST /api/auth/unlock` + `GET /api/auth/status` for
 router-manager's own admin-API password gate (see below). `/exports/` (actual
-end-user traffic to an exposed dev server) is a separate nginx location from
-`/dev-proxy/` (the admin API) — don't confuse the two.
+end-user traffic to an exposed dev server) and `/app/` (App Routes end-user traffic) are
+both separate nginx locations from `/router/` (the admin API + SPA) — don't confuse them.
 
 **DNS management** (2026-08-08, `router/.claude/dns-blocklist-management-plan.md`) —
 DNS content blocklist and resolver override, previously pure build-time
@@ -281,15 +290,15 @@ before hash-reconcile means anything coherent there (netgate today reads
 diverge from).
 
 router's own frontend (`router/frontend`, `@code-docker/router-frontend` — an npm workspace
-package, root `package.json`'s `workspaces:`) owns the actual page components; webmanager's
-`App.tsx` imports them directly (`import { DevProxy, Tailscale, RouterUnlockModalHost } from
-'@code-docker/router-frontend'`) rather than owning that UI itself — see "webmanager" below and
-`router/.claude/functional-router-plan.md`'s "router ↔ webmanager 프론트 통합 방식". Dev
-Proxy, App Routes, Tailscale (forwards/publish/login CRUD + status view), and DNS
-(blocklist sources/custom hosts/resolver) are all ported this way; webmanager also leans on this package for generic, router-unrelated UI primitives
-(`ErrorBanner`/`Sheet`/`Skeleton`), used across ~40 unrelated webmanager files — see
-`.claude/backlog/router-frontend-decouple-plan.md` for why this workspace dependency can't be
-dropped yet if `router`/`webmanager` ever split into separate repos. `router/frontend`'s own
+package, root `package.json`'s `workspaces:`) owns the actual page components (Dev Proxy,
+App Routes, Tailscale, DNS, Net 관리, tinyauth). Since a 2026-08-08 decoupling pass (see
+`router/CLAUDE.md` and `.claude/archive/router-frontend-decouple-plan-done.md`), webmanager
+no longer imports any of these components directly — it `<iframe>`-embeds router's own
+`/router/` page instead (`webmanager/frontend/src/components/RouterEmbed/RouterFrame.tsx` —
+see "webmanager" below), and `webmanager/frontend/package.json` carries zero
+`@code-docker/router-frontend` dependency at all anymore. The generic UI primitives
+webmanager used to borrow from that package (`ErrorBanner`/`Sheet`/`Skeleton`) were
+hand-duplicated into webmanager's own tree as part of the same pass. `router/frontend`'s own
 `App.tsx` (a plain tab switcher, no react-router) is also
 built into a real SPA now — `router/Dockerfile` has its own Node build stage (using
 `router/frontend/package-lock.json`, generated standalone since this Dockerfile's build
@@ -341,14 +350,16 @@ to that origin alone. `router/frontend`'s `RouterAuthPanel`/`RouterTrustedHostsP
 over localhost or over the shared path despite a dedicated domain being configured — see
 docs/router.md's "보안: 공유 origin과 전용 도메인" section.
 
-`ROUTER_MANAGER_HOSTS` also changes how webmanager itself embeds the Dev Proxy/App
-Routes/Tailscale tabs — see "webmanager" below and `webmanager/components/RouterEmbed/
-RouterFrame.tsx` — switching from directly rendering `@code-docker/router-frontend`
-components (same origin as webmanager, the pre-existing default) to a cross-origin
-`<iframe>` into the dedicated domain, which is what actually closes the ambient-cookie gap
-for those specific tabs: same-origin rendering means anything that compromises webmanager
-itself already has DOM/cookie access into router-manager's calls, while a true cross-origin
-iframe has none. `router/frontend/src/embedTheme.ts`'s `?theme=`/`postMessage` handling
+`ROUTER_MANAGER_HOSTS` also changes how webmanager itself embeds the Dev
+Proxy/App Routes/Tailscale/DNS/Net 관리/tinyauth tabs — see "webmanager" below and
+`webmanager/frontend/src/components/RouterEmbed/RouterFrame.tsx` — switching the
+`<iframe>`'s `src` from the same-origin `/router/` path (the default, when
+`ROUTER_MANAGER_HOSTS` is unset) to the dedicated cross-origin domain instead, which is what
+actually closes the ambient-cookie gap for those tabs: a same-origin iframe still shares a
+browsing context whose DOM anything compromising webmanager itself could reach, while a true
+cross-origin iframe has none. Both cases are an `<iframe>` — there is no same-origin
+direct-render fallback (that existed before the 2026-08-08 decoupling above, since removed).
+`router/frontend/src/embedTheme.ts`'s `?theme=`/`postMessage` handling
 (and the matching `[data-theme]` CSS blocks in `router/frontend/src/index.css`, mirroring
 webmanager's own `theme.ts` idiom) keep the embedded iframe's light/dark choice in sync with
 webmanager's, since a cross-origin iframe can't read the parent's `data-theme` attribute
@@ -382,7 +393,7 @@ alias must stay in sync with the same value.
 
 ### webmanager
 
-A browser admin panel (Go backend + Vite/React frontend, `webmanager/` — its own subtree, with its own `CLAUDE.md`/`plan.md`) running alongside code-server as another supervisord program, on port 81. Well beyond its original scope now: supervisord process management, SSH `authorized_keys`/`known_hosts`, git config (commit signing/GPG, git-lfs, raw `.gitconfig` editing, global gitignore/`core.excludesFile` management), the vector-backed logs pipeline described above, an OS-level process/port viewer with resource-history graphs, a Projects-folder browser whose per-project detail sheet carries a git status panel, git worktree list/remove, a project-scoped Claude Code session history (reusing the Claude Code tab's own gated session-log viewer, filtered to that project), and a Claude Code auto-memory viewer (`CLAUDE_CONFIG_DIR/projects/<slug>/memory/`, ungated — curated notes, not raw conversation content), code-server extension and mise tool management, a Claude Code status tab, Docker/dind management, a Dev Proxy tab (imported from `@code-docker/router-frontend` — see "router" above, the actual Caddy instance/backend live on the router container, not here), a web terminal (ephemeral PTY sessions), and a full file manager — see `webmanager/plan.md` for the up-to-date implemented/TODO split. Most of it still has no login of its own and relies entirely on the same reverse-proxy forward-auth as code-server; an opt-in shared password gate (`internal/authgate`, off by default) additionally protects the Terminal/File Manager tabs entirely and gates write actions elsewhere (see `webmanager/.claude/archive/authgate-plan-done.md`) — note this gate no longer covers Dev Proxy or Tailscale at all; both moved to router-manager's own API and are gated by router-manager's own separate `internal/authgate` instance instead (`ROUTER_MANAGER_AUTH_PASSWORD_HASH` — see "router" above).
+A browser admin panel (Go backend + Vite/React frontend, `webmanager/` — its own subtree, with its own `CLAUDE.md`/`plan.md`) running alongside code-server as another supervisord program, on port 81. Well beyond its original scope now: supervisord process management, SSH `authorized_keys`/`known_hosts`, git config (commit signing/GPG, git-lfs, raw `.gitconfig` editing, global gitignore/`core.excludesFile` management), the vector-backed logs pipeline described above, an OS-level process/port viewer with resource-history graphs, a Projects-folder browser whose per-project detail sheet carries a git status panel, git worktree list/remove, a project-scoped Claude Code session history (reusing the Claude Code tab's own gated session-log viewer, filtered to that project), and a Claude Code auto-memory viewer (`CLAUDE_CONFIG_DIR/projects/<slug>/memory/`, ungated — curated notes, not raw conversation content), code-server extension and mise tool management, a Claude Code status tab, Docker/dind management, a Dev Proxy tab (`<iframe>`-embeds router's own `/router/` page — see "router" above, the actual Caddy instance/backend live on the router container, not here), a web terminal (ephemeral PTY sessions), and a full file manager — see `webmanager/plan.md` for the up-to-date implemented/TODO split. Most of it still has no login of its own and relies entirely on the same reverse-proxy forward-auth as code-server; an opt-in shared password gate (`internal/authgate`, off by default) additionally protects the Terminal/File Manager tabs entirely and gates write actions elsewhere (see `webmanager/.claude/archive/authgate-plan-done.md`) — note this gate no longer covers Dev Proxy or Tailscale at all; both moved to router-manager's own API and are gated by router-manager's own separate `internal/authgate` instance instead (`ROUTER_MANAGER_AUTH_PASSWORD_HASH` — see "router" above).
 
 ## Documentation
 

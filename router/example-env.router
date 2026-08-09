@@ -36,7 +36,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-ROUTER_ENV_VERSION=4
+ROUTER_ENV_VERSION=5
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -134,6 +134,11 @@ ROUTER_ENV_VERSION=4
 #. (정확한 최신 명령은 tinyauth 자체 문서 https://tinyauth.app 참고)
 #TINYAUTH_APPURL= # 예: https://code-docker.example.com
 #TINYAUTH_AUTH_USERS= # 예: user:$$2a$$10$$...
+#. tinyauth가 실제 클라이언트 IP를 판단할 때 신뢰할 프록시 대역(CIDR, 콤마
+#. 구분) - forward_auth 요청은 router 자신의 caddy-adapter를 거쳐 로컬로
+#. 들어오므로, 기본값(`172.16.0.0/12`, Docker의 기본 브리지 대역을 포괄)이면
+#. 보통 바꿀 필요가 없습니다. 정확한 의미는 tinyauth 자체 문서
+#. (https://tinyauth.app) 참고.
 #TINYAUTH_AUTH_TRUSTEDPROXIES="172.16.0.0/12"
 
 #. --- router 자신의 nginx: /exports/ 관련 ---
@@ -170,3 +175,13 @@ ROUTER_ENV_VERSION=4
 #. 여기서 인프라 설정으로만 관리합니다. 값을 바꾸면 컨테이너 재시작이
 #. 필요합니다.
 #ROUTER_MANAGER_HOSTS= # 예: router.code.yaeji.moe
+
+#. --- 잘 안 건드리는 값들 ---
+#. router-manager 자신은 기본적으로 TCP 포트를 전혀 열지 않고 유닉스 소켓
+#. (기본 /run/router-manager.sock, ROUTER_MANAGER_SOCK로 변경 가능)만
+#. 리슨합니다 - router 자신의 nginx가 이 소켓으로 프록시합니다. 컨테이너
+#. 밖에서 로컬 개발용으로 router-manager를 직접 띄워 TCP로 붙고 싶을 때만
+#. ROUTER_MANAGER_ADDR(예: "127.0.0.1:8090")를 설정하세요 - 설정하면
+#. 유닉스 소켓 대신 이 주소로 바인딩합니다.
+#ROUTER_MANAGER_ADDR=
+#ROUTER_MANAGER_SOCK=

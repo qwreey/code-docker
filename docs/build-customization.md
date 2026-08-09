@@ -100,7 +100,16 @@ code-server 를 어떻게 수행할지 정의합니다. qwreey/code-server-autoi
 
 ### `supervisord.*.conf` (supervisord 설정)
 
-supervisord 에 사용될 설정파일입니다.
+supervisord 에 사용될 설정파일입니다. `supervisord.*.conf` 자체는 `[supervisord]`/
+`[unix_http_server]`/`[supervisorctl]`/`[rpcinterface]`/`[include]` 같은 supervisord
+자신의 boilerplate만 담고 있고, code/nginx/sshd/webmanager/vector/resolv-writer 등
+실제로 뜨는 각 프로그램의 `[program:...]` 정의는 `config/supervisord.d/*.conf`(git
+추적, 프로그램당 파일 하나)에 따로 있습니다 - 이 폴더는 override 패턴이 아니라
+저장소에 그대로 커밋된 빌트인 프로그램 정의이므로, 기존 프로그램의 설정(로그 로테이션
+개수, `priority`, `autorestart` 등)을 바꾸고 싶다면 이 안의 해당 파일을 직접 고친 뒤
+재빌드하세요. 유저가 새 프로그램을 추가로 등록하고 싶을 때 쓰는 파일은 별도인
+[`supervisord/*.conf`](#supervisordconf-추가-프로그램-등록)입니다 - 헷갈리기 쉬우니
+주의하세요.
 
 ### `user-init.*.sh` (홈 폴더 초기화)
 

@@ -184,6 +184,18 @@
 #   - ./custom-example-env.webmanager:/etc/code-docker/webmanager/example-env.webmanager:ro
 #WEBMANAGER_ENV_TEMPLATE_PATH="/etc/code-docker/webmanager/example-env.webmanager"
 
+# 바로 위 WEBMANAGER_ENV_TEMPLATE_PATH와 완전히 같은 패턴이지만
+# router-manager(`router` 컨테이너)의 router/example-env.router 쪽입니다 -
+# `router-manager --env-migrate`/시작 시 버전 불일치 검사가 여기서 최신
+# router/example-env.router 템플릿을 읽습니다. 마찬가지로 router/.env.router
+# 자신에는 설정할 수 없습니다(자기 자신을 마이그레이션할 템플릿을 자기
+# 안에서 가리키면 자기참조가 되므로) - 이 값은 저장소 루트의 이 파일(.env)에서만
+# 설정합니다. 조직 커스텀 템플릿을 강제하고 싶다면 이 경로에 볼륨을
+# 바인드 마운트하세요 - docker-compose.yml의 code-docker-router 서비스
+# `volumes:`에 아래처럼 추가:
+#   - ./custom-example-env.router:/etc/router/example-env.router:ro
+#ROUTER_ENV_TEMPLATE_PATH="/etc/router/example-env.router"
+
 # 아웃바운드 네트워크 격리(egress lockdown) 관련 설정입니다. 자세한 설계는
 # .claude/backlog/egress-netgate-plan.md, 사용자 문서는 docs/egress-netgate.md
 # 참고. code-docker/dind는 code-docker-external에 더 이상 직접 붙지 않고,

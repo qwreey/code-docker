@@ -124,8 +124,10 @@ tinyauth 컨테이너가 이 스택에서 `TINYAUTH_APPURL` 미설정으로 크�
 
 ## 범위 밖 (일부러 안 함, 이번 라운드)
 
-- 문서 전면 개정 — `.claude/backlog/router-nginx-docs-todo.md`에 체크리스트만
-  남기고 실제 개정은 나중으로 미룸(사용자 명시적 판단).
+- 문서 전면 개정 — 당시엔 `.claude/backlog/router-nginx-docs-todo.md`에
+  체크리스트만 남기고 실제 개정은 나중으로 미뤘음(사용자 명시적 판단) — 이후
+  전부 완료되어 `.claude/archive/router-nginx-docs-todo-done.md`로 옮겨짐
+  (2026-08-10).
 - `/router`를 바깥 도메인에 실제로 연결하는 작업 — 노출 여부는 운영자가 자기
   바깥 리버스 프록시에서 결정할 문제, 이 레포의 in-container nginx 체인에
   하드코딩하지 않음.
