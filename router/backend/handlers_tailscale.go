@@ -275,14 +275,23 @@ type tailscaleStatusResponse struct {
 // the detailed status (self/peers) the Tailscale tab renders — distinct from
 // GET /api/tailscale/state's minimal {backendState, authUrl} shape, which
 // code-server's sign-in banner polls instead.
+//
+// Short-circuits on TAILSCALE_ENABLED=false before touching GetStatus, same
+// as GetState already does — tailscaled was never started in that case, so
+// the exec would otherwise sit for up to GetStatus's own 5s timeout waiting
+// on a socket that's never going to answer, on every poll from either
+// frontend's sidebar (see useTailscaleEnabled.ts).
 func handleTailscaleStatus(w http.ResponseWriter, r *http.Request) {
-	enabled := tailscale.Enabled()
-	status, err := tailscale.GetStatus(r.Context())
-	if err != nil {
-		writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: false, Enabled: enabled})
+	if !tailscale.Enabled() {
+		writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: false, Enabled: false})
 		return
 	}
-	writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: true, Enabled: enabled, Status: &status})
+	status, err := tailscale.GetStatus(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: false, Enabled: true})
+		return
+	}
+	writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: true, Enabled: true, Status: &status})
 }
 
 // handleTailscaleLoginStart triggers an on-demand `tailscale up`, for the
