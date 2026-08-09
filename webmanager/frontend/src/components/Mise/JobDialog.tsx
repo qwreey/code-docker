@@ -14,7 +14,9 @@ import './Mise.css'
 export function JobDialog({ children }: { children: ReactNode }) {
   return (
     <div className="mise-job-dialog-backdrop">
-      <div className="mise-job-dialog-position">{children}</div>
+      <div className="mise-job-dialog-position" role="dialog" aria-modal="true">
+        {children}
+      </div>
     </div>
   )
 }

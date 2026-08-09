@@ -157,7 +157,7 @@ function NotInstalled({ onInstalled }: { onInstalled: () => void }) {
           </div>
         ))}
       </div>
-      <div className="claude-install-overlay">
+      <div className="claude-install-overlay" role="dialog" aria-modal="true">
         <div className="claude-install-message">
           <p>
             Claude Code가 설치되어 있지 않습니다 — 아래 버튼으로 설치하거나, 이미 설치되어 있다면{' '}
@@ -342,7 +342,7 @@ function InstalledView({
         />
       )}
       {updateJob && (
-        <div className="claude-install-overlay">
+        <div className="claude-install-overlay" role="dialog" aria-modal="true">
           <div className="claude-install-message">
             <p>
               Claude Code 업데이트 중

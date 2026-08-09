@@ -21,6 +21,7 @@ import { EnvVersionBanner } from './components/common/EnvVersionBanner'
 import { RouterAuthSetupBanner } from './components/common/RouterAuthSetupBanner'
 import { Skeleton } from './components/common/Skeleton'
 import { withViewTransition } from './utils/viewTransition'
+import { useEmbedEscapeClose } from './utils/embedEscape'
 import './App.css'
 
 // FileManager pulls in the CodeMirror editor chunk and is a sizable feature
@@ -95,6 +96,8 @@ function App() {
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
+
+  useEmbedEscapeClose()
 
   return (
     <div className="app-shell">

@@ -49,19 +49,30 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, .5);
     overflow: hidden;
     display: flex;
+    flex-direction: column;
+}
+/* A dedicated header strip, not an absolutely-positioned button floating on
+   top of the iframe - webmanager's own tabs (e.g. Terminal's settings
+   button) can render their own controls anywhere in the top-right corner of
+   their content, and an overlaid close button collided with them there.
+   Reserving real layout space here means it can never overlap anything the
+   iframe renders, no matter what that tab puts where. */
+.cd-webmanager-modal-header {
+    flex: none;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    height: 36px;
+    padding: 0 6px;
+    background: #1e1e1e;
 }
 .cd-webmanager-modal iframe {
     flex: 1;
     width: 100%;
-    height: 100%;
     border: 0;
     background: #1e1e1e;
 }
 .cd-webmanager-close {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    z-index: 1;
     width: 28px;
     height: 28px;
     border: 0;
@@ -90,6 +101,9 @@
         const modal = document.createElement("div");
         modal.className = "cd-webmanager-modal";
 
+        const header = document.createElement("div");
+        header.className = "cd-webmanager-modal-header";
+
         const close = document.createElement("button");
         close.type = "button";
         close.className = "cd-webmanager-close";
@@ -101,7 +115,8 @@
         iframe.src = MANAGER_URL;
         iframe.title = "webmanager";
 
-        modal.appendChild(close);
+        header.appendChild(close);
+        modal.appendChild(header);
         modal.appendChild(iframe);
         overlay.appendChild(modal);
 
@@ -133,6 +148,17 @@
 
     document.addEventListener("keydown", (e) => {
         if (e.key === "Escape" && isOpen()) hide();
+    });
+
+    // Escape pressed *inside* the iframe never reaches the listener above -
+    // keydown doesn't bubble across an iframe boundary, even same-origin -
+    // so webmanager's own frontend (src/utils/embedEscape.ts) asks for a
+    // close this way instead, once it's confirmed none of its own dialogs
+    // are open to consume Escape themselves first.
+    window.addEventListener("message", (e) => {
+        if (e.origin !== location.origin) return;
+        if (e.source !== overlay?.querySelector("iframe")?.contentWindow) return;
+        if (e.data?.type === "cd-webmanager-close-request" && isOpen()) hide();
     });
 
     function bind(icon) {
