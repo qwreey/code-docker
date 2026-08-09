@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Update code server
 mkdir -p /code/.local/share/code-docker/code

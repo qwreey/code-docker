@@ -15,10 +15,18 @@
 # editing this file).
 apply_default_route() {
     _adr_host="$1"
-    _adr_gw="$(getent hosts "$_adr_host" 2>/dev/null | awk '{ print $1; exit }')"
+    # ahostsv4 (not plain `getent hosts`) forces an IPv4-only lookup - with
+    # ENABLE_IPV6=true and an AAAA record answered first, plain `getent
+    # hosts` could hand back an IPv6 address here, silently replacing the
+    # IPv6 default route while the IPv4 one (which every other piece of
+    # this repo's networking assumes exists) goes stale. `ip -4` below
+    # guards the same thing at the route-replace step itself.
+    _adr_gw="$(getent ahostsv4 "$_adr_host" 2>/dev/null | awk '{ print $1; exit }')"
 
     if [ -n "$_adr_gw" ]; then
-        ip route replace default via "$_adr_gw" 2>/dev/null
+        if ! _adr_err="$(ip -4 route replace default via "$_adr_gw" 2>&1)"; then
+            echo "apply_default_route: WARNING ip route replace failed for $_adr_gw: $_adr_err" >&2
+        fi
     fi
 
     _adr_routes="$(ip -4 route show default 2>/dev/null)"

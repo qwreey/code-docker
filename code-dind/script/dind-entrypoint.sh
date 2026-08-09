@@ -27,7 +27,12 @@ set -eu
 # part of container creation - before this entrypoint (PID 1) ever starts
 # executing - so this line already sees the right answer deterministically
 # in that case too.
-default_iface="$(ip -4 route show default 2>/dev/null | awk '{ print $5; exit }')"
+# Looks for the literal "dev" token rather than assuming a fixed column
+# index ($5 assumed "default via <gw> dev <iface>" specifically) - an
+# onlink route with no `via` ("default dev <iface> ...") shifts every
+# column after it, which silently produced the wrong/empty interface here
+# before.
+default_iface="$(ip -4 route show default 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit }}')"
 
 internal_ip=""
 for dev in /sys/class/net/*; do
@@ -42,8 +47,16 @@ for dev in /sys/class/net/*; do
 done
 
 if [ -z "$internal_ip" ]; then
-	echo >&2 "dind-entrypoint: couldn't find a non-default-route interface, falling back to 0.0.0.0:2375"
-	internal_ip="0.0.0.0"
+	# This script exists specifically to avoid the stock docker:dind
+	# image's insecure 0.0.0.0:2375 bind (privileged + unauthenticated,
+	# TLS-less socket - see root CLAUDE.md's documented trade-off, which
+	# only accepts that risk scoped to code-docker-internal). Falling back
+	# to 0.0.0.0 here on detection failure would silently produce exactly
+	# the state this script is meant to prevent, so fail loudly instead -
+	# a crash-looping container is a much clearer signal than a silently
+	# wide-open daemon socket.
+	echo >&2 "dind-entrypoint: couldn't find a non-default-route interface - refusing to fall back to 0.0.0.0:2375"
+	exit 1
 fi
 
 # dind-authz (see Dockerfile's dind-authz stage) is only present on that

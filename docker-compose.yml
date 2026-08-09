@@ -166,6 +166,14 @@ services:
       code-docker:
         condition: service_started
     restart: unless-stopped
+    # Same reasoning as code-docker's own logging: block above - without
+    # this, a container that's respawned/restarted repeatedly (or just
+    # left running a long time) can accumulate unbounded log file growth.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Create docker in docker daemon. for creating dev dockers (redis, postgres, ...)
   # WARNING: this daemon is privileged and has no auth/TLS on its socket.
@@ -241,6 +249,14 @@ services:
         aliases:
           - dind
     command: ["--log-level=warn"]
+    # Same reasoning as code-docker's own logging: block above - dockerd's
+    # own stdout carries potentially high-volume daemon logging, so this is
+    # if anything more important here than for the other services.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # router - the network-boundary container for code-docker. Started as
   # Phase 2 of egress-netgate-plan.md's outbound lockdown (service used to

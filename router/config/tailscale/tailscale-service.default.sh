@@ -37,7 +37,12 @@ tailscaled_pid=$!
 # command exits, but interrupts a `wait` immediately.
 pids="$tailscaled_pid"
 cleanup() {
-    trap - TERM INT
+    # Also clears the EXIT trap below before this function's own `exit 0`
+    # re-triggers it - EXIT must be trapped (not just TERM/INT) so a
+    # `set -e` abort from e.g. `tailscale status --json | yq ...` failing
+    # mid-script still tears down tailscaled instead of leaving it orphaned
+    # holding the daemon socket for the next respawn to crash-loop against.
+    trap - TERM INT EXIT
     for pid in $pids; do
         kill "$pid" 2>/dev/null || true
     done
@@ -46,7 +51,7 @@ cleanup() {
     done
     exit 0
 }
-trap cleanup TERM INT
+trap cleanup EXIT TERM INT
 
 until [ -S /var/run/tailscale/tailscaled.sock ]; do
     sleep 1

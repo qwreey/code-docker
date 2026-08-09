@@ -20,7 +20,13 @@ mkdir -p /var/yay-bin
 git config --global --add safe.directory /var/yay-bin
 cd /var/yay-bin
 if [ -e .git ]; then
-	git pull origin master --depth 1
+	# fetch+reset, not pull: this is a persisted --mount=type=cache repo, and
+	# a plain `git pull` fails outright if upstream AUR history is ever
+	# amended/rebased (non-fast-forward), aborting the whole image build on
+	# an opaque error. fetch+reset always lands on exactly what origin/master
+	# has now, regardless of history shape.
+	git fetch --depth 1 origin master
+	git reset --hard origin/master
 else
 	git init -b master
 	git remote add origin https://aur.archlinux.org/yay-bin.git

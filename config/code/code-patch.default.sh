@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Seed /etc/code-docker/code/code-patch/*.default.* (each with an optional
 # matching *.override.*) into

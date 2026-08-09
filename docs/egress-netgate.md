@@ -141,9 +141,11 @@ code-docker 컨테이너 자체가 재시작되면(단순히 안의 프로세스
 ## 당장 인터넷이 필요하다면 (기능 자체를 끄기)
 
 `NETGATE_ENABLED="false"`(`.env`)로 끄면 `code-docker-netinit`/dind의 라우팅 루프,
-code-docker 시작 시의 라우트 대기 가드, `code-docker-router` 자신의 방화벽/DNS
-포워딩·블록리스트 적용이 전부 아무것도 안 하고 idle 상태가 됩니다 - `TAILSCALE_ENABLED`와
-같은 패턴입니다. **다만
+code-docker 시작 시의 라우트 대기 가드, `code-docker-router` 자신의 방화벽(CIDR
+차단/인바운드 포트포워딩) 적용 루프가 아무것도 안 하고 idle 상태가 됩니다 -
+`TAILSCALE_ENABLED`와 같은 패턴으로, router 컨테이너 자체나 DNS 포워딩/tailscale/
+Dev Proxy/tinyauth 같은 다른 기능은 계속 정상 동작합니다 (이전에는 router 컨테이너
+전체가 idle 상태가 되어 이 기능들까지 같이 죽는 버그가 있었습니다). **다만
 이것만으로는 예전(제한 없음) 토폴로지로 완전히 돌아가지는 않습니다** -
 `code-docker-external`이 이미 code-docker/dind의 `networks:`에서 빠져 있고, `ports:
 - 80:80`도 code-docker가 아니라 router 서비스에 있어서, `NETGATE_ENABLED=false`만으로는

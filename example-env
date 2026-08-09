@@ -188,17 +188,19 @@
 # .claude/backlog/egress-netgate-plan.md, 사용자 문서는 docs/egress-netgate.md
 # 참고. code-docker/dind는 code-docker-external에 더 이상 직접 붙지 않고,
 # code-docker-netinit(및 dind 자신)이 계속 심어주는 기본 라우트를 통해
-# code-docker-netgate 서비스(실제 필터링/포트포워딩을 담당)를 거쳐서만 나갈 수
+# code-docker-router 서비스(실제 필터링/포트포워딩을 담당)를 거쳐서만 나갈 수
 # 있습니다.
 #
 # "false"로 끄면 code-docker-netinit/dind의 라우팅 루프, code-docker의
-# entrypoint 대기 가드, code-docker-netgate 자신의 방화벽/squid 적용이 전부
-# 아무것도 안 하고 idle 상태가 됩니다(기존 TAILSCALE_ENABLED와 같은 패턴) - 단,
-# 이건 이 기능의 "동작"만 끄는 것이지 networks:의 code-docker-external 제거
-# 자체나 ports:의 위치(code-docker가 아니라 code-docker-netgate에 있음)를
-# 되돌리지는 않습니다. Compose는 네트워크 attachment/포트 퍼블리시 여부를
-# 런타임 환경변수로 조건부 처리할 수 없어서, 완전히 예전(제한 없음) 토폴로지로
-# 되돌리려면 docker-compose.yml의 code-docker / code-docker-dind 두 서비스의
+# entrypoint 대기 가드, code-docker-router 자신의 방화벽(CIDR 차단/인바운드
+# 포트포워딩) 적용 루프가 아무것도 안 하고 idle 상태가 됩니다(기존
+# TAILSCALE_ENABLED와 같은 패턴) - router 컨테이너 자체나 DNS/tailscale/Dev
+# Proxy/tinyauth 같은 다른 기능은 계속 정상 동작합니다. 이건 이 기능의
+# "동작"만 끄는 것이지 networks:의 code-docker-external 제거 자체나 ports:의
+# 위치(code-docker가 아니라 code-docker-router에 있음)를 되돌리지는 않습니다.
+# Compose는 네트워크 attachment/포트 퍼블리시 여부를 런타임 환경변수로
+# 조건부 처리할 수 없어서, 완전히 예전(제한 없음) 토폴로지로 되돌리려면
+# docker-compose.yml의 code-docker / code-docker-dind 두 서비스의
 # networks:에 `code-docker-external: {}`를 직접 다시 추가하고, code-docker의
 # ports:도 복구해야 합니다(`- 80:80`, `- 22:22`) - dind-authz를 완전히 끄고
 # 싶을 때 DIND_TARGET=dind로 명시적으로 바꾸는 것과 같은 성격의, 의도적으로

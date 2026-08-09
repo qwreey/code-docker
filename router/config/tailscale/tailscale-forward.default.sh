@@ -24,8 +24,16 @@ pids=""
 # Only tears down the socat listeners (parents) so they stop accepting new
 # connections - already-accepted (forked) connections are left to finish on
 # their own.
+#
+# EXIT is trapped too (not just TERM/INT, cleared again first thing inside
+# cleanup so its own `exit 0` doesn't re-trigger it): under `set -eu`, a
+# single malformed forwards[$i] entry (e.g. read mid-write by a non-atomic
+# config save) makes one `yq` call fail and aborts the whole script - without
+# an EXIT trap that orphans every socat already spawned by earlier loop
+# iterations, which then holds their listen ports for the next respawn to
+# crash-loop against.
 cleanup() {
-    trap - TERM INT
+    trap - TERM INT EXIT
     for pid in $pids; do
         kill "$pid" 2>/dev/null || true
     done
@@ -34,7 +42,7 @@ cleanup() {
     done
     exit 0
 }
-trap cleanup TERM INT
+trap cleanup EXIT TERM INT
 
 if [ "${TAILSCALE_ENABLED:-true}" = "false" ]; then
     echo "Tailscale not enabled by environment"

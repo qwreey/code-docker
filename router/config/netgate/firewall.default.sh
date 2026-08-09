@@ -58,6 +58,15 @@ apply_rules() {
 		return 0
 	fi
 
+	# Snapshot the config once per cycle instead of letting every yq call
+	# below re-open $NETGATE_CONFIG from disk independently: router-manager's
+	# own config writes are now atomic (temp file + rename, see
+	# internal/netgate's save()), so a single read here always sees either
+	# the old or the new file in full - never a torn/partial one - and every
+	# field extracted below is consistent with every other field from the
+	# same cycle, which N independent re-reads couldn't guarantee.
+	config_snapshot="$(cat "$NETGATE_CONFIG" 2>/dev/null)"
+
 	ensure_chain filter NETGATE-FORWARD
 	ensure_jump filter FORWARD NETGATE-FORWARD
 	ensure_chain nat NETGATE-PREROUTING
@@ -86,12 +95,17 @@ apply_rules() {
 	# outbound: block rules below, since target_host's own address is
 	# typically itself in RFC1918 range (see config.default.yaml's
 	# comment and the plan doc's "인바운드" section).
-	fwd_count=$(yq -r '.forwards | length' "$NETGATE_CONFIG")
+	fwd_count=$(printf '%s' "$config_snapshot" | yq -r '.forwards | length' 2>/dev/null)
+	# Both a yq failure (nonzero exit, e.g. malformed YAML) and yq succeeding
+	# with empty output (e.g. $config_snapshot itself was empty - the config
+	# file doesn't exist yet) must fall back to 0 - an empty $fwd_count would
+	# otherwise make the `[ "$i" -lt "$fwd_count" ]` test below error out.
+	fwd_count="${fwd_count:-0}"
 	i=0
 	while [ "$i" -lt "$fwd_count" ]; do
-		host_port=$(yq -r ".forwards[$i].host_port" "$NETGATE_CONFIG")
-		target_host=$(yq -r ".forwards[$i].target_host" "$NETGATE_CONFIG")
-		target_port=$(yq -r ".forwards[$i].target_port" "$NETGATE_CONFIG")
+		host_port=$(printf '%s' "$config_snapshot" | yq -r ".forwards[$i].host_port")
+		target_host=$(printf '%s' "$config_snapshot" | yq -r ".forwards[$i].target_host")
+		target_port=$(printf '%s' "$config_snapshot" | yq -r ".forwards[$i].target_port")
 		target_ip="$(getent hosts "$target_host" 2>/dev/null | awk '{ print $1; exit }')"
 		if [ -n "$target_ip" ]; then
 			# -i "$default_iface" restricts this to traffic actually
@@ -107,11 +121,12 @@ apply_rules() {
 		i=$((i + 1))
 	done
 
-	out_count=$(yq -r '.outbound | length' "$NETGATE_CONFIG")
+	out_count=$(printf '%s' "$config_snapshot" | yq -r '.outbound | length' 2>/dev/null)
+	out_count="${out_count:-0}"
 	i=0
 	while [ "$i" -lt "$out_count" ]; do
-		action=$(yq -r ".outbound[$i].action" "$NETGATE_CONFIG")
-		cidr=$(yq -r ".outbound[$i].cidr" "$NETGATE_CONFIG")
+		action=$(printf '%s' "$config_snapshot" | yq -r ".outbound[$i].action")
+		cidr=$(printf '%s' "$config_snapshot" | yq -r ".outbound[$i].cidr")
 		case "$action" in
 		allow) iptables -A NETGATE-FORWARD -d "$cidr" -j ACCEPT ;;
 		block) iptables -A NETGATE-FORWARD -d "$cidr" -j DROP ;;
@@ -128,6 +143,19 @@ apply_rules() {
 # permission denied even with NET_ADMIN, since Docker keeps /proc/sys
 # read-only for non-privileged containers regardless of capabilities. See
 # the compose file's own comment on this.
+
+# Scoped here (not in netgate-entrypoint.sh, which used to `exec sleep
+# infinity` for the whole router container the moment this was false) -
+# NETGATE_ENABLED is meant to be a behavioral opt-out for egress filtering
+# specifically, same tier as TAILSCALE_ENABLED/CADDY_ADAPTER_ENABLED, each
+# of which only idles its own program. The old container-wide placement
+# meant flipping this off also silently killed DNS/tailscale/Dev Proxy/
+# tinyauth/router-manager itself, none of which have any relation to egress
+# filtering. See root CLAUDE.md's code-quality audit.
+if [ "${NETGATE_ENABLED:-true}" = "false" ]; then
+	echo "netgate-firewall: NETGATE_ENABLED=false, idling without applying any firewall rules"
+	exec sleep infinity
+fi
 
 while true; do
 	apply_rules || echo >&2 "netgate-firewall: apply_rules failed this cycle, will retry"

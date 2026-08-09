@@ -1,15 +1,13 @@
 #!/bin/sh
 set -eu
 
-# Same behavioral-opt-out pattern as TAILSCALE_ENABLED/NETGATE_ENABLED
-# elsewhere in this repo (see CLAUDE.md's "egress lockdown (netgate)") -
-# code-docker/dind's own routing loops already idle when this is "false", so
-# there's nothing useful for netgate itself to do either: no traffic will
-# ever arrive here to filter or forward.
-if [ "${NETGATE_ENABLED:-true}" = "false" ]; then
-	echo "netgate: NETGATE_ENABLED=false, idling without applying any firewall/proxy rules"
-	exec sleep infinity
-fi
+# NETGATE_ENABLED's own opt-out check moved to firewall.default.sh - this
+# script used to idle the ENTIRE router container (never starting
+# supervisord at all) when NETGATE_ENABLED=false, which also silently took
+# down DNS/tailscale/Dev Proxy/tinyauth/router-manager along with egress
+# filtering, unlike TAILSCALE_ENABLED/CADDY_ADAPTER_ENABLED which only ever
+# idle their own program. See root CLAUDE.md's code-quality audit and
+# firewall.default.sh's own comment on its new check.
 
 if [ -e /etc/code-docker/netgate/supervisord.override.conf ]; then
 	exec /sbin/supervisord -n -c /etc/code-docker/netgate/supervisord.override.conf --user root
