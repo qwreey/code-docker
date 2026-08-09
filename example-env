@@ -228,3 +228,12 @@
 # 값을 직접 설정해야 하는 경우는 router가 세 번째 네트워크에 붙는 등
 # 자동 감지 전제가 깨지는 드문 상황뿐입니다.
 #ROUTER_INTERNAL_SUBNET=""
+
+# code-docker-router가 호스트에 퍼블리시하는 80번 포트의 바인딩 주소/포트입니다
+# (docker-compose.yml ports: 참고). 기본은 "0.0.0.0:80"으로 모든 인터페이스에
+# 바인딩합니다 - 특정 호스트 IP에만 바인딩하고 싶을 때(예: 여러 NIC 중 하나만,
+# 또는 다른 서비스가 이미 0.0.0.0:80을 쓰고 있을 때) ROUTER_HTTP_BIND를,
+# 80이 아닌 다른 호스트 포트를 쓰고 싶을 때 ROUTER_HTTP_PORT를 설정하세요.
+# 컨테이너 내부 포트(80, nginx)는 바뀌지 않습니다.
+#ROUTER_HTTP_BIND="0.0.0.0"
+#ROUTER_HTTP_PORT="80"

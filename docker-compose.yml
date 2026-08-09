@@ -397,7 +397,10 @@ services:
       # an earlier netgate DNAT-back-to-code-docker forward for the same
       # port; that `forwards:` entry was removed since a local listener
       # always wins over PREROUTING DNAT for the same port anyway.
-      - "80:80"
+      #
+      # ROUTER_HTTP_BIND/ROUTER_HTTP_PORT let this bind a specific host
+      # IP/port instead of every interface on 80 - see example-env.
+      - "${ROUTER_HTTP_BIND:-0.0.0.0}:${ROUTER_HTTP_PORT:-80}:80"
       # Uncomment (and see docs/dev-proxy.md's "바깥 리버스 프록시 연결하기"
       # for both options) only if you want the older direct-subdomain-to-8082
       # routing instead of the /exports/ prefix trick above - a second
