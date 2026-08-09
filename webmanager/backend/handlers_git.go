@@ -104,7 +104,11 @@ func (s *Server) handleAddCredential(w http.ResponseWriter, r *http.Request) {
 
 	cred, err := gitconfig.UpsertCredential(s.cfg.GitCredentialsPath, s.cfg.GitConfigPath, body.Host, body.Username, body.Token)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		status := http.StatusInternalServerError
+		if errors.Is(err, gitconfig.ErrInvalidCredential) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusCreated, cred)
@@ -154,7 +158,11 @@ func (s *Server) handlePutGitConfigRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := gitconfig.WriteRaw(s.cfg.GitConfigPath, body.Content); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		status := http.StatusInternalServerError
+		if errors.Is(err, gitconfig.ErrInvalidGitConfigSyntax) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})

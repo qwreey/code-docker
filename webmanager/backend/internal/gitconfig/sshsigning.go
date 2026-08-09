@@ -1,11 +1,8 @@
 package gitconfig
 
 import (
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 )
 
 // GenerateSSHSigningKey (re)generates the dedicated ed25519 keypair webmanager
@@ -28,20 +25,9 @@ func GenerateSSHSigningKey(keyPath string) (publicKeyPath, publicKey string, err
 	_ = os.Remove(keyPath)
 	_ = os.Remove(pubPath)
 
-	cmd := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-f", keyPath, "-C", "webmanager-signing-key")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return "", "", fmt.Errorf("ssh-keygen: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-	if err := os.Chmod(keyPath, 0o600); err != nil {
-		return "", "", err
-	}
-	if err := os.Chmod(pubPath, 0o644); err != nil {
-		return "", "", err
-	}
-
-	pubData, err := os.ReadFile(pubPath)
+	pub, err := generateEd25519Key(keyPath, "webmanager-signing-key")
 	if err != nil {
 		return "", "", err
 	}
-	return pubPath, strings.TrimSpace(string(pubData)), nil
+	return pubPath, pub, nil
 }

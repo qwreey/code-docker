@@ -74,9 +74,12 @@ func FindBinary(override string) (path string, ok bool) {
 // misparsed as a CLI flag). Tool ids may include a backend prefix
 // (`npm:eslint`, `cargo:ripgrep`, `aqua:owner/repo`) per mise's own tool
 // specifier syntax, so `:`/`/` are allowed there; version strings don't
-// need those.
+// need those. `@` is deliberately excluded from toolIDRe (unlike an
+// earlier version of this regex) - callers build the exec argument as
+// `id + "@" + version`, so an id containing its own `@` would produce a
+// mangled two-`@` spec instead of being rejected up front with a clear 400.
 var (
-	toolIDRe  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9@:/_.\-]*$`)
+	toolIDRe  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9:/_.\-]*$`)
 	versionRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.\-]*$`)
 )
 

@@ -4,11 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
+
+	"webmanager/internal/atomicfile"
 )
+
+// sshHostsMu serializes read-modify-write access to configPath - see
+// internal/sshkeys' identical mu for why.
+var sshHostsMu sync.Mutex
 
 type SSHHost struct {
 	Host         string `json:"host"`
@@ -125,6 +131,9 @@ func AddSSHHost(configPath, keysDir, host, hostname, user string) (SSHHost, erro
 		return SSHHost{}, err
 	}
 
+	sshHostsMu.Lock()
+	defer sshHostsMu.Unlock()
+
 	existing, err := ListSSHHosts(configPath)
 	if err != nil {
 		return SSHHost{}, err
@@ -146,9 +155,9 @@ func AddSSHHost(configPath, keysDir, host, hostname, user string) (SSHHost, erro
 	// rejected anything but [A-Za-z0-9._-] in host, so this can't escape
 	// keysDir.
 	keyPath := filepath.Join(keysDir, host)
-	cmd := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-f", keyPath, "-C", fmt.Sprintf("webmanager@%s", host))
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return SSHHost{}, fmt.Errorf("ssh-keygen: %w: %s", err, strings.TrimSpace(string(out)))
+	pubKey, err := generateEd25519Key(keyPath, fmt.Sprintf("webmanager@%s", host))
+	if err != nil {
+		return SSHHost{}, err
 	}
 
 	// From here on, the key files exist on disk — any failure must clean
@@ -160,38 +169,30 @@ func AddSSHHost(configPath, keysDir, host, hostname, user string) (SSHHost, erro
 		_ = os.Remove(keyPath + ".pub")
 	}
 
-	if err := os.Chmod(keyPath, 0o600); err != nil {
-		cleanupKeyFiles()
-		return SSHHost{}, err
-	}
-	if err := os.Chmod(keyPath+".pub", 0o644); err != nil {
-		cleanupKeyFiles()
-		return SSHHost{}, err
-	}
-
 	block := fmt.Sprintf("\nHost %s\n    HostName %s\n    User %s\n    IdentityFile %s\n", host, hostname, user, keyPath)
-	f, err := os.OpenFile(configPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
+	existingData, err := os.ReadFile(configPath)
+	if err != nil && !os.IsNotExist(err) {
 		cleanupKeyFiles()
 		return SSHHost{}, err
 	}
-	defer f.Close()
-	if _, err := f.WriteString(block); err != nil {
+	if err := atomicfile.Write(configPath, append(existingData, []byte(block)...), 0o644, 0o755); err != nil {
 		cleanupKeyFiles()
 		return SSHHost{}, err
 	}
 
-	pubData, _ := os.ReadFile(keyPath + ".pub")
 	return SSHHost{
 		Host:         host,
 		HostName:     hostname,
 		User:         user,
 		IdentityFile: keyPath,
-		PublicKey:    strings.TrimSpace(string(pubData)),
+		PublicKey:    pubKey,
 	}, nil
 }
 
 func DeleteSSHHost(configPath, host string) error {
+	sshHostsMu.Lock()
+	defer sshHostsMu.Unlock()
+
 	blocks, err := parseSSHConfig(configPath)
 	if err != nil {
 		return err
@@ -221,7 +222,7 @@ func DeleteSSHHost(configPath, host string) error {
 			buf.WriteString(l + "\n")
 		}
 	}
-	if err := os.WriteFile(configPath, []byte(buf.String()), 0o644); err != nil {
+	if err := atomicfile.Write(configPath, []byte(buf.String()), 0o644, 0o755); err != nil {
 		return err
 	}
 

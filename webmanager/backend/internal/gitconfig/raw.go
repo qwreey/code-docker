@@ -1,12 +1,21 @@
 package gitconfig
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
+
+// ErrInvalidGitConfigSyntax distinguishes a genuine "the content you
+// submitted doesn't parse" rejection from an I/O failure (disk full,
+// permission denied) elsewhere in WriteRaw - callers previously mapped
+// every WriteRaw error to 400, which reported a real server-side I/O
+// problem as if it were bad user input. See root CLAUDE.md's code-quality
+// audit.
+var ErrInvalidGitConfigSyntax = errors.New("invalid git config syntax")
 
 // ReadRaw returns the raw contents of the gitconfig file at path, for the
 // web-based raw editor. A missing file reads as "" rather than erroring,
@@ -50,7 +59,7 @@ func WriteRaw(path, content string) error {
 
 	out, err := exec.Command("git", "config", "-f", tmpPath, "-l").CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("invalid git config syntax: %s", strings.TrimSpace(string(out)))
+		return fmt.Errorf("%w: %s", ErrInvalidGitConfigSyntax, strings.TrimSpace(string(out)))
 	}
 
 	return os.Rename(tmpPath, path)

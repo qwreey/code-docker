@@ -2,9 +2,7 @@ package gitconfig
 
 import (
 	"errors"
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -50,20 +48,5 @@ func GenerateSSHDefaultKey(keyPath string) (publicKey string, err error) {
 		return "", err
 	}
 
-	cmd := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-f", keyPath, "-C", "webmanager-default-key")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("ssh-keygen: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-	if err := os.Chmod(keyPath, 0o600); err != nil {
-		return "", err
-	}
-	if err := os.Chmod(keyPath+".pub", 0o644); err != nil {
-		return "", err
-	}
-
-	pubData, err := os.ReadFile(keyPath + ".pub")
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(pubData)), nil
+	return generateEd25519Key(keyPath, "webmanager-default-key")
 }

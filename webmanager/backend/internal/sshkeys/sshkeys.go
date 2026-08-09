@@ -15,12 +15,22 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"golang.org/x/crypto/ssh"
+
+	"webmanager/internal/atomicfile"
 )
+
+// mu serializes every read-modify-write below - without it, two concurrent
+// requests (double-click, two browser tabs) can each read the same
+// pre-mutation content and the second writer's save silently discards the
+// first's change; for Add specifically, it also closes the gap between the
+// duplicate-key check and the append where two concurrent Adds of the same
+// key could both pass the check and both get appended.
+var mu sync.Mutex
 
 type Key struct {
 	ID          string `json:"id"`
@@ -153,24 +163,23 @@ func ListKeys(path string) ([]Key, error) {
 	return keys, nil
 }
 
+// appendLine reads the file's current content (if any) and rewrites it in
+// full via atomicfile.Write with line appended - a plain O_APPEND write
+// would be simpler, but this package's other mutations already read-modify-
+// write the whole file, and going through the same atomic-replace path here
+// too means a crash mid-write can never leave a truncated authorized_keys
+// behind. Callers must hold mu.
 func appendLine(path, line string) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	data, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if err := os.Chmod(dir, 0o700); err != nil {
-		return err
+	content := string(data)
+	if content != "" && !strings.HasSuffix(content, "\n") {
+		content += "\n"
 	}
-
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if _, err := f.WriteString(line + "\n"); err != nil {
-		return err
-	}
-	return f.Chmod(0o600)
+	content += line + "\n"
+	return atomicfile.Write(path, []byte(content), 0o600, 0o700)
 }
 
 func Add(path, keyLine string) (Key, error) {
@@ -178,6 +187,9 @@ func Add(path, keyLine string) (Key, error) {
 	if !ok {
 		return Key{}, ErrInvalidKey
 	}
+
+	mu.Lock()
+	defer mu.Unlock()
 
 	existing, err := ListKeys(path)
 	if err != nil {
@@ -208,6 +220,9 @@ func AddComment(path, text string) (Entry, error) {
 		trimmed = "# " + trimmed
 	}
 
+	mu.Lock()
+	defer mu.Unlock()
+
 	if err := appendLine(path, trimmed); err != nil {
 		return Entry{}, err
 	}
@@ -234,6 +249,9 @@ func Update(path, id, newKeyLine string) (Key, error) {
 	if !ok {
 		return Key{}, ErrInvalidKey
 	}
+
+	mu.Lock()
+	defer mu.Unlock()
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -264,10 +282,7 @@ func Update(path, id, newKeyLine string) (Key, error) {
 	}
 
 	content := strings.Join(lines, "\n")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		return Key{}, err
-	}
-	if err := os.Chmod(path, 0o600); err != nil {
+	if err := atomicfile.Write(path, []byte(content), 0o600, 0o700); err != nil {
 		return Key{}, err
 	}
 	return newKey, nil
@@ -286,6 +301,9 @@ func UpdateComment(path, id, newText string) (Entry, error) {
 	if !strings.HasPrefix(trimmed, "#") {
 		trimmed = "# " + trimmed
 	}
+
+	mu.Lock()
+	defer mu.Unlock()
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -313,10 +331,7 @@ func UpdateComment(path, id, newText string) (Entry, error) {
 	lines[foundIndex] = trimmed
 
 	content := strings.Join(lines, "\n")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		return Entry{}, err
-	}
-	if err := os.Chmod(path, 0o600); err != nil {
+	if err := atomicfile.Write(path, []byte(content), 0o600, 0o700); err != nil {
 		return Entry{}, err
 	}
 
@@ -334,6 +349,9 @@ func UpdateComment(path, id, newText string) (Entry, error) {
 // left to preserve them in). Add/Update/Delete are unaffected by this and
 // still touch only the one line they target.
 func Reorder(path string, orderedIDs []string) ([]Entry, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	entries, err := List(path)
 	if err != nil {
 		return nil, err
@@ -370,10 +388,7 @@ func Reorder(path string, orderedIDs []string) ([]Entry, error) {
 	}
 
 	content := strings.Join(lines, "\n") + "\n"
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		return nil, err
-	}
-	if err := os.Chmod(path, 0o600); err != nil {
+	if err := atomicfile.Write(path, []byte(content), 0o600, 0o700); err != nil {
 		return nil, err
 	}
 
@@ -384,6 +399,9 @@ func Reorder(path string, orderedIDs []string) ([]Entry, error) {
 // parsed id matches. Non-key lines (comments, blank lines, entries that
 // fail to parse) are preserved verbatim.
 func Delete(path, id string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -407,16 +425,16 @@ func Delete(path, id string) error {
 	}
 
 	content := strings.Join(kept, "\n")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		return err
-	}
-	return os.Chmod(path, 0o600)
+	return atomicfile.Write(path, []byte(content), 0o600, 0o700)
 }
 
 // DeleteComment rewrites the file line-by-line, dropping only the comment
 // line whose current (index-derived) id matches. Every other line —
 // including other comments and all key lines — is preserved verbatim.
 func DeleteComment(path, id string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -440,8 +458,5 @@ func DeleteComment(path, id string) error {
 	}
 
 	content := strings.Join(kept, "\n")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		return err
-	}
-	return os.Chmod(path, 0o600)
+	return atomicfile.Write(path, []byte(content), 0o600, 0o700)
 }

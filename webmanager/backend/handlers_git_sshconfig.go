@@ -31,7 +31,11 @@ func (s *Server) handlePutSSHConfigRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := gitconfig.WriteRawSSHConfig(s.cfg.SSHClientConfig, body.Content); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		status := http.StatusInternalServerError
+		if errors.Is(err, gitconfig.ErrInvalidSSHConfigSyntax) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})

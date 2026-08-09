@@ -171,11 +171,21 @@ func runOne(ctx context.Context, binPath string, args []string, appendLine func(
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
+		// cmd.Start() is never reached below on this path, so exec's own
+		// cleanup (which only runs from Wait(), i.e. after a successful
+		// Start()) never closes the pipe StdoutPipe() already opened above -
+		// close it explicitly or its fd leaks.
+		_ = stdout.Close()
 		appendLine(err.Error())
 		return -1
 	}
 
 	if err := cmd.Start(); err != nil {
+		// exec only closes the child-side pipe ends on a failed Start() -
+		// the parent-side read ends returned by StdoutPipe/StderrPipe are
+		// normally closed by Wait(), which is never reached here.
+		_ = stdout.Close()
+		_ = stderr.Close()
 		appendLine(err.Error())
 		return -1
 	}

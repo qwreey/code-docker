@@ -3,11 +3,17 @@ package gitconfig
 import (
 	"errors"
 	"os"
-	"path/filepath"
 	"strings"
+	"sync"
 
 	"golang.org/x/crypto/ssh"
+
+	"webmanager/internal/atomicfile"
 )
+
+// knownHostsMu serializes read-modify-write access to path - see
+// internal/sshkeys' identical mu for why.
+var knownHostsMu sync.Mutex
 
 // KnownHostEntry is one parsed line of ~/.ssh/known_hosts — a host key
 // SSH has already trusted (distinct from SSHHost/~/.ssh/config's per-host
@@ -104,20 +110,19 @@ func AddKnownHost(path, line string) error {
 		return ErrInvalidKnownHost
 	}
 
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
+	knownHostsMu.Lock()
+	defer knownHostsMu.Unlock()
 
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-	if err != nil {
+	data, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	defer f.Close()
-	if _, err := f.WriteString(trimmed + "\n"); err != nil {
-		return err
+	content := string(data)
+	if content != "" && !strings.HasSuffix(content, "\n") {
+		content += "\n"
 	}
-	return f.Chmod(0o600)
+	content += trimmed + "\n"
+	return atomicfile.Write(path, []byte(content), 0o600, 0o700)
 }
 
 // DeleteKnownHost removes the entry at index into ListKnownHosts's result
@@ -132,6 +137,9 @@ func AddKnownHost(path, line string) error {
 // delete the wrong row if the file changed in between) but that's no worse
 // than every other index/id-based list-then-mutate flow in this codebase.
 func DeleteKnownHost(path string, index int) error {
+	knownHostsMu.Lock()
+	defer knownHostsMu.Unlock()
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -160,8 +168,5 @@ func DeleteKnownHost(path string, index int) error {
 	}
 
 	content := strings.Join(kept, "\n")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		return err
-	}
-	return os.Chmod(path, 0o600)
+	return atomicfile.Write(path, []byte(content), 0o600, 0o700)
 }

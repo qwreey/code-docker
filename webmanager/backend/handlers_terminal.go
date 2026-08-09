@@ -27,6 +27,16 @@ const terminalReadBufferSize = 32 * 1024
 // before handleTerminal escalates to SIGKILL.
 const terminalKillGrace = 3 * time.Second
 
+// terminalWriteTimeout bounds every WebSocket write of PTY output. Without
+// it, a client whose TCP receive window stalls (backgrounded app, dead
+// network with no RST/FIN) can block conn.Write indefinitely - for the M1
+// loop that just leaks this connection's goroutines until an OS-level TCP
+// timeout; for a termsession.Session's sink (M2, see handleNamedTerminal)
+// it's worse, since pump() calls the sink synchronously and a stuck write
+// stalls PTY draining for every future client of that named session, not
+// just the stalled one.
+const terminalWriteTimeout = 10 * time.Second
+
 // terminalControlMessage is the JSON shape of text WebSocket frames sent by
 // the client. M1 only defines "resize"; unknown types are ignored so the
 // protocol can grow without breaking older clients.
@@ -124,7 +134,8 @@ func (s *Server) handleTerminal(w http.ResponseWriter, r *http.Request) {
 		for {
 			n, rerr := ptmx.Read(buf)
 			if n > 0 {
-				if werr := conn.Write(ctx, websocket.MessageBinary, buf[:n]); werr != nil {
+				werr := writeWithTimeout(ctx, conn, buf[:n])
+				if werr != nil {
 					return
 				}
 			}
@@ -185,7 +196,7 @@ func (s *Server) handleNamedTerminal(ctx context.Context, conn *websocket.Conn, 
 	defer cancel()
 
 	sink := func(p []byte) error {
-		return conn.Write(ctx, websocket.MessageBinary, p)
+		return writeWithTimeout(ctx, conn, p)
 	}
 	detach, scrollback, err := sess.Attach(sink)
 	if err != nil {
@@ -211,7 +222,7 @@ func (s *Server) handleNamedTerminal(ctx context.Context, conn *websocket.Conn, 
 	}()
 
 	if len(scrollback) > 0 {
-		if werr := conn.Write(ctx, websocket.MessageBinary, scrollback); werr != nil {
+		if werr := writeWithTimeout(ctx, conn, scrollback); werr != nil {
 			return
 		}
 	}
@@ -243,6 +254,17 @@ readLoop:
 	}
 
 	_ = conn.Close(websocket.StatusNormalClosure, "")
+}
+
+// writeWithTimeout writes p to conn as a binary frame, bounded by
+// terminalWriteTimeout - see that constant's doc comment for why an
+// unbounded conn.Write is a real problem here, not just defensive
+// programming. ctx is still the parent (cancelled on connection/session
+// teardown), so either cancellation reason ends the write promptly.
+func writeWithTimeout(ctx context.Context, conn *websocket.Conn, p []byte) error {
+	wctx, cancel := context.WithTimeout(ctx, terminalWriteTimeout)
+	defer cancel()
+	return conn.Write(wctx, websocket.MessageBinary, p)
 }
 
 // killShell asks the shell to exit gracefully (SIGHUP) and escalates to

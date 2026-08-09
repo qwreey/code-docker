@@ -94,7 +94,12 @@ func main() {
 		termIdleTimeout = 30 * time.Minute
 	}
 	termScrollbackBytes, err := strconv.Atoi(cfg.TerminalSessionScrollbackBytes)
-	if err != nil {
+	// A non-positive value parses successfully (err == nil) but isn't a
+	// valid ring buffer size - it would reach make([]byte, n) in
+	// termsession.newRingBuffer and panic on the very first session
+	// creation, crashing the whole terminal feature instead of degrading
+	// gracefully like every other non-essential setup value in this repo.
+	if err != nil || termScrollbackBytes <= 0 {
 		log.Printf("main: invalid terminal session scrollback bytes %q, using 262144: %v", cfg.TerminalSessionScrollbackBytes, err)
 		termScrollbackBytes = 262144
 	}

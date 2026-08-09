@@ -169,11 +169,27 @@ func (s *Session) pump() {
 		n, err := s.ptmx.Read(buf)
 		if n > 0 {
 			chunk := append([]byte(nil), buf[:n]...)
-			s.ring.Write(chunk)
+			// ring.Write and the sink/gen read must be one critical section
+			// under the same lock Attach uses around its own "set sink then
+			// snapshot the ring" - otherwise a chunk written here can land in
+			// a reattaching client's scrollback snapshot AND get forwarded to
+			// it live right after, producing visibly duplicated output. See
+			// Attach's own comment for the other half of this.
 			s.mu.Lock()
+			s.ring.Write(chunk)
 			sink, gen := s.sink, s.sinkGen
 			s.mu.Unlock()
 			if sink != nil {
+				// sink is a caller-supplied write (ultimately a WebSocket
+				// write) that's expected to carry its own bounded deadline -
+				// see handlers_terminal.go's terminalWriteTimeout. Without
+				// one, a client whose TCP receive window stalls (backgrounded
+				// app, dead network with no RST/FIN) can block this call
+				// indefinitely: pump() never returns to ptmx.Read, the PTY's
+				// kernel buffer fills, and the shell itself blocks on its
+				// next write - freezing the session for every future client,
+				// not just the stalled one. It also defeats reapIdle, which
+				// treats a non-nil sink as "attached" and exempts it from GC.
 				if werr := sink(chunk); werr != nil {
 					s.clearSinkIfCurrent(gen)
 				}
@@ -217,6 +233,13 @@ func (s *Session) Attach(sink writerFunc) (detach func(), scrollback []byte, err
 	gen := s.sinkGen
 	s.sink = sink
 	s.lastAttachedAt = time.Now()
+	// Snapshotting while still holding s.mu - the same lock pump() now holds
+	// across its own "write to ring, then read sink" step - is what makes
+	// "does this chunk end up in the snapshot or in the live stream"
+	// well-defined instead of a race: whichever of pump()'s write or this
+	// Attach call takes the lock first determines it, with no window where
+	// both (or neither) can happen. See pump()'s own comment.
+	scrollback = s.ring.Snapshot()
 	s.mu.Unlock()
 
 	detach = func() {
@@ -227,7 +250,7 @@ func (s *Session) Attach(sink writerFunc) (detach func(), scrollback []byte, err
 			s.lastAttachedAt = time.Now()
 		}
 	}
-	return detach, s.ring.Snapshot(), nil
+	return detach, scrollback, nil
 }
 
 // Write sends client keystrokes to the PTY.

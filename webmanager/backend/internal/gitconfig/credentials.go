@@ -7,6 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
+
+	"webmanager/internal/atomicfile"
 )
 
 type Credential struct {
@@ -14,7 +17,18 @@ type Credential struct {
 	Username string `json:"username"`
 }
 
-var ErrCredentialNotFound = errors.New("credential not found")
+var (
+	ErrCredentialNotFound = errors.New("credential not found")
+	// ErrInvalidCredential distinguishes a genuine input-validation
+	// rejection from an I/O failure elsewhere in UpsertCredential - see
+	// raw.go's identical ErrInvalidGitConfigSyntax for the full reasoning.
+	ErrInvalidCredential = errors.New("invalid credential")
+)
+
+// credentialsMu serializes read-modify-write access to credsPath - see
+// internal/sshkeys' identical mu for why (lost-update prevention across
+// concurrent requests).
+var credentialsMu sync.Mutex
 
 func parseCredentialLine(line string) (host, username string, ok bool) {
 	trimmed := strings.TrimSpace(line)
@@ -50,8 +64,21 @@ func ListCredentials(path string) ([]Credential, error) {
 // neither the file nor the gitconfig entry yet.
 func UpsertCredential(credsPath, gitConfigPath, host, username, token string) (Credential, error) {
 	if host == "" || username == "" || token == "" {
-		return Credential{}, fmt.Errorf("host, username and token are required")
+		return Credential{}, fmt.Errorf("%w: host, username and token are required", ErrInvalidCredential)
 	}
+	// Defense-in-depth, not the only thing preventing a line-injection into
+	// credsPath: url.URL.String() below already percent-encodes \n/\r in
+	// Host (confirmed - net/url's host encoder escapes both), but that
+	// safety is incidental to net/url's implementation rather than an
+	// explicit check, unlike every sibling parser in this package
+	// (knownhosts.go's parseKnownHostLine, sshhosts.go's
+	// validateAddSSHHostInput) which reject this outright.
+	if strings.ContainsAny(host, "\n\r") {
+		return Credential{}, fmt.Errorf("%w: host must not contain newlines", ErrInvalidCredential)
+	}
+
+	credentialsMu.Lock()
+	defer credentialsMu.Unlock()
 
 	data, err := os.ReadFile(credsPath)
 	if err != nil && !os.IsNotExist(err) {
@@ -72,10 +99,7 @@ func UpsertCredential(credsPath, gitConfigPath, host, username, token string) (C
 	kept = append(kept, u.String())
 
 	content := strings.Join(kept, "\n") + "\n"
-	if err := os.WriteFile(credsPath, []byte(content), 0o600); err != nil {
-		return Credential{}, err
-	}
-	if err := os.Chmod(credsPath, 0o600); err != nil {
+	if err := atomicfile.Write(credsPath, []byte(content), 0o600, 0o700); err != nil {
 		return Credential{}, err
 	}
 
@@ -87,6 +111,9 @@ func UpsertCredential(credsPath, gitConfigPath, host, username, token string) (C
 }
 
 func DeleteCredential(credsPath, host string) error {
+	credentialsMu.Lock()
+	defer credentialsMu.Unlock()
+
 	data, err := os.ReadFile(credsPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -116,10 +143,7 @@ func DeleteCredential(credsPath, host string) error {
 	if len(kept) > 0 {
 		content = strings.Join(kept, "\n") + "\n"
 	}
-	if err := os.WriteFile(credsPath, []byte(content), 0o600); err != nil {
-		return err
-	}
-	return os.Chmod(credsPath, 0o600)
+	return atomicfile.Write(credsPath, []byte(content), 0o600, 0o700)
 }
 
 func ensureCredentialHelper(gitConfigPath, credsPath string) error {

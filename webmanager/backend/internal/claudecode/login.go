@@ -144,16 +144,28 @@ func (m *LoginManager) Start(binPath string) (string, error) {
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		// Same fd-leak trap as internal/mise/jobs.go's runOne: cmd.Start()
+		// is never reached below on this path, so exec's own Wait()-driven
+		// cleanup never closes the pipe(s) already opened above.
+		_ = stdin.Close()
 		cancel()
 		return "", err
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
 		cancel()
 		return "", err
 	}
 
 	if err := cmd.Start(); err != nil {
+		// exec only closes the child-side pipe ends on a failed Start() -
+		// the parent-side ends returned by Std{in,out,err}Pipe are normally
+		// closed by Wait(), which is never reached here.
+		_ = stdin.Close()
+		_ = stdout.Close()
+		_ = stderr.Close()
 		cancel()
 		return "", err
 	}
