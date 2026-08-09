@@ -38,7 +38,7 @@ export function ForwardDialog({
 
   return (
     <Sheet open onClose={onCancel} title={forward ? 'forward 편집' : 'forward 추가'}>
-      <form onSubmit={handleSubmit} className="tailscale-dialog-form">
+      <form onSubmit={handleSubmit} className="dialog-form">
         <div className="form-field">
           <label htmlFor="fwd-name">이름</label>
           <input
@@ -92,7 +92,7 @@ export function ForwardDialog({
           />
         </div>
         {error && <ErrorBanner message={error} />}
-        <div className="tailscale-dialog-actions">
+        <div className="dialog-actions">
           <button type="submit" className="btn btn-primary btn-small" disabled={submitting}>
             {submitting ? '저장하는 중...' : '저장'}
           </button>
