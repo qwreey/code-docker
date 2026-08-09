@@ -15,14 +15,20 @@ supervisord 프로그램 목록 조회 및 start/stop/restart, 표준출력/표�
 
 ### SSH Keys
 
-`/code/.ssh/authorized_keys` 목록 조회/추가/삭제
+컨테이너로 들어오는/나가는 SSH 연결 전반을 다룹니다(git 전용이 아님 — 일반
+ssh/scp 접속에도 그대로 적용). `/code/.ssh/authorized_keys` 목록 조회/추가/삭제,
+기본 SSH 키(`~/.ssh/id_ed25519` — 별도 `Host` 설정이 없는 서버에 접속할 때 SSH가
+자동으로 쓰는 키, 없으면 생성 버튼 노출 + 퍼블릭 키 복사), 호스트별 전용 SSH 키
+(`~/.ssh/config`, ed25519 자동 생성), `~/.ssh/known_hosts` 관리, `~/.ssh/config`
+원본 직접 편집(`ProxyJump`/`Port`/`Host *` 등 구조화 폼이 못 다루는 설정용, 저장 전
+`ssh -G`로 문법 검증) — 이 원본 편집은 내용 자체가 민감할 수 있어 **읽기까지**
+비밀번호 잠금이 걸립니다(다른 대부분의 읽기 전용 API와 다른 지점).
 
 ### Git Config
 
 `/code/.gitconfig` 의 user.name/email, 커밋 사이닝(SSH 키 또는 GPG, GPG 키
-자체 생성/조회/삭제 포함), 호스트별 SSH 키(ed25519 자동 생성), HTTPS credential store
-(`~/.git-credentials`, 평문 저장), `~/.ssh/known_hosts` 관리, `git lfs install` 실행,
-`.gitconfig` 원본 직접 편집(저장 전 문법 검증)
+자체 생성/조회/삭제 포함), HTTPS credential store (`~/.git-credentials`, 평문
+저장), `git lfs install` 실행, `.gitconfig` 원본 직접 편집(저장 전 문법 검증)
 
 ### Dev Proxy
 

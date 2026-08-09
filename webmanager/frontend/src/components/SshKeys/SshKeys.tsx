@@ -5,6 +5,10 @@ import { ErrorBanner } from '../common/ErrorBanner'
 import { Sheet } from '../common/Sheet'
 import { Skeleton } from '../common/Skeleton'
 import { ConfirmDialog } from '../common/ConfirmDialog'
+import { SshDefaultKey } from './SshDefaultKey'
+import { SshHosts } from './SshHosts'
+import { KnownHosts } from './KnownHosts'
+import { SshConfigRaw } from './SshConfigRaw'
 import '../common/common.css'
 import './SshKeys.css'
 import { withViewTransition } from '../../utils/viewTransition'
@@ -366,6 +370,11 @@ export function SshKeys() {
           ? '이 주석을 삭제하시겠습니까?'
           : '이 키를 삭제하시겠습니까? 해당 키로는 더 이상 로그인할 수 없습니다.'}
       </ConfirmDialog>
+
+      <SshDefaultKey />
+      <SshHosts />
+      <KnownHosts />
+      <SshConfigRaw />
     </section>
   )
 }

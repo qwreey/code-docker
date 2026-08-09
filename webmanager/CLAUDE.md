@@ -15,9 +15,19 @@ subfolder (`archive/`, `qa-request/`, `research/`, `feedback/`, `base/`) —
 **Already implemented** — Supervisor (responsive log dialog/bottom-sheet,
 per-program capability metadata that can disable start/stop/restart/logs with
 an explanatory note — `vector`'s log button is disabled this way, per-program
-PID-tree expand reusing the Processes tab's tree utility), SSH keys, git
-config (name/email, SSH+GPG signing, SSH hosts, HTTPS credentials, git-lfs
-install, raw `.gitconfig` editing, known_hosts management) — a Tailscale tab
+PID-tree expand reusing the Processes tab's tree utility), an SSH Keys tab
+(`components/SshKeys/`) covering every SSH-level concern shared by any
+ssh/scp connection, not just git (`authorized_keys` list, a default SSH
+identity key — `SSH_DEFAULT_KEY_PATH`, `~/.ssh/id_ed25519` — with
+generate-if-missing + public-key copy, per-host `~/.ssh/config` entries with
+auto-generated ed25519 keys, `known_hosts` management, and raw
+`~/.ssh/config` editing gated on reads too, not just writes, since it can
+carry `ProxyJump`/usernames/internal hostnames — validated via `ssh -F <tmp>
+-G <placeholder>` before saving, mirroring `.gitconfig`'s `git config -f
+<tmp> -l` validation, see `internal/gitconfig/sshconfigraw.go`; these last
+four used to live under the Git Config tab but moved here since none of them
+are actually git-specific), a Git Config tab (name/email, SSH+GPG signing,
+HTTPS credentials, git-lfs install, raw `.gitconfig` editing) — a Tailscale tab
 also lives here (forwards/publish CRUD, status, login trigger), and a DNS tab
 (blocklist sources, MagicDNS-style custom hosts, resolver override — see root
 `CLAUDE.md`'s "DNS management") the same way, but neither is webmanager's own

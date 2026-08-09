@@ -164,6 +164,14 @@ func main() {
 	mux.Handle("POST /api/git/lfs/install", gate.RequirePassword(http.HandlerFunc(s.handleInstallLFS)))
 	mux.HandleFunc("GET /api/git/config/raw", s.handleGetGitConfigRaw)
 	mux.Handle("PUT /api/git/config/raw", gate.RequirePassword(http.HandlerFunc(s.handlePutGitConfigRaw)))
+	// Gated on GET too (unlike git/config/raw above): raw ssh_config can
+	// contain ProxyJump hosts/usernames/internal hostnames beyond what the
+	// structured ssh-hosts fields expose — see handlers_git_sshconfig.go.
+	mux.Handle("GET /api/git/ssh-config/raw", gate.RequirePassword(http.HandlerFunc(s.handleGetSSHConfigRaw)))
+	mux.Handle("PUT /api/git/ssh-config/raw", gate.RequirePassword(http.HandlerFunc(s.handlePutSSHConfigRaw)))
+	// Public key only, same read-open tier as the GPG public key export below.
+	mux.HandleFunc("GET /api/git/ssh-default-key", s.handleGetSSHDefaultKey)
+	mux.Handle("POST /api/git/ssh-default-key", gate.RequirePassword(http.HandlerFunc(s.handleGenerateSSHDefaultKey)))
 
 	mux.HandleFunc("GET /api/git/signing", s.handleGetGitSigning)
 	mux.Handle("PUT /api/git/signing", gate.RequirePassword(http.HandlerFunc(s.handlePutGitSigning)))

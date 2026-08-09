@@ -29,7 +29,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=10
+WEBMANAGER_ENV_VERSION=11
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -148,6 +148,7 @@ WEBMANAGER_ENV_VERSION=10
 #. tailscale-forward 프로그램 자신의 CONFIG= 경로와 같이 바꿔야 합니다.
 #TAILSCALE_CONFIG_PATH=
 #SSH_SIGNING_KEY_PATH=
+#SSH_DEFAULT_KEY_PATH=
 #VECTOR_LOG_DIR=
 #SYSTEM_DISK_PATH=
 #. webmanager는 이제 nginx가 컨테이너 안에서 /manager 경로로 라우팅해주므로

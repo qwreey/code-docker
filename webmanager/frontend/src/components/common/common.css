@@ -306,3 +306,58 @@
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* Shared by both Git Config and SSH Keys tabs (e.g. HttpsCredentials/GpgKeys
+   vs. KnownHosts/SshHosts) — moved here from GitConfig.css since it stopped
+   being git-specific once known_hosts/ssh-hosts/raw ssh config moved to the
+   SSH Keys tab. */
+.git-config-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.git-config-table th,
+.git-config-table td {
+  text-align: left;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.git-config-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.form-grid-inline {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+.new-key-callout {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+}
+
+.new-key-callout p {
+  margin-top: 0;
+}
+
+.raw-config-note {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-top: -0.4rem;
+}
+
+.raw-config-actions {
+  margin-top: 0.75rem;
+}
+
+.mono-textarea {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  resize: vertical;
+}

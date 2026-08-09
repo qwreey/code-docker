@@ -64,8 +64,9 @@ export function KnownHosts() {
     <div className="card">
       <h2>SSH known_hosts</h2>
       <p className="section-description">
-        Git 원격 서버의 신뢰된 호스트 키 목록입니다. <code>ssh-keyscan</code> 결과나 기존 <code>known_hosts</code> 파일의 한
-        줄을 그대로 붙여넣어 추가할 수 있습니다.
+        SSH로 접속하는 원격 서버(git 원격 포함, ssh/scp 등 모든 SSH 접속에 공통 적용)의 신뢰된 호스트 키
+        목록입니다. <code>ssh-keyscan</code> 결과나 기존 <code>known_hosts</code> 파일의 한 줄을 그대로 붙여넣어 추가할 수
+        있습니다.
       </p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
@@ -108,17 +109,19 @@ export function KnownHosts() {
       )}
 
       <form onSubmit={handleSubmit} className="form-grid-inline">
-        <div className="form-field">
-          <label htmlFor="known-host-line">known_hosts 라인</label>
-          <textarea
-            id="known-host-line"
-            className="mono-textarea"
-            value={line}
-            onChange={(e) => setLine(e.target.value)}
-            placeholder="github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
-            rows={2}
-            required
-          />
+        <div className="form-grid">
+          <div className="form-field">
+            <label htmlFor="known-host-line">known_hosts 라인</label>
+            <textarea
+              id="known-host-line"
+              className="mono-textarea"
+              value={line}
+              onChange={(e) => setLine(e.target.value)}
+              placeholder="github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
+              rows={2}
+              required
+            />
+          </div>
         </div>
         {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}
         <button type="submit" className="btn btn-primary" disabled={submitting}>

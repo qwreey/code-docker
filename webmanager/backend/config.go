@@ -13,6 +13,7 @@ type Config struct {
 	GitCredentialsPath   string
 	StaticDir            string
 	SSHSigningKeyPath    string
+	SSHDefaultKeyPath    string
 	VectorLogDir         string
 	SystemDiskPath       string
 	ClaudeBinPath        string
@@ -138,6 +139,7 @@ func loadConfig() Config {
 		GitCredentialsPath:   getenv("GIT_CREDENTIALS_PATH", "/code/.git-credentials"),
 		StaticDir:            getenv("WEBMANAGER_STATIC_DIR", "./static"),
 		SSHSigningKeyPath:    getenv("SSH_SIGNING_KEY_PATH", "/code/.ssh/signing_key"),
+		SSHDefaultKeyPath:    getenv("SSH_DEFAULT_KEY_PATH", "/code/.ssh/id_ed25519"),
 		VectorLogDir:         getenv("VECTOR_LOG_DIR", "/code/.local/share/code-docker/vector/logs"),
 		SystemDiskPath:       getenv("SYSTEM_DISK_PATH", "/code"),
 		ClaudeBinPath:        getenv("WEBMANAGER_CLAUDE_BINPATH", ""),
