@@ -1,3 +1,10 @@
+.projects-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .projects-last-scan {
   font-size: 0.8rem;
   color: var(--text-muted);

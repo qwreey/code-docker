@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"webmanager/internal/projects"
 )
@@ -95,4 +97,91 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 	}
+}
+
+// cloneProjectRequest is POST /api/projects/clone's body. Root may be
+// omitted when only one scan root is configured (the common case) — the
+// frontend only shows a root picker when GET /api/projects's Roots has more
+// than one entry.
+type cloneProjectRequest struct {
+	URL  string `json:"url"`
+	Name string `json:"name"`
+	Root string `json:"root"`
+}
+
+// handleCloneProject runs `git clone` into a fresh subdirectory of an
+// already-known scan root, as a background job (s.projectJobs — a separate
+// *mise.JobStore instance from s.miseJobs, see server.go's doc comment) so a
+// slow network clone doesn't block the HTTP response. Root/Name are
+// validated by internal/projects.Scanner.PrepareClone (exact-match against
+// configured roots, strict charset for Name — see that function's doc
+// comment) before either ever reaches exec.Command; URL is passed as its own
+// exec.Command argument after a "--" separator (never string-concatenated),
+// the same defense-in-depth convention internal/projectgit.RemoveWorktree
+// uses, so it can't be misparsed as a git flag regardless of its content.
+// Gated like every other project mutation (handleDeleteProject etc.) — this
+// creates a new directory and makes a real network connection.
+func (s *Server) handleCloneProject(w http.ResponseWriter, r *http.Request) {
+	var body cloneProjectRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	body.URL = strings.TrimSpace(body.URL)
+	if body.URL == "" {
+		writeError(w, http.StatusBadRequest, "url is required")
+		return
+	}
+	if strings.ContainsAny(body.URL, "\r\n\x00") {
+		writeError(w, http.StatusBadRequest, "invalid url")
+		return
+	}
+
+	root := body.Root
+	if root == "" {
+		defaultRoot, ok := s.projectScanner.DefaultRoot()
+		if !ok {
+			writeError(w, http.StatusBadRequest, "no project root configured")
+			return
+		}
+		root = defaultRoot
+	}
+
+	dest, err := s.projectScanner.PrepareClone(root, body.Name)
+	switch {
+	case errors.Is(err, projects.ErrUnknownRoot):
+		writeError(w, http.StatusBadRequest, "unknown project root")
+		return
+	case errors.Is(err, projects.ErrInvalidCloneName):
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	case errors.Is(err, projects.ErrCloneDestExists):
+		writeError(w, http.StatusConflict, "a project with this name already exists")
+		return
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jobID := s.projectJobs.StartWithCallback(func(exitCode int) {
+		if exitCode == 0 {
+			s.projectScanner.TriggerScan()
+		}
+	}, "git", []string{"clone", "--progress", "--", body.URL, dest})
+	writeJSON(w, http.StatusOK, jobResponse{JobID: jobID})
+}
+
+// handleProjectJobStatus reports progress for a job started by
+// handleCloneProject — a plain read (s.projectJobs.Status doesn't mutate
+// anything), so unlike the clone-start route this is ungated, same
+// convention as GET /api/mise/jobs/{id}.
+func (s *Server) handleProjectJobStatus(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	status, ok := s.projectJobs.Status(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "unknown job id")
+		return
+	}
+	writeJSON(w, http.StatusOK, status)
 }

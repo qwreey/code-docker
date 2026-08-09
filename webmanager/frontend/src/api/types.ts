@@ -334,6 +334,21 @@ export interface ProjectsResponse {
   codeServerUrl: string
 }
 
+// POST /api/projects/clone's body - see CloneProjectDialog.tsx.
+export interface CloneProjectRequest {
+  url: string
+  name: string
+  root?: string
+}
+
+// POST /api/projects/clone's response - the background job's id, for the
+// frontend to poll via GET /api/projects/jobs/:id (same shape as MiseJob,
+// see that type's own doc comment on why this app keeps one such type per
+// call site rather than a single shared one).
+export interface ProjectCloneJob {
+  jobId: string
+}
+
 // HostMemoryBreakdown/HostCpuInfo/ThermalZoneInfo mirror the real, merged
 // backend contract exactly (handlers_system.go's hostMemoryResources/
 // cpuCoreResources/thermalZone) — HOST-WIDE data (not scoped to this
