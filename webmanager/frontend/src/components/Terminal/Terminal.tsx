@@ -4,7 +4,7 @@ import { FolderOpen } from 'lucide-react'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
-import { api, apiUrl, errorMessage } from '../../api/client'
+import { api, apiUrl, errorMessage, ApiError } from '../../api/client'
 import type {
   ProcessInfo,
   TerminalProfile,
@@ -171,15 +171,26 @@ export function Terminal({
     try {
       const data = await api.get<TerminalSessionInfo[]>('/terminal/sessions')
       setSessions(data)
+      return data
     } catch {
       // best-effort — the tab bar just falls back to only showing the
       // active tab (TerminalTabs.tsx handles an empty list that way)
+      return null
     }
   }, [])
 
   useEffect(() => {
     refreshSessions()
   }, [refreshSessions])
+
+  // Always holds the latest activeSession, readable from inside the
+  // WS-connect effect's onclose handler below without making that effect
+  // depend on (and re-run/reconnect for) every activeSession change beyond
+  // the one it's already keyed on — see its own comment for why.
+  const activeSessionRef = useRef(activeSession)
+  useEffect(() => {
+    activeSessionRef.current = activeSession
+  }, [activeSession])
 
   // Home tab launch profiles — best-effort like refreshSessions above; the
   // Home tab just shows profilesError and an empty list if this fails.
@@ -379,10 +390,24 @@ export function Terminal({
     // backend now actively closes this connection when the underlying
     // session dies on its own (e.g. Ctrl+D exits the shell), so the tab
     // bar should promptly stop showing a session that no longer exists
-    // instead of only noticing on the next unrelated refresh.
+    // instead of only noticing on the next unrelated refresh. If the
+    // refetch confirms this exact session is gone (not just an ordinary
+    // tab-switch-triggered close, which also tears this socket down via
+    // the effect cleanup below — activeSessionRef guards against treating
+    // that as a death), fall back to the Home tab instead of leaving
+    // activeSession pointed at a name TerminalTabs.tsx's
+    // ensureActiveIncluded would otherwise keep synthesizing as a ghost
+    // tab forever (verified live: this was the actual bug, not
+    // hypothetical — closing that ghost tab then 404s since the backend
+    // already GC'd the session, and only a full reload reset activeSession
+    // back to HOME_TAB_ID).
     ws.onclose = () => {
       setState('disconnected')
-      refreshSessions()
+      refreshSessions().then((data) => {
+        if (data && activeSessionRef.current === activeSession && !data.some((s) => s.name === activeSession)) {
+          setActiveSession(HOME_TAB_ID)
+        }
+      })
     }
     ws.onerror = () => setState('disconnected')
     ws.onmessage = (event) => {
@@ -488,8 +513,16 @@ export function Terminal({
       try {
         await api.del(`/terminal/sessions/${encodeURIComponent(name)}`)
       } catch (e) {
-        setSessionActionError(errorMessage(e))
-        return
+        // A 404 here means the session already died on its own (e.g.
+        // Ctrl+D) and the backend already GC'd it — that's exactly the
+        // end state closing was trying to reach, so treat it as success
+        // and fall through to the same cleanup below instead of leaving
+        // the tab stuck with a "session no longer exists" error and
+        // activeSession still pointed at the dead name.
+        if (!(e instanceof ApiError && e.status === 404)) {
+          setSessionActionError(errorMessage(e))
+          return
+        }
       }
       if (name === activeSession) {
         const remaining = sessions.filter((s) => s.name !== name)
