@@ -167,3 +167,37 @@ func (s *Server) handlePutGitConfigRaw(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
+
+func (s *Server) handleGetGitConfigExcludes(w http.ResponseWriter, r *http.Request) {
+	path, err := gitconfig.ExcludesFilePath(s.cfg.GitConfigPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	content, err := gitconfig.ReadExcludesFile(path)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"path": path, "content": content})
+}
+
+func (s *Server) handlePutGitConfigExcludes(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	path, err := gitconfig.ExcludesFilePath(s.cfg.GitConfigPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := gitconfig.WriteExcludesFile(path, body.Content); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}

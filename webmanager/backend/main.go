@@ -169,6 +169,8 @@ func main() {
 	mux.Handle("POST /api/git/lfs/install", gate.RequirePassword(http.HandlerFunc(s.handleInstallLFS)))
 	mux.HandleFunc("GET /api/git/config/raw", s.handleGetGitConfigRaw)
 	mux.Handle("PUT /api/git/config/raw", gate.RequirePassword(http.HandlerFunc(s.handlePutGitConfigRaw)))
+	mux.HandleFunc("GET /api/git/config/excludes", s.handleGetGitConfigExcludes)
+	mux.Handle("PUT /api/git/config/excludes", gate.RequirePassword(http.HandlerFunc(s.handlePutGitConfigExcludes)))
 	// Gated on GET too (unlike git/config/raw above): raw ssh_config can
 	// contain ProxyJump hosts/usernames/internal hostnames beyond what the
 	// structured ssh-hosts fields expose — see handlers_git_sshconfig.go.

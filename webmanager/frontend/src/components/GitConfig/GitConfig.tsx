@@ -2,6 +2,7 @@ import { GitUserForm } from './GitUserForm'
 import { CommitSigning } from './CommitSigning'
 import { HttpsCredentials } from './HttpsCredentials'
 import { GitLFS } from './GitLFS'
+import { GlobalGitignore } from './GlobalGitignore'
 import { RawConfigEditor } from './RawConfigEditor'
 import '../common/common.css'
 import './GitConfig.css'
@@ -20,6 +21,7 @@ export function GitConfig() {
       <CommitSigning />
       <HttpsCredentials />
       <GitLFS />
+      <GlobalGitignore />
       <RawConfigEditor />
     </section>
   )
