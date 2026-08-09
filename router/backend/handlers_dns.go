@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"router/internal/dns"
 )
@@ -165,6 +166,26 @@ func handleSetCustomHosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, entries)
+}
+
+// handleDNSQuery runs a `dig`-style lookup against this container's own
+// dnsmasq for debugging - a plain GET (query string, not a body) since it's
+// read-only, same as every other GET route here staying outside
+// gate.RequirePassword. Bounded by a short timeout since `dig` blocking on
+// an unresponsive upstream shouldn't be able to hang the request forever.
+func handleDNSQuery(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	result, err := dns.Query(ctx, r.URL.Query().Get("domain"), r.URL.Query().Get("type"))
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, dns.ErrEmptyDomain) || errors.Is(err, dns.ErrInvalidQueryType) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func handleGetResolverConfig(w http.ResponseWriter, r *http.Request) {

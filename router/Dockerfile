@@ -94,9 +94,12 @@ FROM archlinux
 # nginx: router's own front door (see
 # router/.claude/router-nginx-hardening-plan.md) - terminates host:80
 # directly now instead of the old DNAT-back-to-code-docker double hop.
+# bind: provides `dig` (bind-tools is merged into this package on Arch) -
+# router-manager's DNS query tool (internal/dns/query.go) shells out to it
+# to run debugging lookups against this container's own dnsmasq.
 RUN pacman -Suy --noconfirm --needed \
         iptables iproute2 supervisor yq gettext curl \
-        tailscale socat caddy dnsmasq nginx && \
+        tailscale socat caddy dnsmasq nginx bind && \
     pacman -Scc --noconfirm
 RUN mkdir -p /var/log/netgate-firewall \
         /var/log/tailscaled /var/log/tailscale-forward /var/log/tailscale-publish \

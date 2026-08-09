@@ -131,6 +131,7 @@ func main() {
 	mux.Handle("PUT /api/dns/custom-hosts", gate.RequirePassword(http.HandlerFunc(handleSetCustomHosts)))
 	mux.HandleFunc("GET /api/dns/resolver", handleGetResolverConfig)
 	mux.Handle("PUT /api/dns/resolver", gate.RequirePassword(http.HandlerFunc(handleSetResolverConfig)))
+	mux.HandleFunc("GET /api/dns/query", handleDNSQuery)
 
 	if err := netgate.EnsureSeeded(); err != nil {
 		log.Printf("main: couldn't seed netgate live config: %v", err)

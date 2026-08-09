@@ -147,6 +147,14 @@ export interface DnsResolverConfig {
   servers: string[]
 }
 
+// Mirrors router/backend/internal/dns.QueryResult, GET /api/dns/query.
+export interface DnsQueryResult {
+  domain: string
+  type: string
+  durationMs: number
+  output: string
+}
+
 export type NetgateOutboundAction = 'allow' | 'block'
 
 // Mirrors router/backend/internal/netgate.OutboundRule - order matters
@@ -163,4 +171,17 @@ export interface NetgateForward {
   hostPort: number
   targetHost: string
   targetPort: number
+}
+
+// Mirrors router/backend/handlers_auth.go's authStatusResponse, GET
+// /api/auth/status. RouterAuthPanel.tsx keeps its own narrower local
+// interface (it never needs unlocked/unlockedUntil) - this full shape is for
+// the sidebar footer's lock-status indicator instead.
+export interface AuthStatus {
+  required: boolean
+  source: 'env' | 'file' | 'unset'
+  unlocked: boolean
+  unlockedUntil?: string | null // RFC3339, only set when unlocked
+  trustedHosts: string[]
+  requestHost: string
 }
