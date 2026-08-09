@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Globe, Network, Route, Settings, ShieldCheck, Signpost, Waypoints, type LucideIcon } from 'lucide-react'
 import { TABS, type Tab } from '../../tabs'
+import { useTailscaleEnabled } from '../Tailscale/useTailscaleEnabled'
 import { Sidebar, type SidebarItem } from './Sidebar'
 import { SidebarFooter } from './SidebarFooter'
 
@@ -32,12 +33,19 @@ interface SidebarContainerProps {
 
 export function SidebarContainer({ active, onSelect, open, onClose }: SidebarContainerProps) {
   const [order, setOrder] = useState<string[]>([])
+  // TAILSCALE_ENABLED=false idles tailscaled/tailscale-forward/tailscale-
+  // publish (see router/config/tailscale/*.default.sh) but the tab itself
+  // used to stay listed regardless - hide it once we know it's off rather
+  // than showing a tab whose every action would just fail against a daemon
+  // that was never started on purpose.
+  const tailscaleEnabled = useTailscaleEnabled()
+  const items = tailscaleEnabled === false ? ITEMS.filter((i) => i.id !== 'tailscale') : ITEMS
 
   return (
     <Sidebar
       title="router"
       footer={<SidebarFooter />}
-      items={ITEMS}
+      items={items}
       order={order}
       onReorder={setOrder}
       active={active}

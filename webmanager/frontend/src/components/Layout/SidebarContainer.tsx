@@ -24,6 +24,7 @@ import {
 import { api, errorMessage } from '../../api/client'
 import type { SidebarOrder } from '../../api/types'
 import { Logo } from '../common/Logo'
+import { useTailscaleEnabled } from '../RouterEmbed/useTailscaleEnabled'
 import { SECTIONS } from './sections'
 import type { SectionId } from './sections'
 import { Sidebar, type SidebarItem } from './Sidebar'
@@ -73,6 +74,12 @@ interface SidebarContainerProps {
 
 export function SidebarContainer({ active, onSelect, open, onClose }: SidebarContainerProps) {
   const [order, setOrder] = useState<string[]>([])
+  // TAILSCALE_ENABLED=false (router's own env, see docs/router.md#tailscale)
+  // idles router's tailscaled entirely - hide the tab once we know it's off
+  // rather than embedding a Tailscale management page for a daemon that was
+  // never started on purpose.
+  const tailscaleEnabled = useTailscaleEnabled()
+  const items = tailscaleEnabled === false ? ITEMS.filter((i) => i.id !== 'tailscale') : ITEMS
 
   useEffect(() => {
     api
@@ -98,7 +105,7 @@ export function SidebarContainer({ active, onSelect, open, onClose }: SidebarCon
       title="webmanager"
       logo={<Logo size={20} className="sidebar-title-mark" />}
       footer={<SidebarFooter />}
-      items={ITEMS}
+      items={items}
       order={order}
       onReorder={handleReorder}
       active={active}

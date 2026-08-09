@@ -70,6 +70,17 @@
             return;
         }
 
+        if (data && data.enabled === false) {
+            // TAILSCALE_ENABLED=false - tailscaled was never started on
+            // purpose, so there's nothing to sign into. Also clears any
+            // stale ignored-signature so re-enabling later starts fresh
+            // instead of possibly matching a leftover ignore by coincidence.
+            window.CDDialog.hide(BANNER_ID);
+            clearIgnoredSignature();
+            wasConnected = null;
+            return;
+        }
+
         const authUrl = data && data.authUrl;
         const backendState = (data && data.backendState) || "Unknown";
         const connected = backendState === "Running";

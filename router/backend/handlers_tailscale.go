@@ -259,9 +259,13 @@ func handleDeleteTailscalePublish(w http.ResponseWriter, r *http.Request) {
 // tailscaleStatusResponse is GET /api/tailscale/status's body. Status is a
 // plain pointer with no `omitempty` so it serializes as an explicit JSON
 // `null` when Available is false, matching the read-only status contract
-// the frontend expects.
+// the frontend expects. Enabled reflects TAILSCALE_ENABLED (tailscale.
+// Enabled()) independent of Available, so a caller can tell "deliberately
+// turned off" apart from "on but daemon not ready/logged in yet" — both
+// frontends' sidebars use it to hide the Tailscale tab entirely when off.
 type tailscaleStatusResponse struct {
 	Available bool              `json:"available"`
+	Enabled   bool              `json:"enabled"`
 	Status    *tailscale.Status `json:"status,omitempty"`
 }
 
@@ -272,12 +276,13 @@ type tailscaleStatusResponse struct {
 // GET /api/tailscale/state's minimal {backendState, authUrl} shape, which
 // code-server's sign-in banner polls instead.
 func handleTailscaleStatus(w http.ResponseWriter, r *http.Request) {
+	enabled := tailscale.Enabled()
 	status, err := tailscale.GetStatus(r.Context())
 	if err != nil {
-		writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: false})
+		writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: false, Enabled: enabled})
 		return
 	}
-	writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: true, Status: &status})
+	writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: true, Enabled: enabled, Status: &status})
 }
 
 // handleTailscaleLoginStart triggers an on-demand `tailscale up`, for the

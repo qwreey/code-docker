@@ -32,7 +32,10 @@ tailscale/Dev Proxy/App Routes/DNS/Net 관리/tinyauth는 전부 webmanager의 �
 `tailscaled`/`tailscale-forward`/`tailscale-publish` 세 프로그램이 router 컨테이너
 안에서 idle 상태로 떠 있습니다. router가 고유한 tailscale IP를 가지므로, tailnet 안
 어디서든 code-docker에 접근하거나(호스트 포트 게시 없이) code-docker에서 다른 tailnet
-기기의 포트를 가져올 수 있습니다.
+기기의 포트를 가져올 수 있습니다. 꺼져 있을 때는 router-manager의 `GET
+/api/tailscale/status`가 `enabled: false`를 보고하고, router 자체 사이드바와
+webmanager의 임베드 사이드바 모두에서 Tailscale 탭이 사라지며, code-server의
+로그인 안내 배너(`tailscale-notify.default.js`)도 뜨지 않습니다.
 
 ### 최초 로그인
 
