@@ -229,8 +229,11 @@ webmanager는 지금처럼 `/api/...`를 그대로 받습니다. access/error �
 기본 켜짐 — router가 code-docker를 향해 publish하는 경로는 아니지만, router가
 사용자 대신 tailnet peer로부터 받은 트래픽이 우회 경로로 들어올 가능성에 대한
 방어 차원으로 유지)과, `ALLOWED_HOSTS`로 조절하는 Host 헤더 화이트리스트도 이
-파일에 있습니다. `/tailscale/`·`/dev-proxy/` 위치도 여기서 router로 프록시됩니다 —
-자세한 내용은 [router.md](router.md) 참고. `TRUSTED_PROXIES`(외부 리버스 프록시의 IP/CIDR를 알려주면 `$remote_addr`가
+파일에 있습니다. `/tailscale/`·`/dev-proxy/`·`/exports/` 위치는 더 이상 여기서
+router로 프록시되지 않습니다 — router가 host:80을 직접 종단하도록 바뀌면서
+(`router/config/nginx/`) 이 파일에서는 빠졌고, webmanager의 Tailscale/Dev Proxy
+탭도 이제 router 자신의 `/router/` 경로로 직접 호출합니다. 자세한 내용은
+[router.md](router.md) 참고. `TRUSTED_PROXIES`(외부 리버스 프록시의 IP/CIDR를 알려주면 `$remote_addr`가
 그 프록시의 X-Forwarded-For를 신뢰해서 실제 클라이언트 IP로 채워짐, 기본 빈 값)도
 같이 있습니다.
 

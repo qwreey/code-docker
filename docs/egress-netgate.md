@@ -134,9 +134,10 @@ code-docker 컨테이너 자체가 재시작되면(단순히 안의 프로세스
 된 옛 네임스페이스에 갇힌 것으로 판단) `exit 1`로 스스로 종료합니다.
 `restart: unless-stopped`가 이를 감지해 컨테이너를 재생성하고, 그러면 현재 code-docker가
 소유한 새 네트워크 네임스페이스에 다시 합류해 라우트를 정상적으로 재적용합니다. 이
-사이클은 실측으로 수 초 안에 완료되는 것을 확인했습니다(아래 Phase 1+2 완료 절 참고).
-재부팅 후에는 `docker compose ps`로 `code-docker-netinit`이 정상적으로 떠 있는지 한 번
-확인하는 습관을 권장합니다.
+사이클은 실측으로 수 초 안에 완료되는 것을 확인했습니다(자세한 실측 로그는
+[`.claude/backlog/egress-netgate-plan.md`](../.claude/backlog/egress-netgate-plan.md)의
+"Phase 1 구현 완료"/"Phase 2 구현 완료" 절 참고). 재부팅 후에는 `docker compose ps`로
+`code-docker-netinit`이 정상적으로 떠 있는지 한 번 확인하는 습관을 권장합니다.
 
 ## 당장 인터넷이 필요하다면 (기능 자체를 끄기)
 

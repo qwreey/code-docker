@@ -2,13 +2,25 @@
 
 authentik 등의 SSO 프로바이더를 사용하는 것을 추천합니다. code-server(`/`)와
 webmanager(`/manager`)는 code-docker 컨테이너 안 nginx가 한 origin으로
-합쳐주고, 여기에 router 컨테이너 자신의 nginx가 `/exports/`(Dev Proxy)와
-`/router/`(router-manager)까지 얹어 host:80 하나로 종단합니다 — code-docker는
-더 이상 `code-docker-external`에 붙지 않아 외부에서 직접 닿지 않고, host에
-퍼블리시된 포트도 router의 80번 하나뿐입니다(자세한 경위는
+합쳐주고, 여기에 router 컨테이너 자신의 nginx가 `/exports/`(Dev Proxy),
+`/app/`(App Routes), `/router/`(router-manager)까지 얹어 host:80 하나로
+종단합니다 — code-docker는 더 이상 `code-docker-external`에 붙지 않아
+외부에서 직접 닿지 않고, host에 퍼블리시된 포트도 router의 80번 하나뿐입니다
+(자세한 경위는
 [dev-proxy.md의 "바깥 리버스 프록시 연결하기"](dev-proxy.md#바깥-리버스-프록시-연결하기)
 참고). 그래서 앞단 리버스 프록시는 **router 컨테이너 하나(`routerip:80`)**만
 바라보면 됩니다.
+
+이 문서는 code-server 자체를 앞단(바깥) 리버스 프록시로 어떻게 보호할지만
+다룹니다 - 이것과 별개로, webmanager 자체 비밀번호 게이트
+([webmanager-config.md의 비밀번호 게이트](webmanager-config.md#비밀번호-게이트),
+`WEBMANAGER_AUTH_PASSWORD_HASH`), router-manager 자체 관리 API 비밀번호
+([router.md의 router-manager 자체 인증](router.md#router-manager-자체-인증),
+`ROUTER_MANAGER_AUTH_PASSWORD_HASH`), Dev Proxy/App Routes 라우트별
+인증([router.md의 tinyauth](router.md#tinyauth), `TINYAUTH_AUTH_USERS`)이
+서로 독립된 별도의 인증 계층으로 따로 존재합니다 - 이 문서에서 다루는 앞단
+SSO를 켜둔다고 해서 저 세 가지가 자동으로 켜지거나 대체되지 않으며, 반대로
+저것들을 켜둔다고 code-server 자체가 보호되지도 않습니다.
 
 ## PWA 설치가 안 되는 이유 (왜 일부 경로를 공개해야 하는지)
 
@@ -33,7 +45,7 @@ code.yaeji.moe {
   }
   reverse_proxy /outpost.goauthentik.io/* http://authentik:9000
 
-  reverse_proxy http://routerip:80   # code-server(/) + webmanager(/manager) + Dev Proxy(/exports/) + router-manager(/router/) 전부 이 한 줄로 커버됩니다 - router 컨테이너 안 nginx가 라우팅합니다, IP는 여기 한 번만 적으면 됩니다
+  reverse_proxy http://routerip:80   # code-server(/) + webmanager(/manager) + Dev Proxy(/exports/) + App Routes(/app/) + router-manager(/router/) 전부 이 한 줄로 커버됩니다 - router 컨테이너 안 nginx가 라우팅합니다, IP는 여기 한 번만 적으면 됩니다
 }
 ```
 

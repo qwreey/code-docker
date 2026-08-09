@@ -53,9 +53,13 @@
 이 포트를 퍼블리시하지 않습니다 — router 자신의 nginx가 host:80을 직접
 종단합니다, 자세한 경위는
 [router-nginx-hardening-plan.md](../router/.claude/router-nginx-hardening-plan.md)
-참고). `/exports/`(Dev Proxy)와 `/router/`(router-manager)는 router의 nginx가
-직접 처리하고, 나머지 요청은 그대로 `code-docker:80`(code-server/webmanager)으로
-넘어갑니다. Dev Proxy도 별도 포트를 새로 열기보다 이 80번을 그대로 재사용하는
+참고). `/exports/`(Dev Proxy), `/router/`(router-manager), `/app/`([App
+Routes](app-routes.md))는 router의 nginx가 직접 처리하고, 나머지(catch-all)
+요청은 router 내부 Caddy(`caddy-adapter`)의 네 번째 site block을 거쳐
+`DEFAULT_UPSTREAM`(기본값 `code-docker:80`, `example-env`에서 변경 가능)으로
+넘어갑니다 — 예전에는 nginx가 이 대상을 직접 하드코딩했지만, 지금은 router
+자신이 뒤에 뭐가 있는지 몰라도 되도록 이 하나도 Caddy를 거칩니다. Dev
+Proxy도 별도 포트를 새로 열기보다 이 80번을 그대로 재사용하는
 게 기본 권장 경로입니다 — 바깥에 노출해야 하는 포트가 80 하나로 끝나고, 바깥
 방화벽/보안그룹/tailnet ACL도 그 하나만 신경 쓰면 됩니다.
 
@@ -75,7 +79,8 @@ caddy-adapter → 기존과 동일하게 Host로 expose를 찾아 dev 서버로 
 
 Caddy 예시 (도메인 하나, `containerip:80`은 이제 **router** 컨테이너의
 IP·포트입니다 — code-server/webmanager 요청도 router의 nginx를 거쳐
-`code-docker:80`으로 위임되므로 같은 진입점을 그대로 쓰면 됩니다):
+(내부적으로 caddy-adapter를 경유해) `DEFAULT_UPSTREAM`(기본
+`code-docker:80`)으로 위임되므로 같은 진입점을 그대로 쓰면 됩니다):
 
 ```caddyfile
 dev.example.com {
@@ -115,7 +120,12 @@ server {
 `ALLOWED_EXPORT_HOSTS`(`example-env`, 기본 빈 값)로 `/exports/`가 받아들일
 Host를 code-server/webmanager용 `ALLOWED_HOSTS`와 별도로 제한할 수 있습니다
 — dev-proxy 도메인은 code-server 도메인보다 훨씬 자주 바뀌는 편이라 따로
-관리합니다.
+관리합니다. 또한 `/exports/`는 기본적으로 `code-docker-internal` 네트워크
+안에서 시작된 요청을 거부합니다(`ROUTER_NGINX_DENY_INTERNAL_EXPORTS`,
+`router/example-env.router`, 기본 `"true"`) — 진짜 외부 Dev Proxy 트래픽이
+그 네트워크 내부에서 시작될 이유가 없기 때문입니다. code-docker 컨테이너
+자신에서 `curl`로 `/exports/`를 직접 테스트하려면 이 값을 `"false"`로
+꺼야 합니다.
 
 ### 대안: `CADDY_ADAPTER_PORT`를 직접 퍼블리시
 

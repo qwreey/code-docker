@@ -33,8 +33,11 @@ ssh/scp 접속에도 그대로 적용). `/code/.ssh/authorized_keys` 목록 조�
 ### Dev Proxy
 
 `router` 컨테이너 안 `caddy-adapter`가 관리하는 `.caddy` 항목(expose) 조회/추가/삭제 —
-이 탭 자체는 router가 소유한 페이지 컴포넌트를 webmanager가 그대로 가져와 보여주는
-것입니다([router.md](router.md) 참고, `@code-docker/router-frontend` 패키지). 이름(내부
+이 탭 자체는 router의 `/router/` 페이지를 iframe으로 그대로 embed한 것입니다
+(`ROUTER_MANAGER_HOSTS`가 비어 있으면 기본값인 같은 origin의 `/router/`를, 설정돼
+있으면 그 전용 도메인을 cross-origin으로 embed — webmanager는 이제
+`@code-docker/router-frontend`를 빌드 의존성으로 갖지 않습니다. 자세한 내용은
+[router.md](router.md#보안-공유-origin과-전용-도메인) 참고). 이름(내부
 식별자, 파일명 + Caddyfile matcher 토큰으로만 쓰임)과 host(실제로 노출할 전체 도메인,
 예: `dev.example.com`이나 `*.staging.example.com`)로 먼저 expose를 만들고, 그 아래에
 라우트(매치 path, target `host:port`, strip prefix, 리버스프록시 path, `route`/`handle`
@@ -52,8 +55,8 @@ webmanager의 다른 곳에서 쓰는 CodeMirror 에디터는 아닙니다). 자
 
 Dev Proxy와 같은 위치(`router` 컨테이너 안 `caddy-adapter`)에서 관리되는, Host
 헤더와 무관한 경로 기반(`/app/<이름>/...`) 리버스 프록시 항목 조회/추가/삭제 —
-이 탭도 router가 소유한 페이지 컴포넌트를 그대로 가져와 보여줍니다
-(`@code-docker/router-frontend`). Dev Proxy와 달리 host 필드가 없고 이름과
+이 탭도 Dev Proxy와 같은 방식(router의 `/router/` 페이지를 iframe으로 embed)으로
+보여줍니다. Dev Proxy와 달리 host 필드가 없고 이름과
 target(`host:port`) 두 값만으로 앱 하나를 등록합니다 — 경로 모양이
 `/app/<이름>/*` 하나로 고정이라 path/strip prefix/매칭 방식 같은 필드 자체가
 없습니다. 최초 부팅 시 `code → code-docker:80` 앱이 자동 생성되고, 지우거나
@@ -62,12 +65,40 @@ target(`host:port`) 두 값만으로 앱 하나를 등록합니다 — 경로 �
 
 ### Tailscale
 
-Dev Proxy와 같은 방식(router가 소유한 `@code-docker/router-frontend` 컴포넌트를
-webmanager가 그대로 가져와 보여줌)으로, tailscale의 전역 설정(SOCKS 주소/재시도
-간격)·forwards·publish 추가/삭제와 로그인 시작/취소, 상태(내 정보/피어 목록) 조회를
-이 탭에서 전부 할 수 있습니다. tailscale 데몬 자체는 router 컨테이너에서 돌고,
-webmanager는 router-manager API를 호출할 뿐입니다. 자세한 내용은
-[router.md](router.md#tailscale)를 확인하세요.
+Dev Proxy와 같은 방식(router의 `/router/` 페이지를 iframe으로 embed)으로,
+tailscale의 전역 설정(SOCKS 주소/재시도 간격)·forwards·publish 추가/삭제와
+로그인 시작/취소, 상태(내 정보/피어 목록) 조회를 이 탭에서 전부 할 수 있습니다.
+tailscale 데몬 자체는 router 컨테이너에서 돌고, webmanager는 router-manager API를
+호출할 뿐입니다. 자세한 내용은 [router.md](router.md#tailscale)를 확인하세요.
+
+### DNS
+
+Dev Proxy/Tailscale과 같은 방식(router의 `/router/` 페이지를 iframe으로 embed)으로,
+router 컨테이너의 dnsmasq가 쓰는 DNS 콘텐츠 블록리스트·MagicDNS 스타일 커스텀
+호스트(호스트이름→실제 IP)·리졸버(`auto`: 컨테이너 자체 `/etc/resolv.conf` 사용,
+`custom`: 고정 업스트림 목록)를 관리합니다. 블록리스트는 소스별(hosts 형식 파일
+하나당 하나)로 커스텀 소스 추가/삭제가 가능하고, 기본 내장 소스(builtin)는 이미지가
+갱신될 때 해시 비교로 업데이트 여부(추가/삭제된 호스트 diff 샘플 포함)를 보여주고
+반영(pull)하거나 무시(ignore)할 수 있습니다. `dig` 스타일 DNS 조회 도구도 이 탭에
+포함되어 있습니다. 자세한 내용은 [router.md](router.md)와
+[egress-netgate.md](egress-netgate.md)를 확인하세요.
+
+### Net 관리
+
+Dev Proxy/Tailscale과 같은 방식(iframe embed)으로, netgate의 아웃바운드 CIDR
+allow/block 규칙(순서 있는 first-match-wins 목록)과 인바운드 포트포워딩 항목을
+조회/추가/삭제/순서변경합니다. 변경 사항은 파일에 저장되는 즉시(별도 재시작 없이)
+router의 `netgate-firewall` 프로그램이 30초 주기로 다시 읽어 반영합니다. 자세한
+내용은 [egress-netgate.md](egress-netgate.md)를 확인하세요.
+
+### tinyauth
+
+Dev Proxy/Tailscale과 같은 방식(iframe embed)으로, Dev Proxy/App Routes 개별
+라우트의 "인증 요구"를 처리하는 tinyauth의 로그인 사용자 목록을 조회/추가/삭제하고
+비밀번호를 변경합니다(`TINYAUTH_AUTH_USERS` 환경변수로 인프라 차원에서 고정한
+경우 읽기 전용 안내로 대체됩니다). 사용자 추가/삭제/비밀번호 변경 시 router의
+`tinyauth` 프로그램이 자동으로 재시작되어 바로 반영됩니다. 자세한 내용은
+[router.md](router.md#tinyauth)를 확인하세요.
 
 ### Logs
 

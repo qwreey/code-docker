@@ -21,9 +21,10 @@
 [`router/.claude/functional-router-plan.md`](../router/.claude/functional-router-plan.md)에
 정리되어 있습니다.
 
-tailscale/Dev Proxy/App Routes는 전부 webmanager의 해당 탭에서 관리할 수 있고,
-`http://<host>/router/`를 직접 열면 webmanager 없이도 같은 화면(+ tinyauth
-사용자 관리)을 쓸 수 있습니다 — 자세한 내용은 아래 "router-manager" 절.
+tailscale/Dev Proxy/App Routes/DNS/Net 관리/tinyauth는 전부 webmanager의 해당
+탭에서도 관리할 수 있고, `http://<host>/router/`를 직접 열면 webmanager 없이도
+같은 화면(+ router-manager 자체 비밀번호 설정을 다루는 "설정" 탭)을 쓸 수
+있습니다 — 자세한 내용은 아래 "router-manager" 절.
 
 ## tailscale
 
@@ -127,7 +128,8 @@ router 자신의 supervisord 프로그램으로 돕니다 — `router/Dockerfile
 도메인 형식(`https://code-docker.example.com`)으로 `.env`에 설정해야 합니다.
 
 사용자는 기본적으로 아무도 없는 상태로 시작합니다 — `/router/`(router-manager UI,
-"설정" 탭)에서 사용자를 추가/삭제/비밀번호 변경할 수 있고, 그때마다 자동으로
+"tinyauth" 탭 — webmanager에도 같은 탭이 있습니다)에서 사용자를 추가/삭제/비밀번호
+변경할 수 있고, 그때마다 자동으로
 `tinyauth`가 재시작되어 바로 반영됩니다. 비밀번호 변경은 기존 비밀번호를 몰라도
 새 비밀번호만 입력하면 되는 관리자용 재설정입니다(router-manager 자체 비밀번호로
 이미 인증된 상태에서만 가능 - tinyauth 자신에게는 이런 재설정 API/CLI가 없어서,
@@ -155,7 +157,9 @@ router 자신의 nginx가 host:80을 직접 종단해 `/router/` 위치 하나�
 개발용으로만 쓰는 opt-in 예외). 같은 소켓이 API와 함께 `router/frontend`로
 빌드된 SPA도 서빙하므로(`router/backend/static.go`), `http://<host>/router/`를
 직접 열면 webmanager 없이도 아래 기능을 전부 UI로 쓸 수 있습니다(Dev Proxy/App
-Routes/Tailscale 탭은 webmanager가 가져다 쓰는 것과 정확히 같은 컴포넌트).
+Routes/Tailscale/DNS/Net 관리/tinyauth 탭은 webmanager가 가져다 쓰는 것과 정확히
+같은 컴포넌트 — router-manager 자체 비밀번호를 다루는 "설정" 탭만 `/router/`
+SPA에만 있습니다).
 아래 API 경로는 router-manager 자신 기준이고, 실제로는 router의 nginx가 그대로
 `/router/api/...`로 통과시킵니다(예: `/router/api/tailscale/state`). 제공하는 것:
 
@@ -174,8 +178,17 @@ Routes/Tailscale 탭은 webmanager가 가져다 쓰는 것과 정확히 같은 �
   여기로 요청을 보냅니다.
 - tinyauth 사용자 CRUD(`GET`/`POST /api/tinyauth/users`,
   `PUT /api/tinyauth/users/{name}/password`, `DELETE /api/tinyauth/users/{name}`) —
-  `/router/` SPA의 "설정" 탭에서만 쓰입니다 (webmanager 쪽엔 이 탭이 없습니다). 위
-  "tinyauth" 절 참고.
+  webmanager의 tinyauth 탭과 `/router/` SPA의 "tinyauth" 탭(별도 탭이며, "설정" 탭과는
+  다릅니다)이 여기로 요청을 보냅니다. 위 "tinyauth" 절 참고.
+- DNS 블록리스트/추가 호스트/리졸버 CRUD(`GET /api/dns/blocklist-sources` +
+  커스텀 소스용 `POST`/`PUT`/`DELETE /api/dns/blocklist-sources/{name}`,
+  내장 소스용 `GET .../builtin/status` + `POST .../builtin/{pull,ignore}`,
+  `GET`/`PUT /api/dns/custom-hosts`, `GET`/`PUT /api/dns/resolver`) —
+  webmanager와 `/router/` SPA 둘 다의 "DNS" 탭이 여기로 요청을 보냅니다. 같은 탭에
+  dig 스타일 조회 도구도 있습니다(`GET /api/dns/query?domain=...&type=...`, 이
+  컨테이너 자신의 dnsmasq(`127.0.0.1`)에 직접 질의 — 디버깅 전용이라 다른 DNS
+  엔드포인트와 달리 인증 게이트도 없습니다, 어차피 읽기 전용 조회입니다). 자세한
+  내용은 [egress-netgate.md](egress-netgate.md)의 DNS 관련 절.
 - netgate outbound/포트포워딩 CRUD(`GET`/`PUT /api/netgate/outbound`,
   `GET`/`POST`/`DELETE /api/netgate/forwards[/{hostPort}]`) — webmanager와 `/router/`
   SPA 둘 다의 "Net 관리" 탭이 여기로 요청을 보냅니다. 자세한 내용은
@@ -197,8 +210,8 @@ webmanager 자체 잠금과 독립적으로 켜고 끌 수 있고, 잠긴 쓰기
 **권장: 앱 안에서 설정 (`/router/`)** — 아무것도 설정하지 않은 채 처음
 띄우면 `GET /api/auth/status`의 `source`가 `"unset"`입니다. 컨테이너의
 `http://<host>/router/`를 열면 router-manager가 직접 제공하는 SPA(webmanager
-없이도 접근 가능 — Dev Proxy/App Routes/Tailscale/tinyauth 사용자 관리까지
-전부 이 안에서 되고, "설정" 탭이 기본으로 열립니다)가 뜨고, 그 탭에서 새
+없이도 접근 가능 — Dev Proxy/App Routes/Tailscale/DNS/Net 관리/tinyauth 사용자
+관리까지 전부 이 안에서 되고, "설정" 탭이 기본으로 열립니다)가 뜨고, 그 탭에서 새
 비밀번호를 설정하면
 `${ROUTER_VOLUME:-./data/router}/auth-hash.json`(컨테이너 안에서는
 `/var/lib/code-docker-router/auth-hash.json` — `ROUTER_MANAGER_AUTH_STORE_PATH`로
@@ -255,7 +268,7 @@ router-manager에 직접 연결합니다(SPA + API 전부) — 그 도메인에�
 접근 중이거나 전용 도메인이 있는데 공유 경로로 접근 중이면 배너로
 안내합니다.
 
-**webmanager에 내장된 Dev Proxy/App Routes/Tailscale/DNS/Net 관리 탭은 항상
+**webmanager에 내장된 Dev Proxy/App Routes/Tailscale/DNS/Net 관리/tinyauth 탭은 항상
 `<iframe>`으로 router의 `/router/` 페이지를 그대로 embed합니다**
 (`components/RouterEmbed/RouterFrame.tsx`, 2026-08-08부터 — 그 전에는
 `ROUTER_MANAGER_HOSTS` 미설정 시 `@code-docker/router-frontend` 컴포넌트를
@@ -279,7 +292,7 @@ webmanager의 라이트/다크 테마 선택을 `postMessage`로 전달해 안�
 이 변경으로 webmanager는 `@code-docker/router-frontend`(router/frontend)를
 빌드 시점 의존성으로 전혀 갖지 않습니다 — router가 아예 없거나 꺼져 있어도
 webmanager 자체 빌드/실행에는 영향이 없고, Dev Proxy/App Routes/Tailscale/DNS/Net
-관리 탭만 빈 iframe으로 보입니다. 두 프로젝트가 별도 저장소로 분리될
+관리/tinyauth 탭만 빈 iframe으로 보입니다. 두 프로젝트가 별도 저장소로 분리될
 가능성을 염두에 둔 결정입니다. `ErrorBanner`/`Sheet`/`Skeleton` 같은
 router-frontend 전용이 아닌 범용 UI 컴포넌트는 webmanager 자체 코드
 (`webmanager/frontend/src/components/common/`)로 손수 복제되어 있습니다 —

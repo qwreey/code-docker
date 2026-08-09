@@ -142,6 +142,7 @@ tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열�
 
 자세한 내용은 [app-routes.md](app-routes.md)를 확인하세요.
 
+- [켜고 끄기](app-routes.md#켜고-끄기) — `CADDY_ADAPTER_ENABLED`로 Dev Proxy와 함께 제어됩니다(별도 스위치 없음)
 - [기본 앱 (code)](app-routes.md#기본-앱-code)
 - [앱 추가하기](app-routes.md#앱-추가하기)
 - [바깥 리버스 프록시 연결하기](app-routes.md#바깥-리버스-프록시-연결하기)
@@ -159,6 +160,7 @@ tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열�
 - [Git Config](webmanager.md#git-config)
 - [Dev Proxy](webmanager.md#dev-proxy)
 - [App Routes](webmanager.md#app-routes)
+- [Tailscale](webmanager.md#tailscale)
 - [Logs](webmanager.md#logs)
 - [Task Manager](webmanager.md#task-manager)
 - [Claude Code](webmanager.md#claude-code)
@@ -168,6 +170,7 @@ tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열�
 - [Terminal](webmanager.md#terminal)
 - [Files](webmanager.md#files)
 - [Docker/dind 관리](webmanager.md#dockerdind-관리)
+- [Sessions (열린 세션)](webmanager.md#sessions-열린-세션)
 
 ### webmanager 설정 (비밀번호 / 환경 변수 마이그레이션)
 
@@ -185,9 +188,10 @@ webmanager 자체 비밀번호 게이트를 켜는 방법과, 이미지를 업�
 전체 파일 목록과 각 파일의 역할은 [build-customization.md](build-customization.md)에 정리되어 있습니다:
 
 - **빌드**: `build.*.sh`
-- **code-server**: `code-service.*.sh`, `code-config.*.yaml`, `code-env.*.sh`, `code-runner.*.sh`, `recommendations.*.yaml`, `shell.*`
-- **webmanager**: `webmanager.*.sh`, `supervisor-metadata.*.yaml`, `example-env.webmanager`(런타임 환경변수 템플릿, 저장소 루트)
-- **기타**: `supervisord.*.conf`, `supervisord/*.conf`, `user-init.*.sh`, `sshd-service.*.sh`, `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`, `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅 + router로 가는 `/tailscale/`·`/dev-proxy/`·`/exports/` 프록시, `NGINX_LOG_LEVEL`로 access_log 상세도 조절), `nginx-error.*.html`(code-server가 아직 안 떴을 때 502 대신 보여주는 자동 재시도 페이지)
+- **code-server**: `code-service.*.sh`, `code-config.*.yaml`, `code-env.*.sh`, `code-runner.*.sh`, `recommendations.*.yaml`
+- **셸**: `shell.*` (`config/shell/`, `script/get-user-shell.sh`가 default/override를 고름)
+- **webmanager**: `webmanager.*.sh`, `example-env.webmanager`(런타임 환경변수 템플릿, 저장소 루트)
+- **기타**: `supervisord.*.conf`, `supervisord/*.conf`, `supervisor-metadata.*.yaml`(webmanager의 Supervisor 탭이 읽지만 프로그램 폴더 밖에 있는 전역 메타데이터), `user-init.*.sh`, `sshd-service.*.sh`, `resolv-writer.*.sh`(router DNS로 nameserver 갱신), `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`, `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅, `NGINX_LOG_LEVEL`로 access_log 상세도 조절 — `/tailscale/`·`/dev-proxy/`·`/exports/`는 이제 router 자신의 nginx가 직접 종단합니다, [router.md](router.md) 참고), `nginx-error.*.html`(code-server가 아직 안 떴을 때 502 대신 보여주는 자동 재시도 페이지)
 
 router 컨테이너(`router/` 서브트리) 자체의 override 파일 목록은 [router.md](router.md)를
 확인하세요 — `router/config/netgate/`, `router/config/tailscale/`,
