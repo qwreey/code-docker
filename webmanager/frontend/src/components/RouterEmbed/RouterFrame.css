@@ -7,13 +7,23 @@
      scroll kicking in for typical use. */
   height: 75vh;
   min-height: 420px;
+  /* Rounding lives here (overflow: hidden clipping the child) rather than on
+     the iframe itself - clipping an <iframe> element directly with
+     border-radius forces the browser to rounded-clip its own compositor
+     surface, which is unnecessary risk for no visual difference (this
+     wrapper-clip produces the identical result). Investigated as a possible
+     cause of the 2026-08-09 renderer-crash incident but ruled out - the real
+     cause was a View Transition capturing this iframe (see App.tsx's
+     IFRAME_SECTIONS and viewTransition.ts) - kept anyway as a harmless
+     hardening since there's no reason to clip the iframe surface itself. */
+  overflow: hidden;
+  border-radius: var(--radius-lg);
 }
 
 .router-frame-iframe {
   width: 100%;
   height: 100%;
   border: none;
-  border-radius: var(--radius-lg);
 }
 
 .router-frame-skeleton-overlay {

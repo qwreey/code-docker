@@ -10,7 +10,18 @@ import { flushSync } from 'react-dom'
 // Browsers without support (Firefox, older Safari) just get the plain
 // synchronous update — no animation, functionally identical.
 export function withViewTransition(update: () => void): void {
-  if (!document.startViewTransition) {
+  // Capturing a View Transition snapshot of a page that currently contains a
+  // live <iframe> (the router-frontend embed - see RouterFrame.tsx) crashes
+  // the renderer in Chrome, reproduced on both a desktop (AMD/Mesa/Wayland)
+  // and an Android device, never on Firefox (which has no View Transition
+  // API at all and just falls through to the plain update below anyway) -
+  // see git history around 2026-08-09 for the incident. This only catches an
+  // iframe present *before* the update (leaving an iframe tab, or any
+  // transition triggered while one is already on screen, e.g. the theme
+  // toggle); App.tsx's sidebar handler additionally skips this wrapper
+  // outright when the *target* tab is iframe-based, since an iframe about to
+  // be mounted can't be detected by this presence check.
+  if (!document.startViewTransition || document.querySelector('iframe')) {
     update()
     return
   }

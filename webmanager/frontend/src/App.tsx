@@ -32,6 +32,15 @@ function isSectionId(v: string | null): v is SectionId {
   return SECTIONS.some((s) => s.id === v)
 }
 
+// Sections that render RouterFrame (a live <iframe> embed - see
+// components/RouterEmbed/RouterFrame.tsx). Switching *into* one of these
+// mounts an iframe that wasn't there before the transition started, which
+// viewTransition.ts's own iframe-presence guard can't detect (it only sees
+// the DOM as it exists at call time, before the update runs) - so this
+// direction needs an explicit check here instead. See viewTransition.ts's
+// own comment for the crash this works around.
+const IFRAME_SECTIONS = new Set<SectionId>(['dev-proxy', 'app-routes', 'tailscale', 'dns', 'net'])
+
 // Splits pathname into {root, section} the same way router/frontend's own
 // App.tsx does (see its splitPath doc comment for the full reasoning) - only
 // looks at the last path segment, so this works unmodified whether the
@@ -84,7 +93,7 @@ function App() {
       </div>
       <SidebarContainer
         active={active}
-        onSelect={(id) => withViewTransition(() => setActive(id))}
+        onSelect={(id) => (IFRAME_SECTIONS.has(id) ? setActive(id) : withViewTransition(() => setActive(id)))}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
