@@ -30,8 +30,13 @@ are actually git-specific), a Git Config tab (name/email, SSH+GPG signing,
 HTTPS credentials, git-lfs install, raw `.gitconfig` editing) — a Tailscale tab
 also lives here (forwards/publish CRUD, status, login trigger), and a DNS tab
 (blocklist sources, MagicDNS-style custom hosts, resolver override — see root
-`CLAUDE.md`'s "DNS management"), Net 관리(netgate outbound/forwards), and
-tinyauth (user CRUD) — six tabs total — the same way, but none of them are
+`CLAUDE.md`'s "DNS management"), Net 관리(netgate outbound/forwards/bandwidth
+shaping - see root `CLAUDE.md`'s "netgate (egress lockdown)"), tinyauth (user
+CRUD), and Router 설정 (router-manager's own auth setup/change, plus a
+read-only `ROUTER_MANAGER_HOSTS` status display - the same "설정" tab
+router's own standalone `/router/` page defaults to) — seven tabs total,
+added in that order as router grew new feature areas — the same way, but
+none of them are
 webmanager's own feature: each always `<iframe>`-embeds router's own
 `/router/` page (`components/RouterEmbed/RouterFrame.tsx`), pointed at the
 same-origin `/router/` path by default or, when `ROUTER_MANAGER_HOSTS` is

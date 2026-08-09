@@ -162,6 +162,8 @@ func main() {
 	mux.HandleFunc("GET /api/netgate/forwards", handleListNetgateForwards)
 	mux.Handle("POST /api/netgate/forwards", gate.RequirePassword(http.HandlerFunc(handleAddNetgateForward)))
 	mux.Handle("DELETE /api/netgate/forwards/{hostPort}", gate.RequirePassword(http.HandlerFunc(handleDeleteNetgateForward)))
+	mux.HandleFunc("GET /api/netgate/bandwidth", handleGetNetgateBandwidth)
+	mux.Handle("PUT /api/netgate/bandwidth", gate.RequirePassword(http.HandlerFunc(handleSetNetgateBandwidth)))
 
 	// Everything else falls through to the built SPA (AppRoutes/DevProxy/
 	// Tailscale/설정 tabs) - replaces the old standalone password-only page

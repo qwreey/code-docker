@@ -89,9 +89,12 @@ router 컨테이너의 dnsmasq가 쓰는 DNS 콘텐츠 블록리스트·MagicDNS
 
 Dev Proxy/Tailscale과 같은 방식(iframe embed)으로, netgate의 아웃바운드 CIDR
 allow/block 규칙(순서 있는 first-match-wins 목록)과 인바운드 포트포워딩 항목을
-조회/추가/삭제/순서변경합니다. 변경 사항은 파일에 저장되는 즉시(별도 재시작 없이)
-router의 `netgate-firewall` 프로그램이 30초 주기로 다시 읽어 반영합니다. 자세한
-내용은 [egress-netgate.md](egress-netgate.md)를 확인하세요.
+조회/추가/삭제/순서변경합니다. 같은 탭에 **대역폭 제한** 카드도 있습니다 - 이
+라우터가 내보내는 전체 트래픽에 대한 하드 리밋(`total_mbps`)과 code-docker/dind 등
+컨테이너별 독립적인 하드 리밋(`services[]`)을 `tc` 기반으로 적용해, 네트워크 소진
+공격을 막습니다. 변경 사항은 파일에 저장되는 즉시(별도 재시작 없이) router의
+`netgate-firewall`/`netgate-shaping` 프로그램이 30초 주기로 다시 읽어 반영합니다.
+자세한 내용은 [egress-netgate.md](egress-netgate.md)를 확인하세요.
 
 ### tinyauth
 
@@ -101,6 +104,16 @@ Dev Proxy/Tailscale과 같은 방식(iframe embed)으로, Dev Proxy/App Routes �
 경우 읽기 전용 안내로 대체됩니다). 사용자 추가/삭제/비밀번호 변경 시 router의
 `tinyauth` 프로그램이 자동으로 재시작되어 바로 반영됩니다. 자세한 내용은
 [router.md](router.md#tinyauth)를 확인하세요.
+
+### Router 설정
+
+Dev Proxy/Tailscale과 같은 방식(iframe embed)으로, router-manager 자신의 관리 API
+비밀번호 설정/변경과 `ROUTER_MANAGER_HOSTS` 전용 도메인 설정 현황(읽기 전용 표시)을
+보여줍니다 - router의 `/router/` 페이지를 직접 열었을 때의 "설정" 탭과 동일한
+화면입니다. 이전에는 webmanager 쪽에는 router 비밀번호 미설정 경고 배너만 있고 실제
+설정 화면 자체는 router를 직접 열어야만 접근할 수 있었는데, 다른 탭들과 마찬가지로
+이제 webmanager 안에서도 바로 설정할 수 있습니다. 자세한 내용은
+[router.md](router.md#router-manager-자체-인증)를 확인하세요.
 
 ### Logs
 

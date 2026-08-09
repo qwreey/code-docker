@@ -72,6 +72,33 @@ func handleAddNetgateForward(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, forward)
 }
 
+func handleGetNetgateBandwidth(w http.ResponseWriter, r *http.Request) {
+	bw, err := netgate.GetBandwidth(netgate.LiveConfigPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, bw)
+}
+
+func handleSetNetgateBandwidth(w http.ResponseWriter, r *http.Request) {
+	var body netgate.Bandwidth
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	bw, err := netgate.SetBandwidth(netgate.LiveConfigPath, body)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, netgate.ErrValidation) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, bw)
+}
+
 func handleDeleteNetgateForward(w http.ResponseWriter, r *http.Request) {
 	hostPort, err := strconv.Atoi(r.PathValue("hostPort"))
 	if err != nil {

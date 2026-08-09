@@ -1,5 +1,6 @@
 import { Outbound } from './Outbound'
 import { Forwards } from './Forwards'
+import { Bandwidth } from './Bandwidth'
 import '../common/common.css'
 import './NetManagement.css'
 
@@ -15,8 +16,8 @@ export function NetManagement() {
         <h1>Net 관리</h1>
       </div>
       <p className="section-description">
-        이 라우터를 게이트웨이로 사용하는 컨테이너가 내보내는 트래픽에 대한 CIDR allow/block 규칙과, 호스트 포트를
-        내부 네트워크의 컨테이너로 전달하는 포트포워딩을 관리합니다.
+        이 라우터를 게이트웨이로 사용하는 컨테이너가 내보내는 트래픽에 대한 CIDR allow/block 규칙, 호스트 포트를
+        내부 네트워크의 컨테이너로 전달하는 포트포워딩, 그리고 대역폭 하드 리밋을 관리합니다.
       </p>
       <div className="warning-note">
         <span aria-hidden="true">⚠</span>
@@ -31,6 +32,7 @@ export function NetManagement() {
 
       <Forwards />
       <Outbound />
+      <Bandwidth />
     </section>
   )
 }

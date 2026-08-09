@@ -6,8 +6,9 @@
 수준이 높습니다. 다섯 가지 기능을 담당합니다:
 
 1. **아웃바운드 격리(netgate)** — RFC1918/사설망 차단, DNS 레벨(dnsmasq) 콘텐츠
-   블록리스트, 인바운드 포트포워딩. outbound 규칙과 포트포워딩은 "Net 관리" 탭에서,
-   DNS 블록리스트/리졸버는 "DNS" 탭에서 웹으로 관리합니다. 자세한 내용은
+   블록리스트, 인바운드 포트포워딩, `tc` 기반 대역폭 하드 리밋(전체/서비스별, 네트워크
+   소진 공격 방어). outbound 규칙/포트포워딩/대역폭 리밋은 "Net 관리" 탭에서, DNS
+   블록리스트/리졸버는 "DNS" 탭에서 웹으로 관리합니다. 자세한 내용은
    [egress-netgate.md](egress-netgate.md).
 2. **tailscale** — 데몬+로그인+포트 가져오기(forwards)+포트 내보내기(publish). 아래 참고.
 3. **Dev Proxy** — 컨테이너 안 dev 서버를 도메인으로 노출. 자세한 내용은
@@ -21,10 +22,10 @@
 [`router/.claude/functional-router-plan.md`](../router/.claude/functional-router-plan.md)에
 정리되어 있습니다.
 
-tailscale/Dev Proxy/App Routes/DNS/Net 관리/tinyauth는 전부 webmanager의 해당
-탭에서도 관리할 수 있고, `http://<host>/router/`를 직접 열면 webmanager 없이도
-같은 화면(+ router-manager 자체 비밀번호 설정을 다루는 "설정" 탭)을 쓸 수
-있습니다 — 자세한 내용은 아래 "router-manager" 절.
+tailscale/Dev Proxy/App Routes/DNS/Net 관리/tinyauth/설정(router-manager 자체 비밀번호
+설정)은 전부 webmanager의 해당 탭에서도 관리할 수 있고, `http://<host>/router/`를
+직접 열면 webmanager 없이도 같은 화면을 쓸 수 있습니다 — 자세한 내용은 아래
+"router-manager" 절.
 
 ## tailscale
 
@@ -192,9 +193,10 @@ SPA에만 있습니다).
   컨테이너 자신의 dnsmasq(`127.0.0.1`)에 직접 질의 — 디버깅 전용이라 다른 DNS
   엔드포인트와 달리 인증 게이트도 없습니다, 어차피 읽기 전용 조회입니다). 자세한
   내용은 [egress-netgate.md](egress-netgate.md)의 DNS 관련 절.
-- netgate outbound/포트포워딩 CRUD(`GET`/`PUT /api/netgate/outbound`,
-  `GET`/`POST`/`DELETE /api/netgate/forwards[/{hostPort}]`) — webmanager와 `/router/`
-  SPA 둘 다의 "Net 관리" 탭이 여기로 요청을 보냅니다. 자세한 내용은
+- netgate outbound/포트포워딩/대역폭 제한 CRUD(`GET`/`PUT /api/netgate/outbound`,
+  `GET`/`POST`/`DELETE /api/netgate/forwards[/{hostPort}]`,
+  `GET`/`PUT /api/netgate/bandwidth`) — webmanager와 `/router/` SPA 둘 다의 "Net 관리"
+  탭이 여기로 요청을 보냅니다. 자세한 내용은
   [egress-netgate.md의 "설정 커스터마이징"](egress-netgate.md#설정-커스터마이징).
 - 자체 admin-API 비밀번호 게이트(`GET /api/auth/status`, `POST /api/auth/unlock`) —
   아래 "router-manager 자체 인증" 참고.
@@ -204,7 +206,8 @@ SPA에만 있습니다).
 router-manager 자신의 관리 API(tailscale config `PUT`, forwards/publish/login의
 `POST`/`DELETE`, dev-proxy expose와 app-routes 앱의 `POST`/`PUT`/`DELETE`, tinyauth
 사용자 CRUD, DNS 블록리스트 소스/custom hosts/resolver의 `POST`/`PUT`/`DELETE`, netgate
-"Net 관리" 탭의 outbound/forwards `PUT`/`POST`/`DELETE`)는 비밀번호 게이트로
+"Net 관리" 탭의 outbound/forwards `PUT`/`POST`/`DELETE`, 대역폭 제한
+`PUT /api/netgate/bandwidth`)는 비밀번호 게이트로
 보호할 수 있습니다. 읽기 라우트(state/config/list/status, DNS의 `/api/dns/query`
 포함)는 항상 열려 있습니다
 — webmanager 자체 게이트와 같은 "읽기는 열어두고 쓰기만 잠근다" 관례입니다.

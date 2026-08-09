@@ -234,9 +234,12 @@ same for `/publish`, `GET /api/tailscale/status`, `POST /api/tailscale/login/
 code-server's sign-in banner, `config/code/code-patch/tailscale-notify.default.js`,
 polls this now instead of a static file), the Dev Proxy expose CRUD, the App Routes expose
 CRUD (`router/backend/internal/approutes`, sharing self-SSRF target validation with Dev
-Proxy via `internal/targetguard`), netgate's outbound/forwards CRUD ("Net 관리" tab,
-`router/backend/internal/netgate`), tinyauth user CRUD (`router/backend/internal/
-tinyauthusers`, "설정" tab), DNS management (`router/backend/internal/dns`,
+Proxy via `internal/targetguard`), netgate's outbound/forwards/bandwidth-shaping CRUD
+("Net 관리" tab, `router/backend/internal/netgate` — bandwidth is `GET`/`PUT
+/api/netgate/bandwidth`, applied via a `tc` HTB tree on the default interface by its own
+`netgate-shaping` supervisord program, see `router/config/netgate/shaping.default.sh` and
+docs/egress-netgate.md's "대역폭 제한" section), tinyauth user CRUD (`router/backend/internal/
+tinyauthusers`, "tinyauth" tab), DNS management (`router/backend/internal/dns`,
 `GET /api/dns/blocklist-sources` + `POST`/`PUT`/`DELETE` for custom sources +
 `GET`/`POST /api/dns/blocklist-sources/builtin/{status,pull,ignore}` for the
 hash-tracked builtin source, `GET`/`PUT /api/dns/custom-hosts`,
@@ -351,7 +354,7 @@ over localhost or over the shared path despite a dedicated domain being configur
 docs/router.md's "보안: 공유 origin과 전용 도메인" section.
 
 `ROUTER_MANAGER_HOSTS` also changes how webmanager itself embeds the Dev
-Proxy/App Routes/Tailscale/DNS/Net 관리/tinyauth tabs — see "webmanager" below and
+Proxy/App Routes/Tailscale/DNS/Net 관리/tinyauth/설정 tabs — see "webmanager" below and
 `webmanager/frontend/src/components/RouterEmbed/RouterFrame.tsx` — switching the
 `<iframe>`'s `src` from the same-origin `/router/` path (the default, when
 `ROUTER_MANAGER_HOSTS` is unset) to the dedicated cross-origin domain instead, which is what
