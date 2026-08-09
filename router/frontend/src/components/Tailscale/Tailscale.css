@@ -45,6 +45,18 @@
   border-bottom: none;
 }
 
+.tailscale-table input,
+.tailscale-table select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+
 .form-grid-inline {
   margin-top: 1rem;
   border-top: 1px solid var(--border);

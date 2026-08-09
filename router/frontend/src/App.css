@@ -4,6 +4,37 @@
   padding: 1.5rem;
 }
 
+/* Standalone /router/ visits keep the 960px reading width (own header+nav,
+   viewed like any other admin page) - but embedded inside webmanager
+   (RouterFrame.tsx, ?embed=1) this same App is the entire tab body, sized to
+   whatever RouterFrame's own iframe gives it (now full-bleed - see
+   RouterFrame.css), and every other webmanager tab already stretches to
+   fill that width. Capping this one at 960px made it the only tab that
+   stayed centered with dead space on either side past that width - dropped
+   here instead of narrowing every other tab to match, since this content
+   (tables of rules/hosts/routes) reads better wide, not narrow. */
+.router-app--embed {
+  max-width: none;
+  /* Match webmanager App.css's own .app-content padding exactly (same three
+     breakpoints below) - RouterFrame.css cancels .app-content's padding via
+     negative margin so this App's own padding becomes the tab's only inset,
+     and it used to be a flat 1.5rem regardless of viewport, visibly
+     tighter/looser than every other tab depending on screen size. */
+  padding: 2rem 2.5rem;
+}
+
+@media (max-width: 720px) {
+  .router-app--embed {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .router-app--embed {
+    padding: 1rem 0.85rem;
+  }
+}
+
 .router-app-header {
   display: flex;
   align-items: center;

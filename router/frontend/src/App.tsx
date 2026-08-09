@@ -115,7 +115,7 @@ function App() {
   }, [embed])
 
   return (
-    <div className="router-app">
+    <div className={embed ? 'router-app router-app--embed' : 'router-app'}>
       {!embed && (
         <header className="router-app-header">
           <h1>router</h1>
