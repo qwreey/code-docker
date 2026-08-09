@@ -651,3 +651,18 @@ export interface GitTag {
   date?: string
   hash?: string
 }
+
+// Mirrors internal/projectgit's WorktreeInfo (GET /api/projects/git/worktrees) -
+// one entry per `git worktree list --porcelain` record, the project's own
+// main worktree included.
+export interface GitWorktree {
+  path: string
+  head?: string
+  branch?: string
+  detached: boolean
+  bare: boolean
+  locked: boolean
+  lockReason?: string
+  prunable: boolean
+  prunableReason?: string
+}

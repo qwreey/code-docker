@@ -276,3 +276,18 @@
   color: var(--text-muted);
   margin-left: auto;
 }
+
+/* Worktrees */
+.git-worktree-table td {
+  vertical-align: middle;
+}
+
+.git-worktree-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.git-worktree-flags .badge svg {
+  margin-right: 0.2rem;
+}

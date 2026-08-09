@@ -261,6 +261,10 @@ func main() {
 	mux.HandleFunc("GET /api/projects/git/remotes", s.handleProjectGitRemotes)
 	mux.HandleFunc("GET /api/projects/git/branches", s.handleProjectGitBranches)
 	mux.HandleFunc("GET /api/projects/git/tags", s.handleProjectGitTags)
+	mux.HandleFunc("GET /api/projects/git/worktrees", s.handleProjectGitWorktrees)
+	// Destructive (git worktree remove), unlike every read above — gated.
+	// See handlers_projectgit_worktree.go's file doc comment.
+	mux.Handle("POST /api/projects/git/worktrees/remove", gate.RequirePassword(http.HandlerFunc(s.handleProjectGitWorktreeRemove)))
 
 	mux.HandleFunc("GET /api/recommendations", s.handleGetRecommendations)
 	mux.HandleFunc("GET /api/code-extensions", s.handleListCodeExtensions)
