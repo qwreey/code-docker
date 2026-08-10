@@ -36,9 +36,20 @@
     display: none;
     align-items: center;
     justify-content: center;
+    opacity: 0;
+    transition: opacity .15s ease;
+}
+/* .cd-webmanager-visible flips display (needed since opacity alone doesn't
+   stop a hidden overlay from blocking clicks/being focusable) a frame before
+   .cd-webmanager-open starts the opacity transition on show, and is removed
+   only after the fade-out transition finishes on hide (see hide() below) -
+   without that delay, display:none would cut the fade-out short instead of
+   letting it animate. */
+.cd-webmanager-overlay.cd-webmanager-visible {
+    display: flex;
 }
 .cd-webmanager-overlay.cd-webmanager-open {
-    display: flex;
+    opacity: 1;
 }
 .cd-webmanager-modal {
     position: relative;
@@ -128,17 +139,43 @@
         document.body.appendChild(overlay);
     }
 
+    let hideTimer = null;
+
     function isOpen() {
         return !!overlay && overlay.classList.contains("cd-webmanager-open");
     }
 
     function show() {
         if (!overlay) buildOverlay();
-        overlay.classList.add("cd-webmanager-open");
+        if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+        }
+        overlay.classList.add("cd-webmanager-visible");
+        // Adding cd-webmanager-open in the same tick as cd-webmanager-visible
+        // wouldn't transition (the browser coalesces both style changes into
+        // one paint) - a rAF forces the "display:flex, opacity:0" state to
+        // actually paint first, so the following opacity:1 is a real
+        // transition rather than an instant jump.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                overlay.classList.add("cd-webmanager-open");
+            });
+        });
     }
 
     function hide() {
-        if (overlay) overlay.classList.remove("cd-webmanager-open");
+        if (!overlay) return;
+        overlay.classList.remove("cd-webmanager-open");
+        if (hideTimer) clearTimeout(hideTimer);
+        // Fallback timeout (not just transitionend) in case the transition
+        // never fires - e.g. the tab was backgrounded (rAF/transitions can
+        // be throttled) or a future edit changes the CSS transition
+        // duration without updating this value.
+        hideTimer = setTimeout(() => {
+            overlay.classList.remove("cd-webmanager-visible");
+            hideTimer = null;
+        }, 200);
     }
 
     function toggle() {
