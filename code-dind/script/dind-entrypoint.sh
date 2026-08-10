@@ -96,14 +96,17 @@ fi
 # unlike code-docker it manages its own default route directly instead of
 # needing a netinit sidecar - same apply_default_route netinit uses, just
 # running against dind's own netns. Also keeps dind's own /etc/resolv.conf
-# pointed at router's DNS forwarder for the same reason code-docker's
-# resolv-writer program does (see router/.claude/router-dns-plan.md) -
-# code-docker-internal being `internal: true` blocks Docker's own embedded
-# DNS from forwarding externally, and dind needs real DNS too (pulling
-# images by registry hostname). apply_default_route/apply_nameserver are
-# shared with netinit/script/netinit-entrypoint.sh and
-# config/resolv-writer/resolv-writer.default.sh - see root CLAUDE.md's
-# "netshare" section; this subtree's own isolated build context can't reach
+# pointed at router's DNS forwarder for the same reason code-docker needs
+# to (see router/.claude/router-dns-plan.md) - code-docker-internal being
+# `internal: true` blocks Docker's own embedded DNS from forwarding
+# externally, and dind needs real DNS too (pulling images by registry
+# hostname). code-docker's own equivalent of this moved to a local dnsmasq
+# instead of apply_nameserver's plain fallback-nameserver approach (see
+# .claude/backlog/dns-local-servfail-fix.md's "code-docker-dind" section for
+# why dind hasn't gotten the same fix yet, and what it'd take).
+# apply_default_route/apply_nameserver are shared with
+# netinit/script/netinit-entrypoint.sh - see root CLAUDE.md's "netshare"
+# section; this subtree's own isolated build context can't reach
 # repo-root netshare/ directly, so /netshare here is a hand-synced copy
 # (code-dind/script/netshare/, run vendor-netshare.sh after editing
 # netshare/).

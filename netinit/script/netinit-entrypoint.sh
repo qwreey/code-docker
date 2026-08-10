@@ -12,9 +12,11 @@ set -u
 # router's IP isn't static across recreates).
 #
 # apply_default_route/apply_nameserver are shared with
-# code-dind/script/dind-entrypoint.sh and
-# config/resolv-writer/resolv-writer.default.sh - see root CLAUDE.md's
-# "netshare" section. This subtree's own isolated build context can't reach
+# code-dind/script/dind-entrypoint.sh - see root CLAUDE.md's
+# "netshare" section (code-docker's own ongoing DNS resolution now goes
+# through config/dns-local/ instead of apply_nameserver, see
+# .claude/backlog/dns-local-servfail-fix.md). This subtree's own isolated
+# build context can't reach
 # repo-root netshare/ directly, so /netshare here is a hand-synced copy
 # (netinit/script/netshare/, run vendor-netshare.sh after editing
 # netshare/).

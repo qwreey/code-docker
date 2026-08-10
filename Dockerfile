@@ -69,10 +69,10 @@ COPY example-env.webmanager /etc/code-docker/webmanager/example-env.webmanager
 # Log directories for per-program rotated log files (read by vector).
 # tailscaled/tailscale-forward/tailscale-status/caddy-adapter moved to
 # router (see .claude/backlog/functional-router-plan.md) - no longer
-# programs in this image. resolv-writer is new - see
-# .claude/backlog/router-dns-plan.md.
+# programs in this image. dns-local replaced the old resolv-writer program -
+# see .claude/backlog/dns-local-servfail-fix.md.
 RUN mkdir -p /var/log/code /var/log/sshd /var/log/webmanager /var/log/nginx \
-    /var/log/resolv-writer
+    /var/log/dns-local
 
 # /etc/code-docker/supervisord/ is where a user's own gitignored
 # config/supervisord/*.conf override files land (see CLAUDE.md's "process
@@ -86,7 +86,7 @@ COPY --chown=root:root netshare /etc/code-docker/netshare
 COPY --chown=root:root \
     config script/entrypoint.sh script/code-service.sh \
     script/user-init.sh script/get-user-shell.sh script/sshd-service.sh \
-    script/webmanager.sh script/resolv-writer.sh \
+    script/webmanager.sh script/dns-local.sh \
     script/vector-service.sh script/nginx-service.sh /etc/code-docker/
 COPY --chown=root:root code-server-autoinstall/*.sh \
     /etc/code-docker/code-server-autoinstall/

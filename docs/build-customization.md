@@ -1,6 +1,6 @@
 # 빌드 커스터마이징
 
-`config/` 아래는 프로그램별 폴더(`build/`, `code/`, `nginx/`, `resolv-writer/`, `shell/`, `sshd/`, `user-init/`, `vector/`, `webmanager/`)로 나뉘어 있습니다 — 각 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 `config/build/build.default.sh` 를 같은 폴더에 `build.override.sh` 로 복사하여 원하는대로 변경할 수 있습니다. 단, sh 파일들은 꼭 `chmod u+x` 를 적용하여 실행가능한 파일로 만들어야합니다.
+`config/` 아래는 프로그램별 폴더(`build/`, `code/`, `dns-local/`, `nginx/`, `shell/`, `sshd/`, `user-init/`, `vector/`, `webmanager/`)로 나뉘어 있습니다 — 각 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 `config/build/build.default.sh` 를 같은 폴더에 `build.override.sh` 로 복사하여 원하는대로 변경할 수 있습니다. 단, sh 파일들은 꼭 `chmod u+x` 를 적용하여 실행가능한 파일로 만들어야합니다.
 가급적 업스트림의 변경사항에 따라 필수 바이너리가 따라가도록 하려면 override 파일에서 `/etc/code-docker/build/build.default.sh` 를 실행하는것을 추천합니다. 다만 원치 않는 경우 하지 않아도 됩니다.
 각 override 파일은 편집 후, 컨테이너 재빌드가 필요합니다. `docker compose build 컨테이너명 && docker compose up -d` 를 수행하세요
 
@@ -36,8 +36,8 @@
 **`config/sshd/`**
 - [`sshd-service.*.sh`](#sshd-servicesh-sshd-서비스)
 
-**`config/resolv-writer/`**
-- [`resolv-writer.*.sh`](#resolv-writersh-router-dns로-nameserver-갱신)
+**`config/dns-local/`**
+- [`dns-local.*.sh`](#dns-localsh-로컬-dns-리졸버)
 
 **`config/vector/`**
 - [`vector-service.*.sh`](#vector-servicesh-vector-실행)
@@ -102,7 +102,7 @@ code-server 를 어떻게 수행할지 정의합니다. qwreey/code-server-autoi
 
 supervisord 에 사용될 설정파일입니다. `supervisord.*.conf` 자체는 `[supervisord]`/
 `[unix_http_server]`/`[supervisorctl]`/`[rpcinterface]`/`[include]` 같은 supervisord
-자신의 boilerplate만 담고 있고, code/nginx/sshd/webmanager/vector/resolv-writer 등
+자신의 boilerplate만 담고 있고, code/nginx/sshd/webmanager/vector/dns-local 등
 실제로 뜨는 각 프로그램의 `[program:...]` 정의는 `config/supervisord.d/*.conf`(git
 추적, 프로그램당 파일 하나)에 따로 있습니다 - 이 폴더는 override 패턴이 아니라
 저장소에 그대로 커밋된 빌트인 프로그램 정의이므로, 기존 프로그램의 설정(로그 로테이션
@@ -127,16 +127,20 @@ tailscale 관련 override 파일(`tailscale-service.*.sh`, `tailscale-forward.*.
 재빌드 대상이 `code-docker-router` 서비스입니다. 자세한 내용은 [router.md](router.md)를
 확인하세요.
 
-### `resolv-writer.*.sh` (router DNS로 nameserver 갱신)
+### `dns-local.*.sh` (로컬 DNS 리졸버)
 
 `code-docker-internal` 네트워크가 `internal: true`라 Docker 자체 내장 DNS(`127.0.0.11`)가
-외부로 쿼리를 포워딩하지 못하기 때문에, router 컨테이너가 대신 실제 DNS 포워더(dnsmasq)를
-띄웁니다 — 이 supervisord 프로그램이 5초마다 `router`의 IP를 다시 조회해서
-`/etc/resolv.conf`에 두 번째 nameserver로 반영합니다(router가 재생성돼 IP가 바뀌어도 계속
-따라감). `entrypoint.sh`도 부팅 시 한 번 동기적으로 같은 일을 하고, `code-docker-dind`도
-자기 자신의 `/etc/resolv.conf`에 동일한 로직을 씁니다 — 세 곳 모두 저장소 루트
-`netshare/apply-nameserver.sh`의 `apply_nameserver` 함수를 공유합니다(직접 수정할 일은
-거의 없는 파일이지만, override한다면 이 공유 함수를 계속 쓰는 걸 권장합니다).
+`router`/`dind` 같은 같은 네트워크의 컨테이너 이름은 알지만 외부 도메인은 즉시 SERVFAIL로
+답합니다. 이걸 `/etc/resolv.conf`에 `127.0.0.11`(1번) → router(2번, fallback)로 단순
+나열해두던 예전 방식(`resolv-writer` 프로그램)은 SERVFAIL을 받고도 다음 nameserver로 안
+넘어가는 리졸버(`dig`, Claude Code의 Node 런타임 등 — glibc NSS 스택을 쓰는 `getent` 등은
+정상적으로 넘어감)에서는 사실상 항상 실패로 이어졌습니다.
+
+이 supervisord 프로그램은 그 대신 이 컨테이너 안에 `--strict-order` 옵션의 dnsmasq를 직접
+띄우고, `/etc/resolv.conf`는 자기 자신(`127.0.0.1`) 하나만 가리키게 만듭니다 — 127.0.0.11의
+SERVFAIL을 건너뛰고 router로 넘어가는 폴백 자체를 dnsmasq 내부에서 처리하므로, 어떤
+클라이언트를 쓰든 결과가 같아집니다. `router`의 IP는 컨테이너가 재생성되면 바뀔 수 있어
+5초마다 다시 조회하고, 바뀌면 dnsmasq를 재시작해 반영합니다.
 
 ### `code-patch.*.sh` (code-patch 심기 스크립트)
 

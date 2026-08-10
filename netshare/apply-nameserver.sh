@@ -13,12 +13,17 @@
 # callers can poll this cheaply in a tight loop. Returns 0 if the hostname
 # resolved, 1 if it didn't (caller's loop just tries again next tick).
 #
-# Identical logic previously hand-duplicated between
-# config/resolv-writer/resolv-writer.default.sh, script/entrypoint.sh, and
-# code-dind/script/dind-entrypoint.sh - see root CLAUDE.md's "netshare"
-# section. Sourced, not exec'd; see wait-until.sh's own header comment for
-# the vendoring note (netinit/ and code-dind/ build from a hand-synced
-# copy, run vendor-netshare.sh after editing this file).
+# Used by script/entrypoint.sh (a short-lived bootstrap, before supervisord
+# starts) and code-dind/script/dind-entrypoint.sh - see root CLAUDE.md's
+# "netshare" section. code-docker's own ongoing DNS maintenance moved off
+# this function to config/dns-local/dns-local.default.sh (a local dnsmasq
+# instead of a two-nameserver resolv.conf, see
+# .claude/backlog/dns-local-servfail-fix.md for why) - code-docker-dind
+# still uses this function's simpler fallback-nameserver approach and is
+# still exposed to the class of bug that fix addresses, see that doc's
+# "code-docker-dind" section. Sourced, not exec'd; see wait-until.sh's own
+# header comment for the vendoring note (netinit/ and code-dind/ build from
+# a hand-synced copy, run vendor-netshare.sh after editing this file).
 apply_nameserver() {
     _ans_host="$1"
     _ans_ip="$(getent hosts "$_ans_host" 2>/dev/null | awk '{ print $1; exit }')"

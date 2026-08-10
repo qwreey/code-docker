@@ -25,8 +25,12 @@ already recorded there.
   (never `0.0.0.0`), self-detects which of the stages above it's running on
   (starts the authz plugin / passes `--userns-remap` only if that stage's
   artifacts are present), and applies the same default-route-enforcement +
-  nameserver-writing `netinit/`/`config/resolv-writer/` use for code-docker,
-  against dind's own netns instead (dind already has `NET_ADMIN` via
+  nameserver-writing `netinit/` uses for code-docker's routing (code-docker's
+  own DNS resolution moved to a local dnsmasq under `config/dns-local/`
+  instead - see root `CLAUDE.md`'s `.claude/backlog/dns-local-servfail-fix.md`
+  for why dind still uses the plain `apply_nameserver` approach this
+  paragraph describes), against dind's own netns instead (dind already has
+  `NET_ADMIN` via
   `privileged: true`, so it doesn't need a separate sidecar the way
   code-docker does) - via `apply_default_route`/`apply_nameserver`, applied
   once synchronously before `dockerd` starts (so nested containers get

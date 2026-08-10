@@ -24,23 +24,27 @@ if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
     # code-docker-internal is `internal: true`, so Docker's own embedded DNS
     # (127.0.0.11) refuses to forward queries externally - router runs a real
     # forwarder instead (see router/.claude/router-dns-plan.md). Do this
-    # once, synchronously, before user-init.sh's own qwreey-fish curl below -
-    # the resolv-writer supervisord program
-    # (config/resolv-writer/resolv-writer.default.sh) keeps /etc/resolv.conf
-    # correct for the rest of this container's life (e.g. if router gets
-    # recreated with a new IP), but that program doesn't start until
+    # once, synchronously, before user-init.sh's own qwreey-fish curl below,
+    # as a short-lived bootstrap: it's the same plain "127.0.0.11 then
+    # router" resolv.conf shape that only some resolvers fail over past
+    # correctly (see .claude/backlog/dns-local-servfail-fix.md), good enough
+    # for the tools user-init.sh itself uses (curl, glibc-based, correctly
+    # fails over), but not a permanent fix. The dns-local supervisord program
+    # (config/dns-local/dns-local.default.sh) supersedes this moments later
+    # with a real local resolver and rewrites /etc/resolv.conf again once
+    # it's up - it can't run this early itself since it doesn't start until
     # supervisord does, which is after user-init.sh already ran.
     # `getent hosts "$router_hostname"` itself doesn't need this rewrite
     # yet - Docker's embedded DNS already resolves same-network container/
     # alias names regardless of the internal-network restriction, only
     # external forwarding is blocked. apply_nameserver is shared with
-    # resolv-writer.default.sh and code-dind/script/dind-entrypoint.sh - see
-    # root CLAUDE.md's "netshare" section.
+    # code-dind/script/dind-entrypoint.sh - see root CLAUDE.md's "netshare"
+    # section.
     router_hostname="${ROUTER_HOSTNAME:-router}"
     if wait_until "router's DNS forwarder" 60 2 getent hosts "$router_hostname"; then
         apply_nameserver "$router_hostname"
     else
-        echo >&2 "entrypoint: could not resolve '$router_hostname' after 60s - continuing without DNS, resolv-writer will keep retrying once supervisord starts"
+        echo >&2 "entrypoint: could not resolve '$router_hostname' after 60s - continuing without DNS, dns-local will keep retrying once supervisord starts"
     fi
 fi
 
