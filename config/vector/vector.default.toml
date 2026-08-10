@@ -81,6 +81,27 @@ condition = '''
 strip_whitespace(to_string!(.message)) != ""
 '''
 
+# code-server periodically logs two specific "File not found" lines for an
+# optional native module (vsda, its digital-signature verifier) this image
+# never builds - the feature it backs just falls back to unsigned mode, so
+# these are expected/harmless, not a real error, and are pure noise in
+# `docker compose logs`/the webmanager Logs page every time they fire. Also
+# dropped here: bare "[HH:MM:SS]" lines with nothing else on them (code-server
+# emits these standalone from time to time) - a timestamp alone with no
+# message carries no information either.
+[transforms.filter_code_noise]
+type = "filter"
+inputs = ["filter_blank_lines"]
+condition = '''
+msg = strip_whitespace(to_string!(.message))
+is_vsda_noise = .app_name == "code" && (
+  contains(msg, "File not found: **/lib/vscode/node_modules/vsda/rust/web/vsda.js") ||
+  contains(msg, "File not found: **/lib/vscode/node_modules/vsda/rust/web/vsda_bg.wasm")
+)
+is_bare_timestamp = match(msg, r'^\[\d{2}:\d{2}:\d{2}\]$')
+!is_vsda_noise && !is_bare_timestamp
+'''
+
 # tailscaled used to be uniquely chatty compared to every other program
 # here (a single restart alone logs dozens of internal-plumbing lines, and
 # steady-state runtime chatter could run into the hundreds of thousands of
@@ -100,7 +121,7 @@ strip_whitespace(to_string!(.message)) != ""
 # original message still reaches the webmanager_logs sink below.
 [transforms.format_console]
 type = "remap"
-inputs = ["filter_blank_lines"]
+inputs = ["filter_code_noise"]
 source = '''
 .message = "[" + string!(.app_name) + "] " + string!(.message)
 '''
@@ -119,7 +140,7 @@ encoding.codec = "text"
 # strips vector's other auto-added fields (file, host, source_type).
 [sinks.webmanager_logs]
 type = "file"
-inputs = ["filter_blank_lines"]
+inputs = ["filter_code_noise"]
 path = "/code/.local/share/code-docker/vector/logs/%Y-%m-%d.jsonl"
 encoding.codec = "json"
 encoding.only_fields = ["timestamp", "app_name", "level", "message"]
