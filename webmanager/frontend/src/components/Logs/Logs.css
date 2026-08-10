@@ -20,6 +20,13 @@
   padding: 0.45rem 0.6rem;
 }
 
+/* Keeps the per-app purge button glued to the app <select> instead of
+   wrapping onto its own line at narrow widths. */
+.logs-app-field {
+  display: flex;
+  gap: 0.4rem;
+}
+
 .logs-live-toggle {
   display: flex;
   align-items: center;

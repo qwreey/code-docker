@@ -133,3 +133,41 @@ func (s *Server) handleLogRange(w http.ResponseWriter, r *http.Request) {
 		"latest":   latest.UnixMilli(),
 	})
 }
+
+// handlePurgeLogs backs DELETE /api/logs, in two mutually exclusive modes:
+// ?app=<name> drops every line for that app across all day-files, ?date=<
+// YYYY-MM-DD> deletes that whole day-file outright. Exactly one must be
+// given — an empty/missing/malformed value is rejected with 400 rather than
+// silently no-op'd, same as every other query param this file validates.
+func (s *Server) handlePurgeLogs(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	app := q.Get("app")
+	date := q.Get("date")
+
+	switch {
+	case app != "" && date != "":
+		writeError(w, http.StatusBadRequest, "specify only one of app or date")
+	case app != "":
+		if !logstore.ValidAppName(app) {
+			writeError(w, http.StatusBadRequest, "app contains invalid characters")
+			return
+		}
+		if err := logstore.PurgeApp(s.cfg.VectorLogDir, app); err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	case date != "":
+		if !logstore.ValidDate(date) {
+			writeError(w, http.StatusBadRequest, "date must match YYYY-MM-DD")
+			return
+		}
+		if err := logstore.PurgeDate(s.cfg.VectorLogDir, date); err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	default:
+		writeError(w, http.StatusBadRequest, "app or date is required")
+	}
+}

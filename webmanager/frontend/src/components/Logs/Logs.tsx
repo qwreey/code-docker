@@ -7,6 +7,7 @@ import type {
   LogsAppsResponse,
   LogsRangeResponse,
 } from '../../api/types'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { ErrorBanner } from '../common/ErrorBanner'
 import '../common/common.css'
 import './Logs.css'
@@ -58,6 +59,8 @@ export function Logs() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [liveRefresh, setLiveRefresh] = useState(false)
+  const [purgeOpen, setPurgeOpen] = useState(false)
+  const [purging, setPurging] = useState(false)
 
   // requestIdRef supersedes (rather than drops) an overlapping loadFirstPage
   // call: the old loadingRef-as-mutex approach made a filter change issued
@@ -211,6 +214,26 @@ export function Logs() {
     setEndMs(undefined)
   }
 
+  // Purges every stored log line for selectedApp (across all day-files, not
+  // just what's currently loaded/visible) then reloads both the range (the
+  // purged app's own entries may have defined the earliest/latest bound) and
+  // the first page so the table stops showing what was just deleted.
+  const handlePurgeApp = useCallback(async () => {
+    if (!selectedApp) return
+    setPurging(true)
+    try {
+      await api.del(`/logs?app=${encodeURIComponent(selectedApp)}`)
+      setPurgeOpen(false)
+      const rangeData = await api.get<LogsRangeResponse>('/logs/range')
+      setRange(rangeData)
+      await loadFirstPage()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setPurging(false)
+    }
+  }, [selectedApp, loadFirstPage])
+
   const rangeMin = range?.earliest != null ? toDatetimeLocalValue(range.earliest) : undefined
   const rangeMax = range?.latest != null ? toDatetimeLocalValue(range.latest) : undefined
 
@@ -239,14 +262,26 @@ export function Logs() {
           <div className="logs-controls">
             <div className="form-field">
               <label htmlFor="logs-app">앱</label>
-              <select id="logs-app" value={selectedApp} onChange={(e) => setSelectedApp(e.target.value)}>
-                <option value="">전체</option>
-                {apps.map((app) => (
-                  <option key={app} value={app}>
-                    {app}
-                  </option>
-                ))}
-              </select>
+              <div className="logs-app-field">
+                <select id="logs-app" value={selectedApp} onChange={(e) => setSelectedApp(e.target.value)}>
+                  <option value="">전체</option>
+                  {apps.map((app) => (
+                    <option key={app} value={app}>
+                      {app}
+                    </option>
+                  ))}
+                </select>
+                {selectedApp && (
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-small"
+                    title={`"${selectedApp}" 로그 삭제`}
+                    onClick={() => setPurgeOpen(true)}
+                  >
+                    삭제
+                  </button>
+                )}
+              </div>
             </div>
             <div className="form-field">
               <label htmlFor="logs-level">레벨</label>
@@ -360,6 +395,21 @@ export function Logs() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={purgeOpen}
+        onClose={() => setPurgeOpen(false)}
+        onConfirm={handlePurgeApp}
+        title={`"${selectedApp}" 로그 삭제`}
+        confirmLabel="삭제"
+        busy={purging}
+        busyLabel="삭제 중..."
+      >
+        <p>
+          "{selectedApp}" 앱의 저장된 모든 로그가 영구적으로 삭제됩니다. 다른 앱의 로그는 영향을 받지 않습니다. 이 작업은
+          되돌릴 수 없습니다.
+        </p>
+      </ConfirmDialog>
     </section>
   )
 }

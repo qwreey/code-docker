@@ -198,6 +198,9 @@ func main() {
 	mux.Handle("GET /api/logs/apps", gate.RequirePassword(http.HandlerFunc(s.handleListLogApps)))
 	mux.Handle("GET /api/logs/entries", gate.RequirePassword(http.HandlerFunc(s.handleListLogEntries)))
 	mux.Handle("GET /api/logs/range", gate.RequirePassword(http.HandlerFunc(s.handleLogRange)))
+	// Purge (?app=<name> or ?date=<YYYY-MM-DD>) - a real destructive mutation
+	// on top of an already-fully-gated feature, not a new trust tier.
+	mux.Handle("DELETE /api/logs", gate.RequirePassword(http.HandlerFunc(s.handlePurgeLogs)))
 
 	mux.HandleFunc("GET /api/processes", s.handleListSystemProcesses)
 	mux.Handle("POST /api/processes/{pid}/signal", gate.RequirePassword(http.HandlerFunc(s.handleSignalProcess)))

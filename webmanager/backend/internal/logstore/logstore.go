@@ -10,13 +10,17 @@ package logstore
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	"webmanager/internal/atomicfile"
 )
 
 // Entry is one parsed, filtered-ready log line, already converted to the
@@ -214,4 +218,97 @@ func readFile(path string, app, level string) ([]Entry, error) {
 		log.Printf("logstore: %s: stopped scanning after error: %v", path, err)
 	}
 	return entries, nil
+}
+
+// appNamePattern mirrors the charset supervisord program names actually use
+// (see config/supervisord.d/*.conf) — app is only ever compared in-memory
+// against rawLine.AppName, never used as a path component, but validating it
+// up front is cheap defense in depth and matches this repo's convention of
+// rejecting an unsafe charset outright rather than trusting a caller.
+var appNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// ValidAppName reports whether app is safe to pass to PurgeApp.
+func ValidAppName(app string) bool {
+	return appNamePattern.MatchString(app)
+}
+
+// ValidDate reports whether date matches dateFileLayout exactly, i.e. is
+// safe to pass to PurgeDate.
+func ValidDate(date string) bool {
+	_, err := time.Parse(dateFileLayout, date)
+	return err == nil
+}
+
+// PurgeApp removes every log line whose app_name matches app from every
+// day-file under dir, rewriting a file only if it actually contained at
+// least one matching line. app must already be validated via ValidAppName.
+func PurgeApp(dir, app string) error {
+	matches, err := filepath.Glob(filepath.Join(dir, "*.jsonl"))
+	if err != nil {
+		return err
+	}
+	for _, path := range matches {
+		if err := purgeAppFromFile(path, app); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// purgeAppFromFile rewrites path with every line whose app_name matches app
+// dropped, via the atomicfile temp-file+rename helper. Lines that fail to
+// parse as JSON are kept as-is (same tolerance as readFile — a purge must
+// never destroy a line it can't positively identify as a match), and the
+// file is left untouched entirely if nothing matched, avoiding a needless
+// rewrite of every other app's day-file on every purge.
+func purgeAppFromFile(path, app string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	var kept bytes.Buffer
+	changed := false
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) > 0 {
+			var raw rawLine
+			if err := json.Unmarshal(line, &raw); err == nil && raw.AppName == app {
+				changed = true
+				continue
+			}
+		}
+		kept.Write(line)
+		kept.WriteByte('\n')
+	}
+	scanErr := scanner.Err()
+	f.Close()
+	if scanErr != nil {
+		// Unlike readFile's read-only degradation, rewriting past a scan
+		// error here would permanently truncate whatever comes after the
+		// failure point in this file — data loss well beyond the lines
+		// actually being purged. Abort this file's rewrite entirely and
+		// surface the error rather than risk that.
+		return scanErr
+	}
+	if !changed {
+		return nil
+	}
+	return atomicfile.Write(path, kept.Bytes(), 0o644, 0o755)
+}
+
+// PurgeDate deletes the day-file for date (already validated via ValidDate)
+// under dir outright. Deleting an already-missing file is not an error,
+// matching the package's general "missing file = no entries" tolerance.
+func PurgeDate(dir, date string) error {
+	path := filepath.Join(dir, date+".jsonl")
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
