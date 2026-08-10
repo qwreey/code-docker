@@ -88,6 +88,17 @@
   background: var(--bg);
 }
 
+/* Name + cwd stacked vertically, taking the row's leftover space - the meta
+   text (attached/last-attached) used to hold this flex:1 slot, but now sits
+   at its own natural width to the right of the (potentially long) cwd path. */
+.terminal-home-session-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+
 .terminal-home-session-name {
   border: none;
   background: none;
@@ -96,10 +107,11 @@
   color: var(--text-heading);
   cursor: pointer;
   padding: 0;
+  text-align: left;
 }
 
 .terminal-home-session-meta {
-  flex: 1;
+  flex-shrink: 0;
   font-size: 0.78rem;
   color: var(--text-muted);
 }

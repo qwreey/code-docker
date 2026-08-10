@@ -71,6 +71,10 @@ type Info struct {
 	// tree endpoint. 0 if the process somehow isn't available (defensive
 	// only; pty.Start succeeding means cmd.Process is always set).
 	Pid int `json:"pid"`
+	// Cwd is the shell's live working directory, same resolution as Cwd()
+	// below - empty string (not an error) if it can't be read, so one
+	// session's /proc lookup failing never fails the whole List() response.
+	Cwd string `json:"cwd"`
 }
 
 type Session struct {
@@ -307,6 +311,14 @@ func (s *Session) info() Info {
 	if s.cmd.Process != nil {
 		pid = s.cmd.Process.Pid
 	}
+	// Inlined rather than calling Cwd() - that method takes s.mu itself, and
+	// mu isn't reentrant.
+	cwd := ""
+	if !s.closed && s.cmd.Process != nil {
+		if link, err := os.Readlink(fmt.Sprintf("/proc/%d/cwd", s.cmd.Process.Pid)); err == nil {
+			cwd = link
+		}
+	}
 	return Info{
 		Name:           s.Name,
 		Pinned:         s.pinned,
@@ -314,6 +326,7 @@ func (s *Session) info() Info {
 		LastAttachedAt: s.lastAttachedAt,
 		Attached:       s.sink != nil,
 		Pid:            pid,
+		Cwd:            cwd,
 	}
 }
 

@@ -84,17 +84,35 @@ function App() {
   // consumes it once on mount (it fully unmounts when not active, see the
   // conditional renders below) and reports back so the payload doesn't
   // linger and reapply on some unrelated later visit to the same tab.
-  const [pendingTerminalOpen, setPendingTerminalOpen] = useState<{ cwd?: string; label?: string } | null>(null)
+  const [pendingTerminalOpen, setPendingTerminalOpen] = useState<{
+    cwd?: string
+    label?: string
+    session?: string
+  } | null>(null)
   const [pendingFilesPath, setPendingFilesPath] = useState<string | null>(null)
+  const [pendingProjectPath, setPendingProjectPath] = useState<string | null>(null)
 
   function openInTerminal(cwd: string, label?: string) {
     setPendingTerminalOpen({ cwd, label })
     withViewTransition(() => setActive('terminal'))
   }
 
+  // Selects an already-open session by name instead of creating a new one -
+  // used by the Projects detail sheet's "이 프로젝트에서 열린 세션" panel to
+  // jump back to a session rather than spawning a duplicate.
+  function openTerminalSession(name: string) {
+    setPendingTerminalOpen({ session: name })
+    withViewTransition(() => setActive('terminal'))
+  }
+
   function openInFileManager(path: string) {
     setPendingFilesPath(path)
     withViewTransition(() => setActive('files'))
+  }
+
+  function openProject(path: string) {
+    setPendingProjectPath(path)
+    withViewTransition(() => setActive('projects'))
   }
 
   useEffect(() => {
@@ -157,7 +175,15 @@ function App() {
             </RequiresUnlock>
           )}
           {active === 'processes' && <Processes />}
-          {active === 'projects' && <Projects onOpenTerminal={openInTerminal} onOpenFileManager={openInFileManager} />}
+          {active === 'projects' && (
+            <Projects
+              onOpenTerminal={openInTerminal}
+              onOpenFileManager={openInFileManager}
+              onOpenTerminalSession={openTerminalSession}
+              initialProjectPath={pendingProjectPath}
+              onInitialProjectPathConsumed={() => setPendingProjectPath(null)}
+            />
+          )}
           {active === 'mise' && <Mise />}
           {active === 'dind' && <Dind />}
           {active === 'claude' && <ClaudeCode />}
@@ -168,6 +194,7 @@ function App() {
                 initialOpen={pendingTerminalOpen}
                 onInitialOpenConsumed={() => setPendingTerminalOpen(null)}
                 onOpenFileManager={openInFileManager}
+                onOpenProject={openProject}
               />
             </RequiresUnlock>
           )}

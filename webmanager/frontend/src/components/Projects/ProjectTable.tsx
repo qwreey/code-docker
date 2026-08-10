@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ExternalLink, FolderOpen, RefreshCw, Terminal as TerminalIcon, Trash2 } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
 import type { MiseToolEntry, MiseToolsResponse, ProjectInfo, ReclaimableEntry } from '../../api/types'
@@ -10,6 +10,7 @@ import { Sheet } from '../common/Sheet'
 import { DeleteReclaimableDialog } from './DeleteReclaimableDialog'
 import ProjectMemoryPanel from './ProjectMemoryPanel'
 import ProjectSessionHistory from './ProjectSessionHistory'
+import ProjectTerminalSessions from './ProjectTerminalSessions'
 import '../common/common.css'
 import './Projects.css'
 
@@ -35,6 +36,9 @@ export function ProjectTable({
   onError,
   onOpenTerminal,
   onOpenFileManager,
+  onOpenTerminalSession,
+  initialProjectPath,
+  onInitialProjectPathConsumed,
 }: {
   projects: ProjectInfo[]
   codeServerUrl: string
@@ -43,6 +47,9 @@ export function ProjectTable({
   onError: (message: string) => void
   onOpenTerminal?: (cwd: string) => void
   onOpenFileManager?: (path: string) => void
+  onOpenTerminalSession?: (name: string) => void
+  initialProjectPath?: string | null
+  onInitialProjectPathConsumed?: () => void
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('lastModified')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -104,6 +111,19 @@ export function ProjectTable({
     }
     loadMiseTools(project.path)
   }
+
+  // Consumes an "open this project's detail sheet" request handed down from
+  // the Terminal tab (App.tsx's openProject) - if the path doesn't match a
+  // known project (e.g. an unscanned nested folder), this is a silent no-op
+  // rather than an error, same tolerance as the reverse jump's path-prefix
+  // matching in ProjectTerminalSessions.
+  useEffect(() => {
+    if (!initialProjectPath) return
+    const project = projects.find((p) => p.path === initialProjectPath)
+    if (project) openDetails(project)
+    onInitialProjectPathConsumed?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProjectPath])
 
   // Same-origin fallback: nginx now serves code-server (/) and webmanager
   // (/manager) from the same origin/port, so the page webmanager is loaded
@@ -422,6 +442,7 @@ export function ProjectTable({
             <WorktreesPanel path={detailsProject.path} />
             <ProjectSessionHistory path={detailsProject.path} />
             <ProjectMemoryPanel path={detailsProject.path} />
+            <ProjectTerminalSessions path={detailsProject.path} onOpenSession={onOpenTerminalSession} />
           </div>
         </Sheet>
       )}

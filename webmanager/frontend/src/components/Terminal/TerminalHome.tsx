@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
-import { Pencil, Pin, PinOff, Play, Plus, Trash2, X } from 'lucide-react'
+import { FolderKanban, Pencil, Pin, PinOff, Play, Plus, Trash2, X } from 'lucide-react'
 import type { TerminalProfile, TerminalSessionInfo } from '../../api/types'
+import { projectPathForCwd } from '../../utils/projectPath'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { Sheet } from '../common/Sheet'
 import './TerminalHome.css'
@@ -39,6 +40,8 @@ export function TerminalHome({
   onSaveProfiles,
   onOpenProfile,
   onNewSession,
+  projectRoots,
+  onOpenProject,
 }: {
   sessions: TerminalSessionInfo[]
   onSelectSession: (name: string) => void
@@ -49,6 +52,8 @@ export function TerminalHome({
   onSaveProfiles: (next: TerminalProfile[]) => void
   onOpenProfile: (profile: TerminalProfile) => void
   onNewSession: () => void
+  projectRoots?: string[]
+  onOpenProject?: (path: string) => void
 }) {
   const [draft, setDraft] = useState<ProfileDraft | null>(null)
   const [pendingDelete, setPendingDelete] = useState<TerminalProfile | null>(null)
@@ -116,40 +121,61 @@ export function TerminalHome({
           <p className="terminal-home-empty">열린 세션이 없습니다.</p>
         ) : (
           <ul className="terminal-home-session-list">
-            {sessions.map((s) => (
-              <li key={s.name} className="terminal-home-session-row">
-                <button type="button" className="terminal-home-session-name" onClick={() => onSelectSession(s.name)}>
-                  {s.name}
-                </button>
-                <span className="terminal-home-session-meta">
-                  {s.attached ? '연결됨' : `${new Date(s.lastAttachedAt).toLocaleString()} 마지막 연결`}
-                </span>
-                <button
-                  type="button"
-                  className={`terminal-home-icon-btn${s.pinned ? ' terminal-tab-pinned' : ''}`}
-                  onClick={() => onTogglePin(s.name, !s.pinned)}
-                  title={s.pinned ? '세션 유지 해제' : '세션 유지'}
-                  aria-label={s.pinned ? '세션 유지 해제' : '세션 유지'}
-                >
-                  {s.pinned ? <Pin size={14} /> : <PinOff size={14} />}
-                </button>
-                {/* Hidden entirely once pinned, same rule as the tab bar
-                    (TerminalTabs.tsx item 3) - pinning means "can't be
-                    closed from the UI" everywhere a session can be closed
-                    from, not just the tab bar. */}
-                {!s.pinned && (
+            {sessions.map((s) => {
+              const projectPath = s.cwd ? projectPathForCwd(s.cwd, projectRoots ?? []) : null
+              return (
+                <li key={s.name} className="terminal-home-session-row">
+                  <div className="terminal-home-session-main">
+                    <button
+                      type="button"
+                      className="terminal-home-session-name"
+                      onClick={() => onSelectSession(s.name)}
+                    >
+                      {s.name}
+                    </button>
+                    {s.cwd && <span className="terminal-home-profile-detail mono-cell">{s.cwd}</span>}
+                  </div>
+                  <span className="terminal-home-session-meta">
+                    {s.attached ? '연결됨' : `${new Date(s.lastAttachedAt).toLocaleString()} 마지막 연결`}
+                  </span>
+                  {onOpenProject && projectPath && (
+                    <button
+                      type="button"
+                      className="terminal-home-icon-btn"
+                      onClick={() => onOpenProject(projectPath)}
+                      title="이 세션이 속한 프로젝트로 이동"
+                      aria-label={`${s.name} 세션의 프로젝트로 이동`}
+                    >
+                      <FolderKanban size={14} />
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="terminal-home-icon-btn"
-                    onClick={() => onCloseSession(s.name)}
-                    title="세션 종료"
-                    aria-label={`${s.name} 세션 종료`}
+                    className={`terminal-home-icon-btn${s.pinned ? ' terminal-tab-pinned' : ''}`}
+                    onClick={() => onTogglePin(s.name, !s.pinned)}
+                    title={s.pinned ? '세션 유지 해제' : '세션 유지'}
+                    aria-label={s.pinned ? '세션 유지 해제' : '세션 유지'}
                   >
-                    <X size={14} />
+                    {s.pinned ? <Pin size={14} /> : <PinOff size={14} />}
                   </button>
-                )}
-              </li>
-            ))}
+                  {/* Hidden entirely once pinned, same rule as the tab bar
+                      (TerminalTabs.tsx item 3) - pinning means "can't be
+                      closed from the UI" everywhere a session can be closed
+                      from, not just the tab bar. */}
+                  {!s.pinned && (
+                    <button
+                      type="button"
+                      className="terminal-home-icon-btn"
+                      onClick={() => onCloseSession(s.name)}
+                      title="세션 종료"
+                      aria-label={`${s.name} 세션 종료`}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>

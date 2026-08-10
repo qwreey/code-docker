@@ -612,6 +612,7 @@ export interface TerminalSessionInfo {
   lastAttachedAt: string
   attached: boolean
   pid: number // PTY-leader shell pid, for cross-referencing GET /api/processes
+  cwd?: string // live working directory (/proc/<pid>/cwd) - "" if unresolvable
 }
 
 export interface SidebarOrder {

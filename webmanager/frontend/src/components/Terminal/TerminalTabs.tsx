@@ -260,7 +260,7 @@ export function TerminalTabs({
                 className="terminal-tab-label"
                 onClick={() => onSelect(s.name)}
                 onDoubleClick={() => active && startEditing(s.name, s.name)}
-                title="더블클릭하여 이름 변경"
+                title={s.cwd ? `${s.cwd} — 더블클릭하여 이름 변경` : '더블클릭하여 이름 변경'}
               >
                 {s.name}
               </button>

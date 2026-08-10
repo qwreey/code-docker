@@ -15,9 +15,15 @@ const SCAN_POLL_INTERVAL_MS = 2000
 export function Projects({
   onOpenTerminal,
   onOpenFileManager,
+  onOpenTerminalSession,
+  initialProjectPath,
+  onInitialProjectPathConsumed,
 }: {
   onOpenTerminal?: (cwd: string) => void
   onOpenFileManager?: (path: string) => void
+  onOpenTerminalSession?: (name: string) => void
+  initialProjectPath?: string | null
+  onInitialProjectPathConsumed?: () => void
 } = {}) {
   const [data, setData] = useState<ProjectsResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -126,6 +132,9 @@ export function Projects({
             onError={setError}
             onOpenTerminal={onOpenTerminal}
             onOpenFileManager={onOpenFileManager}
+            onOpenTerminalSession={onOpenTerminalSession}
+            initialProjectPath={initialProjectPath}
+            onInitialProjectPathConsumed={onInitialProjectPathConsumed}
           />
         )
       )}

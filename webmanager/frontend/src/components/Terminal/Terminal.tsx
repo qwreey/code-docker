@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { FolderOpen } from 'lucide-react'
+import { FolderKanban, FolderOpen } from 'lucide-react'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
 import { api, apiUrl, errorMessage, ApiError } from '../../api/client'
 import type {
   ProcessInfo,
+  ProjectsResponse,
   TerminalProfile,
   TerminalProfilesDoc,
   TerminalSessionInfo,
   TerminalSettings,
 } from '../../api/types'
 import { buildProcessTree } from '../../utils/processTree'
+import { projectPathForCwd } from '../../utils/projectPath'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { DEFAULT_KEYBINDINGS, type ModifierId } from './keybindings'
 import { DEFAULT_THEME_ID, findTheme, themeToXterm } from './themes'
@@ -81,10 +83,12 @@ export function Terminal({
   initialOpen,
   onInitialOpenConsumed,
   onOpenFileManager,
+  onOpenProject,
 }: {
-  initialOpen?: { cwd?: string; label?: string } | null
+  initialOpen?: { cwd?: string; label?: string; session?: string } | null
   onInitialOpenConsumed?: () => void
   onOpenFileManager?: (path: string) => void
+  onOpenProject?: (path: string) => void
 } = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<XTerm | null>(null)
@@ -207,6 +211,19 @@ export function Terminal({
   useEffect(() => {
     refreshProfiles()
   }, [refreshProfiles])
+
+  // Projects tab's scan roots, used to resolve a session's cwd to a project
+  // path (see utils/projectPath.ts) for the "프로젝트로 이동" jump button.
+  // Best-effort/silent on failure - GET /api/projects is cheap (a cached
+  // snapshot, see handlers_projects.go), but this feature is a convenience,
+  // not something worth surfacing an error banner for.
+  const [projectRoots, setProjectRoots] = useState<string[]>([])
+  useEffect(() => {
+    api
+      .get<ProjectsResponse>('/projects')
+      .then((res) => setProjectRoots(res.roots))
+      .catch(() => {})
+  }, [])
 
   const saveProfiles = useCallback(async (next: TerminalProfile[]) => {
     try {
@@ -460,7 +477,11 @@ export function Terminal({
   // mount is exactly the one moment a still-pending request should apply.
   useEffect(() => {
     if (initialOpen) {
-      addSession(initialOpen)
+      if (initialOpen.session) {
+        selectSession(initialOpen.session)
+      } else {
+        addSession(initialOpen)
+      }
       onInitialOpenConsumed?.()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -594,6 +615,12 @@ export function Terminal({
     setCloseConfirm(null)
   }, [closeConfirm, closeSession])
 
+  const activeProjectPath = useMemo(() => {
+    if (activeSession === HOME_TAB_ID) return null
+    const cwd = sessions.find((s) => s.name === activeSession)?.cwd
+    return cwd ? projectPathForCwd(cwd, projectRoots) : null
+  }, [sessions, activeSession, projectRoots])
+
   const surfaceStyle = {
     '--kb-inset': `${keyboardInset}px`,
     // Lets the control bar/surface chrome (Terminal.css) blend into whatever
@@ -624,6 +651,16 @@ export function Terminal({
               title="현재 디렉토리를 파일 브라우저에서 열기"
             >
               <FolderOpen size={14} /> 파일 브라우저에서 열기
+            </button>
+          )}
+          {activeSession !== HOME_TAB_ID && onOpenProject && activeProjectPath && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              onClick={() => onOpenProject(activeProjectPath)}
+              title="현재 디렉토리가 속한 프로젝트로 이동"
+            >
+              <FolderKanban size={14} /> 프로젝트로 이동
             </button>
           )}
           <button type="button" className="btn btn-secondary btn-small" onClick={() => setSettingsOpen(true)}>
@@ -666,6 +703,8 @@ export function Terminal({
             onSaveProfiles={saveProfiles}
             onOpenProfile={openProfile}
             onNewSession={() => addSession()}
+            projectRoots={projectRoots}
+            onOpenProject={onOpenProject}
           />
         )}
         {activeSession !== HOME_TAB_ID && (
