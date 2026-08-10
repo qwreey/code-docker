@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -125,6 +126,19 @@ func GetAuthStatus(ctx context.Context, binPath string) (Auth, error) {
 		SubscriptionType: raw.SubscriptionType,
 		AuthMethod:       raw.AuthMethod,
 	}, nil
+}
+
+// Logout runs `claude auth logout`, ending the CLI's authenticated session.
+// No user-controlled arguments are ever passed (the subcommand takes none),
+// so there's no exec-injection surface here, unlike some other os/exec call
+// sites in this codebase. Combined stdout+stderr is returned as message so
+// the caller can surface the CLI's own explanation on failure.
+func Logout(ctx context.Context, binPath string) (message string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, authTimeout)
+	defer cancel()
+
+	out, err := exec.CommandContext(ctx, binPath, "auth", "logout").CombinedOutput()
+	return strings.TrimSpace(string(out)), err
 }
 
 // Counts is a session/message pair, used for both the "today" and "week"

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError, errorMessage } from '../../api/client'
 import type {
   ClaudeInstallJob,
+  ClaudeLogoutResponse,
   ClaudeMiseVersionInfo,
   ClaudeMiseVersionResponse,
   ClaudePlugin,
@@ -13,6 +14,7 @@ import type {
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Sheet } from '../common/Sheet'
 import { Skeleton } from '../common/Skeleton'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { RestartNeededBanner } from '../common/RestartNeededBanner'
 import { withViewTransition } from '../../utils/viewTransition'
 import { formatDurationMs } from '../../utils/format'
@@ -21,6 +23,7 @@ import { WeeklyChart } from './WeeklyChart'
 import { ModelUsageChart } from './ModelUsageChart'
 import { JobPanel } from '../Mise/JobPanel'
 import { LoginPanel } from './LoginPanel'
+import { ClaudeSettings } from './ClaudeSettings'
 import { SessionLog } from './SessionLog/SessionLog'
 import '../common/common.css'
 import '../Processes/Processes.css'
@@ -291,16 +294,69 @@ function ClaudeVersionTag({ version }: { version: string }) {
   return <span className="claude-version-tag">v{version}</span>
 }
 
+// Logout button for the "로그인 상태" card - gated behind a mandatory
+// ConfirmDialog (never window.confirm, see webmanager/CLAUDE.md's UI dialog
+// conventions) since ending the CLI's authenticated session is destructive
+// and not undoable from here.
+function LogoutButton({ onLoggedOut }: { onLoggedOut: () => void }) {
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleConfirm() {
+    setBusy(true)
+    setError(null)
+    try {
+      await api.post<ClaudeLogoutResponse>('/claude/logout')
+      setConfirmOpen(false)
+      onLoggedOut()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="claude-logout-wrap">
+      <button
+        type="button"
+        className="btn btn-secondary btn-small"
+        onClick={() => {
+          setError(null)
+          setConfirmOpen(true)
+        }}
+      >
+        로그아웃
+      </button>
+      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleConfirm}
+        title="Claude Code 로그아웃"
+        confirmLabel="로그아웃"
+        busy={busy}
+        busyLabel="로그아웃하는 중..."
+      >
+        현재 계정에서 로그아웃합니다. 다시 사용하려면 로그인이 필요합니다.
+      </ConfirmDialog>
+    </div>
+  )
+}
+
 function InstalledView({
   status,
   miseVersion,
   onUpdated,
   onLoggedIn,
+  onLoggedOut,
 }: {
   status: ClaudeStatus
   miseVersion: ClaudeMiseVersionInfo | null
   onUpdated: () => void
   onLoggedIn: () => void
+  onLoggedOut: () => void
 }) {
   const auth = status.auth ?? null
   const stats = status.stats ?? null
@@ -364,6 +420,7 @@ function InstalledView({
           <>
             <div className="claude-card-value">{auth.email}</div>
             <div className="claude-card-sub">{auth.subscriptionType} 구독</div>
+            <LogoutButton onLoggedOut={onLoggedOut} />
           </>
         ) : (
           <LoginPanel onLoggedIn={onLoggedIn} />
@@ -571,7 +628,13 @@ export function ClaudeCode() {
             </div>
 
             {subTab === 'status' && (
-              <InstalledView status={status} miseVersion={miseVersion} onUpdated={handleUpdated} onLoggedIn={load} />
+              <InstalledView
+                status={status}
+                miseVersion={miseVersion}
+                onUpdated={handleUpdated}
+                onLoggedIn={load}
+                onLoggedOut={load}
+              />
             )}
 
             {subTab === 'analytics' &&
@@ -592,10 +655,13 @@ export function ClaudeCode() {
             )}
 
             {subTab === 'management' && (
-              <div className="card">
-                <h2>Skills / Plugins</h2>
-                <PluginsTable plugins={plugins} />
-              </div>
+              <>
+                <ClaudeSettings />
+                <div className="card">
+                  <h2>Skills / Plugins</h2>
+                  <PluginsTable plugins={plugins} />
+                </div>
+              </>
             )}
           </>
         ) : (

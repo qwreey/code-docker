@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -357,6 +358,67 @@ func (s *Server) handleClaudeSessionLines(w http.ResponseWriter, r *http.Request
 // projectGitPath. A missing memory directory is not an error (see
 // claudememory.Load's doc comment) — it's the normal state for a project
 // Claude Code has never run against.
+// handleClaudeSettingsGet returns the raw text of CLAUDE_CONFIG_DIR/
+// settings.json, for the raw editor + friendly toggles in the frontend.
+// Ungated (unlike git/ssh raw config, this file carries no secrets) -
+// matching this repo's reads-stay-open convention.
+func (s *Server) handleClaudeSettingsGet(w http.ResponseWriter, r *http.Request) {
+	content, err := claudecode.ReadSettingsRaw(s.cfg.ClaudeConfigDir)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"content": content})
+}
+
+// handleClaudeSettingsPut validates and writes CLAUDE_CONFIG_DIR/
+// settings.json (gated - this is a write). A syntax error in the submitted
+// JSON is a 400, distinguished from a genuine I/O failure (500) via
+// claudecode.ErrInvalidSettingsJSON, mirroring handlePutGitConfigRaw.
+func (s *Server) handleClaudeSettingsPut(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := claudecode.WriteSettingsRaw(s.cfg.ClaudeConfigDir, body.Content); err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, claudecode.ErrInvalidSettingsJSON) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// claudeLogoutResponse is POST /api/claude/logout's body.
+type claudeLogoutResponse struct {
+	Message string `json:"message"`
+}
+
+// handleClaudeLogout runs `claude auth logout`, ending the authenticated
+// session (gated - destructive). Any non-zero exit is surfaced as a 500 with
+// the CLI's own combined output as the error message rather than swallowed,
+// since the frontend needs to know the logout didn't actually happen.
+func (s *Server) handleClaudeLogout(w http.ResponseWriter, r *http.Request) {
+	binPath, ok := claudecode.FindBinary(s.cfg.ClaudeBinPath)
+	if !ok {
+		writeError(w, http.StatusNotFound, "claude CLI is not installed")
+		return
+	}
+
+	message, err := claudecode.Logout(r.Context(), binPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, message)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, claudeLogoutResponse{Message: message})
+}
+
 func (s *Server) handleClaudeMemory(w http.ResponseWriter, r *http.Request) {
 	project := r.URL.Query().Get("project")
 	if project == "" {
