@@ -307,6 +307,18 @@ export interface ClaudeMemory {
   files: ClaudeMemoryFile[]
 }
 
+// GET/PUT /api/claude/settings's raw settings.json contents - see
+// components/ClaudeCode/ClaudeSettings.tsx for the shared raw text/parsed
+// toggle state it's read into.
+export interface ClaudeSettingsRaw {
+  content: string
+}
+
+// POST /api/claude/logout's response.
+export interface ClaudeLogoutResponse {
+  message: string
+}
+
 export interface ReclaimableEntry {
   pattern: string
   path: string

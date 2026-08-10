@@ -57,6 +57,10 @@
   font-size: 0.8rem;
 }
 
+.claude-logout-wrap {
+  margin-top: 0.6rem;
+}
+
 .claude-header-actions {
   display: flex;
   align-items: center;
