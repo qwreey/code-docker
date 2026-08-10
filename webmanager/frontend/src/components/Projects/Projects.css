@@ -214,3 +214,24 @@
   color: var(--text-heading);
   min-width: 6rem;
 }
+
+/* CloneProjectDialog - stacked single-column layout (url/name/branch are
+   always 3 inputs; root/recursive are conditional/extra rows) instead of
+   .form-grid's auto-fit multi-column, since 3+ short fields side by side in
+   the dialog's fixed width read cramped. Keeps .form-grid's own
+   margin-bottom so the submit button doesn't crowd up against the last
+   field. */
+.clone-project-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.form-checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}

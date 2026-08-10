@@ -102,11 +102,14 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 // cloneProjectRequest is POST /api/projects/clone's body. Root may be
 // omitted when only one scan root is configured (the common case) — the
 // frontend only shows a root picker when GET /api/projects's Roots has more
-// than one entry.
+// than one entry. Branch may be omitted to clone the remote's default
+// branch. Recursive adds --recursive (submodules).
 type cloneProjectRequest struct {
-	URL  string `json:"url"`
-	Name string `json:"name"`
-	Root string `json:"root"`
+	URL       string `json:"url"`
+	Name      string `json:"name"`
+	Root      string `json:"root"`
+	Branch    string `json:"branch"`
+	Recursive bool   `json:"recursive"`
 }
 
 // handleCloneProject runs `git clone` into a fresh subdirectory of an
@@ -115,12 +118,14 @@ type cloneProjectRequest struct {
 // slow network clone doesn't block the HTTP response. Root/Name are
 // validated by internal/projects.Scanner.PrepareClone (exact-match against
 // configured roots, strict charset for Name — see that function's doc
-// comment) before either ever reaches exec.Command; URL is passed as its own
-// exec.Command argument after a "--" separator (never string-concatenated),
-// the same defense-in-depth convention internal/projectgit.RemoveWorktree
-// uses, so it can't be misparsed as a git flag regardless of its content.
-// Gated like every other project mutation (handleDeleteProject etc.) — this
-// creates a new directory and makes a real network connection.
+// comment) and Branch by internal/projects.ValidateBranchName before any of
+// them ever reaches exec.Command; URL and the resolved dest are passed as
+// their own exec.Command arguments after a "--" separator (never string-
+// concatenated), the same defense-in-depth convention
+// internal/projectgit.RemoveWorktree uses, so neither can be misparsed as a
+// git flag regardless of its content. Gated like every other project
+// mutation (handleDeleteProject etc.) — this creates a new directory and
+// makes a real network connection.
 func (s *Server) handleCloneProject(w http.ResponseWriter, r *http.Request) {
 	var body cloneProjectRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -136,6 +141,14 @@ func (s *Server) handleCloneProject(w http.ResponseWriter, r *http.Request) {
 	if strings.ContainsAny(body.URL, "\r\n\x00") {
 		writeError(w, http.StatusBadRequest, "invalid url")
 		return
+	}
+
+	body.Branch = strings.TrimSpace(body.Branch)
+	if body.Branch != "" {
+		if err := projects.ValidateBranchName(body.Branch); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	root := body.Root
@@ -164,11 +177,20 @@ func (s *Server) handleCloneProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	args := []string{"clone", "--progress"}
+	if body.Branch != "" {
+		args = append(args, "-b", body.Branch)
+	}
+	if body.Recursive {
+		args = append(args, "--recursive")
+	}
+	args = append(args, "--", body.URL, dest)
+
 	jobID := s.projectJobs.StartWithCallback(func(exitCode int) {
 		if exitCode == 0 {
 			s.projectScanner.TriggerScan()
 		}
-	}, "git", []string{"clone", "--progress", "--", body.URL, dest})
+	}, "git", args)
 	writeJSON(w, http.StatusOK, jobResponse{JobID: jobID})
 }
 

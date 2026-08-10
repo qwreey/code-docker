@@ -4,6 +4,7 @@ import type { CloneProjectRequest, MiseJobStatus, ProjectCloneJob } from '../../
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Sheet } from '../common/Sheet'
 import { JobPanel } from '../Mise/JobPanel'
+import './Projects.css'
 
 const JOB_POLL_INTERVAL_MS = 1500
 
@@ -14,6 +15,26 @@ const JOB_POLL_INTERVAL_MS = 1500
 // regardless, since a client-side check can never be trusted as the real
 // defense.
 const CLONE_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
+
+// Mirrors internal/projects.branchNameRe - see ValidateBranchName's own doc
+// comment for why this charset (git ref names, namespaced branches like
+// "feature/x" allowed) and the extra "..", "//", "@{", trailing-slash/dot
+// rejections below. Same UX-nicety-only caveat as CLONE_NAME_RE: the backend
+// is the real defense, and the value is always passed to `git clone` as its
+// own exec.Command argument, never string-concatenated.
+const BRANCH_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/
+
+function isValidBranchName(name: string): boolean {
+  return (
+    BRANCH_NAME_RE.test(name) &&
+    !name.includes('..') &&
+    !name.includes('//') &&
+    !name.includes('@{') &&
+    !name.endsWith('/') &&
+    !name.endsWith('.') &&
+    !name.endsWith('.lock')
+  )
+}
 
 // Best-effort pre-fill for the destination folder name from a pasted git
 // URL - handles both `https://host/owner/repo.git` and scp-like
@@ -40,6 +61,8 @@ export function CloneProjectDialog({
   const [url, setUrl] = useState('')
   const [name, setName] = useState('')
   const [nameEdited, setNameEdited] = useState(false)
+  const [branch, setBranch] = useState('')
+  const [recursive, setRecursive] = useState(false)
   const [root, setRoot] = useState(roots[0] ?? '')
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -51,6 +74,8 @@ export function CloneProjectDialog({
     setUrl('')
     setName('')
     setNameEdited(false)
+    setBranch('')
+    setRecursive(false)
     setRoot(roots[0] ?? '')
     setFormError(null)
     setSubmitting(false)
@@ -89,12 +114,19 @@ export function CloneProjectDialog({
       setFormError('폴더 이름은 영문/숫자로 시작하고 영문, 숫자, ".", "_", "-"만 사용할 수 있습니다.')
       return
     }
+    const trimmedBranch = branch.trim()
+    if (trimmedBranch && !isValidBranchName(trimmedBranch)) {
+      setFormError('브랜치 이름이 올바르지 않습니다.')
+      return
+    }
 
     setSubmitting(true)
     setFormError(null)
     try {
       const body: CloneProjectRequest = { url: trimmedUrl, name }
       if (roots.length > 1) body.root = root
+      if (trimmedBranch) body.branch = trimmedBranch
+      if (recursive) body.recursive = true
       const res = await api.post<ProjectCloneJob>('/projects/clone', body)
       setJob({ jobId: res.jobId, status: null })
     } catch (e) {
@@ -144,7 +176,7 @@ export function CloneProjectDialog({
     <Sheet open={open} onClose={handleDialogClose} title="git clone으로 새 프로젝트">
       {!job ? (
         <form onSubmit={handleSubmit} className="form-grid-inline">
-          <div className="form-grid">
+          <div className="clone-project-fields">
             <div className="form-field">
               <label htmlFor="clone-project-url">git URL</label>
               <input
@@ -168,6 +200,16 @@ export function CloneProjectDialog({
                 required
               />
             </div>
+            <div className="form-field">
+              <label htmlFor="clone-project-branch">브랜치</label>
+              <input
+                id="clone-project-branch"
+                type="text"
+                placeholder="비워두면 기본 브랜치"
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+              />
+            </div>
             {roots.length > 1 && (
               <div className="form-field">
                 <label htmlFor="clone-project-root">저장 위치</label>
@@ -180,6 +222,10 @@ export function CloneProjectDialog({
                 </select>
               </div>
             )}
+            <label className="form-checkbox-field">
+              <input type="checkbox" checked={recursive} onChange={(e) => setRecursive(e.target.checked)} />
+              서브모듈도 함께 클론 (--recursive)
+            </label>
           </div>
 
           {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}

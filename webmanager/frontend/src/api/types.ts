@@ -339,6 +339,8 @@ export interface CloneProjectRequest {
   url: string
   name: string
   root?: string
+  branch?: string
+  recursive?: boolean
 }
 
 // POST /api/projects/clone's response - the background job's id, for the

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 var (
@@ -19,6 +20,9 @@ var (
 	// ErrCloneDestExists is returned when the resolved destination already
 	// exists on disk.
 	ErrCloneDestExists = errors.New("destination already exists")
+	// ErrInvalidBranchName is returned by ValidateBranchName when branch
+	// isn't a safe git ref name.
+	ErrInvalidBranchName = errors.New("branch must be a valid git ref name (letters, numbers, dot, underscore, dash, slash, starting with a letter or number)")
 )
 
 // cloneNameRe mirrors mise.toolIDRe/versionRe's convention (a leading `-`
@@ -35,6 +39,30 @@ var cloneNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 func ValidateCloneName(name string) error {
 	if !cloneNameRe.MatchString(name) || name == "." || name == ".." {
 		return ErrInvalidCloneName
+	}
+	return nil
+}
+
+// branchNameRe allows the charset git ref names actually use (letters,
+// numbers, dot, underscore, dash, slash for namespaced branches like
+// "feature/x") while still rejecting a leading "-" (so it can never look
+// like a flag) and anything outside that allowlist (spaces, control chars,
+// "~^:?*[\"). This is intentionally passed to `git clone` as its own
+// exec.Command argument (the value of -b) rather than string-concatenated,
+// same defense-in-depth convention as ValidateCloneName/PrepareClone's dest
+// path and internal/projectgit.RemoveWorktree's worktree path — this
+// allowlist is a second, independent layer on top of that.
+var branchNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
+
+// ValidateBranchName reports whether name is safe to pass as `git clone
+// -b <name>`. Empty is not validated here — an empty branch means "use the
+// remote's default branch" and callers should skip validation/the -b flag
+// entirely in that case.
+func ValidateBranchName(name string) error {
+	if !branchNameRe.MatchString(name) ||
+		strings.Contains(name, "..") || strings.Contains(name, "//") || strings.Contains(name, "@{") ||
+		strings.HasSuffix(name, "/") || strings.HasSuffix(name, ".") || strings.HasSuffix(name, ".lock") {
+		return ErrInvalidBranchName
 	}
 	return nil
 }
