@@ -12,6 +12,8 @@ import (
 
 	gopsnet "github.com/shirou/gopsutil/v4/net"
 	"github.com/shirou/gopsutil/v4/process"
+
+	"webmanager/internal/cgroup"
 )
 
 // ProcessInfo is one row of GET /api/processes.
@@ -97,11 +99,19 @@ func (s *Sampler) ListProcesses(ctx context.Context) ([]ProcessInfo, error) {
 	numCPU := runtime.NumCPU()
 	result := make([]ProcessInfo, 0, len(procs))
 
+	// Sampled once per request, not per-process: a container-wide memory
+	// cgroup limit (docker-compose's deploy.resources.limits.memory) should
+	// make MemPercent read relative to that cap, matching what the
+	// container-scoped memory widgets elsewhere in this tab already show,
+	// instead of gopsutil's own host-wide /proc/meminfo-based percent which
+	// stays tiny regardless of how tight the container's actual cap is.
+	_, memLimitBytes, _ := cgroup.Memory()
+
 	prevSamples := s.getSamples()
 	newSamples := make(map[int32]cpuSample, len(procs))
 
 	for _, p := range procs {
-		info, cpuTime, ok := buildProcessInfo(ctx, p)
+		info, cpuTime, ok := buildProcessInfo(ctx, p, memLimitBytes)
 		if !ok {
 			continue
 		}
@@ -123,8 +133,9 @@ func (s *Sampler) ListProcesses(ctx context.Context) ([]ProcessInfo, error) {
 // fail to read, in which case the whole process is skipped rather than
 // returned half-populated. cpuTime is the raw cumulative user+system seconds
 // gopsutil reports, handed back so the caller can run it through the
-// delta sampler.
-func buildProcessInfo(ctx context.Context, p *process.Process) (info ProcessInfo, cpuTime float64, ok bool) {
+// delta sampler. memLimitBytes is the container's cgroup memory.max (nil
+// when unlimited or unreadable), sampled once per request by the caller.
+func buildProcessInfo(ctx context.Context, p *process.Process, memLimitBytes *uint64) (info ProcessInfo, cpuTime float64, ok bool) {
 	name, err := p.NameWithContext(ctx)
 	if err != nil {
 		return ProcessInfo{}, 0, false
@@ -149,14 +160,24 @@ func buildProcessInfo(ctx context.Context, p *process.Process) (info ProcessInfo
 		return ProcessInfo{}, 0, false
 	}
 
-	memPercent, err := p.MemoryPercentWithContext(ctx)
-	if err != nil {
-		return ProcessInfo{}, 0, false
-	}
-
 	memInfo, err := p.MemoryInfoWithContext(ctx)
 	if err != nil || memInfo == nil {
 		return ProcessInfo{}, 0, false
+	}
+
+	// When the container has a cgroup memory limit, report RSS as a percent
+	// of *that* cap rather than gopsutil's own host-wide percent (which is
+	// computed against /proc/meminfo's total and ignores cgroup limits
+	// entirely) - matches the "컨테이너 (cgroup)" scope the whole-container
+	// memory widgets elsewhere in this tab already use.
+	var memPercent float32
+	if memLimitBytes != nil && *memLimitBytes > 0 {
+		memPercent = float32(memInfo.RSS) / float32(*memLimitBytes) * 100
+	} else {
+		memPercent, err = p.MemoryPercentWithContext(ctx)
+		if err != nil {
+			return ProcessInfo{}, 0, false
+		}
 	}
 
 	times, err := p.TimesWithContext(ctx)

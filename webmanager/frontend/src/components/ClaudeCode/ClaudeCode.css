@@ -219,6 +219,18 @@
   font-size: 0.85rem;
 }
 
+/* Keep "open" and "copy" together as one unit - the row itself may still
+   wrap onto a second line under the text, but the two buttons never split
+   apart from each other the way they did when they were separate flex
+   children of .claude-login-url-row. */
+.claude-login-url-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 /* Real <a href> styled as a button (not a raw inline URL) - large OAuth
    query strings used to stretch this row's layout, same fix as Tailscale's
    .tailscale-login-link (Tailscale/Tailscale.css). The full URL is still on

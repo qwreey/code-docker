@@ -15,13 +15,18 @@ type SortKey = 'pid' | 'name' | 'username' | 'status' | 'cpuPercent' | 'memPerce
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'tree'
 
-const COLUMNS: { key: SortKey; label: string; className: string }[] = [
+const COLUMNS: { key: SortKey; label: string; className: string; title?: string }[] = [
   { key: 'pid', label: 'PID', className: 'pf-col-pid' },
   { key: 'name', label: '이름', className: 'pf-col-name' },
   { key: 'username', label: '사용자', className: 'pf-col-user' },
   { key: 'status', label: '상태', className: 'pf-col-status' },
   { key: 'cpuPercent', label: 'CPU', className: 'pf-col-cpu' },
-  { key: 'memPercent', label: 'MEM', className: 'pf-col-mem' },
+  {
+    key: 'memPercent',
+    label: 'MEM',
+    className: 'pf-col-mem',
+    title: '컨테이너 메모리 제한(cgroup)이 설정된 경우 그 제한 대비 비율, 없으면 호스트 전체 메모리 대비 비율',
+  },
   { key: 'rssBytes', label: 'RSS', className: 'pf-col-rss' },
 ]
 
@@ -225,7 +230,7 @@ export function ProcessTable() {
                 <tr>
                   {COLUMNS.map((col) =>
                     viewMode === 'list' ? (
-                      <th key={col.key} className={col.className}>
+                      <th key={col.key} className={col.className} title={col.title}>
                         <button type="button" className="sortable-header" onClick={() => toggleSort(col.key)}>
                           {col.label}
                           {sortKey === col.key && (
@@ -234,7 +239,7 @@ export function ProcessTable() {
                         </button>
                       </th>
                     ) : (
-                      <th key={col.key} className={col.className}>
+                      <th key={col.key} className={col.className} title={col.title}>
                         {col.label}
                       </th>
                     ),

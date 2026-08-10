@@ -80,7 +80,7 @@ export function FileTable({
       <table className="process-info-table">
         <thead>
           <tr>
-            <th>
+            <th className="table-actions-col">
               <input
                 type="checkbox"
                 checked={allSelected}
@@ -98,7 +98,7 @@ export function FileTable({
         <tbody>
           {entries.map((entry) => (
             <tr key={entry.path} className={entry.isDir ? 'file-manager-row file-manager-row-dir' : 'file-manager-row'}>
-              <td onClick={(e) => e.stopPropagation()}>
+              <td className="table-actions-col" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
                   checked={selected.has(entry.path)}
