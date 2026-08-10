@@ -63,6 +63,7 @@ export function CloneProjectDialog({
   const [nameEdited, setNameEdited] = useState(false)
   const [branch, setBranch] = useState('')
   const [recursive, setRecursive] = useState(false)
+  const [depth, setDepth] = useState('')
   const [root, setRoot] = useState(roots[0] ?? '')
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -76,6 +77,7 @@ export function CloneProjectDialog({
     setNameEdited(false)
     setBranch('')
     setRecursive(false)
+    setDepth('')
     setRoot(roots[0] ?? '')
     setFormError(null)
     setSubmitting(false)
@@ -119,6 +121,15 @@ export function CloneProjectDialog({
       setFormError('브랜치 이름이 올바르지 않습니다.')
       return
     }
+    const trimmedDepth = depth.trim()
+    let depthValue: number | undefined
+    if (trimmedDepth) {
+      depthValue = Number(trimmedDepth)
+      if (!Number.isInteger(depthValue) || depthValue < 1) {
+        setFormError('클론 깊이는 1 이상의 정수여야 합니다.')
+        return
+      }
+    }
 
     setSubmitting(true)
     setFormError(null)
@@ -127,6 +138,7 @@ export function CloneProjectDialog({
       if (roots.length > 1) body.root = root
       if (trimmedBranch) body.branch = trimmedBranch
       if (recursive) body.recursive = true
+      if (depthValue) body.depth = depthValue
       const res = await api.post<ProjectCloneJob>('/projects/clone', body)
       setJob({ jobId: res.jobId, status: null })
     } catch (e) {
@@ -208,6 +220,18 @@ export function CloneProjectDialog({
                 placeholder="비워두면 기본 브랜치"
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="clone-project-depth">클론 깊이 (선택)</label>
+              <input
+                id="clone-project-depth"
+                type="number"
+                min={1}
+                step={1}
+                placeholder="비워두면 전체 히스토리 (--depth 미적용)"
+                value={depth}
+                onChange={(e) => setDepth(e.target.value)}
               />
             </div>
             {roots.length > 1 && (

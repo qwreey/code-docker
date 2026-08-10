@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"webmanager/internal/projects"
@@ -103,13 +104,15 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 // omitted when only one scan root is configured (the common case) — the
 // frontend only shows a root picker when GET /api/projects's Roots has more
 // than one entry. Branch may be omitted to clone the remote's default
-// branch. Recursive adds --recursive (submodules).
+// branch. Recursive adds --recursive (submodules). Depth, if positive, adds
+// --depth <n> (a shallow clone) — 0 (or omitted) means a full clone.
 type cloneProjectRequest struct {
 	URL       string `json:"url"`
 	Name      string `json:"name"`
 	Root      string `json:"root"`
 	Branch    string `json:"branch"`
 	Recursive bool   `json:"recursive"`
+	Depth     int    `json:"depth"`
 }
 
 // handleCloneProject runs `git clone` into a fresh subdirectory of an
@@ -151,6 +154,11 @@ func (s *Server) handleCloneProject(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if body.Depth < 0 {
+		writeError(w, http.StatusBadRequest, "depth must not be negative")
+		return
+	}
+
 	root := body.Root
 	if root == "" {
 		defaultRoot, ok := s.projectScanner.DefaultRoot()
@@ -183,6 +191,9 @@ func (s *Server) handleCloneProject(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Recursive {
 		args = append(args, "--recursive")
+	}
+	if body.Depth > 0 {
+		args = append(args, "--depth", strconv.Itoa(body.Depth))
 	}
 	args = append(args, "--", body.URL, dest)
 
