@@ -35,6 +35,7 @@ export function TerminalSettingsPanel({
   onDismissError,
   onSave,
   onPreviewTheme,
+  fontFamilies,
 }: {
   open: boolean
   onClose: () => void
@@ -44,6 +45,7 @@ export function TerminalSettingsPanel({
   onDismissError: () => void
   onSave: (next: TerminalSettings) => void
   onPreviewTheme: (colors: Record<string, string>) => void
+  fontFamilies: string[]
 }) {
   const [draftKeybindings, setDraftKeybindings] = useState<KeyBinding[]>(settings.keybindings)
   const [themeDraft, setThemeDraft] = useState<ThemeDraft | null>(null)
@@ -75,6 +77,10 @@ export function TerminalSettingsPanel({
 
   function saveKeybindings() {
     onSave({ ...settings, keybindings: draftKeybindings })
+  }
+
+  function selectFontFamily(family: string) {
+    onSave({ ...settings, fontFamily: family })
   }
 
   function selectTheme(themeId: string) {
@@ -170,6 +176,28 @@ export function TerminalSettingsPanel({
           <button type="button" className="btn btn-primary btn-small" onClick={saveKeybindings} disabled={saving}>
             {saving ? '저장 중...' : '저장'}
           </button>
+        </div>
+      </section>
+
+      <section className="terminal-settings-section">
+        <h4>폰트</h4>
+        <p className="section-description">
+          웹매니저 터미널에 적용할 폰트입니다. 폰트 탭에서 업로드한 폰트만 선택할 수 있습니다.
+        </p>
+        <div className="form-field">
+          <label htmlFor="terminal-font-select">폰트</label>
+          <select
+            id="terminal-font-select"
+            value={settings.fontFamily}
+            onChange={(e) => selectFontFamily(e.target.value)}
+          >
+            <option value="">시스템 기본</option>
+            {fontFamilies.map((family) => (
+              <option key={family} value={family}>
+                {family}
+              </option>
+            ))}
+          </select>
         </div>
       </section>
 

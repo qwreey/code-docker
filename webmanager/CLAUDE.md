@@ -85,7 +85,24 @@ untouched since it already has its own full-tab overlay, web terminal M1+M2
 customizable keybindings, 10 built-in + custom color themes, named
 persistent sessions with a real tab bar/pin-toggle backed by
 `internal/termsession`, keyboard-aware mobile layout, edge-to-edge
-theme-matched surface), a Claude Code install button (reuses the mise install
+theme-matched surface), a Font Manager tab (`internal/fonts` — upload/list/
+edit/delete ttf/otf/woff/woff2, `GET /api/fonts/css` generates `@font-face`
+rules fresh per request, loaded by webmanager's own `index.html` via a
+static `<link>` and by code-server via a new code-patch file,
+`config/code/code-patch/fonts.default.css`, whose own content never changes
+— it's just `@import url("/manager/api/fonts/css")`, so the existing
+hash-tracked code-patch seeding needs no changes at all. code-server itself
+gets no forced-application override: it already supports
+`editor.fontFamily`/`terminal.integrated.fontFamily` in user settings.json,
+and a loaded `@font-face` name just matches once typed there — the Fonts tab
+only shows family names with a copy button and a short how-to. webmanager's
+own web terminal has no settings.json equivalent, so the selected family
+rides in `internal/terminalsettings.Settings.FontFamily` and is applied
+directly to the xterm.js instance. Victor Mono + IBM Plex Mono Nerd (the
+Mono/fixed-width variant specifically) are downloaded once at first boot,
+`SEED_DEFAULT_FONTS` opts out, failure warns and skips rather than blocking
+boot — see `.claude/archive/font-manager-plan-done.md`, root `.claude/backlog/`'s
+original idea doc), a Claude Code install button (reuses the mise install
 job plumbing — `POST /api/claude/install` resolves the latest version via
 `mise latest claude-code` and installs through the same `mise.JobStore` the
 mise tab uses, `Mise/JobPanel.tsx` extracted so both tabs share the same

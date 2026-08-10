@@ -6,6 +6,7 @@ import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
 import { api, apiUrl, errorMessage, ApiError } from '../../api/client'
 import type {
+  FontManifest,
   ProcessInfo,
   ProjectsResponse,
   TerminalProfile,
@@ -51,6 +52,17 @@ const EMPTY_SETTINGS: TerminalSettings = {
   themeId: DEFAULT_THEME_ID,
   customThemes: [],
   homeLabel: '',
+  fontFamily: '',
+}
+
+// Same literal stack as index.css's --mono token — xterm.js's fontFamily
+// option feeds a canvas 2D context's `font` string directly, which (unlike
+// a real CSS property) doesn't resolve var(--mono), so the fallback chain
+// has to be spelled out here instead of referencing the CSS variable.
+const DEFAULT_MONO_STACK = "ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace"
+
+function resolveFontFamily(selected: string): string {
+  return selected ? `'${selected}', ${DEFAULT_MONO_STACK}` : DEFAULT_MONO_STACK
 }
 
 // nextSessionName picks "세션 N" for the smallest N not already taken (or,
@@ -139,6 +151,7 @@ export function Terminal({
       themeId: base.themeId || DEFAULT_THEME_ID,
       customThemes: base.customThemes,
       homeLabel: base.homeLabel,
+      fontFamily: base.fontFamily,
     }
   }, [settings])
 
@@ -225,6 +238,17 @@ export function Terminal({
       .catch(() => {})
   }, [])
 
+  // Font Manager family names for the settings panel's font picker —
+  // best-effort/silent like projectRoots above, the panel just falls back
+  // to only offering "시스템 기본" if this fails.
+  const [fontFamilies, setFontFamilies] = useState<string[]>([])
+  useEffect(() => {
+    api
+      .get<FontManifest>('/fonts')
+      .then((res) => setFontFamilies(Array.from(new Set(res.fonts.map((f) => f.family))).sort()))
+      .catch(() => {})
+  }, [])
+
   const saveProfiles = useCallback(async (next: TerminalProfile[]) => {
     try {
       await api.put('/terminal/profiles', { profiles: next })
@@ -242,6 +266,17 @@ export function Terminal({
       termRef.current.options.theme = themeToXterm(currentTheme)
     }
   }, [currentTheme])
+
+  // Apply the selected Font Manager family live, same "initial value at
+  // creation, then kept in sync by its own effect" shape as the theme
+  // effect above. A font swap can change cell metrics, so re-fit afterward
+  // (same call the ResizeObserver below already makes for size changes).
+  useEffect(() => {
+    if (termRef.current) {
+      termRef.current.options.fontFamily = resolveFontFamily(effectiveSettings.fontFamily)
+      fitAddonRef.current?.fit()
+    }
+  }, [effectiveSettings.fontFamily])
 
   const sendBytes = useCallback((bytes: string) => {
     if (!bytes) return
@@ -310,6 +345,7 @@ export function Terminal({
       cursorBlink: true,
       convertEol: true,
       theme: themeToXterm(currentTheme),
+      fontFamily: resolveFontFamily(effectiveSettings.fontFamily),
     })
     termRef.current = term
     const fitAddon = new FitAddon()
@@ -725,6 +761,7 @@ export function Terminal({
         onDismissError={() => setSaveError(null)}
         onSave={saveSettings}
         onPreviewTheme={previewTheme}
+        fontFamilies={fontFamilies}
       />
       <ConfirmDialog
         open={closeConfirm !== null}

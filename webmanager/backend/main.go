@@ -360,6 +360,19 @@ func main() {
 	mux.Handle("GET /api/terminal/profiles", gate.RequirePassword(http.HandlerFunc(s.handleGetTerminalProfiles)))
 	mux.Handle("PUT /api/terminal/profiles", gate.RequirePassword(http.HandlerFunc(s.handlePutTerminalProfiles)))
 
+	// Font Manager (internal/fonts). Reads (list, generated CSS, raw font
+	// bytes) stay open — none of it is sensitive, and code-server's own
+	// page fetches /api/fonts/css unauthenticated via
+	// config/code/code-patch/fonts.default.css's @import, so it couldn't
+	// be gated even if it needed to be. Uploads/edits/deletes are real
+	// mutations, gated like Projects' write routes.
+	mux.HandleFunc("GET /api/fonts", s.handleListFonts)
+	mux.HandleFunc("GET /api/fonts/css", s.handleFontsCSS)
+	mux.HandleFunc("GET /api/fonts/files/{id}", s.handleFontFile)
+	mux.Handle("POST /api/fonts", gate.RequirePassword(http.HandlerFunc(s.handleUploadFont)))
+	mux.Handle("PATCH /api/fonts/{id}", gate.RequirePassword(http.HandlerFunc(s.handlePatchFont)))
+	mux.Handle("DELETE /api/fonts/{id}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteFont)))
+
 	// SECURITY: arbitrary filesystem read/write/delete under
 	// WEBMANAGER_FILES_ROOT (default /code) — webmanager's single largest
 	// risk surface alongside the terminal above and dind. Gated by the
@@ -397,6 +410,7 @@ func main() {
 	go s.resourceHistory.Run(bgCtx)
 	go s.termSessions.Run(bgCtx)
 	go s.sessionHeartbeats.Run(bgCtx)
+	go seedDefaultFonts(bgCtx, cfg)
 
 	go func() {
 		log.Printf("webmanager listening on %s", cfg.Addr)

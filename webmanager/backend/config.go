@@ -118,6 +118,19 @@ type Config struct {
 	// Code/extension install or uninstall completes, cleared implicitly the
 	// moment code-server's live PID no longer matches what was recorded.
 	RestartStatusPath string
+
+	// FontsDir holds both uploaded font binaries and their manifest.json
+	// (see internal/fonts) — a dedicated path outside the usual
+	// /code/.local/share/code-docker/webmanager/ settings tree since
+	// config/code/code-patch/fonts.default.css's generated CSS references
+	// these files by a fixed URL regardless of webmanager's own layout.
+	FontsDir            string
+	FontsMaxUploadBytes string
+
+	// SeedDefaultFonts gates the first-boot runtime download of the
+	// bundled default fonts (Victor Mono, IBM Plex Mono Nerd) — "false"
+	// skips it. Never blocks startup either way; see cmd's seedDefaultFonts.
+	SeedDefaultFonts string
 }
 
 func getenv(key, def string) string {
@@ -190,5 +203,9 @@ func loadConfig() Config {
 		EnvVersionDismissPath: getenv("WEBMANAGER_ENV_VERSION_DISMISS_PATH", "/code/.local/share/code-docker/webmanager/env-version-dismiss.json"),
 
 		RestartStatusPath: getenv("WEBMANAGER_RESTART_STATUS_PATH", "/code/.local/share/code-docker/webmanager/restart-status.json"),
+
+		FontsDir:            getenv("WEBMANAGER_FONTS_DIR", "/code/.local/managed-fonts"),
+		FontsMaxUploadBytes: getenv("WEBMANAGER_FONTS_MAX_UPLOAD_BYTES", "10485760"),
+		SeedDefaultFonts:    getenv("SEED_DEFAULT_FONTS", "true"),
 	}
 }

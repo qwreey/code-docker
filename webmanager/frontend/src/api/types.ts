@@ -613,6 +613,23 @@ export interface TerminalSettings {
   themeId: string
   customThemes: TerminalTheme[]
   homeLabel: string // custom Home tab title, "" = use the default "홈"
+  fontFamily: string // selected Font Manager family for webmanager's own web terminal, "" = built-in var(--mono) stack
+}
+
+// Mirrors internal/fonts.Font — one uploaded (or default-seeded) font file.
+export interface FontEntry {
+  id: string
+  family: string
+  weight: number
+  style: string // "normal" | "italic" | "oblique"
+  format: string // @font-face format() token, e.g. "truetype"
+  ext: string
+  originalFilename: string
+  builtin: boolean
+}
+
+export interface FontManifest {
+  fonts: FontEntry[]
 }
 
 // Mirrors internal/termsession.Info — M2 named sessions (see

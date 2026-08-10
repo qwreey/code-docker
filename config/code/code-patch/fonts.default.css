@@ -1,0 +1,10 @@
+/* Pulls in the live, user-managed @font-face definitions from webmanager's
+ * Font Manager (see webmanager/backend/internal/fonts and root CLAUDE.md's
+ * "single-origin merge" — /manager/ always resolves regardless of which
+ * page loads this). This file's own content never changes; the actual font
+ * list is entirely dynamic on the /manager side, so it's fetched via
+ * @import rather than baked in here. code-server itself needs no further
+ * setup to use a font defined this way — set editor.fontFamily /
+ * terminal.integrated.fontFamily to the font's name in your user
+ * settings.json and the browser matches it automatically once loaded. */
+@import url("/manager/api/fonts/css");

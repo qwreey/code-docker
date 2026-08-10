@@ -1,5 +1,14 @@
 # 폰트 매니저 (아이디어 정리 — 구현 전, 사용자 노트 원문 기반)
 
+> **구현 완료 (2026-08-10)**: 이 문서 자체는 착수 전 아이디어 스케치라 아래 "미해결
+> 질문"들은 낡은 내용 — 실제 구현/최종 결정은 `webmanager/CLAUDE.md`("Already
+> implemented"의 Font Manager 항목)와 `webmanager/plan.md`의 "구현 완료" 표를 참고.
+> 요약: 1차 범위는 터미널 폰트만(웹매니저 자체 터미널 + code-server), code-server
+> 쪽은 강제 적용 없이 `editor.fontFamily`/`terminal.integrated.fontFamily`에 이름을
+> 직접 넣는 방식(사용자가 이 문서의 "code-patch로 @font-face 주입" 아이디어를 실제
+> 착수 시점에 "강제할 필요 없다"고 정정), 기본 폰트는 런타임 다운로드. 아래 본문은
+> 착수 전 설계 스케치 기록으로만 남겨둔다.
+
 2026-08-10, 사용자가 다른 여러 요청과 함께 남긴 노트를 정리한 문서. 스코프가 크고
 (파일 업로드 UI, code-server 패치, webmanager 터미널/UI 설정 연동까지 걸쳐 있음)
 다른 급한 항목들을 먼저 처리하느라 이번 라운드엔 착수하지 않음 — 구현 전 설계

@@ -44,6 +44,14 @@ type Settings struct {
 	// already-backend-persisted, already-follows-the-user-across-devices
 	// settings blob instead of a new file.
 	HomeLabel string `json:"homeLabel"`
+	// FontFamily is the selected font-family name for webmanager's own web
+	// terminal (see internal/fonts) — empty means "use the built-in
+	// var(--mono) stack". Same "rides along in this blob" reasoning as
+	// HomeLabel above. Unlike code-server's terminal, which reads its own
+	// user settings.json, webmanager's terminal has no such file of its
+	// own, so this is applied directly to the xterm.js instance
+	// (Terminal.tsx) rather than left for the user to type in somewhere.
+	FontFamily string `json:"fontFamily"`
 }
 
 func empty() Settings {

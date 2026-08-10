@@ -14,6 +14,7 @@ import { Extensions } from './components/Extensions/Extensions'
 import { Mise } from './components/Mise/Mise'
 import { Dind } from './components/Dind/Dind'
 import { Terminal } from './components/Terminal/Terminal'
+import { Fonts } from './components/Fonts/Fonts'
 import { Sessions } from './components/Sessions/Sessions'
 import { RequiresUnlock } from './components/common/RequiresUnlock'
 import { UnlockModalHost } from './components/common/UnlockModal'
@@ -198,6 +199,7 @@ function App() {
               />
             </RequiresUnlock>
           )}
+          {active === 'fonts' && <Fonts />}
           {active === 'files' && (
             <Suspense fallback={<Skeleton />}>
               <RequiresUnlock>

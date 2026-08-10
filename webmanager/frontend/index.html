@@ -3,6 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Font Manager's live @font-face definitions (see
+         webmanager/backend/internal/fonts) - a fixed /manager/ prefix since
+         this file is always served under that path (see root CLAUDE.md's
+         "single-origin merge"), same absolute-path convention
+         config/code/code-patch/fonts.default.css's @import uses. -->
+    <link rel="stylesheet" href="/manager/api/fonts/css" />
     <!-- interactive-widget=resizes-content: makes Chrome/Firefox-Android shrink
          the layout viewport (and dvh) for the on-screen keyboard again, like
          pre-Chrome-108 behavior (Chrome 108 changed the default to match

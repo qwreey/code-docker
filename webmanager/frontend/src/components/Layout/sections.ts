@@ -15,6 +15,7 @@ export type SectionId =
   | 'mise'
   | 'dind'
   | 'terminal'
+  | 'fonts'
   | 'claude'
   | 'extensions'
   | 'files'
@@ -43,6 +44,7 @@ export const SECTIONS: SectionMeta[] = [
   { id: 'mise', label: 'mise', implemented: true },
   { id: 'dind', label: 'Docker (dind)', implemented: true },
   { id: 'terminal', label: 'Terminal', implemented: true },
+  { id: 'fonts', label: '폰트', implemented: true },
   { id: 'claude', label: 'Claude Code', implemented: true },
   { id: 'extensions', label: 'Code Extensions', implemented: true },
   { id: 'files', label: 'Files', implemented: true },

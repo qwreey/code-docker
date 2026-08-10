@@ -1,0 +1,50 @@
+.fonts-code-server-hint {
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 1rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.fonts-code-server-hint p {
+  margin: 0 0 0.5rem;
+}
+
+.fonts-hint-example {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 0.78rem;
+  color: var(--text-heading);
+}
+
+.fonts-row {
+  align-items: flex-start;
+}
+
+.fonts-row-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.fonts-edit-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.fonts-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.fonts-upload-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  padding: 1rem 1.1rem;
+  margin-top: 1rem;
+}
