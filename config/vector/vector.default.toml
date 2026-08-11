@@ -94,10 +94,9 @@ type = "filter"
 inputs = ["filter_blank_lines"]
 condition = '''
 msg = strip_whitespace(to_string!(.message))
-is_vsda_noise = .app_name == "code" && (
-  contains(msg, "File not found: **/lib/vscode/node_modules/vsda/rust/web/vsda.js") ||
-  contains(msg, "File not found: **/lib/vscode/node_modules/vsda/rust/web/vsda_bg.wasm")
-)
+is_vsda_missing_js = contains(msg, "File not found: **/lib/vscode/node_modules/vsda/rust/web/vsda.js")
+is_vsda_missing_wasm = contains(msg, "File not found: **/lib/vscode/node_modules/vsda/rust/web/vsda_bg.wasm")
+is_vsda_noise = .app_name == "code" && (is_vsda_missing_js || is_vsda_missing_wasm)
 is_bare_timestamp = match(msg, r'^\[\d{2}:\d{2}:\d{2}\]$')
 !is_vsda_noise && !is_bare_timestamp
 '''
