@@ -52,6 +52,20 @@ function buildSegments(data: DiskBreakdownResponse): Segment[] {
   if (otherBytes > 0) {
     segments.push({ key: '__other__', label: '기타', bytes: otherBytes, colorVar: 'var(--viz-seq-3)' })
   }
+  // Distinct from the "기타" bucket above (small-but-visible directories
+  // under the threshold): this is space used on the same disk that this
+  // du walk can't see at all — other containers, other bind mounts, the
+  // host OS — since on most setups Root's filesystem isn't exclusive to
+  // this container. Without this segment that space silently got counted
+  // as "free" instead, which could overstate real headroom by 100s of GB.
+  if (data.otherBytes > 0) {
+    segments.push({
+      key: '__other_host__',
+      label: '다른 컨테이너/호스트',
+      bytes: data.otherBytes,
+      colorVar: 'var(--viz-seq-4)',
+    })
+  }
   // Free space gets its own hatched (not flat-colored) segment so it doesn't
   // read as just another usage category - it's the inverse of one, à la
   // Windows Storage Sense / 삼성 저장공간 분석기 showing how much room is left.

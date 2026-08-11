@@ -39,6 +39,12 @@ type Response struct {
 	Scanning   bool    `json:"scanning"`
 	ScannedAt  *string `json:"scannedAt"`
 	TotalBytes uint64  `json:"totalBytes"`
+	// OtherBytes is space used on the underlying filesystem that this du walk
+	// never saw — other containers' data, other bind mounts, the host OS
+	// itself, anything sharing the same disk/pool outside Root's own tree.
+	// Kept separate from Entries' "기타" (small-but-visible directories) so
+	// the two aren't conflated.
+	OtherBytes uint64  `json:"otherBytes"`
 	FreeBytes  uint64  `json:"freeBytes"`
 	Entries    []Entry `json:"entries"`
 }
@@ -159,18 +165,27 @@ func scan(root string) Response {
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].SizeBytes > result[j].SizeBytes })
 
-	// FreeBytes is derived as total-used (this container's own footprint),
-	// not statfs's Bavail — Bavail reflects the underlying host disk/pool's
-	// actual free space, which most storage drivers (e.g. overlay2 without an
-	// explicit per-container size limit) share across every other container
-	// and host process on the same disk. Using it directly would make this
-	// container's "free" segment shrink/grow based on completely unrelated
-	// activity elsewhere on the host, which defeats the point of a
-	// container-scoped "what's using my space" breakdown (entries + free
-	// must sum to exactly total, unaffected by outside consumers).
-	var free uint64
-	if total > used {
-		free = total - used
+	// FreeBytes comes straight from statfs's Bavail (the real, current
+	// available space on this filesystem), not total-used. An earlier
+	// version derived free as total-used instead, reasoning that Bavail
+	// reflects the underlying host disk/pool's free space shared across every
+	// other container and host process on the same disk (e.g. overlay2
+	// without an explicit per-container size limit) and would make "free"
+	// swing on unrelated outside activity. In practice that produced numbers
+	// far worse than the swinging it tried to avoid: on any host where the
+	// container's root and other consumers (other containers, other bind
+	// mounts, the host OS) share one disk — the common case — du only ever
+	// sees this container's own tree, so total-used silently counted every
+	// byte used by everything *else* on that disk as "free", overstating
+	// real headroom by 100s of GB. OtherBytes below fills that gap visibly
+	// instead of hiding it inside "free".
+	free := stat.Bavail * bsize
+	if free > total {
+		free = total
+	}
+	var other uint64
+	if total > used+free {
+		other = total - used - free
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -179,6 +194,7 @@ func scan(root string) Response {
 		Available:  true,
 		ScannedAt:  &now,
 		TotalBytes: total,
+		OtherBytes: other,
 		FreeBytes:  free,
 		Entries:    result,
 	}

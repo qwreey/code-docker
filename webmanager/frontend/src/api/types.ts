@@ -413,6 +413,10 @@ export interface DiskBreakdownResponse {
   scanning: boolean
   scannedAt: string | null
   totalBytes: number
+  // Used on the underlying filesystem but outside root's own tree (other
+  // containers/mounts/the host OS sharing the same disk) — not part of
+  // entries, and not free space either.
+  otherBytes: number
   freeBytes: number
   entries: DiskBreakdownEntry[]
 }
