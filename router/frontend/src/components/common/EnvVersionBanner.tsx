@@ -14,9 +14,13 @@ type EnvVersionStatus = {
 // steps means people skip the backup half in practice, and this way every
 // run also appends to .env.router.bak instead of overwriting it, so older
 // backups aren't lost either. Same command shape as webmanager's own
-// EnvVersionBanner.tsx.
+// EnvVersionBanner.tsx. Leading `touch` covers the "no .env.router at all
+// yet" case (fileVersion shows as 알수없음 below) - without it `cat` errors
+// on a missing file and the rest of the pipe still limps along on empty
+// stdin, which is confusing; `touch` is a no-op when the file already
+// exists, so this is safe unconditionally.
 const MIGRATE_CMD =
-  'cat .env.router | tee -a .env.router.bak | docker compose exec -T code-docker-router router-manager --env-migrate > .env.router'
+  'touch .env.router && cat .env.router | tee -a .env.router.bak | docker compose exec -T code-docker-router router-manager --env-migrate > .env.router'
 
 // Hand-ported from webmanager/frontend/src/components/common/
 // EnvVersionBanner.tsx (GET/POST /api/system/env-version[/dismiss] - see

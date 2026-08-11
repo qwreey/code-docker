@@ -13,9 +13,13 @@ type EnvVersionStatus = {
 // Single tee'd command rather than a separate `cp ... .bak` step first - two
 // steps means people skip the backup half in practice, and this way every
 // run also appends to .env.webmanager.bak instead of overwriting it, so
-// older backups aren't lost either.
+// older backups aren't lost either. Leading `touch` covers the "no
+// .env.webmanager at all yet" case (fileVersion shows as 알수없음 below) -
+// without it `cat` errors on a missing file and the rest of the pipe still
+// limps along on empty stdin, which is confusing; `touch` is a no-op when
+// the file already exists, so this is safe unconditionally.
 const MIGRATE_CMD =
-  'cat .env.webmanager | tee -a .env.webmanager.bak | docker compose exec -T code-docker /etc/code-docker/webmanager/webmanager --env-migrate > .env.webmanager'
+  'touch .env.webmanager && cat .env.webmanager | tee -a .env.webmanager.bak | docker compose exec -T code-docker /etc/code-docker/webmanager/webmanager --env-migrate > .env.webmanager'
 
 // Fetched once on mount — .env.webmanager only changes on a container
 // recreate (docker compose up -d), never mid-session, so there's nothing to
