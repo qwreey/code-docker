@@ -244,6 +244,14 @@ export interface ClaudeLoginStatus {
   exitCode: number | null
 }
 
+export interface ClaudeInteractiveLoginStartResponse {
+  sessionId: string
+}
+
+export interface ClaudeOnboardingStatus {
+  completed: boolean
+}
+
 export interface ClaudePrefs {
   hideVersionCheck: boolean
 }

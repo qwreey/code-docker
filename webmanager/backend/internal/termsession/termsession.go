@@ -131,7 +131,30 @@ type CreateOptions struct {
 }
 
 func newSession(name, shell string, scrollbackBytes int, opts CreateOptions) (*Session, error) {
-	cmd := exec.Command(shell)
+	return newSessionCmd(name, shell, nil, scrollbackBytes, opts)
+}
+
+// NewStandalone starts a Session whose PTY leader is command/args directly
+// (e.g. the `claude` binary itself), not a login shell — and, unlike every
+// session created through a Registry, it's never added to any Registry's
+// name->Session map, so it never appears in GET /api/terminal/sessions or
+// competes with a user's own named tabs. Used by
+// internal/claudecode's interactive-login flow (see that package), which
+// needs a Session's full PTY lifecycle (Attach/Write/Resize/Close) for one
+// dedicated, caller-owned command rather than a general-purpose shell — see
+// root CLAUDE.md's webmanager section, "인터랙티브 온보딩" for why the
+// interactive CLI itself has to be the process actually running, not a
+// shell that merely typed `claude` as a first command. The caller alone is
+// responsible for eventually calling Close() - nothing here schedules that
+// automatically (though the PTY leader exiting on its own still marks the
+// session Done() exactly like a Registry-owned one, so a caller can select
+// on Done() instead of polling).
+func NewStandalone(name, command string, args []string, scrollbackBytes int, opts CreateOptions) (*Session, error) {
+	return newSessionCmd(name, command, args, scrollbackBytes, opts)
+}
+
+func newSessionCmd(name, command string, args []string, scrollbackBytes int, opts CreateOptions) (*Session, error) {
+	cmd := exec.Command(command, args...)
 	cmd.Dir = "/code"
 	if opts.Cwd != "" {
 		if info, err := os.Stat(opts.Cwd); err == nil && info.IsDir() {

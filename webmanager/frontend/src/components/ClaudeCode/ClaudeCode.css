@@ -57,6 +57,20 @@
   font-size: 0.8rem;
 }
 
+.claude-advanced-login-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.claude-advanced-login-toggle:hover {
+  color: var(--text);
+}
+
 .claude-logout-wrap {
   margin-top: 0.6rem;
 }

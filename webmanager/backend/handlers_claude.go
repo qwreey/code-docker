@@ -284,6 +284,63 @@ func (s *Server) handleClaudeLoginCancel(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
+// claudeOnboardingStatusResponse is GET /api/claude/onboarding-status's
+// body.
+type claudeOnboardingStatusResponse struct {
+	Completed bool `json:"completed"`
+}
+
+// handleClaudeOnboardingStatus reports claudecode.HasCompletedOnboarding -
+// a plain file read (no subprocess), cheap enough for
+// InteractiveLoginDialog to poll every couple seconds while its wizard is
+// running, and for the frontend to check once up front to decide whether
+// the interactive dialog is even necessary (see that flag's own doc
+// comment for why this isn't just GET /api/claude/status's auth.loggedIn).
+func (s *Server) handleClaudeOnboardingStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, claudeOnboardingStatusResponse{Completed: claudecode.HasCompletedOnboarding()})
+}
+
+// claudeInteractiveLoginStartResponse is
+// POST /api/claude/login/interactive/start's body.
+type claudeInteractiveLoginStartResponse struct {
+	SessionID string `json:"sessionId"`
+}
+
+// handleClaudeInteractiveLoginStart starts the real `claude` CLI as a PTY
+// session (internal/claudecode.InteractiveLoginManager) that the frontend
+// then attaches to over GET /api/claude/login/interactive/{id} (a
+// WebSocket, see handlers_terminal.go's handleClaudeInteractiveLoginTerminal)
+// and renders with xterm.js, so the user goes through the CLI's own
+// interactive onboarding wizard directly - see that manager's doc comment
+// for why this exists alongside the headless flow above rather than
+// replacing it outright.
+func (s *Server) handleClaudeInteractiveLoginStart(w http.ResponseWriter, r *http.Request) {
+	binPath, ok := claudecode.FindBinary(s.cfg.ClaudeBinPath)
+	if !ok {
+		writeError(w, http.StatusNotFound, "claude CLI is not installed")
+		return
+	}
+
+	id, _, err := s.interactiveLoginMgr.Start(binPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, claudeInteractiveLoginStartResponse{SessionID: id})
+}
+
+// handleClaudeInteractiveLoginCancel closes session id's PTY, if it's still
+// the current one. Always 200 - idempotent, matching
+// claudecode.InteractiveLoginManager.Cancel's own contract, since the
+// frontend calls this both as a fallback after the wizard should have
+// already exited on its own and on dialog-close/unmount.
+func (s *Server) handleClaudeInteractiveLoginCancel(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	_ = s.interactiveLoginMgr.Cancel(id)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 // claudeSessionsResponse is GET /api/claude/sessions's body. Sessions is
 // never nil (see handleClaudeSessions).
 type claudeSessionsResponse struct {

@@ -126,14 +126,15 @@ func main() {
 			cfg.ProjectsOldDays,
 			cfg.CodeServerURL,
 		),
-		miseJobs:           mise.NewJobStore(),
-		projectJobs:        mise.NewJobStore(),
-		loginMgr:           claudecode.NewLoginManager(),
-		diskUsage:          diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
-		termSessions:       termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
-		sessionHeartbeats:  sessionheartbeat.NewStore(),
-		gate:               gate,
-		envTemplateVersion: envTemplateVersion,
+		miseJobs:            mise.NewJobStore(),
+		projectJobs:         mise.NewJobStore(),
+		loginMgr:            claudecode.NewLoginManager(),
+		interactiveLoginMgr: claudecode.NewInteractiveLoginManager(),
+		diskUsage:           diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
+		termSessions:        termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
+		sessionHeartbeats:   sessionheartbeat.NewStore(),
+		gate:                gate,
+		envTemplateVersion:  envTemplateVersion,
 	}
 
 	mux := http.NewServeMux()
@@ -236,6 +237,7 @@ func main() {
 	mux.Handle("POST /api/dind/containers/{id}/remove", gate.RequirePassword(http.HandlerFunc(s.handleRemoveDindContainer)))
 
 	mux.HandleFunc("GET /api/claude/status", s.handleClaudeStatus)
+	mux.HandleFunc("GET /api/claude/onboarding-status", s.handleClaudeOnboardingStatus)
 	mux.HandleFunc("GET /api/claude/mise-version", s.handleClaudeMiseVersion)
 	mux.HandleFunc("GET /api/claude/plugins", s.handleClaudePlugins)
 	mux.Handle("POST /api/claude/install", gate.RequirePassword(http.HandlerFunc(s.handleClaudeInstall)))
@@ -245,6 +247,17 @@ func main() {
 	mux.Handle("GET /api/claude/login/{id}", gate.RequirePassword(http.HandlerFunc(s.handleClaudeLoginStatus)))
 	mux.Handle("POST /api/claude/login/{id}/code", gate.RequirePassword(http.HandlerFunc(s.handleClaudeLoginCode)))
 	mux.Handle("POST /api/claude/login/{id}/cancel", gate.RequirePassword(http.HandlerFunc(s.handleClaudeLoginCancel)))
+	// Interactive login (internal/claudecode.InteractiveLoginManager) - runs
+	// the real `claude` CLI as a PTY the frontend embeds via xterm.js, so the
+	// user completes the CLI's own onboarding wizard directly instead of the
+	// headless `claude auth login` flow above, which populates valid
+	// credentials but never marks that wizard's own completion state (see
+	// root CLAUDE.md's webmanager section). Gated exactly like the headless
+	// flow and like GET /api/terminal below - a live PTY session is the same
+	// trust tier either way.
+	mux.Handle("POST /api/claude/login/interactive/start", gate.RequirePassword(http.HandlerFunc(s.handleClaudeInteractiveLoginStart)))
+	mux.Handle("GET /api/claude/login/interactive/{id}", gate.RequirePassword(http.HandlerFunc(s.handleClaudeInteractiveLoginTerminal)))
+	mux.Handle("POST /api/claude/login/interactive/{id}/cancel", gate.RequirePassword(http.HandlerFunc(s.handleClaudeInteractiveLoginCancel)))
 	mux.Handle("GET /api/claude/sessions", gate.RequirePassword(http.HandlerFunc(s.handleClaudeSessions)))
 	mux.Handle("GET /api/claude/sessions/{project}/{sessionId}", gate.RequirePassword(http.HandlerFunc(s.handleClaudeSessionLines)))
 	mux.HandleFunc("GET /api/claude/memory", s.handleClaudeMemory)

@@ -117,4 +117,3 @@ func TestSinkErrorDoesNotBlockPump(t *testing.T) {
 		t.Fatalf("reapCheck still reports attached=%v after sink errored, want the sink to have been cleared", attached)
 	}
 }
-

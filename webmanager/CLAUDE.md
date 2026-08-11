@@ -129,7 +129,40 @@ a passive read). This reverses `claude-plan.md`'s earlier explicit decision
 to leave login to the user's own terminal — that assumed SSH/code-server
 access was always available, which stopped being true once webmanager needed
 to support org/company deployments where webmanager itself is the only
-surface ever opened. A Claude Code conversation-log viewer inside the same
+surface ever opened. That headless flow alone turned out to be incomplete,
+though (2026-08-11 incident): `claude auth login` populates valid
+credentials `claude auth status` recognizes immediately, but never touches
+`~/.claude.json`'s separate `hasCompletedOnboarding` flag, which is what
+actually gates whether a later bare `claude` (e.g. in code-server's
+integrated terminal) shows its own first-run wizard from scratch again —
+the two are independent CLI-internal states, not one. The fix is a second
+login path, `InteractiveLoginDialog.tsx` + `internal/claudecode/
+interactivelogin.go`'s `InteractiveLoginManager`: it runs the real `claude`
+binary as a PTY's leader process directly (`termsession.NewStandalone` —
+same package as the Terminal tab's sessions, but never Registry-tracked, so
+it never shows up in the Terminal tab's own session list) and the frontend
+embeds it live via xterm.js over its own WebSocket
+(`GET /api/claude/login/interactive/{id}`, `handlers_terminal.go`'s
+`relayTerminalSession` — extracted from `handleNamedTerminal` so both
+share the same relay code), so the user drives the CLI's actual onboarding
+wizard instead of a scripted `claude auth login` transcript. Which path is
+primary is decided by `GET /api/claude/onboarding-status`
+(`claudecode.HasCompletedOnboarding`, a plain read of that same
+`hasCompletedOnboarding` field — cheap enough to poll every couple seconds):
+once it's already true, the interactive terminal is never actually needed
+again (re-onboarding is a one-time thing), so the plain headless flow above
+is offered as primary with the terminal as a "고급" fallback; before that
+first completion, it's the other way around, since only the real wizard can
+set that flag in the first place. The dialog itself also polls
+`onboarding-status` (not `auth.loggedIn`) to decide when it's actually safe
+to auto-close — confirmed live that `loggedIn` flips true well before the
+wizard's remaining screens (a continue prompt, then a security notice) are
+done, and closing on that alone re-creates the exact bug this was built to
+fix. Closing sends two Ctrl+C bytes (Ink-style CLIs need a second press to
+actually exit) then falls back to an explicit server-side `Session.Close()`
+a couple seconds later — confirmed live the double-byte alone doesn't
+always land in time, so the fallback is load-bearing, not just defensive.
+A Claude Code conversation-log viewer inside the same
 tab (`.claude/archive/claude-session-log-plan-done.md`, `internal/claudecode/sessions.go`) lists
 and renders every session transcript found under
 `CLAUDE_CONFIG_DIR/projects/*/*.jsonl` as a condensed chat view — the

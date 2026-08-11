@@ -38,12 +38,13 @@ type Server struct {
 	// never intermixes with mise's own install/uninstall jobs, and its
 	// polling route can live under /api/projects/... instead of the
 	// mise-specific /api/mise/jobs/{id} path.
-	projectJobs       *mise.JobStore
-	loginMgr          *claudecode.LoginManager
-	diskUsage         *diskusage.Analyzer
-	termSessions      *termsession.Registry
-	sessionHeartbeats *sessionheartbeat.Store
-	gate              *authgate.Gate
+	projectJobs         *mise.JobStore
+	loginMgr            *claudecode.LoginManager
+	interactiveLoginMgr *claudecode.InteractiveLoginManager
+	diskUsage           *diskusage.Analyzer
+	termSessions        *termsession.Registry
+	sessionHeartbeats   *sessionheartbeat.Store
+	gate                *authgate.Gate
 
 	// envTemplateVersion is cfg.EnvTemplatePath's WEBMANAGER_ENV_VERSION at
 	// startup ("" if the template was unreadable) — see

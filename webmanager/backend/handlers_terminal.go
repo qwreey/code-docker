@@ -192,6 +192,17 @@ func (s *Server) handleNamedTerminal(ctx context.Context, conn *websocket.Conn, 
 		return
 	}
 
+	relayTerminalSession(ctx, conn, sess, name)
+}
+
+// relayTerminalSession shuttles an already-obtained *termsession.Session's
+// PTY output to conn as binary frames, and conn's binary frames (keystrokes)
+// / "resize" control messages back to the PTY, until either side closes.
+// Shared by handleNamedTerminal (session obtained via the Registry) and
+// handleClaudeInteractiveLoginTerminal (session obtained via
+// claudecode.InteractiveLoginManager, never Registry-tracked) - the relay
+// logic itself doesn't care which. logLabel is only used for log lines.
+func relayTerminalSession(ctx context.Context, conn *websocket.Conn, sess *termsession.Session, logLabel string) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -200,7 +211,7 @@ func (s *Server) handleNamedTerminal(ctx context.Context, conn *websocket.Conn, 
 	}
 	detach, scrollback, err := sess.Attach(sink)
 	if err != nil {
-		log.Printf("terminal: session %q: attach failed: %v", name, err)
+		log.Printf("terminal: session %q: attach failed: %v", logLabel, err)
 		_ = conn.Close(websocket.StatusInternalError, err.Error())
 		return
 	}
@@ -241,19 +252,45 @@ readLoop:
 		case websocket.MessageText:
 			var ctl terminalControlMessage
 			if jerr := json.Unmarshal(data, &ctl); jerr != nil {
-				log.Printf("terminal: session %q: ignoring malformed control message: %v", name, jerr)
+				log.Printf("terminal: session %q: ignoring malformed control message: %v", logLabel, jerr)
 				continue
 			}
 			if ctl.Type != "resize" || ctl.Cols == 0 || ctl.Rows == 0 {
 				continue
 			}
 			if serr := sess.Resize(ctl.Cols, ctl.Rows); serr != nil {
-				log.Printf("terminal: session %q: resize failed: %v", name, serr)
+				log.Printf("terminal: session %q: resize failed: %v", logLabel, serr)
 			}
 		}
 	}
 
 	_ = conn.Close(websocket.StatusNormalClosure, "")
+}
+
+// handleClaudeInteractiveLoginTerminal upgrades to a WebSocket and relays
+// the interactive `claude` onboarding session started by a prior
+// POST /api/claude/login/interactive/start (see
+// internal/claudecode.InteractiveLoginManager and handlers_claude.go) - same
+// relay as a named terminal session, just sourced from that manager instead
+// of s.termSessions. A 404 (unknown/superseded/expired id) closes the
+// socket immediately with a policy-violation-shaped status so the frontend
+// can tell "start over" apart from a normal disconnect.
+func (s *Server) handleClaudeInteractiveLoginTerminal(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	sess, ok := s.interactiveLoginMgr.Session(id)
+	if !ok {
+		http.Error(w, "unknown or expired interactive login session", http.StatusNotFound)
+		return
+	}
+
+	conn, err := websocket.Accept(w, r, nil)
+	if err != nil {
+		log.Printf("claude interactive login: websocket accept failed: %v", err)
+		return
+	}
+
+	relayTerminalSession(context.Background(), conn, sess, "claude-interactive-login")
 }
 
 // writeWithTimeout writes p to conn as a binary frame, bounded by

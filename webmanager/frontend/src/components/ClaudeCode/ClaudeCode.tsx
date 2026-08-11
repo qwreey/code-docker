@@ -5,6 +5,7 @@ import type {
   ClaudeLogoutResponse,
   ClaudeMiseVersionInfo,
   ClaudeMiseVersionResponse,
+  ClaudeOnboardingStatus,
   ClaudePlugin,
   ClaudePluginsResponse,
   ClaudePrefs,
@@ -23,6 +24,7 @@ import { WeeklyChart } from './WeeklyChart'
 import { ModelUsageChart } from './ModelUsageChart'
 import { JobPanel } from '../Mise/JobPanel'
 import { LoginPanel } from './LoginPanel'
+import { InteractiveLoginDialog } from './InteractiveLoginDialog'
 import { ClaudeSettings } from './ClaudeSettings'
 import { SessionLog } from './SessionLog/SessionLog'
 import '../common/common.css'
@@ -386,6 +388,38 @@ function InstalledView({
     startUpdate()
   }, [miseVersion, startUpdate])
 
+  // Which login CTA is primary depends on whether this instance has ever
+  // finished the CLI's own onboarding wizard (~/.claude.json's
+  // hasCompletedOnboarding - see InteractiveLoginDialog's doc comment for
+  // why this isn't just auth.loggedIn): once it has, the plain headless
+  // flow (LoginPanel - `claude auth login`) is sufficient on its own for
+  // logging back in, since re-onboarding is never required again, and the
+  // heavier terminal dialog is only offered as a "고급" fallback. Only
+  // before that first completion is the interactive dialog actually
+  // necessary (it's the only thing that can drive the wizard to
+  // completion) - so it's the primary CTA in that case, with the headless
+  // flow demoted to "고급" instead. null (still loading) defaults to the
+  // interactive dialog being primary, same as the "never onboarded" case -
+  // the safer default, since skipping a wizard that's actually still
+  // needed is worse than one extra click for someone already onboarded.
+  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (auth?.loggedIn) return
+    let cancelled = false
+    api
+      .get<ClaudeOnboardingStatus>('/claude/onboarding-status')
+      .then((res) => {
+        if (!cancelled) setOnboardingCompleted(res.completed)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [auth?.loggedIn])
+
+  const [showInteractiveLogin, setShowInteractiveLogin] = useState(false)
+  const [showAdvancedLogin, setShowAdvancedLogin] = useState(false)
+
   return (
     <div className="claude-installed-wrap">
       {miseVersion?.outdated && !updateJob && (
@@ -422,8 +456,51 @@ function InstalledView({
             <div className="claude-card-sub">{auth.subscriptionType} 구독</div>
             <LogoutButton onLoggedOut={onLoggedOut} />
           </>
+        ) : onboardingCompleted ? (
+          <div className="claude-login-panel">
+            <LoginPanel onLoggedIn={onLoggedIn} />
+            <div className="claude-card-note">
+              <button
+                type="button"
+                className="claude-advanced-login-toggle"
+                onClick={() => setShowInteractiveLogin(true)}
+              >
+                안 되면: 터미널로 로그인
+              </button>
+            </div>
+            {showInteractiveLogin && (
+              <InteractiveLoginDialog
+                onLoggedIn={onLoggedIn}
+                onClose={() => setShowInteractiveLogin(false)}
+              />
+            )}
+          </div>
         ) : (
-          <LoginPanel onLoggedIn={onLoggedIn} />
+          <div className="claude-login-panel">
+            <button
+              type="button"
+              className="btn btn-primary btn-small"
+              onClick={() => setShowInteractiveLogin(true)}
+            >
+              로그인
+            </button>
+            <div className="claude-card-note">
+              <button
+                type="button"
+                className="claude-advanced-login-toggle"
+                onClick={() => setShowAdvancedLogin((v) => !v)}
+              >
+                {showAdvancedLogin ? '고급 옵션 숨기기' : '고급: 브라우저에서만 로그인'}
+              </button>
+            </div>
+            {showAdvancedLogin && <LoginPanel onLoggedIn={onLoggedIn} />}
+            {showInteractiveLogin && (
+              <InteractiveLoginDialog
+                onLoggedIn={onLoggedIn}
+                onClose={() => setShowInteractiveLogin(false)}
+              />
+            )}
+          </div>
         )}
       </div>
 
