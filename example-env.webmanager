@@ -28,7 +28,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=13
+WEBMANAGER_ENV_VERSION=14
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -99,6 +99,18 @@ WEBMANAGER_ENV_VERSION=13
 #. 그대로 따라가므로(코드 자체 기본값), 그쪽만 바꿨다면 이건 안 건드려도 됩니다 -
 #. 이 값을 직접 지정하면 그 자동 추적을 끊고 여기 적은 값으로 고정됩니다.
 #WEBMANAGER_CODE_SERVER_MANIFEST_URL=http://private:8080/manifest.json
+
+#. webmanager 자신의 PWA manifest(위 shortcuts용 manifest와는 별개 - /manager/
+#. 페이지를 직접 "홈 화면에 추가"할 때 쓰이는 manifest입니다)의 display 모드.
+#. code-server 앱은 상단 브라우저 바를 숨기는 게 의도된 동작이지만, webmanager를
+#. 홈 화면에서 열 땐 주소창이 계속 보이길 원할 수 있어 분리했습니다. 값:
+#. "browser"(기본값, 항상 일반 브라우저 UI로 열림 - 주소창이 가장 확실하게
+#. 보장됨), "minimal-ui"(일부 브라우저 UI만 남김 - Firefox/Samsung Internet은
+#. 미지원이라 조용히 standalone으로 대체됨), "standalone"/"fullscreen"(브라우저
+#. UI 완전히 숨김). 브라우저는 "홈 화면에 추가" 하는 그 순간에만 manifest를
+#. 읽으므로, 이미 설치된 바로가기가 있다면 값을 바꿔도 소급 적용되지 않습니다 -
+#. 삭제 후 다시 추가해야 새 값이 반영됩니다.
+#WEBMANAGER_PWA_DISPLAY_MODE=browser
 
 #. --- Task Manager 탭 ---
 #. 리소스 히스토리 그래프 샘플링 주기(초)와 보관 기간(분).

@@ -9,6 +9,15 @@
          "single-origin merge"), same absolute-path convention
          config/code/code-patch/fonts.default.css's @import uses. -->
     <link rel="stylesheet" href="/manager/api/fonts/css" />
+    <!-- webmanager's own PWA manifest — deliberately separate from
+         code-server's (which nginx serves at /manifest.json, merged with a
+         shortcuts jump-list entry into webmanager). code-server's manifest
+         requests standalone/fullscreen display; webmanager's requests
+         "browser" (WEBMANAGER_PWA_DISPLAY_MODE, see
+         backend/handlers_webmanager_manifest.go) so installing THIS page
+         directly keeps the browser topbar visible, without touching
+         code-server's own installed-app behavior at all. -->
+    <link rel="manifest" href="/manager/webmanager-manifest.json" />
     <!-- interactive-widget=resizes-content: makes Chrome/Firefox-Android shrink
          the layout viewport (and dvh) for the on-screen keyboard again, like
          pre-Chrome-108 behavior (Chrome 108 changed the default to match
