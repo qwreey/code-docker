@@ -224,6 +224,14 @@ netgate 설정이 아무리 정상이어도 절대 성공할 수 없습니다. `
 데몬이 실제로 관리하는 것과 동일한 nftables 오브젝트를 백엔드 불일치 없이 확실하게
 건드립니다.
 
+router가 `code-docker-internal` 외에 다른 `internal: true` 네트워크에도 붙는 경우(예:
+`EXTRA_INCLUDE`로 연동한 sibling 프로젝트가 router를 자기 전용 네트워크에도 붙이는 경우
+- `.claude/backlog/roblox-studio-vnc-isolation-plan.md` 참고) 그 네트워크도 똑같이
+`DOCKER-INTERNAL`에 막힙니다 - `code-docker-netfilter-fix`는 `CODE_DOCKER_INTERNAL_NETWORK`
+하나가 아니라 `CODE_DOCKER_EXTRA_INTERNAL_NETWORKS`(공백 구분 목록, `example-env` 참고)로
+추가 네트워크 이름을 몇 개든 받아 각각에 동일한 `DOCKER-USER` 예외를 겁니다 -
+`code-docker-internal` 자신의 기본 보호는 별도 변수라 항상 그대로 유지됩니다.
+
 ## 당장 인터넷이 필요하다면 (기능 자체를 끄기)
 
 `NETGATE_ENABLED="false"`(`.env`)로 끄면 `code-docker-netinit`/dind의 라우팅 루프,

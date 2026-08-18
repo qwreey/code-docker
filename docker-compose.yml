@@ -1,3 +1,27 @@
+# Optional extra Compose file, included as-is into this project - lets a locally
+# cloned sibling project (e.g. builds/roblox-studio-docker, cloned the same way
+# builds/code-docker itself is per docs/index.md) attach its own services to
+# code-docker-internal/code-docker-router etc. without ever touching this file, so
+# `git pull` on this repo never conflicts with that local customization. Defaults to
+# empty-extra-include.yml, an intentionally-committed 0-byte file that's a total no-op
+# when included (confirmed by direct testing) - but Compose resolves `include: path:`
+# relative to wherever THIS file actually lives at runtime, not to this git repo, so in
+# the recommended split-directory deploy (docs/index.md: clone into builds/code-docker/,
+# copy this file out one level) that 0-byte file being committed in the repo is NOT
+# enough on its own - `docker compose` fails outright (even `config`, not just
+# `build`/`up`) unless empty-extra-include.yml also physically exists next to wherever
+# THIS docker-compose.yml was copied to. docs/index.md's setup steps include a `touch
+# empty-extra-include.yml` for exactly this reason - if that step is ever missing there,
+# that's a bug, not something this comment alone fixes. To actually use the mechanism:
+# create your own `extra-include.yml` (left out of version control - see .gitignore)
+# containing `include:\n  - path: builds/<your-project>/<its-own-integration-file>.yml`,
+# then set `EXTRA_INCLUDE=extra-include.yml` in `.env`. See
+# .claude/backlog/roblox-studio-vnc-isolation-plan.md for the concrete
+# roblox-studio-docker case this was built for (network-attach today; VNC-only-network
+# isolation via router is the follow-up work tracked in that doc, not done yet).
+include:
+  - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}
+
 networks:
   code-docker-internal:
     name: "${PREFIX:-}code-docker-internal"
@@ -328,6 +352,13 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       CODE_DOCKER_INTERNAL_NETWORK: "${PREFIX:-}code-docker-internal"
+      # Space-separated list of any OTHER internal: true networks router also needs a
+      # DOCKER-USER exemption for (e.g. a sibling project's EXTRA_INCLUDE overlay
+      # attaching router to a dedicated network - see example-env's own comment on this
+      # var and .claude/backlog/roblox-studio-vnc-isolation-plan.md). Left as a separate
+      # env var from CODE_DOCKER_INTERNAL_NETWORK above on purpose - see netfilter-fix/fix.sh's
+      # own comment on why.
+      CODE_DOCKER_EXTRA_INTERNAL_NETWORKS: "${CODE_DOCKER_EXTRA_INTERNAL_NETWORKS:-}"
     restart: unless-stopped
     logging:
       driver: "json-file"

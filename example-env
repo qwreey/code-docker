@@ -27,6 +27,31 @@
 # BUILD_CONTEXT="builds/code-docker" 로 지정하세요.
 #BUILD_CONTEXT="."
 
+# docker-compose.yml 최상위에 추가로 include할 Compose 파일 경로입니다. PREFIX/
+# BUILD_CONTEXT와 마찬가지로 컨테이너 안 환경변수가 아니라 docker-compose.yml
+# 자신의 include: 키에만 쓰입니다. 기본값 "empty-extra-include.yml"은 아무 것도
+# 안 하는 0바이트 빈 파일(레포에 커밋되어 있음)이라, 이 값을 안 건드리면 지금까지와
+# 완전히 동일하게 동작합니다. 로컬에서 다른 프로젝트(예: builds/ 아래 별도로
+# 클론한 프로젝트)를 이 프로젝트와 함께 띄우고 싶을 때만, 버전관리 대상이 아닌
+# 자신만의 extra-include.yml을 만들고 여기서 그 경로를 가리키세요 - 원본
+# docker-compose.yml은 전혀 건드리지 않아도 되므로 `git pull`과 절대 충돌하지
+# 않습니다. 구체적인 예시는 .claude/backlog/roblox-studio-vnc-isolation-plan.md
+# 참고.
+#EXTRA_INCLUDE="empty-extra-include.yml"
+
+# EXTRA_INCLUDE로 붙인 다른 프로젝트가 자기 서비스를 code-docker-internal이 아니라
+# 별도의 `internal: true` 네트워크(예: roblox-studio-docker의 VNC 전용 네트워크,
+# .claude/backlog/roblox-studio-vnc-isolation-plan.md 참고)에 붙이고 router가 그
+# 네트워크도 넘나들게 하려면, 최신 Docker Engine의 DOCKER-INTERNAL 체인이 그
+# 네트워크에 대해서도 router의 FORWARD 트래픽을 막는다 - code-docker-netfilter-fix
+# 서비스가 이 값을 읽어 그 네트워크들에도 같은 DOCKER-USER 예외를 걸어줍니다.
+# 공백으로 구분된 네트워크 "이름" 목록입니다(PREFIX가 붙기 전, docker-compose.yml의
+# `networks:` 키 이름 그대로) - PREFIX/BUILD_CONTEXT와 마찬가지로 컨테이너 안
+# 환경변수가 아니라 code-docker-netfilter-fix 서비스 하나에만 전달됩니다.
+# code-docker-internal 자신은 항상 별도로 보호되므로 여기엔 "추가"할 네트워크만
+# 적으면 됩니다.
+#CODE_DOCKER_EXTRA_INTERNAL_NETWORKS=""
+
 # code-docker-internal/external 두 네트워크의 enable_ipv6를 한 번에
 # 켭니다. PREFIX/BUILD_CONTEXT와 마찬가지로 컨테이너 안 환경변수가 아니라
 # docker-compose.yml의 네트워크 정의에만 쓰입니다. 도커 엔진 자체의 ipv6

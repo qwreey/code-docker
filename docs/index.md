@@ -7,9 +7,23 @@ cd ~/code-docker
 mkdir builds # 빌드용 레포지토리 복사
 git clone --recurse-submodules https://github.com/qwreey/code-docker.git builds/code-docker
 cp builds/code-docker/docker-compose.yml ./ # 컴포즈 파일 복사
+touch empty-extra-include.yml # docker-compose.yml의 include: 대상 - 없으면 아예 실행이 안 됨, 아래 참고
 ```
 
 그런 다음 `example-env` 를 `.env` 로 복사하고, `BUILD_CONTEXT="builds/code-docker"` 로 설정하세요 (레포지토리를 `builds/code-docker` 에 클론했으므로 빌드 컨텍스트가 `docker-compose.yml` 과 다른 위치를 가리켜야 합니다). `docker-compose.yml` 자체는 고칠 필요 없습니다 - 나머지 커스터마이징이 필요하면 마저 읽고 편집하세요.
+
+> Note: `touch empty-extra-include.yml`을 빠뜨리면 `docker compose`가 `include:`
+> 대상 파일을 못 찾아서 `build`/`up`은 물론 `config`조차 바로 에러로 실패합니다 -
+> `docker-compose.yml`은 `~/code-docker/`(방금 그 파일을 복사해 온 위치)에 있고
+> Compose는 `include: path:`를 **그 docker-compose.yml이 실제로 놓인 위치** 기준
+> 상대경로로 찾기 때문에, `builds/code-docker/empty-extra-include.yml`이 레포에
+> 커밋돼 있어도 그것만으론 부족합니다 - `BUILD_CONTEXT`와 똑같은 이유로 한 번 더
+> 손대야 하는 파일이라고 생각하면 됩니다. 이미 이 스텝 없이 예전에 클론해서 쓰고
+> 있었다면(이 기능 추가 이전 배포), 그냥 `~/code-docker/`(docker-compose.yml과 같은
+> 위치)에서 한 번 `touch empty-extra-include.yml`만 실행하면 됩니다 - 그 외엔 아무
+> 것도 안 바뀝니다. 이 파일/`EXTRA_INCLUDE`가 실제로 뭘 위한 것인지는
+> `example-env`의 `EXTRA_INCLUDE` 항목과
+> `.claude/backlog/roblox-studio-vnc-isolation-plan.md` 참고.
 
 이제 `docker compose build` 를 수행하고 잘 빌드가 되는지 확인합니다.
 만약 빌드에 성공했다면 `docker compose up -d` 를 수행하세요.

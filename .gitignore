@@ -4,5 +4,8 @@
 .env
 .env.webmanager
 .env.router
+# User-local EXTRA_INCLUDE target (see docker-compose.yml's include: comment) - not
+# empty-extra-include.yml, which IS committed (the intentional no-op default).
+extra-include.yml
 config/**/*-override*
 config/**/*.override*
