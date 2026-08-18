@@ -278,8 +278,22 @@
 }
 
 /* Worktrees */
+.git-worktree-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.git-worktree-table th,
 .git-worktree-table td {
+  text-align: left;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
   vertical-align: middle;
+}
+
+.git-worktree-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .git-worktree-flags {
