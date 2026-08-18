@@ -278,6 +278,19 @@ export function Terminal({
     }
   }, [effectiveSettings.fontFamily])
 
+  // Re-focuses xterm's hidden input textarea. Used as a safety net after
+  // every mobile-toolbar interaction (button tap, sticky-modifier arm, and
+  // the toolbar's own touchend below) — on mobile, tapping/scrolling the
+  // on-screen control bar can otherwise steal focus away from that textarea
+  // (see TerminalControls.tsx's own preventDefault handling for the other
+  // half of this fix), which both drops xterm's own focus state and closes
+  // the virtual keyboard. Calling this from inside the same synchronous
+  // touch-derived event handler keeps it within the user-gesture context
+  // most mobile browsers require to reopen the keyboard programmatically.
+  const focusTerminal = useCallback(() => {
+    termRef.current?.focus()
+  }, [])
+
   const sendBytes = useCallback((bytes: string) => {
     if (!bytes) return
     const mod = armedModifierRef.current
@@ -290,7 +303,8 @@ export function Terminal({
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(new TextEncoder().encode(out))
     }
-  }, [])
+    focusTerminal()
+  }, [focusTerminal])
 
   const armModifier = useCallback((mod: ModifierId) => {
     setArmedModifier((prev) => {
@@ -298,7 +312,8 @@ export function Terminal({
       armedModifierRef.current = next
       return next
     })
-  }, [])
+    focusTerminal()
+  }, [focusTerminal])
 
   // Live-preview a theme without persisting it (used while editing a custom
   // theme's colors, and to revert preview on cancel).
@@ -749,6 +764,7 @@ export function Terminal({
             armedModifier={armedModifier}
             onArmModifier={armModifier}
             onSendBytes={sendBytes}
+            onFocusTerminal={focusTerminal}
           />
         )}
       </div>
