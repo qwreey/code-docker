@@ -1,3 +1,10 @@
+.ssh-default-key-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
 .ssh-keys-toolbar {
   display: flex;
   justify-content: flex-end;

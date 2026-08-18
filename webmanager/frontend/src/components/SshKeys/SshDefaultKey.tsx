@@ -61,12 +61,12 @@ export function SshDefaultKey() {
           <CopyButton text={status.publicKey} />
         </div>
       ) : (
-        <>
+        <div className="ssh-default-key-empty">
           <p className="empty-state">아직 기본 키가 없습니다.</p>
           <button type="button" className="btn btn-primary" disabled={generating} onClick={handleGenerate}>
             {generating ? '생성하는 중...' : '키 생성'}
           </button>
-        </>
+        </div>
       )}
     </div>
   )
