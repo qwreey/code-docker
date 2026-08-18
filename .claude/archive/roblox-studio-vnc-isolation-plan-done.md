@@ -1,5 +1,11 @@
 # roblox-studio-docker 연동: VNC 전용 네트워크 격리 (netgate `forwards:` 다중 네트워크 지원)
 
+> **완료됨 (2026-08-18)**: 이 repo 쪽 작업(EXTRA_INCLUDE 훅, netfilter-fix 다중
+> 네트워크 지원)은 모두 끝났고 `docker compose up`까지 실제로 검증됨 — 문서
+> 하단 "권장 작업 순서" 4단계까지 완료. 남은 작업은 전부 `roblox-studio-docker`
+> 쪽 repo에 있다 (이 문서 본문에서도 스스로 "이 repo에서 더 할 일 없음"이라고
+> 결론 내림). 아래 본문은 설계 히스토리로만 남겨둔다.
+
 ## 배경
 
 `~/Projects/roblox-studio-docker` (별도 standalone 프로젝트 — Docker/Wine 기반 Roblox
