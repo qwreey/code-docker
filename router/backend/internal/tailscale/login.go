@@ -39,7 +39,12 @@ func NewLoginManager() *LoginManager {
 // it finishes. A no-op, non-error if a previous Start's process is still
 // running - the caller should just keep polling status instead of stacking
 // a second login attempt onto the same daemon.
-func (m *LoginManager) Start(loginServer, hostname string) error {
+//
+// forceReauth adds --force-reauth, which is what makes this usable for
+// re-authentication (starting a fresh login while already logged in), not
+// just first-time setup - without it, `tailscale up` against an
+// already-Running backend is a no-op that never produces a new AuthURL.
+func (m *LoginManager) Start(loginServer, hostname string, forceReauth bool) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -53,6 +58,9 @@ func (m *LoginManager) Start(loginServer, hostname string) error {
 	}
 	if hostname != "" {
 		args = append(args, "--hostname="+hostname)
+	}
+	if forceReauth {
+		args = append(args, "--force-reauth")
 	}
 	cmd := exec.Command("tailscale", args...)
 	if err := cmd.Start(); err != nil {

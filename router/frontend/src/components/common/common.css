@@ -89,6 +89,16 @@
   margin: -0.25rem 0 1.25rem;
 }
 
+/* A small note under a form field/group explaining a non-obvious side
+   effect (e.g. "saving this doesn't take effect until X") - same muted
+   styling as .section-description, sized for inline form use rather than a
+   page-level subtitle. */
+.form-hint {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin: -0.5rem 0 0.75rem;
+}
+
 .empty-state {
   color: var(--text-muted);
   font-size: 0.9rem;

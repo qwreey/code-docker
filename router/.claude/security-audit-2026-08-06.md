@@ -110,11 +110,26 @@ access to every router-manager route** — create/delete Dev Proxy exposes
 (chains directly into Finding 1's SSRF), rewrite the tailscale
 `socks5_address`/`retry_intervall` global config, add/delete tailscale
 forwards and publishes, and trigger `tailscale up`/`tailscale up --login-
-server=...` with attacker-supplied login server / hostname flags (the login
-server itself still comes from `TAILSCALE_LOGIN_SERVER` env, not the
-request body, so this specific call is not itself a full takeover, but it's
-still an authenticated-tailnet-identity-affecting action available with zero
-credentials).
+server=...` with attacker-supplied login server / hostname flags.
+
+> **2026-08-18 update:** this paragraph originally continued "...the login
+> server itself still comes from `TAILSCALE_LOGIN_SERVER` env, not the
+> request body, so this specific call is not itself a full takeover" — that
+> is now **stale**. `PUT /api/tailscale/config` accepts a `loginServer`
+> field (persisted to `config.yaml`, consumed by both the automatic
+> first-boot login attempt and `POST /api/tailscale/login/start`) whenever
+> `TAILSCALE_LOGIN_SERVER` itself is unset. The env var still always wins
+> when set (same priority `ROUTER_MANAGER_AUTH_PASSWORD_HASH` uses), but in
+> the common case where it's *not* set, the mitigating factor this
+> paragraph relied on no longer holds: a compromised code-docker container
+> can now set an attacker-controlled login server and trigger
+> `POST /api/tailscale/login/start` (`{"forceReauth": true}` if already
+> logged in) with zero credentials by default, which **is** now enough to
+> redirect this node's tailnet identity to an attacker-controlled control
+> plane. This raises the practical urgency of this finding's fix direction
+> below — setting `ROUTER_MANAGER_AUTH_PASSWORD_HASH` (or the in-app
+> password) is no longer just "affects an already-authenticated identity,"
+> it gates a genuine control-plane takeover primitive.
 
 This is a materially bigger blast radius than the docs let on — `docs/router.md`'s
 security framing ("router는 이제 code-docker보다 신뢰 수준이 높은 유일한

@@ -35,6 +35,7 @@ export function Status() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
+  const [reauthing, setReauthing] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -86,13 +87,45 @@ export function Status() {
     }
   }, [starting, load])
 
+  // Re-authentication: `/login/start` with no body 409s once BackendState is
+  // already "Running" (see handleTailscaleLoginStart's own comment), so this
+  // is the { forceReauth: true } path that makes `tailscale up
+  // --force-reauth` actually produce a fresh AuthURL instead of being a
+  // no-op - the login-pending banner above then takes over automatically
+  // once the next poll sees BackendState move off "Running".
+  const handleReauth = useCallback(async () => {
+    if (reauthing) return
+    setReauthing(true)
+    try {
+      await api.post('/login/start', { forceReauth: true })
+      await load()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setReauthing(false)
+    }
+  }, [reauthing, load])
+
   return (
     <div className="card">
       <div className="section-header">
         <h2>상태</h2>
-        <button type="button" className="btn btn-secondary btn-small" onClick={load} disabled={loading}>
-          {loading ? '불러오는 중...' : '새로고침'}
-        </button>
+        <div>
+          {status && status.backendState === 'Running' && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              onClick={handleReauth}
+              disabled={reauthing}
+              title="현재 로그인을 유지한 채 새 로그인 URL을 발급합니다 (계정 변경 등에 사용)"
+            >
+              {reauthing ? '재인증 시도하는 중...' : '재인증'}
+            </button>
+          )}{' '}
+          <button type="button" className="btn btn-secondary btn-small" onClick={load} disabled={loading}>
+            {loading ? '불러오는 중...' : '새로고침'}
+          </button>
+        </div>
       </div>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}

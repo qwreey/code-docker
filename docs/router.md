@@ -110,6 +110,27 @@ docker compose exec code-docker-router supervisorctl restart tailscale-forward t
 바뀔 수 있어 tailscale hostname/IP만 신뢰합니다
 ([functional-router-plan.md](../router/.claude/functional-router-plan.md) 참고).
 
+로그인 서버(Headscale 등 자체 호스팅 컨트롤 서버)는 이제 Tailscale 탭의 "기본 설정"에서도
+지정할 수 있습니다 — `config.yaml`의 `login_server` 필드로 저장되며, forwards/publish와
+같은 파일에 함께 저장됩니다. `TAILSCALE_LOGIN_SERVER` 환경변수가 설정되어 있으면 항상
+그 값이 우선합니다(UI 필드는 읽기 전용으로 표시되고 변경할 수 없음) — 인프라 설정으로
+고정하고 싶다면 여전히 환경변수를 쓰세요. 어느 쪽도 설정하지 않으면 예전과 동일하게
+tailscale.com 공식 서버를 씁니다. 이 값은 저장 즉시 적용되지 않고 **다음 로그인 시도부터**
+반영됩니다 — 아직 로그인 전이라면 "로그인 시도하기" 버튼으로 시작하세요.
+
+"상태" 카드의 "재인증" 버튼은 `tailscale up --force-reauth`를 실행해, 이미 로그인된
+상태에서도 새 로그인 URL을 발급합니다(계정을 바꿔서 다시 로그인하고 싶을 때 등에 사용).
+단, **로그인 서버 자체를 다른 값으로 바꾸는 것**까지 "재인증" 한 번으로 안전하게
+처리되는지는 확인되지 않았습니다(`tailscale up --help`에 따르면 이전에 명시하지 않은
+플래그가 암묵적으로 바뀌는 경우 `--reset` 없이는 거부될 수 있다고 되어 있어, 로그인
+서버를 바꾸는 시나리오와 상호작용이 있을 수 있습니다) — 로그인 서버를 확실하게 바꾸려면
+계속 기존 절차(아래 상태 디렉터리를 지우고 재시작)를 쓰는 것을 권장합니다.
+
+```sh
+docker compose exec code-docker-router rm -rf /var/lib/code-docker-router/tailscale/state
+docker compose restart code-docker-router
+```
+
 ### 보안
 
 router는 이제 code-docker보다 신뢰 수준이 높은 유일한 국경 컨테이너이므로, tailscaled의

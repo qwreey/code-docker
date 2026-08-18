@@ -161,6 +161,19 @@ user overrides, same auto-include idiom as the main image's `config/supervisord.
   code-docker in full (daemon+login+forwards+publish, not partial) — code-docker itself has
   zero tailscale processes/packages now. `TAILSCALE_ENABLED`/`TAILSCALE_LOGIN_SERVER`/
   `TAILSCALE_HOSTNAME` (docker-compose env, same names as before the move) configure it.
+  `TAILSCALE_LOGIN_SERVER` is also settable from the Tailscale tab's own "기본 설정"
+  (`config.yaml`'s `login_server` field, alongside `forwards:`/`publish:` — see below) —
+  the env var always wins when set (an infra-as-code pin, same priority
+  `ROUTER_MANAGER_AUTH_PASSWORD_HASH`/`TINYAUTH_AUTH_USERS` already use), and the UI
+  field renders read-only with a note in that case (`router/backend/internal/tailscale`'s
+  `GlobalConfig.LoginServer`/`LoginServerPinned`/`EffectiveLoginServer`). An unset UI
+  value behaves identically to today's unset-env default (tailscale.com's own SaaS) — the
+  field is never prefilled. The Tailscale tab's "재인증" button (`tailscale up
+  --force-reauth`, `POST /api/tailscale/login/start` with `{"forceReauth": true}`) issues a
+  fresh login URL even while already logged in; switching to a genuinely different login
+  server on an already-authenticated node still goes through the pre-existing "wipe
+  `tailscale/state` and restart" procedure (`docs/router.md`) rather than "재인증" alone,
+  since `tailscale up`'s own flag semantics around that combination aren't confirmed safe.
   Inbound: `tailscaled`'s netstack auto-forwards any tailnet connection to the same port on
   `127.0.0.1`, unconditionally, for any port with no `tailscale serve` rule (core
   `tailscaled` behavior) — since code-docker no longer runs tailscaled at all, this only

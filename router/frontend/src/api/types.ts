@@ -51,10 +51,17 @@ export interface TailscaleState {
   authUrl?: string | null
 }
 
-// Mirrors router/backend/internal/tailscale.GlobalConfig.
+// Mirrors router/backend's GET/PUT /api/tailscale/config response
+// (tailscaleConfigResponse wrapping internal/tailscale.GlobalConfig).
+// loginServer is empty unless the user set a custom control-plane server in
+// the Tailscale tab (or TAILSCALE_LOGIN_SERVER is set, in which case
+// loginServerPinned is true and loginServer reflects that env value instead
+// - see GlobalConfig's own doc comment for the env-always-wins priority).
 export interface TailscaleGlobalConfig {
   socksAddress: string
   retryInterval: number
+  loginServer: string
+  loginServerPinned: boolean
 }
 
 // Mirrors router/backend/internal/tailscale.Forward.

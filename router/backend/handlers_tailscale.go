@@ -68,13 +68,31 @@ func writeSupervisorErr(w http.ResponseWriter, err error) {
 	})
 }
 
+// tailscaleConfigResponse wraps GlobalConfig with LoginServerPinned so the
+// frontend can render the login-server field read-only with an explanatory
+// note the same way TinyauthUsers' `pinned` already does for
+// TINYAUTH_AUTH_USERS - see tailscale.GlobalConfig's own doc comment for the
+// env-always-wins priority this reflects.
+type tailscaleConfigResponse struct {
+	tailscale.GlobalConfig
+	LoginServerPinned bool `json:"loginServerPinned"`
+}
+
 func handleGetTailscaleConfig(w http.ResponseWriter, r *http.Request) {
 	cfg, err := tailscale.GetGlobalConfig(tailscale.ConfigPath)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, cfg)
+	pinned := tailscale.LoginServerPinned()
+	if pinned {
+		// Report the value actually in effect, not whatever (stale/unset)
+		// value happens to be sitting in the file - same idea as
+		// EffectiveLoginServer, inlined here since we already know it's
+		// pinned.
+		cfg.LoginServer = os.Getenv("TAILSCALE_LOGIN_SERVER")
+	}
+	writeJSON(w, http.StatusOK, tailscaleConfigResponse{GlobalConfig: cfg, LoginServerPinned: pinned})
 }
 
 func handlePutTailscaleConfig(w http.ResponseWriter, r *http.Request) {
@@ -82,6 +100,19 @@ func handlePutTailscaleConfig(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
+	}
+	pinned := tailscale.LoginServerPinned()
+	if pinned {
+		// TAILSCALE_LOGIN_SERVER always wins - never let a client-submitted
+		// value (the disabled UI field just echoes the env value back, but
+		// don't rely on that) overwrite what's on disk. socksAddress/
+		// retryInterval remain editable regardless of this pin.
+		existing, err := tailscale.GetGlobalConfig(tailscale.ConfigPath)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		body.LoginServer = existing.LoginServer
 	}
 	if err := tailscale.SetGlobalConfig(tailscale.ConfigPath, body); err != nil {
 		status := http.StatusInternalServerError
@@ -95,7 +126,10 @@ func handlePutTailscaleConfig(w http.ResponseWriter, r *http.Request) {
 		writeSupervisorErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, body)
+	if pinned {
+		body.LoginServer = os.Getenv("TAILSCALE_LOGIN_SERVER")
+	}
+	writeJSON(w, http.StatusOK, tailscaleConfigResponse{GlobalConfig: body, LoginServerPinned: pinned})
 }
 
 func handleListTailscaleForwards(w http.ResponseWriter, r *http.Request) {
@@ -294,6 +328,13 @@ func handleTailscaleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, tailscaleStatusResponse{Available: true, Enabled: true, Status: &status})
 }
 
+// tailscaleLoginStartRequest is POST /api/tailscale/login/start's optional
+// JSON body - an empty/absent body is treated as {"forceReauth": false},
+// preserving the original first-time-login behavior for existing callers.
+type tailscaleLoginStartRequest struct {
+	ForceReauth bool `json:"forceReauth"`
+}
+
 // handleTailscaleLoginStart triggers an on-demand `tailscale up`, for the
 // Tailscale tab's login retry button - the automatic attempt
 // tailscale-service.default.sh makes on first boot only fires once ever (see
@@ -303,25 +344,43 @@ func handleTailscaleStatus(w http.ResponseWriter, r *http.Request) {
 // Deliberately checks current status first and skips starting a second
 // process if a login is already pending (AuthURL set) - the frontend should
 // just keep polling the existing GET /api/tailscale/status instead, which
-// already reports BackendState/AuthURL without any stdout scraping.
-// TAILSCALE_LOGIN_SERVER/TAILSCALE_HOSTNAME are the same env vars
-// docker-compose.yml passes to tailscale-service.default.sh for its own
-// automatic first-boot attempt.
+// already reports BackendState/AuthURL without any stdout scraping. That
+// same check would otherwise reject a re-authentication request outright
+// (BackendState == "Running" looks identical to "already logged in, nothing
+// to do") - ForceReauth skips it and passes --force-reauth through to
+// LoginManager.Start, which is what makes `tailscale up` produce a fresh
+// AuthURL instead of being a no-op against an already-authenticated backend.
+//
+// The login server itself always comes from tailscale.EffectiveLoginServer
+// (TAILSCALE_LOGIN_SERVER env wins, else the Tailscale tab's own 기본 설정)
+// - TAILSCALE_HOSTNAME remains env-only (see GlobalConfig's own doc comment
+// on why only the login server got a UI counterpart).
 func handleTailscaleLoginStart(w http.ResponseWriter, r *http.Request) {
-	if status, err := tailscale.GetStatus(r.Context()); err == nil {
-		if status.BackendState == "Running" {
-			writeError(w, http.StatusConflict, "already logged in")
-			return
-		}
-		if status.AuthURL != "" {
-			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
-			return
+	var req tailscaleLoginStartRequest
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req) // no body / malformed body -> zero value (first-login behavior)
+	}
+
+	if !req.ForceReauth {
+		if status, err := tailscale.GetStatus(r.Context()); err == nil {
+			if status.BackendState == "Running" {
+				writeError(w, http.StatusConflict, "already logged in")
+				return
+			}
+			if status.AuthURL != "" {
+				writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+				return
+			}
 		}
 	}
 
-	loginServer := os.Getenv("TAILSCALE_LOGIN_SERVER")
+	loginServer, err := tailscale.EffectiveLoginServer(tailscale.ConfigPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	hostname := os.Getenv("TAILSCALE_HOSTNAME")
-	if err := tailscaleLogin.Start(loginServer, hostname); err != nil {
+	if err := tailscaleLogin.Start(loginServer, hostname, req.ForceReauth); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

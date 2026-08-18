@@ -55,7 +55,10 @@ ROUTER_ENV_VERSION=5
 #TAILSCALE_ENABLED="true"
 
 #. 자체 호스팅 컨트롤 서버(예: Headscale)용 `tailscale up --login-server=`.
-#. 비워두면 공식 tailscale.com 컨트롤 서버를 씁니다.
+#. 비워두면 공식 tailscale.com 컨트롤 서버를 씁니다. Tailscale 탭의 "기본 설정"에서도
+#. 같은 값을 지정할 수 있지만, 여기 이 환경변수가 설정되어 있으면 항상 이 값이
+#. 이겨서 UI 쪽 값은 무시됩니다(UI에는 읽기 전용으로 표시됨) - 인프라 설정으로
+#. 고정하고 싶을 때만 이 변수를 쓰고, 아니면 UI에서 관리하세요.
 #TAILSCALE_LOGIN_SERVER= # 예: https://tail.qwreey.moe
 
 #. `tailscale up --hostname=`으로 등록되는 태일넷 호스트네임(MagicDNS에 이

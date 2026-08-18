@@ -17,6 +17,7 @@ package tailscale
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -82,6 +83,25 @@ func validateSocksAddress(addr string) error {
 	return nil
 }
 
+// validateLoginServer allows empty (meaning "use tailscale.com's own SaaS
+// control server" - the same behavior as today's unset TAILSCALE_LOGIN_SERVER
+// env var, see GlobalConfig's own doc comment) or a plain absolute http(s)
+// URL, matching what `tailscale up --login-server=` itself expects. This is
+// only a format sanity check, not an SSRF allowlist - login.go's LoginManager
+// hands the value straight to the `tailscale` CLI as a flag value (never
+// shell-interpolated), and the mutating PUT route below is already gated by
+// router-manager's own authgate the same way forwards/publish already are.
+func validateLoginServer(server string) error {
+	if server == "" {
+		return nil
+	}
+	u, err := url.Parse(server)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("%w: loginServer must be a valid http(s) URL", ErrValidation)
+	}
+	return nil
+}
+
 // validatePort rejects anything outside the valid TCP port range - a
 // negative or >65535 value is currently only checked as "!= 0" by callers,
 // so it's persisted and only fails opaquely from socat/tailscale serve
@@ -116,10 +136,20 @@ type Publish struct {
 	Mode          string `yaml:"mode" json:"mode"`
 }
 
-// GlobalConfig is the top-level, non-list part of the file.
+// GlobalConfig is the top-level, non-list part of the file. LoginServer is
+// the UI-set fallback control-plane server for `tailscale up
+// --login-server=` (self-hosted Headscale etc.) - empty means "use
+// tailscale.com's own SaaS", exactly like today's unset-env behavior. The
+// real TAILSCALE_LOGIN_SERVER env var, when set, always wins over this field
+// (an infra-as-code pin, same priority ROUTER_MANAGER_AUTH_PASSWORD_HASH/
+// TINYAUTH_AUTH_USERS already use) - see EffectiveLoginServer, which is what
+// every actual login attempt (tailscale-service.default.sh's own first-boot
+// attempt and handleTailscaleLoginStart's on-demand retry) should resolve
+// against instead of reading either source directly.
 type GlobalConfig struct {
 	SocksAddress  string `json:"socksAddress"`
 	RetryInterval int    `json:"retryInterval"`
+	LoginServer   string `json:"loginServer"`
 }
 
 // fileConfig mirrors the full YAML document. Round-tripping through this
@@ -128,6 +158,7 @@ type GlobalConfig struct {
 type fileConfig struct {
 	SocksAddress  string    `yaml:"socks5_address"`
 	RetryInterval int       `yaml:"retry_intervall"`
+	LoginServer   string    `yaml:"login_server,omitempty"`
 	Forwards      []Forward `yaml:"forwards"`
 	Publish       []Publish `yaml:"publish"`
 }
@@ -174,11 +205,14 @@ func GetGlobalConfig(path string) (GlobalConfig, error) {
 	if err != nil {
 		return GlobalConfig{}, err
 	}
-	return GlobalConfig{SocksAddress: cfg.SocksAddress, RetryInterval: cfg.RetryInterval}, nil
+	return GlobalConfig{SocksAddress: cfg.SocksAddress, RetryInterval: cfg.RetryInterval, LoginServer: cfg.LoginServer}, nil
 }
 
 func SetGlobalConfig(path string, g GlobalConfig) error {
 	if err := validateSocksAddress(g.SocksAddress); err != nil {
+		return err
+	}
+	if err := validateLoginServer(g.LoginServer); err != nil {
 		return err
 	}
 	mu.Lock()
@@ -189,7 +223,33 @@ func SetGlobalConfig(path string, g GlobalConfig) error {
 	}
 	cfg.SocksAddress = g.SocksAddress
 	cfg.RetryInterval = g.RetryInterval
+	cfg.LoginServer = g.LoginServer
 	return save(path, cfg)
+}
+
+// LoginServerPinned reports whether the real TAILSCALE_LOGIN_SERVER env var
+// is set - when it is, it always wins over GlobalConfig.LoginServer (see
+// that field's own doc comment), and callers should treat the UI-set value
+// as read-only/inert.
+func LoginServerPinned() bool {
+	return os.Getenv("TAILSCALE_LOGIN_SERVER") != ""
+}
+
+// EffectiveLoginServer resolves the login server an actual `tailscale up`
+// attempt should use: the TAILSCALE_LOGIN_SERVER env var always wins when
+// set, else the value persisted via the Tailscale tab's 기본 설정 (empty
+// means "use tailscale.com's own SaaS control server", identical to today's
+// unset-env behavior - never defaulted to anything else just because the
+// config file exists).
+func EffectiveLoginServer(path string) (string, error) {
+	if v := os.Getenv("TAILSCALE_LOGIN_SERVER"); v != "" {
+		return v, nil
+	}
+	cfg, err := GetGlobalConfig(path)
+	if err != nil {
+		return "", err
+	}
+	return cfg.LoginServer, nil
 }
 
 func ListForwards(path string) ([]Forward, error) {

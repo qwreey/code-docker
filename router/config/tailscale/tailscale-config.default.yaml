@@ -6,6 +6,15 @@
 socks5_address: localhost:1055   # tailscaled's SOCKS5 listen address, usually leave as-is
 retry_intervall: 5               # default retry interval (seconds) for forwards, overridable per-entry
 
+# Self-hosted control server (e.g. Headscale) for `tailscale up --login-server=`,
+# settable from the Tailscale tab's own "기본 설정" too - GET/PUT /api/tailscale/config.
+# Leave unset (or empty) to use tailscale.com's own SaaS control server - this is the
+# default and must stay that way unless a user explicitly picks a custom one, so this
+# stays commented out here rather than seeded with a real value.
+# The TAILSCALE_LOGIN_SERVER env var, when set, always wins over this field regardless
+# of what's written here - see root CLAUDE.md's "tailscale" section.
+#login_server: https://tail.example.com
+
 # Pull a remote tailnet peer's port into code-docker (socat + SOCKS5, run
 # from router now). Reach these from inside code-docker via the "forward"
 # hostname, e.g.

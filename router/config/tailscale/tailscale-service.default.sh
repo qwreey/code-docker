@@ -17,6 +17,16 @@ fi
 # "tailscale 전체 이관").
 mkdir -p /var/lib/code-docker-router/tailscale/state
 
+# Same path tailscale-forward.default.sh/tailscale-publish.default.sh own -
+# read only, deliberately NOT seeded here too: this program can start before
+# either of those (supervisord gives no start-order guarantee), and racing
+# two/three `cp` calls against the same non-atomic destination is exactly the
+# "read mid-write" hazard tailscale-forward.default.sh's own cleanup()
+# comment already warns about. If the file doesn't exist yet, login_server
+# just resolves to "" below (identical to the pre-UI-field default) - it'll
+# exist by the time a later restart or an on-demand login-start needs it.
+CONFIG=/var/lib/code-docker-router/tailscale/config.yaml
+
 /usr/bin/tailscaled \
     --tun=userspace-networking \
     --socks5-server=localhost:1055 \
@@ -82,8 +92,20 @@ if [ "$backend_state" != "Running" ]; then
     else
         touch "$LOGIN_ATTEMPTED_MARKER"
         tailscale_up_args=()
-        if [ -n "${TAILSCALE_LOGIN_SERVER:-}" ]; then
-            tailscale_up_args+=(--login-server="$TAILSCALE_LOGIN_SERVER")
+        # TAILSCALE_LOGIN_SERVER always wins when set (infra-as-code pin -
+        # same priority router-manager's own EffectiveLoginServer uses for
+        # the on-demand login-start API); otherwise fall back to whatever
+        # the Tailscale tab's 기본 설정 has persisted to config.yaml. -r: see
+        # tailscale-publish.default.sh's comment on why (Arch's yq is
+        # kislyuk/yq, a jq wrapper - string results come back JSON-quoted
+        # without it). An empty result either way means "use tailscale.com's
+        # own SaaS", identical to today's behavior.
+        login_server="${TAILSCALE_LOGIN_SERVER:-}"
+        if [ -z "$login_server" ] && [ -e "$CONFIG" ]; then
+            login_server=$(yq -r '.login_server // ""' "$CONFIG" 2>/dev/null || true)
+        fi
+        if [ -n "$login_server" ]; then
+            tailscale_up_args+=(--login-server="$login_server")
         fi
         if [ -n "${TAILSCALE_HOSTNAME:-}" ]; then
             tailscale_up_args+=(--hostname="$TAILSCALE_HOSTNAME")
