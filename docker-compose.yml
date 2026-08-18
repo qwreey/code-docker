@@ -16,9 +16,8 @@
 # create your own `extra-include.yml` (left out of version control - see .gitignore)
 # containing `include:\n  - path: builds/<your-project>/<its-own-integration-file>.yml`,
 # then set `EXTRA_INCLUDE=extra-include.yml` in `.env`. See
-# .claude/backlog/roblox-studio-vnc-isolation-plan.md for the concrete
-# roblox-studio-docker case this was built for (network-attach today; VNC-only-network
-# isolation via router is the follow-up work tracked in that doc, not done yet).
+# .claude/archive/roblox-studio-vnc-isolation-plan-done.md for the concrete
+# roblox-studio-docker case this was built for and verified against (2026-08-18).
 include:
   - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}
 
@@ -355,7 +354,7 @@ services:
       # Space-separated list of any OTHER internal: true networks router also needs a
       # DOCKER-USER exemption for (e.g. a sibling project's EXTRA_INCLUDE overlay
       # attaching router to a dedicated network - see example-env's own comment on this
-      # var and .claude/backlog/roblox-studio-vnc-isolation-plan.md). Left as a separate
+      # var and .claude/archive/roblox-studio-vnc-isolation-plan-done.md). Left as a separate
       # env var from CODE_DOCKER_INTERNAL_NETWORK above on purpose - see netfilter-fix/fix.sh's
       # own comment on why.
       CODE_DOCKER_EXTRA_INTERNAL_NETWORKS: "${CODE_DOCKER_EXTRA_INTERNAL_NETWORKS:-}"

@@ -31,7 +31,7 @@
 # (always present, defaults to code-docker-internal) is the one this project itself depends
 # on, and CODE_DOCKER_EXTRA_INTERNAL_NETWORKS is for anything a sibling project's
 # EXTRA_INCLUDE overlay (see docker-compose.yml's `include:` comment and
-# .claude/backlog/roblox-studio-vnc-isolation-plan.md) attaches router to - e.g. a
+# .claude/archive/roblox-studio-vnc-isolation-plan-done.md) attaches router to - e.g. a
 # VNC-only `internal: true` network. Kept as two separate env vars deliberately: a sibling
 # overlay setting CODE_DOCKER_EXTRA_INTERNAL_NETWORKS can never accidentally clobber this
 # project's own default exemption, since Compose environment merging replaces a key's value

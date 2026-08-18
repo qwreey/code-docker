@@ -119,7 +119,8 @@ Dev Proxy/Tailscale과 같은 방식(iframe embed)으로, router-manager 자신�
 
 프로그램별 구조화 로그를 앱/레벨/시간 범위(존재하는 로그 기준으로 자동
 clamp됨)로 필터링해서 조회, 커서 기반 페이지네이션, 실시간 새로고침(신규 항목 누적)
-(아래 [구조화 로그(vector)](#구조화-로그-vector) 참고) — 로그에 시크릿이 노출될 수 있어 이 탭 전체가 비밀번호
+(아래 [구조화 로그(vector)](#구조화-로그-vector) 참고), 앱별 로그 전체 삭제(확인
+다이얼로그 필수) — 로그에 시크릿이 노출될 수 있어 이 탭 전체가 비밀번호
 게이트 대상입니다([비밀번호 게이트](webmanager-config.md#비밀번호-게이트) 참고)
 
 ### Task Manager
@@ -146,7 +147,8 @@ clamp됨)로 필터링해서 조회, 커서 기반 페이지네이션, 실시간
 오늘·이번 주/최장 세션, 월간 히트맵, 주간 그래프, 모델별 토큰 사용량), 설치된
 Skills/Plugins 목록, 이 인스턴스에서 진행된 대화 세션 로그 뷰어(`CLAUDE_CONFIG_DIR/projects/*/*.jsonl`의
 목록/축약 채팅뷰 — 이 서브탭만 Terminal/Files/Logs와 동급으로 비밀번호 게이트
-대상)
+대상), 관리 서브탭에서 `settings.json` 원본 편집과 로그아웃 버튼(`claude auth
+logout`) 제공
 
 ### Code Extensions
 
@@ -170,7 +172,10 @@ stashed/conflicts 요약, 커밋 로그/diff/리모트/브랜치/태그 조회 �
 게이트 + 확인 다이얼로그), 그 프로젝트를 건드린 Claude Code 대화 세션 기록(Claude
 Code 탭의 세션 로그 뷰어를 그대로 재사용 — 마찬가지로 비밀번호 게이트 대상), Claude
 Code 자동 메모리 뷰어(`CLAUDE_CONFIG_DIR/projects/<slug>/memory/` — 정제된 노트라
-게이트 없음, 기본 접힘)가 함께 표시됩니다
+게이트 없음, 기본 접힘), 그 프로젝트 아래 현재 열려 있는 Terminal 세션 목록(거기서
+바로 해당 세션으로 이동 가능)이 함께 표시됩니다. "git clone으로 새 프로젝트"
+다이얼로그로 URL을 붙여넣어 백그라운드에서 clone하고 완료되면 자동으로 목록에
+반영되는 것도 가능합니다(비밀번호 게이트)
 
 ### mise
 
@@ -182,6 +187,17 @@ Code 자동 메모리 뷰어(`CLAUDE_CONFIG_DIR/projects/<slug>/memory/` — 정
 직후 이 탭(과 Code Extensions/Claude Code 탭)에 뜨는 "지금 재시작" 배너로 바로
 할 수 있고, 탭을 이동했다 돌아와도 재시작 필요 여부가 계속 표시됩니다
 
+### Fonts
+
+ttf/otf/woff/woff2 폰트를 직접 업로드하거나 추천 목록(Victor Mono, BlexMono Nerd
+Font Mono, kuskhan/jetendard 등)에서 Extensions/mise 탭과 동일한 클릭 설치 방식으로
+설치 — family별 아코디언 목록에서 조회/삭제. jetendard만 컨테이너 첫 부팅 시
+기본으로 자동 설치되고(`SEED_DEFAULT_FONTS`로 끌 수 있음), 그 외 추천 폰트는 전부
+직접 클릭해서 설치해야 합니다. 설치한 폰트는 webmanager 자신과 code-server 양쪽에
+`@font-face`로 로드되지만 code-server 쪽엔 강제 적용이 없어 `editor.fontFamily`/
+`terminal.integrated.fontFamily`에 이름을 직접 입력해야 하고(안내문+복사 버튼
+제공), webmanager 자신의 Terminal 탭 폰트만 이 탭에서 선택하면 바로 적용됩니다
+
 ### Terminal
 
 브라우저에서 바로 여는 쉘(xterm.js + WebSocket) — code-server 자체가
@@ -189,9 +205,11 @@ Code 자동 메모리 뷰어(`CLAUDE_CONFIG_DIR/projects/<slug>/memory/` — 정
 용도. 이름 붙은 영속 세션을 여러 개 열어두고 탭으로 전환할 수 있고(이름 변경도
 가능), 유휴 상태로 일정 시간 방치되면 자동 정리됩니다(고정한 세션은 예외). 항상 열려
 있는 홈 탭에서 시작 위치/실행 명령을 저장하는 프로파일을 만들어두고 거기서 새
-세션을 바로 시작할 수 있습니다(카드형 목록, 드래그앤드롭 순서 변경). 모바일에서도
-쓸 수 있게 Esc/Ctrl/Alt/Shift/Tab/방향키 온스크린 버튼(커스터마이징 가능)과 색상
-테마(프리셋 10개 + 사용자 정의) 지원
+세션을 바로 시작할 수 있습니다(카드형 목록, 드래그앤드롭 순서 변경). 각 세션의
+실시간 cwd가 홈 화면/탭 툴팁에 표시되고, 거기서 바로 해당 프로젝트로 점프할 수
+있습니다(Projects 탭 상세 시트에도 반대로 그 프로젝트 아래 열린 세션 목록이 뜸).
+모바일에서도 쓸 수 있게 Esc/Ctrl/Alt/Shift/Tab/방향키 온스크린 버튼(커스터마이징
+가능)과 색상 테마(프리셋 10개 + 사용자 정의), 폰트 선택(Fonts 탭) 지원
 
 ### Files
 

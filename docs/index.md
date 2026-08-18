@@ -23,7 +23,7 @@ touch empty-extra-include.yml # docker-compose.yml의 include: 대상 - 없으�
 > 위치)에서 한 번 `touch empty-extra-include.yml`만 실행하면 됩니다 - 그 외엔 아무
 > 것도 안 바뀝니다. 이 파일/`EXTRA_INCLUDE`가 실제로 뭘 위한 것인지는
 > `example-env`의 `EXTRA_INCLUDE` 항목과
-> `.claude/backlog/roblox-studio-vnc-isolation-plan.md` 참고.
+> `.claude/archive/roblox-studio-vnc-isolation-plan-done.md` 참고.
 
 이제 `docker compose build` 를 수행하고 잘 빌드가 되는지 확인합니다.
 만약 빌드에 성공했다면 `docker compose up -d` 를 수행하세요.
