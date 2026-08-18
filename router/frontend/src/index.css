@@ -176,6 +176,12 @@
   box-sizing: border-box;
 }
 
+/* Android Chrome shows a default blue/gray highlight rectangle on tap for
+   any interactive element - disable it app-wide rather than per-component. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   margin: 0;
 }
