@@ -62,3 +62,28 @@ mise:
         label: direnv
       - id: lazygit
         label: lazygit
+
+fonts:
+  - category: 모노스페이스 폰트
+    fonts:
+      - id: jetendard
+        label: Jetendard
+        description: 컨테이너 첫 부팅 시 기본으로 설치되는 폰트 — 삭제 후 다시 받고 싶을 때 여기서 재설치할 수 있습니다.
+        weight: 400
+        style: normal
+        zipURL: https://github.com/kuskhan/jetendard/releases/latest/download/Jetendard-TTF.zip
+        zipEntrySuffix: ttf/Jetendard-Regular.ttf
+      - id: victor-mono
+        label: Victor Mono
+        description: 이탤릭체에 커시브 스타일을 적용한 모노스페이스 폰트.
+        weight: 400
+        style: normal
+        directURL: https://raw.githubusercontent.com/rubjo/victor-mono/master/dist/woff2/VictorMono-Regular.woff2
+        directExt: woff2
+      - id: blexmono-nerd-font-mono
+        label: BlexMono Nerd Font Mono
+        description: IBM Plex Mono 기반, 터미널 아이콘 글리프가 포함된 Nerd Font(고정폭) 변형.
+        weight: 400
+        style: normal
+        zipURL: https://github.com/ryanoasis/nerd-fonts/releases/latest/download/IBMPlexMono.zip
+        zipEntrySuffix: NerdFontMono-Regular.ttf

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, apiUrl, errorMessage } from '../../api/client'
-import type { FontEntry, FontManifest } from '../../api/types'
+import type { FontEntry, FontManifest, FontRecommendationCategory, RecommendationsResponse, RecommendedFont } from '../../api/types'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { CopyButton } from '../common/CopyButton'
 import { ErrorBanner } from '../common/ErrorBanner'
@@ -9,6 +9,26 @@ import '../common/common.css'
 import '../Extensions/Extensions.css'
 import './Fonts.css'
 import { withViewTransition } from '../../utils/viewTransition'
+
+const SHOW_RECOMMENDATIONS_KEY = 'webmanager.fonts.showRecommendations'
+
+function loadShowRecommendations(): boolean {
+  try {
+    const stored = localStorage.getItem(SHOW_RECOMMENDATIONS_KEY)
+    if (stored === null) return true
+    return stored === 'true'
+  } catch {
+    return true
+  }
+}
+
+function saveShowRecommendations(value: boolean) {
+  try {
+    localStorage.setItem(SHOW_RECOMMENDATIONS_KEY, value ? 'true' : 'false')
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - preference just won't persist
+  }
+}
 
 const WEIGHT_NAMES: Record<number, string> = {
   100: 'Thin',
@@ -69,6 +89,11 @@ export function Fonts() {
   const [deleteTarget, setDeleteTarget] = useState<FontEntry | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  const [recommended, setRecommended] = useState<FontRecommendationCategory[]>([])
+  const [installingIds, setInstallingIds] = useState<Set<string>>(new Set())
+  const [recommendCategoryOpen, setRecommendCategoryOpen] = useState<Record<string, boolean>>({})
+  const [showRecommendations, setShowRecommendations] = useState(loadShowRecommendations)
+
   const loadingRef = useRef(false)
 
   const load = useCallback(async () => {
@@ -76,8 +101,12 @@ export function Fonts() {
     loadingRef.current = true
     setLoading(true)
     try {
-      const manifest = await api.get<FontManifest>('/fonts')
+      const [manifest, recommendations] = await Promise.all([
+        api.get<FontManifest>('/fonts'),
+        api.get<RecommendationsResponse>('/recommendations'),
+      ])
       setFonts(manifest.fonts)
+      setRecommended(recommendations.fonts ?? [])
       setError(null)
     } catch (e) {
       setError(errorMessage(e))
@@ -172,15 +201,57 @@ export function Fonts() {
     }
   }
 
+  async function handleInstallRecommended(id: string) {
+    if (installingIds.has(id)) return
+    setInstallingIds((prev) => new Set(prev).add(id))
+    try {
+      const font = await api.post<FontEntry>('/fonts/install', { id })
+      setFonts((prev) => [...prev, font])
+      setError(null)
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setInstallingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+  }
+
+  function toggleRecommendCategory(category: string) {
+    setRecommendCategoryOpen((prev) => ({ ...prev, [category]: !(prev[category] ?? true) }))
+  }
+
+  function isRecommendCategoryOpen(category: string): boolean {
+    return recommendCategoryOpen[category] ?? true
+  }
+
+  function handleShowRecommendationsChange(checked: boolean) {
+    setShowRecommendations(checked)
+    saveShowRecommendations(checked)
+  }
+
   const groups = groupByFamily(fonts)
+  const installedFamilies = new Set(fonts.map((f) => f.family))
 
   return (
     <section>
       <div className="section-header">
         <h1>폰트</h1>
-        <button type="button" className="btn btn-secondary btn-small" onClick={load} disabled={loading}>
-          {loading ? '불러오는 중...' : '새로고침'}
-        </button>
+        <div className="extensions-header-controls">
+          <label className="extensions-recommend-toggle">
+            <input
+              type="checkbox"
+              checked={showRecommendations}
+              onChange={(e) => handleShowRecommendationsChange(e.target.checked)}
+            />
+            추천 표시
+          </label>
+          <button type="button" className="btn btn-secondary btn-small" onClick={load} disabled={loading}>
+            {loading ? '불러오는 중...' : '새로고침'}
+          </button>
+        </div>
       </div>
       <p className="section-description">
         업로드한 폰트는 webmanager 웹터미널(터미널 설정에서 선택)과 code-server 양쪽에서 사용할 수 있습니다.
@@ -311,6 +382,57 @@ export function Fonts() {
           })}
         </>
       )}
+
+      {showRecommendations &&
+        (loading && recommended.length === 0 ? null : recommended.length === 0 ? null : (
+          <>
+            <h2 className="fonts-recommend-heading">추천 폰트</h2>
+            {recommended.map((group) => {
+              const isOpen = isRecommendCategoryOpen(group.category)
+              return (
+                <div className="extensions-group" key={group.category || '기타'}>
+                  <button
+                    type="button"
+                    className="extensions-group-toggle"
+                    onClick={() => toggleRecommendCategory(group.category)}
+                    aria-expanded={isOpen}
+                  >
+                    <span className={`extensions-chevron ${isOpen ? 'extensions-chevron-open' : ''}`}>▶</span>
+                    <h3 className="extensions-group-title">{group.category || '기타'}</h3>
+                  </button>
+                  {isOpen && (
+                    <ul className="extensions-list">
+                      {group.fonts.map((rf: RecommendedFont) => {
+                        const isInstalled = installedFamilies.has(rf.label)
+                        const isInstalling = installingIds.has(rf.id)
+                        return (
+                          <li className="extensions-row" key={rf.id}>
+                            <div className="extensions-row-info">
+                              <div className="extensions-row-label">{rf.label}</div>
+                              <div className="extensions-row-description">{rf.description}</div>
+                            </div>
+                            {isInstalled ? (
+                              <span className="badge badge-green">설치됨</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-small"
+                                onClick={() => handleInstallRecommended(rf.id)}
+                                disabled={isInstalling}
+                              >
+                                {isInstalling ? '설치 중...' : '설치'}
+                              </button>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
+          </>
+        ))}
 
       {!uploadOpen && (
         <button type="button" className="btn btn-secondary btn-small" onClick={() => setUploadOpen(true)}>

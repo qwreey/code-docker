@@ -452,9 +452,23 @@ export interface RecommendedExtension {
   category: string
 }
 
+export interface RecommendedFont {
+  id: string
+  label: string
+  description: string
+  weight: number
+  style: string
+}
+
+export interface FontRecommendationCategory {
+  category: string
+  fonts: RecommendedFont[]
+}
+
 export interface RecommendationsResponse {
   extensions: RecommendedExtension[]
   mise?: MiseRecommendationCategory[]
+  fonts?: FontRecommendationCategory[]
 }
 
 export interface ResourceHistoryPoint {

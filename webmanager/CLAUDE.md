@@ -98,10 +98,24 @@ and a loaded `@font-face` name just matches once typed there — the Fonts tab
 only shows family names with a copy button and a short how-to. webmanager's
 own web terminal has no settings.json equivalent, so the selected family
 rides in `internal/terminalsettings.Settings.FontFamily` and is applied
-directly to the xterm.js instance. Victor Mono + IBM Plex Mono Nerd (the
-Mono/fixed-width variant specifically) are downloaded once at first boot,
+directly to the xterm.js instance. Every downloadable default font — not
+just Victor Mono/BlexMono Nerd Font Mono, but kuskhan/jetendard too — is one
+entry in `recommendations.default.yaml`'s `fonts:` key, browsable/installable
+from the Fonts tab's "추천 폰트" section the same click-to-install way
+Extensions/mise already work (`POST /api/fonts/install {id}`, synchronous
+rather than a background job since a single font/zip download is well
+within its 60s timeout; "installed" state is derived by matching a
+recommendation's label against already-loaded font families, there's no
+separate id-to-font linkage). Jetendard alone is additionally downloaded
+once at first boot (`main.defaultFontSeedIDs`, currently just `["jetendard"]`
+— a list of recommendation ids, not a duplicated copy of the source URL;
 `SEED_DEFAULT_FONTS` opts out, failure warns and skips rather than blocking
-boot — see `.claude/archive/font-manager-plan-done.md`, root `.claude/backlog/`'s
+boot) via `main.installRecommendedFont`, the exact same download/save
+codepath the click-to-install handler uses — after that first boot, a
+seeded font is a completely ordinary manifest entry with no special
+handling: deleting it or reinstalling it later via the recommendation list
+is left entirely up to the user. See
+`.claude/archive/font-manager-plan-done.md`, root `.claude/backlog/`'s
 original idea doc), a Claude Code install button (reuses the mise install
 job plumbing — `POST /api/claude/install` resolves the latest version via
 `mise latest claude-code` and installs through the same `mise.JobStore` the

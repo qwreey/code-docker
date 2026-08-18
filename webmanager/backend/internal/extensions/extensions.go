@@ -42,17 +42,45 @@ type MiseCategory struct {
 	Tools    []MiseTool `yaml:"tools" json:"tools"`
 }
 
+// RecommendedFont is one entry under a fonts category's `fonts:` list.
+// Either DirectURL (a font file as-is) or ZipURL+ZipEntrySuffix (a release
+// zip, of which only the entry ending in ZipEntrySuffix is extracted) is
+// set, never both. main.installRecommendedFont downloads through this
+// shape directly — boot-time seeding (main.defaultFontSeedIDs) and a
+// user-triggered click (POST /api/fonts/install) both just reference an
+// entry here by ID rather than duplicating its source.
+type RecommendedFont struct {
+	ID          string `yaml:"id" json:"id"`
+	Label       string `yaml:"label" json:"label"`
+	Description string `yaml:"description" json:"description"`
+	Weight      int    `yaml:"weight" json:"weight"`
+	Style       string `yaml:"style" json:"style"`
+
+	DirectURL      string `yaml:"directURL" json:"-"`
+	DirectExt      string `yaml:"directExt" json:"-"`
+	ZipURL         string `yaml:"zipURL" json:"-"`
+	ZipEntrySuffix string `yaml:"zipEntrySuffix" json:"-"`
+}
+
+// FontCategory is one entry under the recommendations file's `fonts:` key.
+type FontCategory struct {
+	Category string            `yaml:"category" json:"category"`
+	Fonts    []RecommendedFont `yaml:"fonts" json:"fonts"`
+}
+
 // recommendationsFile mirrors the full YAML document. Unknown top-level keys
 // are ignored by yaml.Unmarshal, not errors.
 type recommendationsFile struct {
 	Extensions []Recommended  `yaml:"extensions"`
 	Mise       []MiseCategory `yaml:"mise"`
+	Fonts      []FontCategory `yaml:"fonts"`
 }
 
-// Recommendations is the parsed recommendations file, both top-level keys.
+// Recommendations is the parsed recommendations file, every top-level key.
 type Recommendations struct {
 	Extensions []Recommended
 	Mise       []MiseCategory
+	Fonts      []FontCategory
 }
 
 // LoadRecommendations reads overridePath if it exists, else defaultPath. If
@@ -67,7 +95,7 @@ func LoadRecommendations(defaultPath, overridePath string) (Recommendations, err
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return Recommendations{Extensions: []Recommended{}, Mise: []MiseCategory{}}, nil
+			return Recommendations{Extensions: []Recommended{}, Mise: []MiseCategory{}, Fonts: []FontCategory{}}, nil
 		}
 		return Recommendations{}, err
 	}
@@ -82,7 +110,10 @@ func LoadRecommendations(defaultPath, overridePath string) (Recommendations, err
 	if f.Mise == nil {
 		f.Mise = []MiseCategory{}
 	}
-	return Recommendations{Extensions: f.Extensions, Mise: f.Mise}, nil
+	if f.Fonts == nil {
+		f.Fonts = []FontCategory{}
+	}
+	return Recommendations{Extensions: f.Extensions, Mise: f.Mise, Fonts: f.Fonts}, nil
 }
 
 const installTimeout = 60 * time.Second

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"webmanager/internal/extensions"
 	"webmanager/internal/fonts"
 )
 
@@ -223,4 +224,47 @@ func (s *Server) handleDeleteFont(w http.ResponseWriter, r *http.Request) {
 	_ = fonts.DeleteFile(s.cfg.FontsDir, target)
 
 	writeJSON(w, http.StatusOK, m)
+}
+
+// handleInstallRecommendedFont downloads one font from the recommendations
+// file's `fonts:` list (see recommendations.default.yaml) and adds it to the
+// manifest — the click-to-install counterpart of handleInstallCodeExtension/
+// handleCreateMiseTool, but synchronous rather than a background job: a
+// single font/zip download is bounded by fontDownloadTimeout (60s), the same
+// budget boot-time seeding already uses without issue. id must match an
+// entry already present in the recommendations file — there is no arbitrary
+// URL input here, so no separate URL validation is needed beyond that
+// lookup. Shares its actual download/save logic with seedDefaultFonts via
+// installRecommendedFont (seeddefaults.go) — a font seeded at boot is
+// otherwise indistinguishable from one a user later installs by clicking
+// the same recommendation.
+func (s *Server) handleInstallRecommendedFont(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	recs, err := extensions.LoadRecommendations(s.cfg.RecommendationsDefaultPath, s.cfg.RecommendationsOverridePath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	rec := findRecommendedFont(recs, body.ID)
+	if rec == nil {
+		writeError(w, http.StatusNotFound, "unknown recommended font id")
+		return
+	}
+
+	client := &http.Client{Timeout: fontDownloadTimeout}
+	f, err := installRecommendedFont(r.Context(), client, s.cfg.FontsDir, *rec)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, f)
 }

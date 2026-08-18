@@ -48,3 +48,9 @@
   padding: 1rem 1.1rem;
   margin-top: 1rem;
 }
+
+.fonts-recommend-heading {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 1rem;
+  color: var(--text-heading);
+}

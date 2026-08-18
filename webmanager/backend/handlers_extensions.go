@@ -25,9 +25,26 @@ type MiseRecommendationCategory struct {
 	Tools    []MiseRecommendedTool `json:"tools"`
 }
 
+// FontRecommendation is one entry in a font category's list — source fields
+// (directURL/zipURL/...) deliberately aren't part of the wire shape, only
+// what the frontend needs to display + POST /api/fonts/install {id} against.
+type FontRecommendation struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	Weight      int    `json:"weight"`
+	Style       string `json:"style"`
+}
+
+type FontRecommendationCategory struct {
+	Category string               `json:"category"`
+	Fonts    []FontRecommendation `json:"fonts"`
+}
+
 type RecommendationsResponse struct {
 	Extensions []RecommendedExtension       `json:"extensions"`
 	Mise       []MiseRecommendationCategory `json:"mise,omitempty"`
+	Fonts      []FontRecommendationCategory `json:"fonts,omitempty"`
 }
 
 type CodeExtensionsResponse struct {
@@ -44,6 +61,7 @@ func (s *Server) handleGetRecommendations(w http.ResponseWriter, r *http.Request
 	resp := RecommendationsResponse{
 		Extensions: make([]RecommendedExtension, 0, len(recs.Extensions)),
 		Mise:       make([]MiseRecommendationCategory, 0, len(recs.Mise)),
+		Fonts:      make([]FontRecommendationCategory, 0, len(recs.Fonts)),
 	}
 	for _, e := range recs.Extensions {
 		resp.Extensions = append(resp.Extensions, RecommendedExtension{
@@ -59,6 +77,13 @@ func (s *Server) handleGetRecommendations(w http.ResponseWriter, r *http.Request
 			tools = append(tools, MiseRecommendedTool{ID: t.ID, Label: t.Label, Description: t.Description})
 		}
 		resp.Mise = append(resp.Mise, MiseRecommendationCategory{Category: c.Category, Tools: tools})
+	}
+	for _, c := range recs.Fonts {
+		items := make([]FontRecommendation, 0, len(c.Fonts))
+		for _, f := range c.Fonts {
+			items = append(items, FontRecommendation{ID: f.ID, Label: f.Label, Description: f.Description, Weight: f.Weight, Style: f.Style})
+		}
+		resp.Fonts = append(resp.Fonts, FontRecommendationCategory{Category: c.Category, Fonts: items})
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

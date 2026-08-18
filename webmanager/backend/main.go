@@ -383,6 +383,7 @@ func main() {
 	mux.HandleFunc("GET /api/fonts/css", s.handleFontsCSS)
 	mux.HandleFunc("GET /api/fonts/files/{id}", s.handleFontFile)
 	mux.Handle("POST /api/fonts", gate.RequirePassword(http.HandlerFunc(s.handleUploadFont)))
+	mux.Handle("POST /api/fonts/install", gate.RequirePassword(http.HandlerFunc(s.handleInstallRecommendedFont)))
 	mux.Handle("PATCH /api/fonts/{id}", gate.RequirePassword(http.HandlerFunc(s.handlePatchFont)))
 	mux.Handle("DELETE /api/fonts/{id}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteFont)))
 
