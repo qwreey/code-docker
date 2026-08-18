@@ -191,6 +191,21 @@
   gap: 0.6rem;
 }
 
+.terminal-status-badge {
+  gap: 0.35rem;
+}
+
+/* Shown only below the icon-only breakpoint (see the 720px media query) as
+   a stand-in for the badge's own text once that's hidden - a bare colored
+   pill with no label reads as broken, this keeps a status indicator. */
+.terminal-status-dot {
+  display: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
 /* Terminal + control bar merged into one seamless surface (Termux-style —
    no border/gap between the two so the controls read as part of the
    terminal itself, not a separate toolbar floating above it) — fills all
@@ -336,6 +351,30 @@
        .app-content's old 2.5rem padding + this remainder) before the
        padding-cancelling negative margin above made that part obsolete. */
     height: calc(100dvh - 3.6rem - var(--kb-inset, 0px));
+  }
+
+  /* Icon-only topbar actions - at this width the connection badge + up to
+     three labeled buttons wrapped/crowded the single-row topbar. Every
+     .btn here already carries an icon and a title attribute, so the label
+     text is redundant once space is tight. */
+  .terminal-header-actions .btn-label {
+    display: none;
+  }
+
+  .terminal-header-actions .btn {
+    padding: 0.3rem;
+  }
+
+  .terminal-status-badge .btn-label {
+    display: none;
+  }
+
+  .terminal-status-badge {
+    padding: 0.35em;
+  }
+
+  .terminal-status-dot {
+    display: inline-block;
   }
 }
 

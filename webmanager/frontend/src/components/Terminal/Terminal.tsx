@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { FolderKanban, FolderOpen } from 'lucide-react'
+import { FolderKanban, FolderOpen, Settings } from 'lucide-react'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
@@ -34,6 +34,10 @@ import './Terminal.css'
 type SessionCreateOptions = { label?: string; cwd?: string; command?: string }
 
 type ConnectionState = 'connecting' | 'connected' | 'disconnected'
+
+// Short enough that cwd (and thus "프로젝트로 이동") catches up to a `cd`
+// within a beat, long enough to stay a cheap background poll.
+const CWD_POLL_INTERVAL_MS = 3000
 
 const STATE_LABEL: Record<ConnectionState, string> = {
   connecting: '연결 중...',
@@ -266,6 +270,14 @@ export function Terminal({
 
   useEffect(() => {
     refreshSessions()
+    // Session cwd is read live off /proc/<pid>/cwd on the backend, but this
+    // frontend cache only otherwise refetches on connect/disconnect/rename -
+    // a plain `cd` in an already-open session left it stale until one of
+    // those fired, which broke "프로젝트로 이동" and the Projects tab's
+    // reverse link right after cd. Poll while the tab is mounted so both
+    // stay in sync with the shell's actual directory.
+    const timer = setInterval(refreshSessions, CWD_POLL_INTERVAL_MS)
+    return () => clearInterval(timer)
   }, [refreshSessions])
 
   // Always holds the latest activeSession, readable from inside the
@@ -1005,7 +1017,10 @@ export function Terminal({
         <h1>Terminal</h1>
         <div className="terminal-header-actions">
           {activeSession !== HOME_TAB_ID && (
-            <span className={`badge ${STATE_BADGE_CLASS[state]}`}>{STATE_LABEL[state]}</span>
+            <span className={`badge ${STATE_BADGE_CLASS[state]} terminal-status-badge`} title={STATE_LABEL[state]}>
+              <span className="terminal-status-dot" aria-hidden="true" />
+              <span className="btn-label">{STATE_LABEL[state]}</span>
+            </span>
           )}
           {activeSession !== HOME_TAB_ID && onOpenFileManager && (
             <button
@@ -1014,7 +1029,7 @@ export function Terminal({
               onClick={openFileManagerHere}
               title="현재 디렉토리를 파일 브라우저에서 열기"
             >
-              <FolderOpen size={14} /> 파일 브라우저에서 열기
+              <FolderOpen size={14} /> <span className="btn-label">파일 브라우저에서 열기</span>
             </button>
           )}
           {activeSession !== HOME_TAB_ID && onOpenProject && activeProjectPath && (
@@ -1024,11 +1039,16 @@ export function Terminal({
               onClick={() => onOpenProject(activeProjectPath)}
               title="현재 디렉토리가 속한 프로젝트로 이동"
             >
-              <FolderKanban size={14} /> 프로젝트로 이동
+              <FolderKanban size={14} /> <span className="btn-label">프로젝트로 이동</span>
             </button>
           )}
-          <button type="button" className="btn btn-secondary btn-small" onClick={() => setSettingsOpen(true)}>
-            설정
+          <button
+            type="button"
+            className="btn btn-secondary btn-small"
+            onClick={() => setSettingsOpen(true)}
+            title="설정"
+          >
+            <Settings size={14} /> <span className="btn-label">설정</span>
           </button>
         </div>
       </div>

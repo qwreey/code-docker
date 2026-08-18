@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight, Terminal as TerminalIcon } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
 import type { TerminalSessionInfo } from '../../api/types'
@@ -10,6 +10,11 @@ import '../common/common.css'
 // Reuses ProjectMemoryPanel's section/toggle classes - same generic
 // collapsed-by-default layout, not worth a third near-duplicate CSS file.
 import './ProjectMemoryPanel.css'
+
+// Matches Terminal.tsx's own CWD_POLL_INTERVAL_MS - cwd is read live off
+// /proc/<pid>/cwd on the backend, so a `cd` in a session shown here needs
+// re-polling too, not just a one-shot fetch on first expand.
+const CWD_POLL_INTERVAL_MS = 3000
 
 // Self-contained "이 프로젝트에서 열린 세션" section for the Projects tab's
 // per-project detail sheet - the reverse direction of Terminal's own
@@ -29,26 +34,34 @@ export default function ProjectTerminalSessions({
 }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [loaded, setLoaded] = useState(false)
   const [sessions, setSessions] = useState<TerminalSessionInfo[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  async function toggleOpen() {
-    const next = !open
-    setOpen(next)
-    if (!next || loaded || loading) return
+  const load = useCallback(
+    async (withSkeleton: boolean) => {
+      if (withSkeleton) setLoading(true)
+      try {
+        const res = await api.get<TerminalSessionInfo[]>('/terminal/sessions')
+        setSessions(res.filter((s) => s.cwd && isUnderProjectPath(s.cwd, path)))
+        setError(null)
+      } catch (e) {
+        setError(errorMessage(e))
+      } finally {
+        if (withSkeleton) withViewTransition(() => setLoading(false))
+      }
+    },
+    [path],
+  )
 
-    setLoading(true)
-    try {
-      const res = await api.get<TerminalSessionInfo[]>('/terminal/sessions')
-      setSessions(res.filter((s) => s.cwd && isUnderProjectPath(s.cwd, path)))
-      setError(null)
-    } catch (e) {
-      setError(errorMessage(e))
-    } finally {
-      setLoaded(true)
-      withViewTransition(() => setLoading(false))
-    }
+  useEffect(() => {
+    if (!open) return
+    load(true)
+    const timer = setInterval(() => load(false), CWD_POLL_INTERVAL_MS)
+    return () => clearInterval(timer)
+  }, [open, load])
+
+  function toggleOpen() {
+    setOpen((prev) => !prev)
   }
 
   return (

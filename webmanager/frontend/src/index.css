@@ -197,6 +197,18 @@
 
 /* Android Chrome shows a default blue/gray highlight rectangle on tap for
    any interactive element - disable it app-wide rather than per-component. */
+/* Hard ceiling so no descendant's height miscalculation (e.g. Terminal.css's
+   keyboard-aware sizing racing visualViewport's async resize event on
+   mobile) can ever escape as page-level scroll - .app-content/.terminal-
+   container etc. handle their own internal scrolling, nothing here needs to
+   scroll the whole page. */
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
 html {
   -webkit-tap-highlight-color: transparent;
 }
