@@ -155,6 +155,18 @@ export function RouterAuthPanel() {
           </form>
         </>
       )}
+
+      {status.source !== 'env' && (
+        <div className="info-note">
+          <span aria-hidden="true">ℹ</span>
+          <span>
+            비밀번호를 잊으셨나요? 도커 호스트에서(컨테이너 밖에서){' '}
+            <code>{'${ROUTER_VOLUME:-./data/router}'}/auth-hash.json</code>을 삭제하고{' '}
+            <code>docker compose restart code-docker-router</code>로 재시작하세요 — 다시 미설정
+            상태로 돌아가 이 페이지에서 새로 설정할 수 있습니다.
+          </span>
+        </div>
+      )}
     </div>
   )
 }
