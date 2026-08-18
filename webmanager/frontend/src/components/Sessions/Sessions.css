@@ -1,0 +1,52 @@
+.session-group-header td {
+  background: var(--color-gray-bg);
+  font-weight: 600;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.session-group-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.session-group-rename-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 0.15rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius);
+  opacity: 0.6;
+}
+
+.session-group-rename-btn:hover {
+  opacity: 1;
+  background: var(--surface-hover);
+}
+
+.session-group-count {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.session-group-rename {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.session-group-rename input {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  min-width: 12rem;
+}

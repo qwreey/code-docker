@@ -74,9 +74,18 @@ interface SidebarContainerProps {
   onSelect: (id: SectionId) => void
   open: boolean
   onClose: () => void
+  collapsed: boolean
+  onToggleCollapsed: () => void
 }
 
-export function SidebarContainer({ active, onSelect, open, onClose }: SidebarContainerProps) {
+export function SidebarContainer({
+  active,
+  onSelect,
+  open,
+  onClose,
+  collapsed,
+  onToggleCollapsed,
+}: SidebarContainerProps) {
   const [order, setOrder] = useState<string[]>([])
   // TAILSCALE_ENABLED=false (router's own env, see docs/router.md#tailscale)
   // idles router's tailscaled entirely - hide the tab once we know it's off
@@ -116,6 +125,8 @@ export function SidebarContainer({ active, onSelect, open, onClose }: SidebarCon
       onSelect={(id) => onSelect(id as SectionId)}
       open={open}
       onClose={onClose}
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
     />
   )
 }

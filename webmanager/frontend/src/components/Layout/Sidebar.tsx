@@ -34,6 +34,11 @@ interface SidebarProps {
   onSelect: (id: string) => void
   open: boolean
   onClose: () => void
+  // Desktop-only "hide the whole sidebar" mode - orthogonal to open/onClose
+  // above, which is the mobile drawer. Persistence/state live in the caller
+  // (App.tsx), same split as order/onReorder.
+  collapsed: boolean
+  onToggleCollapsed: () => void
 }
 
 // Applies a persisted id order on top of the current items list: known ids
@@ -58,7 +63,20 @@ function reconcileOrder(items: SidebarItem[], saved: string[]): SidebarItem[] {
   return ordered
 }
 
-export function Sidebar({ title, logo, footer, items, order, onReorder, active, onSelect, open, onClose }: SidebarProps) {
+export function Sidebar({
+  title,
+  logo,
+  footer,
+  items,
+  order,
+  onReorder,
+  active,
+  onSelect,
+  open,
+  onClose,
+  collapsed,
+  onToggleCollapsed,
+}: SidebarProps) {
   const sections = order.length > 0 ? reconcileOrder(items, order) : items
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const dragIdRef = useRef<string | null>(null)
@@ -81,10 +99,19 @@ export function Sidebar({ title, logo, footer, items, order, onReorder, active, 
   return (
     <>
       {open && <div className="sidebar-backdrop" onClick={onClose} />}
-      <nav className={'sidebar' + (open ? ' sidebar-open' : '')} aria-label="섹션 메뉴">
+      <nav className={'sidebar' + (open ? ' sidebar-open' : '') + (collapsed ? ' sidebar-collapsed' : '')} aria-label="섹션 메뉴">
         <div className="sidebar-title">
           {logo}
           {title}
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            aria-label="사이드바 접기"
+            title="사이드바 접기"
+            onClick={onToggleCollapsed}
+          >
+            <span aria-hidden="true">«</span>
+          </button>
         </div>
         <div className="sidebar-list-wrap">
           <ul className="sidebar-list">

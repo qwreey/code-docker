@@ -1,6 +1,10 @@
 .app-shell {
   display: flex;
   height: 100vh;
+  /* .sidebar-collapsed (Layout.css) slides the sidebar off the left edge
+     via a negative margin rather than shrinking its width - this keeps
+     that slide from ever creating a stray horizontal scrollbar. */
+  overflow-x: hidden;
 }
 
 /* Column wrapper around EnvVersionBanner + .app-content — kept as a
@@ -34,6 +38,25 @@
 
 .mobile-topbar {
   display: none;
+}
+
+/* Desktop counterpart to .mobile-topbar - shown only while the sidebar is
+   collapsed (see Sidebar.tsx's "«" button / Layout.css's .sidebar-collapsed).
+   Hidden below 721px since the mobile drawer's own .mobile-topbar already
+   covers that case and having both would duplicate the menu bar. */
+.desktop-topbar {
+  display: none;
+}
+
+@media (min-width: 721px) {
+  .desktop-topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
 }
 
 .hamburger-btn {

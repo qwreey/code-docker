@@ -77,6 +77,10 @@ type Config struct {
 	// (see internal/terminalprofiles).
 	TerminalProfilesPath string
 
+	// BrowserNamesPath is where user-assigned friendly names for a
+	// heartbeat-reported browserId are persisted (see internal/browsernames).
+	BrowserNamesPath string
+
 	// SidebarOrderPath is where the user's drag-and-drop sidebar tab order
 	// is persisted (see internal/uiprefs). Not gated — purely cosmetic.
 	SidebarOrderPath string
@@ -208,6 +212,7 @@ func loadConfig() Config {
 
 		TerminalSettingsPath: getenv("WEBMANAGER_TERMINAL_SETTINGS_PATH", "/code/.local/share/code-docker/webmanager/terminal-settings.json"),
 		TerminalProfilesPath: getenv("WEBMANAGER_TERMINAL_PROFILES_PATH", "/code/.local/share/code-docker/webmanager/terminal-profiles.json"),
+		BrowserNamesPath:     getenv("WEBMANAGER_BROWSER_NAMES_PATH", "/code/.local/share/code-docker/webmanager/browser-names.json"),
 		SidebarOrderPath:     getenv("WEBMANAGER_SIDEBAR_ORDER_PATH", "/code/.local/share/code-docker/webmanager/sidebar-order.json"),
 
 		DiskBreakdownRoot:      getenv("SYSTEM_DISK_BREAKDOWN_ROOT", "/"),

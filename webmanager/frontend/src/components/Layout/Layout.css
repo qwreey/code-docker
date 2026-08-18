@@ -7,6 +7,26 @@
   display: flex;
   flex-direction: column;
   padding: 1rem 0.75rem;
+  transition: margin-left 0.15s ease;
+}
+
+/* Desktop-only "hide the sidebar entirely" mode - see App.tsx's
+   .desktop-topbar for the matching "메뉴 열기" affordance that appears
+   while this is active. Left as a no-op below 721px since the mobile
+   drawer (.sidebar-open, above) already fully owns visibility there.
+
+   Deliberately margin-left (slides the whole, still-220px-wide box off the
+   left edge), not width - animating width forces every child
+   (.sidebar-title/.sidebar-list-wrap/footer) to reflow and visibly
+   compress on every frame of the transition. Keeping the box's own width
+   fixed and only moving its position means nothing inside it ever
+   reflows; margin-left still counts toward the flex item's main-axis
+   footprint (unlike transform), so .app-main still smoothly reclaims the
+   freed space as this animates, same end state as the old width:0. */
+@media (min-width: 721px) {
+  .sidebar-collapsed {
+    margin-left: -220px;
+  }
 }
 
 .sidebar-title {
@@ -18,6 +38,28 @@
   font-size: 1.05rem;
   padding: 0.4rem 0.5rem 1rem;
   color: var(--text-heading);
+}
+
+.sidebar-collapse-btn {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.sidebar-collapse-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
 .sidebar-title-mark {
@@ -221,5 +263,12 @@
     inset: 0;
     background: rgba(0, 0, 0, 0.45);
     z-index: 40;
+  }
+
+  /* Collapse-to-top-bar is a desktop-only concept (mobile already has its
+     own drawer open/close via the hamburger) - hide the button here rather
+     than leave a control that would silently do nothing. */
+  .sidebar-collapse-btn {
+    display: none;
   }
 }

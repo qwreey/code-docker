@@ -341,6 +341,8 @@ func main() {
 	mux.HandleFunc("POST /api/sessions/heartbeat", s.handleSessionHeartbeat)
 	mux.Handle("GET /api/sessions", gate.RequirePassword(http.HandlerFunc(s.handleListSessions)))
 	mux.Handle("POST /api/sessions/{id}/close", gate.RequirePassword(http.HandlerFunc(s.handleRequestSessionClose)))
+	mux.Handle("GET /api/sessions/browsers", gate.RequirePassword(http.HandlerFunc(s.handleListBrowserNames)))
+	mux.Handle("PUT /api/sessions/browsers/{id}", gate.RequirePassword(http.HandlerFunc(s.handleSetBrowserName)))
 
 	mux.HandleFunc("GET /api/ui/sidebar-order", s.handleGetSidebarOrder)
 	mux.HandleFunc("PUT /api/ui/sidebar-order", s.handlePutSidebarOrder)

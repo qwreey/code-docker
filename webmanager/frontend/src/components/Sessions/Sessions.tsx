@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Pencil } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
-import type { OpenSession } from '../../api/types'
+import type { BrowserNames, OpenSession } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
 import { withViewTransition } from '../../utils/viewTransition'
 import { summarizeUserAgent } from './uaSummary'
 import '../Processes/Processes.css'
+import './Sessions.css'
 
 const POLL_INTERVAL_MS = 30000
 
@@ -26,8 +28,26 @@ function formatLastSeen(iso: string): string {
 // actually controls access. GET /api/sessions is password-gated (unlike most
 // reads in this app) because the list itself — which folders are open right
 // now — is the sensitive part here.
+// Groups sessions by browserId (see api/types.ts's OpenSession doc comment),
+// preserving each group's first-appearance order — sessions itself already
+// comes back most-recent-first (sessionheartbeat.Store.List), so this keeps
+// the most recently active device's group listed first too. An empty
+// browserId (pre-existing heartbeats, or localStorage disabled) is its own
+// group under the '' key, rendered as "알 수 없음".
+function groupByBrowser(sessions: OpenSession[]): Array<[string, OpenSession[]]> {
+  const map = new Map<string, OpenSession[]>()
+  for (const s of sessions) {
+    const key = s.browserId || ''
+    const group = map.get(key)
+    if (group) group.push(s)
+    else map.set(key, [s])
+  }
+  return Array.from(map.entries())
+}
+
 export function Sessions() {
   const [sessions, setSessions] = useState<OpenSession[]>([])
+  const [browserNames, setBrowserNames] = useState<BrowserNames>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // In-flight close requests only - purely for disabling the button while the
@@ -35,6 +55,9 @@ export function Sessions() {
   // comes from the server's closeRequested field (via the next load()), so
   // this never has to be reconciled against it.
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set())
+  const [editingBrowserId, setEditingBrowserId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const [renameError, setRenameError] = useState<string | null>(null)
 
   const loadingRef = useRef(false)
 
@@ -42,8 +65,12 @@ export function Sessions() {
     if (loadingRef.current) return
     loadingRef.current = true
     try {
-      const list = await api.get<OpenSession[]>('/sessions')
+      const [list, names] = await Promise.all([
+        api.get<OpenSession[]>('/sessions'),
+        api.get<BrowserNames>('/sessions/browsers'),
+      ])
       setSessions(list)
+      setBrowserNames(names)
       setError(null)
     } catch (e) {
       setError(errorMessage(e))
@@ -58,6 +85,24 @@ export function Sessions() {
     const timer = setInterval(load, POLL_INTERVAL_MS)
     return () => clearInterval(timer)
   }, [load])
+
+  const groups = useMemo(() => groupByBrowser(sessions), [sessions])
+
+  function startRename(browserId: string) {
+    setEditingBrowserId(browserId)
+    setEditValue(browserNames[browserId] ?? '')
+    setRenameError(null)
+  }
+
+  async function saveRename(browserId: string) {
+    try {
+      const names = await api.put<BrowserNames>(`/sessions/browsers/${browserId}`, { name: editValue.trim() })
+      setBrowserNames(names)
+      setEditingBrowserId(null)
+    } catch (e) {
+      setRenameError(errorMessage(e))
+    }
+  }
 
   const requestClose = useCallback(
     async (id: string) => {
@@ -91,6 +136,7 @@ export function Sessions() {
       </p>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+      {renameError && <ErrorBanner message={renameError} onDismiss={() => setRenameError(null)} />}
 
       {loading ? (
         <Skeleton />
@@ -108,22 +154,67 @@ export function Sessions() {
               </tr>
             </thead>
             <tbody>
-              {sessions.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.folder || '알 수 없음'}</td>
-                  <td title={s.userAgent}>{summarizeUserAgent(s.userAgent)}</td>
-                  <td>{formatLastSeen(s.lastSeen)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-small"
-                      disabled={s.closeRequested || closingIds.has(s.id)}
-                      onClick={() => requestClose(s.id)}
-                    >
-                      {s.closeRequested ? '닫기 요청됨' : '닫기 시도'}
-                    </button>
-                  </td>
-                </tr>
+              {groups.map(([browserId, group]) => (
+                <Fragment key={browserId || 'unknown'}>
+                  <tr className="session-group-header">
+                    <td colSpan={4}>
+                      {editingBrowserId === browserId ? (
+                        <span className="session-group-rename">
+                          <input
+                            type="text"
+                            value={editValue}
+                            autoFocus
+                            maxLength={60}
+                            placeholder="이 브라우저의 별칭"
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveRename(browserId)
+                              if (e.key === 'Escape') setEditingBrowserId(null)
+                            }}
+                          />
+                          <button type="button" className="btn btn-secondary btn-small" onClick={() => saveRename(browserId)}>
+                            저장
+                          </button>
+                          <button type="button" className="btn btn-secondary btn-small" onClick={() => setEditingBrowserId(null)}>
+                            취소
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="session-group-label">
+                          {browserId ? browserNames[browserId] || '이름 없는 브라우저' : '알 수 없음 (구버전 / 프라이빗 모드)'}
+                          {browserId && (
+                            <button
+                              type="button"
+                              className="session-group-rename-btn"
+                              title="별칭 설정"
+                              onClick={() => startRename(browserId)}
+                            >
+                              <Pencil size={12} />
+                            </button>
+                          )}
+                          <span className="session-group-count">탭 {group.length}개</span>
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                  {group.map((s) => (
+                    <tr key={s.id}>
+                      <td>{s.folder || '알 수 없음'}</td>
+                      <td title={s.userAgent}>{summarizeUserAgent(s.userAgent)}</td>
+                      <td>{formatLastSeen(s.lastSeen)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-small"
+                          disabled={s.closeRequested || closingIds.has(s.id)}
+                          onClick={() => requestClose(s.id)}
+                        >
+                          {s.closeRequested ? '닫기 요청됨' : '닫기 시도'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>

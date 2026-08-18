@@ -693,11 +693,18 @@ export interface TerminalProfilesDoc {
 // heartbeat (see webmanager/.claude/qa-request/session-heartbeat-plan-done.md).
 export interface OpenSession {
   id: string
+  // Empty for a heartbeat sent before browserId existed, or from a browser
+  // with localStorage disabled — the Sessions tab groups those together
+  // under a synthetic "unknown device" bucket.
+  browserId: string
   folder: string
   userAgent: string
   lastSeen: string
   closeRequested: boolean
 }
+
+// browserId -> user-assigned friendly name (see GET/PUT /api/sessions/browsers).
+export type BrowserNames = Record<string, string>
 
 // Mirrors internal/projects' git-status contract (GET /api/projects/git/*).
 // status never errors (always 200, isGitRepo: false + zero-valued fields for

@@ -34,8 +34,16 @@ const (
 
 // Entry is one client-reported tab, keyed by its self-generated id in Store.
 type Entry struct {
-	ID        string    `json:"id"`
-	Folder    string    `json:"folder"`
+	ID     string `json:"id"`
+	Folder string `json:"folder"`
+	// BrowserID identifies the *device/browser profile*, not the tab —
+	// generated once and kept in localStorage (unlike ID above, which is
+	// per-tab sessionStorage, see session-heartbeat.default.js), so every
+	// tab open in the same browser reports the same BrowserID. Empty on a
+	// heartbeat from before this field existed, or from a browser with
+	// localStorage disabled — the frontend groups those under a synthetic
+	// "알 수 없음" bucket rather than failing to render them.
+	BrowserID string    `json:"browserId"`
 	UserAgent string    `json:"userAgent"`
 	LastSeen  time.Time `json:"lastSeen"`
 
@@ -66,12 +74,13 @@ func NewStore() *Store {
 // getting it on every heartbeat until the tab actually closes or the entry
 // is GC'd). Returns the resulting CloseRequested state so the caller can
 // include it in the heartbeat response.
-func (s *Store) Heartbeat(id, folder, userAgent string) bool {
+func (s *Store) Heartbeat(id, browserID, folder, userAgent string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	closeRequested := s.entries[id].CloseRequested
 	s.entries[id] = Entry{
 		ID:             id,
+		BrowserID:      browserID,
 		Folder:         folder,
 		UserAgent:      userAgent,
 		LastSeen:       time.Now(),

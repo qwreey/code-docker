@@ -36,6 +36,8 @@ export function TerminalSettingsPanel({
   onSave,
   onPreviewTheme,
   fontFamilies,
+  mobileInputWorkaroundEnabled,
+  onToggleMobileInputWorkaround,
 }: {
   open: boolean
   onClose: () => void
@@ -46,6 +48,8 @@ export function TerminalSettingsPanel({
   onSave: (next: TerminalSettings) => void
   onPreviewTheme: (colors: Record<string, string>) => void
   fontFamilies: string[]
+  mobileInputWorkaroundEnabled: boolean
+  onToggleMobileInputWorkaround: (enabled: boolean) => void
 }) {
   const [draftKeybindings, setDraftKeybindings] = useState<KeyBinding[]>(settings.keybindings)
   const [draftDetachSequence, setDraftDetachSequence] = useState(bytesToDisplay(settings.detachSequence))
@@ -242,6 +246,25 @@ export function TerminalSettingsPanel({
             ))}
           </select>
         </div>
+      </section>
+
+      <section className="terminal-settings-section">
+        <h4>모바일 입력 (실험적)</h4>
+        <p className="section-description">
+          모바일 가상 키보드의 예측 입력(자동완성) 기능 때문에 문자가 즉시 전송되지 않고 스페이스를 누를 때까지
+          버퍼링되는 문제를 우회하는 기능입니다. 실제 <code>&lt;input type="password"&gt;</code> 필드로 포커스를
+          가로채서 예측 입력 자체를 끄는 방식이라, 기기/키보드 앱에 따라 아직 완벽하지 않을 수 있습니다(연속 입력
+          시 느려짐 등). 문제가 있으면 꺼서 기존 방식(버퍼링은 있지만 더 안정적)으로 되돌릴 수 있습니다. 데스크탑에는
+          영향이 없고, 변경 사항은 터미널 탭을 나갔다가 다시 들어와야 적용됩니다.
+        </p>
+        <label className="checkbox-option">
+          <input
+            type="checkbox"
+            checked={mobileInputWorkaroundEnabled}
+            onChange={(e) => onToggleMobileInputWorkaround(e.target.checked)}
+          />
+          모바일 입력 버퍼링 우회 사용
+        </label>
       </section>
 
       <section className="terminal-settings-section">

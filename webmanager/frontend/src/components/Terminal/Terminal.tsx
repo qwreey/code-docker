@@ -97,6 +97,34 @@ function saveFontSize(value: number) {
   }
 }
 
+// Experimental mobile IME-buffering workaround (see the touch-device block
+// in the xterm-creation effect below) - enabled by default, but real-device
+// testing (2026-08-19) found it still has rough edges (typing speed under
+// fast consecutive input), so an escape hatch to fall back to xterm's own
+// default textarea is worth keeping. Per-device localStorage like fontSize
+// above, not backend-persisted - toggling only takes effect the next time
+// the Terminal tab is fully remounted (leave and reopen it), since the
+// touch-device setup runs once in the xterm-creation effect, not on every
+// render.
+const MOBILE_INPUT_WORKAROUND_KEY = 'webmanager.terminal.mobileInputWorkaround'
+
+function loadMobileInputWorkaroundEnabled(): boolean {
+  try {
+    return localStorage.getItem(MOBILE_INPUT_WORKAROUND_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function saveMobileInputWorkaroundEnabled(enabled: boolean) {
+  try {
+    if (enabled) localStorage.removeItem(MOBILE_INPUT_WORKAROUND_KEY)
+    else localStorage.setItem(MOBILE_INPUT_WORKAROUND_KEY, '0')
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - the toggle just won't persist
+  }
+}
+
 // nextSessionName picks "세션 N" for the smallest N not already taken (or,
 // when a profile supplies a label, that label itself — only falling back to
 // "label 2", "label 3", ... if it's already in use), so repeated "+" clicks
@@ -148,6 +176,7 @@ export function Terminal({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [armedModifier, setArmedModifier] = useState<ModifierId | null>(null)
   const [fontSize, setFontSize] = useState<number>(loadFontSize)
+  const [mobileInputWorkaroundEnabled, setMobileInputWorkaroundEnabled] = useState<boolean>(loadMobileInputWorkaroundEnabled)
   const [sessions, setSessions] = useState<TerminalSessionInfo[]>([])
   // HOME_TAB_ID is a virtual tab (never a real termsession.Session), and is
   // also the initial state now: opening the Terminal tab must not silently
@@ -174,6 +203,11 @@ export function Terminal({
   // resending stale values on an unrelated later reconnect.
   const pendingCreateOptionsRef = useRef<Map<string, { cwd?: string; command?: string }>>(new Map())
   const keyboardInset = useKeyboardInset()
+  // Bumped by the disconnect overlay's "재연결" button to force the
+  // WS-connect effect below to re-run against the same activeSession
+  // without changing it — that effect is only otherwise keyed on
+  // activeSession/refreshSessions, neither of which changes on demand.
+  const [reconnectNonce, setReconnectNonce] = useState(0)
 
   // Effective settings: fall back to hardcoded defaults until the backend
   // responds (or if it returns an empty keybindings list).
@@ -364,6 +398,11 @@ export function Terminal({
     [focusTerminal],
   )
 
+  const toggleMobileInputWorkaround = useCallback((enabled: boolean) => {
+    saveMobileInputWorkaroundEnabled(enabled)
+    setMobileInputWorkaroundEnabled(enabled)
+  }, [])
+
   const sendBytes = useCallback((bytes: string) => {
     if (!bytes) return
     const mod = armedModifierRef.current
@@ -443,6 +482,203 @@ export function Terminal({
     term.open(container)
     fitAddon.fit()
 
+    // Mobile virtual keyboards (Gboard etc.) run predictive/autocorrect text
+    // through the same DOM composition API (compositionstart/update/end)
+    // real IME composition (Hangul assembly, etc.) needs, so xterm.js's
+    // default hidden textarea buffers plain Latin typing exactly like a
+    // real IME until a word boundary commits it ("aaaa" not appearing until
+    // a space is pressed). These attributes alone don't stop it (harmless
+    // baseline regardless); see the touch-device block below for what
+    // actually does.
+    if (term.textarea) {
+      term.textarea.setAttribute('autocorrect', 'off')
+      term.textarea.setAttribute('autocapitalize', 'off')
+      term.textarea.setAttribute('autocomplete', 'off')
+      term.textarea.setAttribute('spellcheck', 'false')
+    }
+
+    // Confirmed live (2026-08-19) that CSS-only masking (-webkit-text-
+    // security) isn't enough — the keyboard only suppresses predictive
+    // composition for a real <input type="password">, which <textarea>
+    // (xterm.js's own hidden input) structurally cannot be. So on a touch
+    // device only, mint an actual password-type <input>, redirect focus to
+    // it every time term.textarea would otherwise become focused (its own
+    // internal click-to-focus, or any focusTerminal() call below), and feed
+    // what it captures through the same sendBytes() pipeline term.onData
+    // already uses — xterm itself never receives real keystrokes on a
+    // touch device, this input does. Left a no-op on desktop (mouse/
+    // trackpad users never hit the buffering bug, and this is a real
+    // behavior swap not worth the risk there). This is a first pass, not
+    // verified against every Android keyboard app / iOS Safari — expect to
+    // iterate against real-device testing.
+    const isTouchDevice =
+      loadMobileInputWorkaroundEnabled() &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: coarse)').matches
+    let mobileInputCleanup: (() => void) | undefined
+    if (isTouchDevice && term.textarea) {
+      const mobileInput = document.createElement('input')
+      mobileInput.type = 'password'
+      // "off", not "new-password" - "new-password" is literally the hint
+      // Chrome's own save-password heuristic watches for ("this field is
+      // for creating a new password"), which turned out to make the
+      // unwanted "저장하시겠습니까?" prompt worse, not better (confirmed
+      // live, 2026-08-19). "off" plus a random name at least avoids
+      // matching common field-name autofill heuristics; Chrome's no-form
+      // save-prompt heuristic on mobile may still fire regardless of any
+      // attribute here — that's a known Chrome quirk (autocomplete=off is
+      // deliberately ignored for the save-prompt decision, only affects
+      // autofill *suggestions*), not something fixable client-side.
+      mobileInput.autocomplete = 'off'
+      mobileInput.name = `terminal-input-${Math.random().toString(36).slice(2)}`
+      mobileInput.setAttribute('autocorrect', 'off')
+      mobileInput.setAttribute('autocapitalize', 'off')
+      mobileInput.setAttribute('spellcheck', 'false')
+      mobileInput.setAttribute('aria-hidden', 'true')
+      mobileInput.tabIndex = -1
+      // Same fully-invisible, off-screen placement as xterm's own hidden
+      // textarea (xterm.css's .xterm-helper-textarea) - never meant to be
+      // seen, only to hold real DOM/keyboard focus.
+      Object.assign(mobileInput.style, {
+        position: 'absolute',
+        opacity: '0',
+        left: '-9999em',
+        top: '0',
+        width: '0',
+        height: '0',
+        zIndex: '-5',
+        border: '0',
+        padding: '0',
+      })
+      container.appendChild(mobileInput)
+
+      // Confirmed live (2026-08-19): fully clearing the field to '' after
+      // every keystroke breaks backspace — deleting from an already-empty
+      // field is a no-op with nothing for the browser to fire an input
+      // event about, so backspace silently did nothing. Keeping one
+      // sentinel character in the field at all times means there's always
+      // something for backspace to consume. baseline tracks what we've
+      // already forwarded to the PTY; every input/compositionend event is
+      // diffed against it (length-based, not full text diffing - real
+      // single-keystroke mobile input is always a plain append or a plain
+      // backspace, never a mid-string edit) rather than assuming the field
+      // was actually reset back to ANCHOR since the browser may not have
+      // gotten to that reset yet on fast consecutive typing (see
+      // scheduleReset below).
+      const ANCHOR = ' '
+      let baseline = ANCHOR
+      mobileInput.value = ANCHOR
+      mobileInput.setSelectionRange(ANCHOR.length, ANCHOR.length)
+
+      // Also confirmed live: resetting .value synchronously inside the
+      // input handler made fast consecutive typing drop characters -
+      // mutating a focused field's value while Android's own IME/webview
+      // bridge is still processing that same keystroke appears to stall or
+      // desync it. Deferring the reset to the next animation frame lets
+      // that processing fully finish first. The equality check guards
+      // against a stale reset clobbering a value that's already moved on
+      // by the time the frame runs (e.g. two keystrokes landed before this
+      // fired) - in that case the newer keystroke's own scheduled reset
+      // takes over instead.
+      let resetScheduled = false
+      const scheduleReset = () => {
+        if (resetScheduled) return
+        resetScheduled = true
+        const expected = mobileInput.value
+        requestAnimationFrame(() => {
+          resetScheduled = false
+          if (mobileInput.value !== expected) return
+          mobileInput.value = ANCHOR
+          mobileInput.setSelectionRange(ANCHOR.length, ANCHOR.length)
+          baseline = ANCHOR
+        })
+      }
+
+      // Shared by onInput (plain typing) and onCompositionEnd (IME commit)
+      // — both just need "what changed vs. baseline", the source doesn't
+      // matter once composition itself is done.
+      const processValueChange = () => {
+        const value = mobileInput.value
+        if (value.length > baseline.length) {
+          sendBytes(value.slice(baseline.length))
+        } else if (value.length < baseline.length) {
+          sendBytes('\x7f'.repeat(baseline.length - value.length))
+        }
+        baseline = value
+        scheduleReset()
+      }
+
+      let composing = false
+      const onCompositionStart = () => {
+        composing = true
+      }
+      // Real IME composition (Hangul assembly etc.) still legitimately
+      // fires compositionstart/end regardless of input type - that's
+      // OS/keyboard-level, not something a password field suppresses. Only
+      // commit on compositionend so an in-progress multi-keystroke syllable
+      // isn't sent character-by-character as it's being assembled.
+      const onCompositionEnd = () => {
+        composing = false
+        processValueChange()
+      }
+      const onInput = () => {
+        if (composing) return
+        processValueChange()
+      }
+      const onKeyDown = (e: KeyboardEvent) => {
+        // Enter never reaches the input-event handling above - a
+        // single-line <input> doesn't insert a line break the way xterm's
+        // own <textarea> did, so this is the one key still driven by
+        // keydown. Most mobile keyboards (Gboard included) do dispatch a
+        // real keydown for Enter even though they don't for ordinary
+        // character keys.
+        if (e.key === 'Enter' && !composing) {
+          e.preventDefault()
+          sendBytes('\r')
+        }
+      }
+      // Whenever xterm's own textarea would become focused - its internal
+      // click-to-focus handler, or any focusTerminal() call elsewhere in
+      // this file - immediately steal focus back to this input instead.
+      // This is what keeps the keyboard in password mode across every
+      // existing focus path without having to special-case each call site.
+      const onTextareaFocus = () => {
+        mobileInput.focus()
+      }
+
+      mobileInput.addEventListener('compositionstart', onCompositionStart)
+      mobileInput.addEventListener('compositionend', onCompositionEnd)
+      mobileInput.addEventListener('input', onInput)
+      mobileInput.addEventListener('keydown', onKeyDown)
+      term.textarea.addEventListener('focus', onTextareaFocus)
+
+      mobileInputCleanup = () => {
+        term.textarea?.removeEventListener('focus', onTextareaFocus)
+        mobileInput.remove()
+      }
+    }
+
+    // A program running inside the PTY (tmux/vim with set-clipboard, etc.)
+    // can ask the terminal to copy to the OS clipboard via an OSC 52 escape
+    // sequence — xterm.js doesn't handle that on its own (same gap the
+    // xclip/wl-copy shims paper over for code-server's own terminal, see
+    // root CLAUDE.md), and this main terminal never registered a handler
+    // for it (only InteractiveLoginDialog.tsx's standalone login PTY did).
+    // OSC 52 payload shape is "<selector>;<base64>", only the base64 half
+    // matters here.
+    const oscDisposable = term.parser.registerOscHandler(52, (data) => {
+      const b64 = data.split(';')[1]
+      if (!b64 || b64 === '?') return true
+      try {
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+        void navigator.clipboard.writeText(new TextDecoder().decode(bytes))
+      } catch {
+        // Malformed payload or clipboard API unavailable - not worth
+        // surfacing an error for.
+      }
+      return true
+    })
+
     // Routed through sendBytes so a sticky modifier armed via the on-screen
     // control bar also applies to the very next real keypress/paste.
     const dataDisposable = term.onData((data) => sendBytes(data))
@@ -474,6 +710,8 @@ export function Terminal({
 
     return () => {
       resizeObserver.disconnect()
+      mobileInputCleanup?.()
+      oscDisposable.dispose()
       dataDisposable.dispose()
       term.dispose()
       termRef.current = null
@@ -572,7 +810,11 @@ export function Terminal({
       ws.close()
       if (wsRef.current === ws) wsRef.current = null
     }
-  }, [activeSession, refreshSessions])
+  }, [activeSession, refreshSessions, reconnectNonce])
+
+  const reconnect = useCallback(() => {
+    setReconnectNonce((n) => n + 1)
+  }, [])
 
   const selectSession = useCallback(
     (name: string) => {
@@ -814,6 +1056,16 @@ export function Terminal({
             unmounting avoids having to recreate xterm when a session opens
             again. */}
         <div ref={containerRef} className="terminal-container" hidden={activeSession === HOME_TAB_ID} />
+        {activeSession !== HOME_TAB_ID && state === 'disconnected' && (
+          <div className="terminal-disconnect-overlay">
+            <div className="terminal-disconnect-card">
+              <p>연결이 해제되었습니다</p>
+              <button type="button" className="btn btn-primary btn-small" onClick={reconnect}>
+                재연결
+              </button>
+            </div>
+          </div>
+        )}
         {activeSession === HOME_TAB_ID && (
           <TerminalHome
             sessions={sessions}
@@ -850,6 +1102,8 @@ export function Terminal({
         onSave={saveSettings}
         onPreviewTheme={previewTheme}
         fontFamilies={fontFamilies}
+        mobileInputWorkaroundEnabled={mobileInputWorkaroundEnabled}
+        onToggleMobileInputWorkaround={toggleMobileInputWorkaround}
       />
       <ConfirmDialog
         open={closeConfirm !== null}

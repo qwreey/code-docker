@@ -35,6 +35,27 @@ function isSectionId(v: string | null): v is SectionId {
   return SECTIONS.some((s) => s.id === v)
 }
 
+// Client-side-only UI preference (per webmanager/CLAUDE.md's ground rules) -
+// same try/catch-wrapped load/save pattern as theme.ts/Extensions.tsx.
+const SIDEBAR_COLLAPSED_KEY = 'webmanager-sidebar-collapsed'
+
+function loadSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function saveSidebarCollapsed(collapsed: boolean) {
+  try {
+    if (collapsed) localStorage.setItem(SIDEBAR_COLLAPSED_KEY, '1')
+    else localStorage.removeItem(SIDEBAR_COLLAPSED_KEY)
+  } catch {
+    // best-effort - the choice still applies for this page load either way
+  }
+}
+
 // Sections that render RouterFrame (a live <iframe> embed - see
 // components/RouterEmbed/RouterFrame.tsx). Switching *into* one of these
 // mounts an iframe that wasn't there before the transition started, which
@@ -74,6 +95,15 @@ function App() {
   const rootPath = initialSplit.root
   const [active, setActiveState] = useState<SectionId>(() => initialSplit.section ?? 'supervisor')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed)
+
+  function toggleSidebarCollapsed() {
+    setSidebarCollapsed((v) => {
+      const next = !v
+      saveSidebarCollapsed(next)
+      return next
+    })
+  }
 
   function setActive(id: SectionId) {
     setActiveState(id)
@@ -145,6 +175,8 @@ function App() {
         onSelect={(id) => (IFRAME_SECTIONS.has(id) ? setActive(id) : withViewTransition(() => setActive(id)))}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={toggleSidebarCollapsed}
       />
       {/* EnvVersionBanner lives here, above .app-content rather than inside
           it, deliberately — Terminal.css's full-bleed layout relies on
@@ -157,6 +189,19 @@ function App() {
           .app-main) means it's never in a position the negative margin can
           reach, for every tab, not just Terminal. */}
       <div className="app-main">
+        {sidebarCollapsed && (
+          <div className="desktop-topbar">
+            <button
+              type="button"
+              className="hamburger-btn"
+              aria-label="사이드바 펼치기"
+              onClick={toggleSidebarCollapsed}
+            >
+              <span aria-hidden="true">☰</span>
+            </button>
+            <span className="mobile-topbar-title">webmanager</span>
+          </div>
+        )}
         <EnvVersionBanner />
         <RouterAuthSetupBanner />
         <main className="app-content">

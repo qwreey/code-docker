@@ -22,6 +22,7 @@ var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[
 
 type heartbeatRequest struct {
 	ID        string `json:"id"`
+	BrowserID string `json:"browserId"`
 	Folder    string `json:"folder"`
 	UserAgent string `json:"userAgent"`
 }
@@ -46,8 +47,15 @@ func (s *Server) handleSessionHeartbeat(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "id must be a UUID")
 		return
 	}
+	// BrowserID is optional (empty from a browser with localStorage
+	// disabled, or a code-patch predating this field) — only validated as a
+	// UUID when actually present, unlike ID above which is always required.
+	if body.BrowserID != "" && !uuidRe.MatchString(body.BrowserID) {
+		writeError(w, http.StatusBadRequest, "browserId must be a UUID")
+		return
+	}
 
-	shouldClose := s.sessionHeartbeats.Heartbeat(body.ID, body.Folder, body.UserAgent)
+	shouldClose := s.sessionHeartbeats.Heartbeat(body.ID, body.BrowserID, body.Folder, body.UserAgent)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true, "shouldClose": shouldClose})
 }
 

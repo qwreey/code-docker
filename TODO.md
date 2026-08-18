@@ -25,3 +25,13 @@
   등의 원인으로 추정. 중요도는 낮음(사용자 본인 평가) — 급하게 다룰 필요는
   없고, 나중에 `entrypoint.sh`의 시그널 트랩 처리와 supervisord 기동 타이밍을
   같이 살펴봐야 함.
+- (2026-08-19, 사용자 제보, 에이전트가 추가) webmanager 터미널의 모바일 입력
+  워크어라운드(실험적, 터미널 설정 패널에서 끄고 켤 수 있음, localStorage) —
+  가상 키보드 예측입력 때문에 글자가 스페이스 누르기 전까진 버퍼링되던 문제와
+  비밀번호 저장 자동완성 팝업은 실기기 확인상 해결됨. 다만 연속으로 빠르게
+  입력하면 여전히 입력이 씹히는 속도 문제가 남아있음 — 매 키 입력마다
+  `requestAnimationFrame`으로 숨겨진 `<input type="password">`의 값을
+  리셋하는 방식이 원인으로 추정되지만 에이전트가 직접 프로파일링은 못 해봐서
+  확실친 않음. 나중에 실기기(안드로이드 Chrome)로 붙어서 디버깅 필요 — 관련
+  코드는 `webmanager/frontend/src/components/Terminal/Terminal.tsx`의 xterm
+  생성 이펙트 안 `mobileInput` 관련 블록.

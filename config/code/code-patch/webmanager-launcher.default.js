@@ -183,6 +183,10 @@
         else show();
     }
 
+    function openInNewTab() {
+        window.open(MANAGER_URL, "_blank", "noopener");
+    }
+
     document.addEventListener("keydown", (e) => {
         if (e.key === "Escape" && isOpen()) hide();
     });
@@ -202,8 +206,21 @@
         if (icon.dataset.cdWebmanagerBound) return;
         icon.dataset.cdWebmanagerBound = "1";
         icon.classList.add("cd-webmanager-launcher");
-        icon.title = "웹매니저 열기";
-        icon.addEventListener("click", toggle);
+        icon.title = "웹매니저 열기 (휠클릭/Ctrl+클릭: 새 탭)";
+        // .window-appicon is a plain <div>, not a real link, so middle-click
+        // and Ctrl/Cmd+click have no native "open in new tab" behavior to
+        // fall back on - handle both explicitly instead of only the plain
+        // left-click overlay-toggle path.
+        icon.addEventListener("click", (e) => {
+            if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                openInNewTab();
+                return;
+            }
+            toggle();
+        });
+        icon.addEventListener("auxclick", (e) => {
+            if (e.button === 1) openInNewTab();
+        });
     }
 
     // .window-appicon is part of the workbench titlebar and rendered once

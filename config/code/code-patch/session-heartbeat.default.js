@@ -26,6 +26,24 @@
         id = crypto.randomUUID();
     }
 
+    // localStorage (not sessionStorage) - identifies the browser/device
+    // itself rather than one tab, so every tab open in the same browser
+    // profile reports the same value and the Sessions UI can group them
+    // under one device with a user-assigned friendly name.
+    const BROWSER_ID_KEY = "cd-session-heartbeat-browser-id";
+    let browserId = "";
+    try {
+        browserId = localStorage.getItem(BROWSER_ID_KEY) || "";
+        if (!browserId) {
+            browserId = crypto.randomUUID();
+            localStorage.setItem(BROWSER_ID_KEY, browserId);
+        }
+    } catch {
+        // Private browsing / storage disabled - leave empty rather than
+        // minting a per-load id, which would just create a fresh "device"
+        // in the Sessions UI on every heartbeat instead of grouping.
+    }
+
     const HEARTBEAT_URL = `${location.origin}/manager/api/sessions/heartbeat`;
     const INTERVAL_MS = 30000;
 
@@ -38,7 +56,7 @@
             const res = await fetch(HEARTBEAT_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id, folder, userAgent: navigator.userAgent }),
+                body: JSON.stringify({ id, browserId, folder, userAgent: navigator.userAgent }),
             });
             const body = await res.json();
             if (body && body.shouldClose) {
