@@ -5,6 +5,10 @@
 아키텍처 적합성)는 끝났지만 구현 방향을 결정할 사용자 판단이 남아 있어 이번
 라운드엔 착수하지 않음.
 
+**2026-08-19 업데이트**: KasmVNC/Guacamole 추가 리서치 완료, 구현 방향
+결정됨(noVNC+websockify, Selkies는 백로그) — 아래 "결정 사항" 섹션 참고.
+아직 구현은 시작 전.
+
 ## 동기
 
 `roblox-studio-docker`(sibling 프로젝트, `~/Projects/roblox-studio-docker`,
@@ -101,13 +105,62 @@ App Routes가 유효한 전송 경로가 됨. 두 옵션:
   재검토(Caddy가 router 컨테이너 안에서 도는 건 동일하므로 "국경은 router만"
   원칙 자체는 유지됨).
 
-## 미해결 질문
+## 미해결 질문 (2026-08-19: 1, 2번 결정됨 — 아래 "결정 사항" 참고)
 
-1. 위 "경로 A vs B" 선택.
-2. B를 택했다면 wayvnc를 완전히 버릴지, 기존 SETUP.md의 TigerVNC/KRDC
-   워크플로우(실사용자 존재)를 나란히 유지할지.
+1. ~~위 "경로 A vs B" 선택.~~ → 경로 B, 그 중 B-1(noVNC+websockify)로 결정.
+2. ~~B를 택했다면 wayvnc를 완전히 버릴지, 기존 SETUP.md의 TigerVNC/KRDC
+   워크플로우(실사용자 존재)를 나란히 유지할지.~~ → wayvnc 유지, TigerVNC/KRDC
+   워크플로우도 나란히 유지(raw RFB 5900은 그대로 열어둠, noVNC는 그 앞에
+   추가되는 것이지 대체가 아님).
 3. `allowedTargetHosts`를 어떤 형태로 일반화할지(env var vs router-manager
-   편집 UI) — netgate forwards 쪽에도 같은 패턴이 필요한지 함께 검토.
+   편집 UI) — netgate forwards 쪽에도 같은 패턴이 필요한지 함께 검토. (미결)
+
+## 결정 사항 (2026-08-19)
+
+- **지금 구현할 것**: 경로 B-1 — wayvnc는 그대로 두고 앞단에 **noVNC+websockify만
+  얹는다.** Selkies 전환은 하지 않음.
+- **Selkies는 백로그로 이관**: "실사용 중 실제로 성능 문제를 겪으면 그때
+  처리" 트리거로 미룸. 지금 당장 구현할 근거가 부족하다는 판단(사용자
+  결정, 2026-08-19).
+- **스택은 타겟별로 다를 수 있다는 전제**: 이 VNC 임베드 기능이 결국
+  router에 붙는 임의의 GUI 컨테이너를 겨냥하는 범용 기능이 될 것이므로,
+  모든 타겟이 고효율 스택(Selkies)을 필요로 하진 않음 — 예: redis-insight
+  류의 단순 웹/GUI 툴은 noVNC로 충분, Roblox Studio처럼 카메라 회전·드래그가
+  잦은 3D 인터랙션은 결국 Selkies가 필요해질 가능성이 높음. **향후 방향은
+  noVNC와 Selkies를 나란히(타겟별 선택 가능하게) 지원하는 것** — 지금은
+  noVNC 하나만 구현하고, Selkies는 나중에 두 번째 백엔드 옵션으로 추가.
+- **`wayvnc --gpu` 하드웨어 인코딩은 별개의 독립적 옵션으로 남겨둠**: noVNC
+  채택 여부와 무관하게 wayvnc 자체 인코딩 단계에서 켤 수 있음(리서치 결과
+  2번 항목 참고). 다만 NVIDIA는 여전히 깨짐(이슈 #360/#258 open), AMD
+  dGPU는 수정됨(#327) — 호스트 GPU 벤더 확인 후 시도할 가치가 있는
+  독립적인 후속 최적화로 백로그에 남김(이번 구현 스코프엔 없음).
+
+## 추가 리서치 (2026-08-19): "noVNC 반응성이 별로라 대안 필요" 질문에 대한 답
+
+동기 섹션에 남아있던 "noVNC는 반응성이 별로라 KasmVNC 등 대안이 있는지 확인
+필요" 질문을 재조사함 (KasmVNC, Apache Guacamole 개별 검토):
+
+- **KasmVNC**: TigerVNC(Xvnc)를 포크해 noVNC+websockify+VNC서버를 하나로
+  통합한 웹 네이티브 서버. HW H.264/H.265/AV1 인코더 내장, 멀티유저·클립보드·
+  오디오 지원 등 스펙만 보면 매력적이지만 **핵심적으로 X11(Xvnc) 기반이라
+  Wayland/wlroots 네이티브 캡처를 지원하지 않음** — Wayland 지원 요청 이슈
+  (kasmtech/KasmVNC#193)가 여전히 open. labwc(wlroots headless)를 쓰는 이
+  프로젝트에 붙이려면 XWayland 브리지를 또 얹어야 해서, KasmVNC가 원래
+  없애려던 "레이어 여러 개" 문제를 재도입하는 셈 — 부적합.
+- **Apache Guacamole**: VNC/RDP/SSH를 하나의 브라우저 클라이언트로 통합하는
+  프로토콜-어그노스틱 게이트웨이. guacd가 RFB를 받아 자체 프로토콜로
+  재인코딩해 넘기는데, 실측 보고 사례 기준 guacd+VNC 처리 합산 지연이 약
+  150ms까지 관측됨(wayvnc/noVNC 조합의 ~10.6ms와 자릿수 차이). 멀티프로토콜
+  게이트웨이가 필요 없는 단일 VNC 타겟 하나에 guacd+톰캣 풀스택을 얹는 것도
+  이 프로젝트 규모 대비 과설계.
+- **결론**: KasmVNC/Guacamole 둘 다 이 스택(Wayland/wlroots, 단일 타겟)에는
+  noVNC+websockify보다 못함 — **noVNC 유지가 이 셋 중에서는 여전히
+  합리적**. 다만 셋 중 최선일 뿐, 카메라 회전 같은 지연시간 민감한 3D
+  인터랙션을 진짜로 개선하려면 위 "경로 B-2"에 이미 적혀 있던 **Selkies
+  전환**이 여전히 더 나은 답 — 이번 조사로 그 판단은 바뀌지 않음.
+
+Sources: KasmVNC docs/wiki (Differences From TigerVNC), kasmtech/KasmVNC#193,
+Guacamole architecture doc, Guacamole 메일링리스트 지연시간 스레드.
 
 ## 참고
 
