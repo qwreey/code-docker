@@ -46,6 +46,14 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "--env-migrate" {
 		os.Exit(envMigrateCmd(loadConfig()))
 	}
+	// CLI helper mode: `webmanager --attach <name> [start-dir]` joins an
+	// already-running (or brand-new) webmanager Terminal-tab session from
+	// outside the browser — never starts the server. See attachcmd.go's doc
+	// comment. `bin/attach` (on PATH everywhere in the container) is a thin
+	// wrapper around this exact invocation.
+	if len(os.Args) > 1 && os.Args[1] == "--attach" {
+		os.Exit(attachCmd(loadConfig(), os.Args[2:]))
+	}
 
 	cfg := loadConfig()
 

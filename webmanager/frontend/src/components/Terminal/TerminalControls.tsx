@@ -1,4 +1,5 @@
 import type { MouseEvent } from 'react'
+import { ZoomIn, ZoomOut } from 'lucide-react'
 import type { KeyBinding } from '../../api/types'
 import { isModifierBinding, type ModifierId } from './keybindings'
 
@@ -17,6 +18,14 @@ function preventFocusSteal(event: MouseEvent) {
  * modifiers (armModifier) instead of literal byte-senders (sendBytes) --
  * their `bytes` field is unused.
  *
+ * Zoom in/out is a fixed pair appended after the customizable keybinding
+ * row, not part of it -- unlike a key, it never sends a byte and its state
+ * (font size) is per-device localStorage, not the backend-persisted
+ * TerminalSettings blob (see Terminal.tsx's FONT_SIZE_STORAGE_KEY), so it
+ * doesn't belong in a user-reorderable/removable list the same way. Icons
+ * instead of a text label, and terminal-key-action's own slightly different
+ * color, mark it as this different category of control at a glance.
+ *
  * Mobile focus/keyboard fix: tapping (or even just touch-scrolling) this bar
  * used to steal focus away from xterm's hidden input textarea, which both
  * dropped xterm's own focus state and dismissed the on-screen keyboard.
@@ -33,12 +42,14 @@ export function TerminalControls({
   onArmModifier,
   onSendBytes,
   onFocusTerminal,
+  onZoom,
 }: {
   keybindings: KeyBinding[]
   armedModifier: ModifierId | null
   onArmModifier: (id: ModifierId) => void
   onSendBytes: (bytes: string) => void
   onFocusTerminal: () => void
+  onZoom: (direction: 'in' | 'out') => void
 }) {
   return (
     <div
@@ -74,6 +85,26 @@ export function TerminalControls({
           </button>
         )
       })}
+      <button
+        type="button"
+        className="terminal-key-btn terminal-key-action"
+        aria-label="글자 축소"
+        title="글자 축소"
+        onMouseDown={preventFocusSteal}
+        onClick={() => onZoom('out')}
+      >
+        <ZoomOut size={16} />
+      </button>
+      <button
+        type="button"
+        className="terminal-key-btn terminal-key-action"
+        aria-label="글자 확대"
+        title="글자 확대"
+        onMouseDown={preventFocusSteal}
+        onClick={() => onZoom('in')}
+      >
+        <ZoomIn size={16} />
+      </button>
     </div>
   )
 }

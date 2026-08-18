@@ -278,6 +278,22 @@
   color: var(--accent-contrast);
 }
 
+/* Zoom in/out: tinted from the app's own --accent instead of the theme's
+   --term-fg like every other key above, so it reads as a distinct utility
+   control rather than another terminal key (it doesn't send a byte, and
+   never belongs to the customizable keybinding list). */
+.terminal-key-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.terminal-key-action:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
 @media (max-width: 720px) {
   .terminal-section {
     margin: -1.25rem;

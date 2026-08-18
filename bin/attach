@@ -1,0 +1,12 @@
+#!/bin/sh
+# Join an already-running (or brand-new) webmanager Terminal-tab session
+# from outside the browser - SSH, code-server's integrated terminal, or
+# typed inside an ordinary webmanager terminal tab. Thin wrapper around
+# `webmanager --attach` (webmanager/backend/attachcmd.go) - see that file's
+# doc comment and webmanager/.claude/qa-request/attach-cli-plan-done.md for the
+# design (no tmux, no separate session mechanism: this is just another
+# WebSocket client on the exact same session a browser tab would open).
+#
+# Usage: attach <name> [start-dir]
+
+exec /etc/code-docker/webmanager/webmanager --attach "$@"

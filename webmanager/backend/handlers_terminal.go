@@ -233,6 +233,17 @@ func relayTerminalSession(ctx context.Context, conn *websocket.Conn, sess *terms
 	}()
 
 	if len(scrollback) > 0 {
+		// Clear+home before replaying: the ring buffer is raw bytes, not
+		// parsed terminal state, so relative cursor-movement escapes in it
+		// only render correctly against a known-blank starting screen. The
+		// browser frontend already gets this for free (term.reset() before
+		// reconnecting - see Terminal.tsx), but webmanager --attach
+		// (attachcmd.go) hands this straight to a real terminal with
+		// whatever was on it before, so the clear has to happen here,
+		// covering both callers identically.
+		if werr := writeWithTimeout(ctx, conn, []byte("\x1b[2J\x1b[H")); werr != nil {
+			return
+		}
 		if werr := writeWithTimeout(ctx, conn, scrollback); werr != nil {
 			return
 		}

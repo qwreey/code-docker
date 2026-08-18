@@ -53,6 +53,7 @@ const EMPTY_SETTINGS: TerminalSettings = {
   customThemes: [],
   homeLabel: '',
   fontFamily: '',
+  detachSequence: '',
 }
 
 // Same literal stack as index.css's --mono token — xterm.js's fontFamily
@@ -63,6 +64,37 @@ const DEFAULT_MONO_STACK = "ui-monospace, SFMono-Regular, Consolas, 'Liberation 
 
 function resolveFontFamily(selected: string): string {
   return selected ? `'${selected}', ${DEFAULT_MONO_STACK}` : DEFAULT_MONO_STACK
+}
+
+// Zoom (font size) is deliberately per-device localStorage, not part of the
+// backend-persisted TerminalSettings blob — same "client-side-only UI
+// preference" idiom as Extensions.tsx's SHOW_RECOMMENDATIONS_KEY, since a
+// phone and a desktop monitor want different zoom levels, not one synced
+// value. FONT_SIZE_DEFAULT matches xterm.js's own built-in default (never
+// explicitly set before now) so an already-open terminal doesn't visibly
+// jump the first time this ships.
+const FONT_SIZE_STORAGE_KEY = 'webmanager.terminal.fontSize'
+const FONT_SIZE_DEFAULT = 15
+const FONT_SIZE_MIN = 8
+const FONT_SIZE_MAX = 32
+const FONT_SIZE_STEP = 1
+
+function loadFontSize(): number {
+  try {
+    const stored = Number(localStorage.getItem(FONT_SIZE_STORAGE_KEY))
+    if (Number.isFinite(stored) && stored >= FONT_SIZE_MIN && stored <= FONT_SIZE_MAX) return stored
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - falls back to default
+  }
+  return FONT_SIZE_DEFAULT
+}
+
+function saveFontSize(value: number) {
+  try {
+    localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(value))
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - zoom just won't persist
+  }
 }
 
 // nextSessionName picks "세션 N" for the smallest N not already taken (or,
@@ -115,6 +147,7 @@ export function Terminal({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [armedModifier, setArmedModifier] = useState<ModifierId | null>(null)
+  const [fontSize, setFontSize] = useState<number>(loadFontSize)
   const [sessions, setSessions] = useState<TerminalSessionInfo[]>([])
   // HOME_TAB_ID is a virtual tab (never a real termsession.Session), and is
   // also the initial state now: opening the Terminal tab must not silently
@@ -152,6 +185,7 @@ export function Terminal({
       customThemes: base.customThemes,
       homeLabel: base.homeLabel,
       fontFamily: base.fontFamily,
+      detachSequence: base.detachSequence,
     }
   }, [settings])
 
@@ -278,6 +312,33 @@ export function Terminal({
     }
   }, [effectiveSettings.fontFamily])
 
+  // Tells the backend the PTY's size changed — shared by the ResizeObserver
+  // below (container size changed) and the zoom effect further down (font
+  // size changed, which can shift cols/rows without the container itself
+  // resizing, so the ResizeObserver alone would never fire for it).
+  const sendResize = useCallback(() => {
+    const term = termRef.current
+    const ws = wsRef.current
+    if (term && ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
+    }
+  }, [])
+
+  // Apply the zoom (font size) level live — same "initial value at creation,
+  // then kept in sync by its own effect" shape as theme/fontFamily above.
+  // Unlike those two, a font size change reliably shifts cols/rows within
+  // the same container, so this is the one live-apply effect that also
+  // needs to notify the backend via sendResize (the ResizeObserver only
+  // fires on the container's own size changing, not xterm's internal cell
+  // metrics).
+  useEffect(() => {
+    if (termRef.current) {
+      termRef.current.options.fontSize = fontSize
+      fitAddonRef.current?.fit()
+      sendResize()
+    }
+  }, [fontSize, sendResize])
+
   // Re-focuses xterm's hidden input textarea. Used as a safety net after
   // every mobile-toolbar interaction (button tap, sticky-modifier arm, and
   // the toolbar's own touchend below) — on mobile, tapping/scrolling the
@@ -290,6 +351,18 @@ export function Terminal({
   const focusTerminal = useCallback(() => {
     termRef.current?.focus()
   }, [])
+
+  const zoom = useCallback(
+    (direction: 'in' | 'out') => {
+      setFontSize((prev) => {
+        const next = Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, prev + (direction === 'in' ? FONT_SIZE_STEP : -FONT_SIZE_STEP)))
+        saveFontSize(next)
+        return next
+      })
+      focusTerminal()
+    },
+    [focusTerminal],
+  )
 
   const sendBytes = useCallback((bytes: string) => {
     if (!bytes) return
@@ -361,6 +434,7 @@ export function Terminal({
       convertEol: true,
       theme: themeToXterm(currentTheme),
       fontFamily: resolveFontFamily(effectiveSettings.fontFamily),
+      fontSize,
     })
     termRef.current = term
     const fitAddon = new FitAddon()
@@ -394,10 +468,7 @@ export function Terminal({
 
     const resizeObserver = new ResizeObserver(() => {
       fitAddon.fit()
-      const ws = wsRef.current
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
-      }
+      sendResize()
     })
     resizeObserver.observe(container)
 
@@ -765,6 +836,7 @@ export function Terminal({
             onArmModifier={armModifier}
             onSendBytes={sendBytes}
             onFocusTerminal={focusTerminal}
+            onZoom={zoom}
           />
         )}
       </div>

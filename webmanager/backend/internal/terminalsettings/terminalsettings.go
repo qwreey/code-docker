@@ -52,6 +52,20 @@ type Settings struct {
 	// own, so this is applied directly to the xterm.js instance
 	// (Terminal.tsx) rather than left for the user to type in somewhere.
 	FontFamily string `json:"fontFamily"`
+	// DetachSequence is the literal byte sequence (same convention as
+	// KeyBinding.Bytes - real control bytes, e.g. "\x10\x11" for Ctrl+P
+	// Ctrl+Q) that `webmanager --attach` (main package's attachcmd.go)
+	// watches stdin for to detach from a shared session without touching
+	// it - see that file's detachMatcher. Empty means "use the built-in
+	// default" (also Ctrl+P Ctrl+Q, Docker's own convention) - attachcmd.go
+	// decides that default, not this package, so a config value literally
+	// equal to the default and "unset" are indistinguishable on purpose
+	// (same "" -> built-in idiom as FontFamily above). This is the one
+	// field in this blob read by attachcmd.go (a CLI, not the browser) -
+	// still stored here rather than a separate file since it's a per-user
+	// preference like everything else in this struct, not per-device like
+	// Terminal.tsx's zoom level (localStorage).
+	DetachSequence string `json:"detachSequence"`
 }
 
 func empty() Settings {

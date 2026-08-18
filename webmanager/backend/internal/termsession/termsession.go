@@ -1,20 +1,38 @@
 // Package termsession manages named, persistent PTY sessions for the web
 // terminal (M2 — see webmanager/.claude/archive/terminal-plan-done.md's "영속 세션
 // 토글" section). It's the server-owned session registry that decouples a PTY
-// process's lifetime from any single WebSocket connection's lifetime,
-// deliberately built by hand rather than shelling out to tmux/screen (repo
-// owner's explicit call: "버그 많음").
+// process's lifetime from any single WebSocket connection's lifetime.
+//
+// A Session's PTY leader is a bare login shell (see newSession) — every
+// webmanager Terminal tab is a plain, unwrapped PTY. Two earlier attempts at
+// letting SSH/code-server reach a session too both got reverted the same day
+// (webmanager/.claude/qa-request/attach-cli-plan-done.md's "History" section):
+// wrapping every Session in tmux broke full-screen/alt-screen apps and glyph
+// rendering (`claude`'s own TUI included) for ordinary use; a standalone,
+// tmux-backed `bin/attach` tool decoupled from this Registry entirely
+// avoided that, but wasn't actually what was wanted either — the ask was to
+// reach an *already-running webmanager session*, not a separate parallel
+// one. This is the third design: `webmanager --attach <name>` (see
+// attachcmd.go in the main package) is a plain WebSocket client that talks
+// to the exact same `GET /api/terminal?session=<name>` endpoint a browser
+// tab does, so it's just another Attach-ed sink on the same Session — no
+// tmux anywhere, no separate session, no capability ordinary Terminal-tab
+// use doesn't already have. That's what makes Attach's multi-sink support
+// below load-bearing now, not just a nicety: a browser tab and an
+// external `--attach` client (or several of either) can be live on the same
+// Session at once.
 //
 // A Session is created the first time a name is used and keeps running
 // after its WebSocket disconnects — reconnecting with the same name
 // reattaches to the same PTY, replaying recent output (scrollback
-// ringBuffer) first. "Ephemeral" (M1's original behavior, still used when a
-// client connects without a session name) and "persistent" aren't different
-// code paths here: every Session behaves the same way once created, and
-// Pinned is just a bool on the record that exempts it from idle GC — see
-// SetPinned. This package knows nothing about WebSocket (main package's
-// handlers_terminal.go owns that); a Session's live output goes to whatever
-// io.Writer is currently Attach-ed.
+// ringBuffer, prefixed with a clear-screen sequence — see
+// handlers_terminal.go's relayTerminalSession) first. "Ephemeral" (M1's
+// original behavior, still used when a client connects without a session
+// name) and "persistent" aren't different code paths here: every Session
+// behaves the same way once created, and Pinned is just a bool on the
+// record that exempts it from idle GC — see SetPinned. This package knows
+// nothing about WebSocket (main package's handlers_terminal.go owns that);
+// a Session's live output goes to every io.Writer currently Attach-ed.
 package termsession
 
 import (
@@ -41,7 +59,9 @@ var (
 // label a human picks, never passed to exec.Command or a file path) but
 // still bounded — mainly to keep it well-behaved as JSON/UI text, not a
 // security boundary like the stricter identifier regexes elsewhere in this
-// codebase (e.g. internal/dind's container ID validation).
+// codebase (e.g. internal/dind's container ID validation). No longer
+// constrained to tmux's session-name charset — see this package's doc
+// comment, a registry-backed Session's name never reaches tmux at all now.
 var nameRe = regexp.MustCompile(`^[\p{L}\p{N} _.-]{1,64}$`)
 
 func ValidateName(name string) error {
@@ -103,8 +123,8 @@ type Session struct {
 	mu             sync.Mutex
 	pinned         bool
 	closed         bool
-	sink           writerFunc
-	sinkGen        uint64
+	sinks          map[uint64]writerFunc
+	nextSinkID     uint64
 	lastAttachedAt time.Time
 }
 
@@ -130,8 +150,22 @@ type CreateOptions struct {
 	InitialCommand string
 }
 
+// WEBMANAGER_TERMINAL_SESSION is set on every registry-backed session's own
+// shell environment to that session's name, so a shell running inside one
+// can tell it's inside a webmanager terminal session at all - specifically
+// so `webmanager --attach` (main package's attachcmd.go) refuses to attach
+// to *anything* from in there, not just the same session back into itself.
+// A same-session attach is an obvious direct mirror loop; attaching to a
+// different session is just as unsafe once nesting can chain (A into B,
+// something inside B attaching back into A) - so nesting is blocked
+// outright rather than only checking for the direct case. Any subprocess a
+// shell spawns inherits it normally, same as $TERM, so this holds
+// regardless of how many levels of subshell/script sit between the prompt
+// and the actual `attach` invocation.
+const terminalSessionEnvVar = "WEBMANAGER_TERMINAL_SESSION"
+
 func newSession(name, shell string, scrollbackBytes int, opts CreateOptions) (*Session, error) {
-	return newSessionCmd(name, shell, nil, scrollbackBytes, opts)
+	return newSessionCmd(name, shell, nil, []string{terminalSessionEnvVar + "=" + name}, scrollbackBytes, opts)
 }
 
 // NewStandalone starts a Session whose PTY leader is command/args directly
@@ -150,10 +184,10 @@ func newSession(name, shell string, scrollbackBytes int, opts CreateOptions) (*S
 // session Done() exactly like a Registry-owned one, so a caller can select
 // on Done() instead of polling).
 func NewStandalone(name, command string, args []string, scrollbackBytes int, opts CreateOptions) (*Session, error) {
-	return newSessionCmd(name, command, args, scrollbackBytes, opts)
+	return newSessionCmd(name, command, args, nil, scrollbackBytes, opts)
 }
 
-func newSessionCmd(name, command string, args []string, scrollbackBytes int, opts CreateOptions) (*Session, error) {
+func newSessionCmd(name, command string, args []string, extraEnv []string, scrollbackBytes int, opts CreateOptions) (*Session, error) {
 	cmd := exec.Command(command, args...)
 	cmd.Dir = "/code"
 	if opts.Cwd != "" {
@@ -161,7 +195,7 @@ func newSessionCmd(name, command string, args []string, scrollbackBytes int, opt
 			cmd.Dir = opts.Cwd
 		}
 	}
-	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+	cmd.Env = append(append(os.Environ(), "TERM=xterm-256color"), extraEnv...)
 
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
@@ -175,6 +209,7 @@ func newSessionCmd(name, command string, args []string, scrollbackBytes int, opt
 		cmd:            cmd,
 		ptmx:           ptmx,
 		ring:           newRingBuffer(scrollbackBytes),
+		sinks:          make(map[uint64]writerFunc),
 		lastAttachedAt: now,
 		done:           make(chan struct{}),
 	}
@@ -187,8 +222,8 @@ func newSessionCmd(name, command string, args []string, scrollbackBytes int, opt
 
 // pump is the session's one long-lived reader: runs for the session's whole
 // lifetime (not tied to any WebSocket), continuously draining the PTY into
-// the scrollback ring buffer and, when a client is attached, forwarding the
-// same bytes live. This is the actual "PTY lifetime decoupled from
+// the scrollback ring buffer and forwarding the same bytes live to every
+// currently Attach-ed sink. This is the actual "PTY lifetime decoupled from
 // connection lifetime" mechanism the M2 design called for.
 func (s *Session) pump() {
 	buf := make([]byte, 32*1024)
@@ -196,17 +231,21 @@ func (s *Session) pump() {
 		n, err := s.ptmx.Read(buf)
 		if n > 0 {
 			chunk := append([]byte(nil), buf[:n]...)
-			// ring.Write and the sink/gen read must be one critical section
-			// under the same lock Attach uses around its own "set sink then
-			// snapshot the ring" - otherwise a chunk written here can land in
-			// a reattaching client's scrollback snapshot AND get forwarded to
-			// it live right after, producing visibly duplicated output. See
-			// Attach's own comment for the other half of this.
+			// ring.Write and snapshotting the sink set must be one critical
+			// section under the same lock Attach uses around its own "add
+			// sink then snapshot the ring" - otherwise a chunk written here
+			// can land in a newly-attaching client's scrollback snapshot AND
+			// get forwarded to it live right after, producing visibly
+			// duplicated output. See Attach's own comment for the other half
+			// of this.
 			s.mu.Lock()
 			s.ring.Write(chunk)
-			sink, gen := s.sink, s.sinkGen
+			sinks := make(map[uint64]writerFunc, len(s.sinks))
+			for id, sink := range s.sinks {
+				sinks[id] = sink
+			}
 			s.mu.Unlock()
-			if sink != nil {
+			for id, sink := range sinks {
 				// sink is a caller-supplied write (ultimately a WebSocket
 				// write) that's expected to carry its own bounded deadline -
 				// see handlers_terminal.go's terminalWriteTimeout. Without
@@ -216,9 +255,11 @@ func (s *Session) pump() {
 				// kernel buffer fills, and the shell itself blocks on its
 				// next write - freezing the session for every future client,
 				// not just the stalled one. It also defeats reapIdle, which
-				// treats a non-nil sink as "attached" and exempts it from GC.
+				// treats a non-empty sink set as "attached" and exempts it
+				// from GC. A stalled/erroring sink only removes itself, never
+				// the others, so one dead client can't take the rest down.
 				if werr := sink(chunk); werr != nil {
-					s.clearSinkIfCurrent(gen)
+					s.removeSink(id)
 				}
 			}
 		}
@@ -229,39 +270,35 @@ func (s *Session) pump() {
 	}
 }
 
-// clearSinkIfCurrent removes the attached sink only if gen still matches the
-// current attachment's generation — a Session that's already been Attach-ed
-// to a newer connection by the time an old write fails must not have that
-// newer attachment wiped out by the old one's error handling. sinkGen is
-// bumped on every Attach/Detach specifically so this comparison works (Go
-// func values themselves aren't comparable).
-func (s *Session) clearSinkIfCurrent(gen uint64) {
+// removeSink drops one sink by id — used both by pump() when a write to it
+// errors and by the detach func Attach returns. Safe to call more than once
+// for the same id (delete on an already-missing key is a no-op).
+func (s *Session) removeSink(id uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.sinkGen == gen {
-		s.sink = nil
-		s.lastAttachedAt = time.Now()
-	}
+	delete(s.sinks, id)
+	s.lastAttachedAt = time.Now()
 }
 
-// Attach makes sink the session's live output receiver, replays the current
-// scrollback into it first (so a reattaching client sees what it missed),
-// and returns a detach func the caller must call exactly once when its
-// connection ends. Kicks (silently drops) any previously attached sink —
-// "last connection wins", the simplest policy for the actual use case here
-// (reattach after closing a tab), not concurrent shared viewing like tmux.
+// Attach adds sink as one of the session's live output receivers, replays
+// the current scrollback into it first (so a newly-attaching client sees
+// what it missed), and returns a detach func the caller must call exactly
+// once when its connection ends. Multiple sinks can be attached
+// concurrently — a browser tab and one or more `webmanager --attach`
+// clients (see attachcmd.go) all watching and typing into the same Session
+// at once — attaching never kicks any other sink.
 func (s *Session) Attach(sink writerFunc) (detach func(), scrollback []byte, err error) {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
 		return nil, nil, ErrSessionGone
 	}
-	s.sinkGen++
-	gen := s.sinkGen
-	s.sink = sink
+	id := s.nextSinkID
+	s.nextSinkID++
+	s.sinks[id] = sink
 	s.lastAttachedAt = time.Now()
 	// Snapshotting while still holding s.mu - the same lock pump() now holds
-	// across its own "write to ring, then read sink" step - is what makes
+	// across its own "write to ring, then read sinks" step - is what makes
 	// "does this chunk end up in the snapshot or in the live stream"
 	// well-defined instead of a race: whichever of pump()'s write or this
 	// Attach call takes the lock first determines it, with no window where
@@ -269,14 +306,7 @@ func (s *Session) Attach(sink writerFunc) (detach func(), scrollback []byte, err
 	scrollback = s.ring.Snapshot()
 	s.mu.Unlock()
 
-	detach = func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		if s.sinkGen == gen {
-			s.sink = nil
-			s.lastAttachedAt = time.Now()
-		}
-	}
+	detach = func() { s.removeSink(id) }
 	return detach, scrollback, nil
 }
 
@@ -321,7 +351,7 @@ func (s *Session) rename(name string) {
 func (s *Session) reapCheck(now time.Time) (pinned bool, idle time.Duration, attached bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.sink != nil {
+	if len(s.sinks) > 0 {
 		return s.pinned, 0, true
 	}
 	return s.pinned, now.Sub(s.lastAttachedAt), false
@@ -347,7 +377,7 @@ func (s *Session) info() Info {
 		Pinned:         s.pinned,
 		CreatedAt:      s.CreatedAt,
 		LastAttachedAt: s.lastAttachedAt,
-		Attached:       s.sink != nil,
+		Attached:       len(s.sinks) > 0,
 		Pid:            pid,
 		Cwd:            cwd,
 	}
@@ -387,7 +417,7 @@ func (s *Session) Close() {
 		return
 	}
 	s.closed = true
-	s.sink = nil
+	s.sinks = nil
 	close(s.done)
 	s.mu.Unlock()
 

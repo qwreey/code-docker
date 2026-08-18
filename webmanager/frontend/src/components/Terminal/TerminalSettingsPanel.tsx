@@ -48,12 +48,14 @@ export function TerminalSettingsPanel({
   fontFamilies: string[]
 }) {
   const [draftKeybindings, setDraftKeybindings] = useState<KeyBinding[]>(settings.keybindings)
+  const [draftDetachSequence, setDraftDetachSequence] = useState(bytesToDisplay(settings.detachSequence))
   const [themeDraft, setThemeDraft] = useState<ThemeDraft | null>(null)
   const [confirmDeleteTheme, setConfirmDeleteTheme] = useState<TerminalTheme | null>(null)
 
   useEffect(() => {
     if (open) {
       setDraftKeybindings(settings.keybindings)
+      setDraftDetachSequence(bytesToDisplay(settings.detachSequence))
       setThemeDraft(null)
     }
     // Only resync when the panel opens (or settings identity changes while
@@ -77,6 +79,11 @@ export function TerminalSettingsPanel({
 
   function saveKeybindings() {
     onSave({ ...settings, keybindings: draftKeybindings })
+  }
+
+  function saveDetachSequence(display: string) {
+    setDraftDetachSequence(display)
+    onSave({ ...settings, detachSequence: displayToBytes(display) })
   }
 
   function selectFontFamily(family: string) {
@@ -174,6 +181,42 @@ export function TerminalSettingsPanel({
             + 키 추가
           </button>
           <button type="button" className="btn btn-primary btn-small" onClick={saveKeybindings} disabled={saving}>
+            {saving ? '저장 중...' : '저장'}
+          </button>
+        </div>
+      </section>
+
+      <section className="terminal-settings-section">
+        <h4>Attach 종료 시퀀스</h4>
+        <p className="section-description">
+          SSH나 code-server 터미널에서 <code>attach</code>로 붙었을 때, 이 시퀀스를 입력하면 세션은 그대로 둔 채
+          로컬에서만 빠져나갑니다(브라우저 탭을 닫는 것과 동일). 기본값은 Ctrl+]입니다 — Docker 스타일 Ctrl+P Ctrl+Q는
+          code-server 자체 단축키(빠른 열기)와 겹쳐서 그 안에서는 안 먹을 수 있어 기본값에서는 제외했지만, 아래에서
+          여전히 선택할 수 있습니다. Ctrl+[는 터미널에서 Esc와 완전히 같은 바이트라 vim 등에서 오작동하니 피하는
+          것을 권장합니다.
+        </p>
+        <div className="terminal-keybinding-actions">
+          <button type="button" className="btn btn-secondary btn-small" onClick={() => saveDetachSequence('\\x1d')}>
+            Ctrl+] (기본값)
+          </button>
+          <button type="button" className="btn btn-secondary btn-small" onClick={() => saveDetachSequence('\\x10\\x11')}>
+            Ctrl+P Ctrl+Q
+          </button>
+        </div>
+        <div className="terminal-detach-sequence-row">
+          <input
+            className="mono-cell"
+            value={draftDetachSequence}
+            onChange={(e) => setDraftDetachSequence(e.target.value)}
+            placeholder="\x1d 형식"
+            aria-label="Attach 종료 시퀀스"
+          />
+          <button
+            type="button"
+            className="btn btn-primary btn-small"
+            onClick={() => saveDetachSequence(draftDetachSequence)}
+            disabled={saving}
+          >
             {saving ? '저장 중...' : '저장'}
           </button>
         </div>
