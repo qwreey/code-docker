@@ -62,6 +62,11 @@
     display: flex;
     flex-direction: column;
 }
+.cd-webmanager-modal.cd-webmanager-modal-maximized {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+}
 /* A dedicated header strip, not an absolutely-positioned button floating on
    top of the iframe - webmanager's own tabs (e.g. Terminal's settings
    button) can render their own controls anywhere in the top-right corner of
@@ -73,6 +78,7 @@
     display: flex;
     justify-content: flex-end;
     align-items: center;
+    gap: 6px;
     height: 36px;
     padding: 0 6px;
     background: #1e1e1e;
@@ -83,27 +89,59 @@
     border: 0;
     background: #1e1e1e;
 }
-.cd-webmanager-close {
+.cd-webmanager-close,
+.cd-webmanager-maximize {
     width: 28px;
     height: 28px;
     border: 0;
     border-radius: 4px;
     background: rgba(255, 255, 255, .08);
     color: #f9fafb;
-    font: 16px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font: 14px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     cursor: pointer;
     transition: background .15s ease;
 }
-.cd-webmanager-close:hover {
+.cd-webmanager-close {
+    font-size: 16px;
+}
+.cd-webmanager-close:hover,
+.cd-webmanager-maximize:hover {
     background: rgba(255, 255, 255, .2);
+}
+.cd-webmanager-maximize.cd-webmanager-maximize-active {
+    background: rgba(255, 255, 255, .22);
 }
 `;
         document.head.appendChild(style);
     }
 
     const MANAGER_URL = `${location.origin}/manager/`;
+    const MAXIMIZE_STORAGE_KEY = "cd-webmanager-maximized";
 
     let overlay = null;
+    // Read once at load, same as router-auth-notify.default.js/
+    // tailscale-notify.default.js's own localStorage dismiss-flags - a
+    // fresh page load re-reads it, a live toggle only needs to update this
+    // plus the DOM (see toggleMaximize()).
+    let maximized = localStorage.getItem(MAXIMIZE_STORAGE_KEY) === "1";
+
+    function applyMaximized() {
+        if (!overlay) return;
+        overlay
+            .querySelector(".cd-webmanager-modal")
+            ?.classList.toggle("cd-webmanager-modal-maximized", maximized);
+        const btn = overlay.querySelector(".cd-webmanager-maximize");
+        if (btn) {
+            btn.classList.toggle("cd-webmanager-maximize-active", maximized);
+            btn.title = maximized ? "원래 크기로" : "최대화";
+        }
+    }
+
+    function toggleMaximize() {
+        maximized = !maximized;
+        localStorage.setItem(MAXIMIZE_STORAGE_KEY, maximized ? "1" : "0");
+        applyMaximized();
+    }
 
     function buildOverlay() {
         overlay = document.createElement("div");
@@ -114,6 +152,12 @@
 
         const header = document.createElement("div");
         header.className = "cd-webmanager-modal-header";
+
+        const maximize = document.createElement("button");
+        maximize.type = "button";
+        maximize.className = "cd-webmanager-maximize";
+        maximize.textContent = "⛶";
+        maximize.addEventListener("click", () => toggleMaximize());
 
         const close = document.createElement("button");
         close.type = "button";
@@ -126,6 +170,7 @@
         iframe.src = MANAGER_URL;
         iframe.title = "webmanager";
 
+        header.appendChild(maximize);
         header.appendChild(close);
         modal.appendChild(header);
         modal.appendChild(iframe);
@@ -137,6 +182,7 @@
         });
 
         document.body.appendChild(overlay);
+        applyMaximized();
     }
 
     let hideTimer = null;
