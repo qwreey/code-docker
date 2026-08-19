@@ -4,3 +4,6 @@
 [submodule "envmigrate"]
 	path = envmigrate
 	url = https://github.com/qwreey/envmigrate
+[submodule "router/envmigrate"]
+	path = router/envmigrate
+	url = https://github.com/qwreey/envmigrate

@@ -18,8 +18,17 @@
 # then set `EXTRA_INCLUDE=extra-include.yml` in `.env`. See
 # .claude/archive/roblox-studio-vnc-isolation-plan-done.md for the concrete
 # roblox-studio-docker case this was built for and verified against (2026-08-18).
+#
+# The second entry below is NOT the same mechanism, despite using the same `include:`
+# keyword - router is core, always-present topology (like NETGATE_ENABLED, it has a
+# behavioral opt-out but the service itself never goes away), not an optional sibling, so
+# it gets its own fixed path rather than being routed through EXTRA_INCLUDE. It still
+# needs the same ${BUILD_CONTEXT:-.} indirection as every other subtree's build.context
+# for the same split-directory-deploy reason - router/ itself doesn't move even when
+# docker-compose.yml is copied out one level, only the include path pointing at it does.
 include:
   - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}
+  - path: ${BUILD_CONTEXT:-.}/router/docker-compose.router.yml
 
 networks:
   code-docker-internal:
@@ -369,78 +378,26 @@ services:
   # Phase 2 of egress-netgate-plan.md's outbound lockdown (service used to
   # be named code-docker-netgate): the actual filtering/forwarding
   # chokepoint code-docker-netinit's and dind's own routing loops (above)
-  # point their default route at, via the `router` alias below. DNS-level
+  # point their default route at, via the `router` alias. DNS-level
   # content-blocklist (dnsmasq), RFC1918/CIDR FORWARD filtering, and inbound
-  # port-forwarding (DNAT) all live in this one container - see the plan
-  # doc and docs/egress-netgate.md for the full design/reasoning, and
-  # CLAUDE.md's "egress lockdown (netgate)" section for the short version.
-  # router/.claude/functional-router-plan.md is the vision doc for this container's
-  # expanding role (tailscale, Dev Proxy, tinyauth - later phases).
+  # port-forwarding (DNAT) all live in this one container - see
+  # docs/egress-netgate.md for the full design/reasoning, and CLAUDE.md's
+  # "egress lockdown (netgate)" section for the short version.
+  #
+  # The service itself is defined in router/docker-compose.router.yml (see
+  # the `router` include below), not here - router/ is its own standalone
+  # project (qwreey/router-docker), brought in as a git submodule, and code-
+  # docker only supplies the fields whose relative paths (env_file, volumes'
+  # bind-mount source) need to resolve against THIS file's own location
+  # rather than the fragment's - see each field's own comment below. This
+  # merges onto the code-docker-router service the fragment defines, same
+  # technique already proven for EXTRA_INCLUDE overlays (see
+  # .claude/archive/roblox-studio-vnc-isolation-plan-done.md) - a file
+  # doesn't need to originally define a service to add fields to it.
+  # Confirmed via `docker compose config` that this merge (fragment fields +
+  # these two) resolves to the exact same service as the old fully-inline
+  # definition.
   code-docker-router:
-    container_name: "${PREFIX:-}code-docker-router"
-    hostname: code-docker-router
-    build:
-      # See code-docker's own build.context comment above re: BUILD_CONTEXT.
-      # router/ is its own self-contained subtree (own Dockerfile, own
-      # .dockerignore) - context points directly at it rather than the repo
-      # root + dockerfile:, so it doesn't share code-docker's build context/
-      # .dockerignore.
-      context: "${BUILD_CONTEXT:-.}/router"
-      network: host
-    restart: unless-stopped
-    environment:
-      # Same behavioral opt-out as code-docker/dind's own NETGATE_ENABLED
-      # above - "false" idles this service too instead of applying any
-      # firewall/proxy rules (nothing would ever reach it anyway once
-      # code-docker/dind's own loops are idle - see example-env).
-      NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
-      # Dev Proxy's internal Caddy instance (see
-      # router/.claude/functional-router-plan.md's "Dev Proxy Caddy도
-      # router로 이관"). Only code-docker-router ever reads CADDY_ADAPTER_PORT -
-      # router's own nginx talks to Caddy over a unix socket regardless (see
-      # router/.claude/router-nginx-hardening-plan.md Phase 4), and that's
-      # the only path docs/dev-proxy.md recommends by default. CADDY_ADAPTER_PORT
-      # has no default: leaving it unset means caddy-adapter never binds a
-      # TCP port at all. Set it only to opt into the direct-publish
-      # alternative in docs/dev-proxy.md (and then actually publish it via
-      # this service's own `ports:`, which isn't set by default either).
-      CADDY_ADAPTER_ENABLED: "${CADDY_ADAPTER_ENABLED:-true}"
-      CADDY_ADAPTER_PORT: "${CADDY_ADAPTER_PORT:-}"
-      # router's own nginx `location /` catch-all proxies to caddy-adapter's
-      # DEFAULT_UPSTREAM-backed site block instead of hardcoding a target
-      # itself (see caddy-adapter.default.sh/nginx.default.conf) - default
-      # keeps pointing at code-docker for zero-config setups.
-      DEFAULT_UPSTREAM: "${DEFAULT_UPSTREAM:-}"
-      # router is now the actual internet-facing hop (see
-      # router/.claude/router-nginx-hardening-plan.md) - its own nginx
-      # reuses the same ALLOWED_HOSTS/NGINX_BLOCK_LOOPBACK/TRUSTED_PROXIES/
-      # NGINX_LOG_LEVEL values as code-docker's copy above (same .env
-      # source, shared across both services' environment: blocks) - stays
-      # here for that reason, unlike ALLOWED_EXPORT_HOSTS below which moved
-      # to router/example-env.router since code-docker has no use for it.
-      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-}"
-      NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
-      TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
-      NGINX_LOG_LEVEL: "${NGINX_LOG_LEVEL:-errors}"
-      # Optional manual override - left unset by default so router
-      # auto-detects code-docker-internal's live CIDR from its own routing
-      # table instead (see the code-docker-internal network's own comment
-      # above, and nginx-service.default.sh's detect_internal_subnet).
-      ROUTER_INTERNAL_SUBNET: "${ROUTER_INTERNAL_SUBNET:-}"
-      # `router-manager --env-migrate`/the startup version-mismatch check
-      # read the current router/example-env.router template from here - same
-      # pattern as code-docker's own WEBMANAGER_ENV_TEMPLATE_PATH above.
-      # Left unset to use the image's own copy.
-      ROUTER_ENV_TEMPLATE_PATH: "${ROUTER_ENV_TEMPLATE_PATH:-/etc/router/example-env.router}"
-    # Same resource-exhaustion guard as code-docker's own deploy: block
-    # (see its comment above) - router is the internet-facing hop (port
-    # 80 below), so a flood/DoS aimed at it shouldn't be able to starve
-    # the host either. Default "0" (unlimited) - see example-env.
-    deploy:
-      resources:
-        limits:
-          cpus: "${ROUTER_CPU_LIMIT:-0}"
-          memory: "${ROUTER_MEM_LIMIT:-0}"
     # router's own feature-specific settings (tailscale, Dev Proxy exposure
     # policy, router-manager's own admin-API password, tinyauth, /exports/
     # allowlists) all live in .env.router, not here - copy
@@ -452,14 +409,16 @@ services:
     #
     # Deliberately NOT "router/.env.router" (what you'd naively write given
     # the template file it's copied from lives under router/) - env_file
-    # paths are relative to wherever this docker-compose.yml itself lives,
-    # which in the recommended split-directory deploy (docs/index.md: clone
-    # into builds/code-docker/, copy docker-compose.yml out one level) is a
-    # different directory than the router/ subtree - and required: false
-    # means a missing file there is never reported, so a "router/.env.router"
-    # path would silently never be read. Flat and colocated with .env/
-    # .env.webmanager instead: nothing under builds/ needs touching to set a
-    # router value, matching how those two are already handled.
+    # paths are relative to wherever the file that DECLARES them lives, and
+    # this one's declared here (not in router/docker-compose.router.yml) so
+    # it stays relative to THIS file - which in the recommended
+    # split-directory deploy (docs/index.md: clone into builds/code-docker/,
+    # copy docker-compose.yml out one level) is a different directory than
+    # the router/ subtree - and required: false means a missing file there
+    # is never reported, so a "router/.env.router" path would silently never
+    # be read. Flat and colocated with .env/.env.webmanager instead: nothing
+    # under builds/ needs touching to set a router value, matching how those
+    # two are already handled.
     env_file:
       - path: .env.router
         required: false
@@ -467,73 +426,11 @@ services:
       # Persistent state for router's own features (tailscale login
       # state/config.yaml, caddy-adapter's managed/custom Caddyfile
       # fragments) - router has no /code volume of its own (that's
-      # code-docker's), so this is its equivalent.
+      # code-docker's), so this is its equivalent. Declared here rather than
+      # in router/docker-compose.router.yml because a relative
+      # `./data/router` needs to resolve against wherever THIS file sits
+      # (data/ deliberately lives outside the source checkout, independent
+      # of BUILD_CONTEXT - see root CLAUDE.md's "Build (Dockerfile)"
+      # section) - `docker compose config` confirmed declaring it in the
+      # fragment instead resolves to router/data/router, which is wrong.
       - "${ROUTER_VOLUME:-./data/router}:/var/lib/code-docker-router"
-    cap_add:
-      # NET_ADMIN only - no privileged: true, no SYS_MODULE or anything
-      # else. This container is meaningfully more trusted than code-docker
-      # (same "국경을 넘는 컨테이너" framing as dind - see the plan doc's
-      # "위험 패턴 경고" / "솔직한 한계"), so it gets exactly the one
-      # capability its job (iptables/ip_forward/routing, all scoped to its
-      # own netns) actually needs and nothing more.
-      - NET_ADMIN
-    sysctls:
-      # Declared here (not via a runtime `sysctl -w` in
-      # router/config/netgate/firewall.default.sh) because Docker keeps /proc/sys
-      # read-only for non-privileged containers regardless of NET_ADMIN -
-      # `sysctl -w` at runtime fails with "permission denied" even though
-      # this exact key is one of the "namespaced" sysctls Docker allows
-      # setting declaratively at container-creation time. Confirmed by
-      # testing: without this, the key still happened to already read 1 in
-      # one test environment (so forwarding "worked" anyway) but a runtime
-      # `sysctl -w` attempt failed outright - relying on that coincidence
-      # would silently break forwarding on any host where it defaults to 0.
-      - net.ipv4.ip_forward=1
-    networks:
-      code-docker-internal:
-        # code-docker-netinit's and dind-entrypoint.sh's own routing loops
-        # both resolve this alias by default (see ROUTER_HOSTNAME above on
-        # code-docker/code-docker-netinit/code-docker-dind, and
-        # script/entrypoint.sh, netinit/script/netinit-entrypoint.sh,
-        # code-dind/script/dind-entrypoint.sh, config/resolv-writer/resolv-writer.default.sh) -
-        # keep this alias in sync with ROUTER_HOSTNAME if you override it,
-        # see example-env. Renamed from `netgate` alongside the service
-        # rename. `forward` is tailscale-forward.default.sh's own socat
-        # bind target (`forward:<port>`, resolved from inside code-docker,
-        # reaches router's forwards listeners) - it used to live on a
-        # dedicated code-docker-forwards network to keep forwards/publish
-        # from sharing a port namespace, back when both lived inside
-        # code-docker itself. Now that both live entirely on router
-        # (forwards' socat binds router's own IP; publish's `tailscale
-        # serve` proxies to a *different* container - code-docker - rather
-        # than binding a local port at all), that collision can't happen
-        # anymore, so the dedicated network was dropped and `forward` just
-        # aliases router's existing code-docker-internal attachment.
-        aliases:
-          - "${ROUTER_HOSTNAME:-router}"
-          - forward
-      code-docker-external: {}
-    ports:
-      # code-docker-router is the only container with a real route to the
-      # host's network, so this is the only place a host port can be
-      # published from. router's own nginx (see
-      # router/.claude/router-nginx-hardening-plan.md) terminates this
-      # directly now - /exports/ and /router/ are handled here, everything
-      # else reverse-proxies on to code-docker:80 unchanged. This replaced
-      # an earlier netgate DNAT-back-to-code-docker forward for the same
-      # port; that `forwards:` entry was removed since a local listener
-      # always wins over PREROUTING DNAT for the same port anyway.
-      #
-      # ROUTER_HTTP_BIND/ROUTER_HTTP_PORT let this bind a specific host
-      # IP/port instead of every interface on 80 - see example-env.
-      - "${ROUTER_HTTP_BIND:-0.0.0.0}:${ROUTER_HTTP_PORT:-80}:80"
-      # Uncomment (and see docs/dev-proxy.md's "바깥 리버스 프록시 연결하기"
-      # for both options) only if you want the older direct-subdomain-to-8082
-      # routing instead of the /exports/ prefix trick above - a second
-      # published port, but no path-rewrite step needed on your outer proxy.
-      # - "8082:8082"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"

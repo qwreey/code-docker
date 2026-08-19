@@ -13,12 +13,12 @@ require (
 	golang.org/x/term v0.45.0 // indirect
 )
 
-// router/Dockerfile's build context is router/ only (see router/CLAUDE.md -
-// deliberately isolated from the repo root), so unlike webmanager/backend
-// this can't just COPY the repo-root envmigrate/ module directly - `go mod
-// vendor` (see repo-root vendor-envmigrate.sh) materializes it into
+// router's own Docker build context is router/ only (see router/CLAUDE.md),
+// so it depends on its own envmigrate submodule (router/envmigrate) rather
+// than reaching outside router/ entirely - `go mod vendor` (see
+// vendor-envmigrate.sh, router/'s own copy) materializes it into
 // router/backend/vendor/, which IS inside router's own build context.
 // This replace directive still matters for local `go build`/`go test`/`go
 // mod vendor` on a normal checkout - only the Docker build ignores it in
 // favor of vendor/.
-replace github.com/qwreey/envmigrate => ../../envmigrate
+replace github.com/qwreey/envmigrate => ../envmigrate

@@ -401,15 +401,17 @@ not the repo-root `example-env` — mirrors webmanager's `.env.webmanager` patte
 (reconcile-against-template, `#!important`/`#!` markers, `#~` dead-key archival) is a
 shared Go module, `github.com/qwreey/envmigrate` — originally extracted from webmanager's
 own `internal/envmigrate` and parameterized (version-key name, file names) so both tools
-use it; now its own standalone repo, brought in as a git submodule at `envmigrate/` (same
-pattern as `code-server-autoinstall`, see `.gitmodules`). webmanager's Dockerfile stage
-just adds one `COPY envmigrate/` (its build context is already repo root); router/backend's
-build context is deliberately isolated to `router/` (see `router/CLAUDE.md`), so it can't
-reach the repo-root submodule checkout directly — `go mod vendor` materializes it into
+use it; now its own standalone repo, brought in as a git submodule (same pattern as
+`code-server-autoinstall`). webmanager's Dockerfile stage `COPY`s the repo-root
+`envmigrate/` submodule directly (its build context is already repo root). router/backend's
+build context is deliberately isolated to `router/` (see `router/CLAUDE.md`), so — since
+`router/` is mid-extraction into its own standalone project (see that file's own note) —
+router carries its *own* `envmigrate` submodule at `router/envmigrate` rather than reaching
+outside `router/` into the repo-root one; `go mod vendor` materializes it into
 `router/backend/vendor/` instead, which *is* inside router's own build context and gets
-committed like any other source. Run `vendor-envmigrate.sh` (repo root) after updating the
-`envmigrate` submodule and before rebuilding router's image — `go build` fails loudly on a
-stale/inconsistent `vendor/`, so this can't silently drift. `ROUTER_HOSTNAME` (default `router`) is a similar
+committed like any other source. Run `router/vendor-envmigrate.sh` after updating the
+`router/envmigrate` submodule and before rebuilding router's image — `go build` fails
+loudly on a stale/inconsistent `vendor/`, so this can't silently drift. `ROUTER_HOSTNAME` (default `router`) is a similar
 compose-topology-vs-feature-var split example in the other direction: it stays in the
 repo-root `example-env` (not `router/example-env.router`) because code-docker,
 code-docker-netinit, and code-docker-dind all resolve it too (`getent hosts

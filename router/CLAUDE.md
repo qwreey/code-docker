@@ -73,6 +73,18 @@ duplicates the few router-frontend-authored generic UI primitives it still
 needs (`ErrorBanner`/`Sheet`/`Skeleton`) rather than depending on the package
 at all now.
 
+## Extraction in progress
+
+`router/` is being split out into its own standalone repo, `qwreey/router-docker`, brought
+back into code-docker as a git submodule (same pattern as `code-server-autoinstall`) —
+code-docker will "use" router rather than router living physically inside this repo. As
+part of that, `router/` now carries its own `envmigrate` submodule
+(`router/envmigrate`, `router/vendor-envmigrate.sh`) instead of reaching into the
+repo-root `envmigrate/` — this makes `router/` fully clone-build-testable on its own,
+independent of code-docker. See root `CLAUDE.md`'s "router" section and the plan this was
+executed from for the rest of the extraction (own `docker-compose.router.yml`, own docs,
+own frontend workspace membership removed from root `package.json`).
+
 ## Ground rules
 
 - Follow the root `CLAUDE.md`'s override pattern (`<name>.default.*` +
