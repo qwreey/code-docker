@@ -47,7 +47,7 @@ COPY backend/static.go ./
 COPY backend/internal ./internal
 # router's build context is router/ only (see router/CLAUDE.md), so it can't
 # COPY the repo-root envmigrate/ module directly the way webmanager's own
-# Dockerfile stage does - backend/vendor/ (see script/vendor-envmigrate.sh)
+# Dockerfile stage does - backend/vendor/ (see repo-root vendor-envmigrate.sh)
 # is a `go mod vendor`-materialized copy that lives inside this context
 # instead. `go build` auto-detects and uses vendor/ when present/consistent.
 COPY backend/vendor ./vendor

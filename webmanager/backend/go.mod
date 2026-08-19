@@ -3,9 +3,9 @@ module webmanager
 go 1.25.0
 
 require (
-	code-docker/envmigrate v0.0.0
 	github.com/coder/websocket v1.8.15
 	github.com/creack/pty v1.1.24
+	github.com/qwreey/envmigrate v0.0.0
 	github.com/shirou/gopsutil/v4 v4.26.7
 	golang.org/x/crypto v0.54.0
 	golang.org/x/sys v0.47.0
@@ -23,4 +23,4 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 )
 
-replace code-docker/envmigrate => ../../envmigrate
+replace github.com/qwreey/envmigrate => ../../envmigrate

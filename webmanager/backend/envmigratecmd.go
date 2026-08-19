@@ -5,14 +5,14 @@ import (
 	"io"
 	"os"
 
-	"code-docker/envmigrate"
+	"github.com/qwreey/envmigrate"
 )
 
 // envMigrateCmd implements `webmanager --env-migrate` — reconciles a user's
 // .env.webmanager (piped in via stdin) against this image's current
 // example-env.webmanager (cfg.EnvTemplatePath), writing the reconstructed
 // file to stdout and any migration notes to stderr. See
-// code-docker/envmigrate's package doc and
+// github.com/qwreey/envmigrate's package doc and
 // webmanager/.claude/env-migration-plan.md for the full behavior. Meant to
 // be run roughly like:
 //

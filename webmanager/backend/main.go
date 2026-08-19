@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"code-docker/envmigrate"
+	"github.com/qwreey/envmigrate"
 
 	"webmanager/internal/authgate"
 	"webmanager/internal/cgroup"
@@ -25,7 +25,7 @@ import (
 	"webmanager/internal/termsession"
 )
 
-// envMigrateOpts parameterizes the shared code-docker/envmigrate package
+// envMigrateOpts parameterizes the shared github.com/qwreey/envmigrate package
 // for webmanager's own file names - see envmigratecmd.go's other call site.
 var envMigrateOpts = envmigrate.Options{
 	VersionKey:       "WEBMANAGER_ENV_VERSION",

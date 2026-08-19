@@ -3,7 +3,7 @@ module router
 go 1.25.0
 
 require (
-	code-docker/envmigrate v0.0.0
+	github.com/qwreey/envmigrate v0.0.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -16,9 +16,9 @@ require (
 // router/Dockerfile's build context is router/ only (see router/CLAUDE.md -
 // deliberately isolated from the repo root), so unlike webmanager/backend
 // this can't just COPY the repo-root envmigrate/ module directly - `go mod
-// vendor` (see script/vendor-envmigrate.sh) materializes it into
+// vendor` (see repo-root vendor-envmigrate.sh) materializes it into
 // router/backend/vendor/, which IS inside router's own build context.
 // This replace directive still matters for local `go build`/`go test`/`go
 // mod vendor` on a normal checkout - only the Docker build ignores it in
 // favor of vendor/.
-replace code-docker/envmigrate => ../../envmigrate
+replace github.com/qwreey/envmigrate => ../../envmigrate

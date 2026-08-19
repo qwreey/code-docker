@@ -14,4 +14,4 @@ set -e
 # forgetting this step is a build error, not a silent staleness bug.
 cd "$(dirname "$0")/router/backend"
 go mod vendor
-echo "vendor-envmigrate: router/backend/vendor/code-docker/envmigrate refreshed"
+echo "vendor-envmigrate: router/backend/vendor/github.com/qwreey/envmigrate refreshed"

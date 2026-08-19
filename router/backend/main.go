@@ -16,7 +16,7 @@ import (
 	"net/http"
 	"os"
 
-	"code-docker/envmigrate"
+	"github.com/qwreey/envmigrate"
 
 	"router/internal/authgate"
 	"router/internal/netgate"

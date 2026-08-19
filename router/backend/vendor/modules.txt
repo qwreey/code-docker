@@ -1,6 +1,6 @@
-# code-docker/envmigrate v0.0.0 => ../../envmigrate
+# github.com/qwreey/envmigrate v0.0.0 => ../../envmigrate
 ## explicit; go 1.25.0
-code-docker/envmigrate
+github.com/qwreey/envmigrate
 # golang.org/x/crypto v0.54.0
 ## explicit; go 1.25.0
 golang.org/x/crypto/argon2
@@ -19,4 +19,4 @@ golang.org/x/term
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# code-docker/envmigrate => ../../envmigrate
+# github.com/qwreey/envmigrate => ../../envmigrate

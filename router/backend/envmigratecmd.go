@@ -5,12 +5,12 @@ import (
 	"io"
 	"os"
 
-	"code-docker/envmigrate"
+	"github.com/qwreey/envmigrate"
 )
 
-// envMigrateOpts parameterizes the shared code-docker/envmigrate package for
+// envMigrateOpts parameterizes the shared github.com/qwreey/envmigrate package for
 // router-manager's own file names - mirrors webmanager/backend/main.go's own
-// envMigrateOpts var, same package (code-docker/envmigrate) either way.
+// envMigrateOpts var, same package (github.com/qwreey/envmigrate) either way.
 var envMigrateOpts = envmigrate.Options{
 	VersionKey:       "ROUTER_ENV_VERSION",
 	EnvFileName:      ".env.router",
@@ -21,7 +21,7 @@ var envMigrateOpts = envmigrate.Options{
 // user's .env.router (piped in via stdin) against this image's current
 // example-env.router (ROUTER_ENV_TEMPLATE_PATH), writing the reconstructed
 // file to stdout and any migration notes to stderr. Mirrors webmanager's own
-// envmigratecmd.go exactly - see code-docker/envmigrate's package doc for
+// envmigratecmd.go exactly - see github.com/qwreey/envmigrate's package doc for
 // the full behavior. Meant to be run roughly like:
 //
 //	cat .env.router | tee -a .env.router.bak | docker compose exec -T code-docker-router \
