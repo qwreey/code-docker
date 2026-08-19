@@ -157,10 +157,12 @@ func ValidateHost(host string) error {
 // unrestricted target let a route reach arbitrary RFC1918/LAN addresses,
 // defeating netgate's whole purpose from inside what's supposed to be the
 // lowest-trust container's own admin surface.
-var allowedTargetHosts = map[string]bool{
+// Extended at package init by targetguard.ExtraAllowedHostsEnv
+// (ROUTER_EXTRA_ALLOWED_TARGET_HOSTS) — see that const's own doc comment.
+var allowedTargetHosts = targetguard.WithExtraHosts(map[string]bool{
 	"code-docker": true,
 	"dind":        true,
-}
+})
 
 // ValidateTarget checks target is a plain host:port with no whitespace or
 // Caddyfile syntax characters (braces, newlines) that could break out of

@@ -64,7 +64,9 @@ webmanager에 닿습니다(code-docker 자신의 내부 nginx가 `/` vs `/manage
   서비스 호스트네임을 쓰세요. 기본적으로 `code-docker`/`dind` 두 호스트네임만
   허용되고 그 외 대상은 거부됩니다(Caddy 자신의 admin API 등을 겨냥한
   self-SSRF 방지) — `APPROUTES_ALLOW_EXTERNAL_TARGETS="true"`로 제한을
-  풀 수 있지만, router 자기 자신(`localhost`/`127.0.0.1`/`router`)과
+  통째로 풀거나, `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`(`.env.router`)로
+  특정 호스트만(예: `EXTRA_INCLUDE`로 붙는 sibling 프로젝트의 alias)
+  허용 목록에 추가할 수 있습니다 — router 자기 자신(`localhost`/`127.0.0.1`/`router`)과
   tailscale forwards의 `forward` 별칭([tailscale 절](router.md#tailscale)
   참고 — 이것도 router 자신을 가리키는 alias)은 이 옵트아웃으로도 절대
   허용되지 않습니다. Dev Proxy의 `DEVPROXY_ALLOW_EXTERNAL_TARGETS`와는 완전히

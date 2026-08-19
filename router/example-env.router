@@ -38,7 +38,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-ROUTER_ENV_VERSION=5
+ROUTER_ENV_VERSION=6
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -84,6 +84,18 @@ ROUTER_ENV_VERSION=5
 #. 독립적인 별도 값입니다 - 두 기능이 각자 따로 대상 제약을 풀 수 있어야
 #. 하기 때문입니다. 자세한 내용은 docs/app-routes.md 참고.
 #APPROUTES_ALLOW_EXTERNAL_TARGETS="false"
+
+#. Dev Proxy/App Routes 둘 다에 알려진 서비스 목록(code-docker, dind)을
+#. 개별 호스트 단위로 넓힙니다 - 위 두 *_ALLOW_EXTERNAL_TARGETS="true"처럼
+#. 제약을 통째로 풀지 않고, 특정 호스트만 허용 목록에 추가하고 싶을 때
+#. 씁니다. 콤마로 구분된 호스트명 목록(포트 제외) - 예: sibling 프로젝트가
+#. EXTRA_INCLUDE로 자기 컨테이너를 code-docker-internal에 붙이는 경우
+#. (root CLAUDE.md의 EXTRA_INCLUDE/roblox-studio-docker 통합 참고), 그
+#. 컨테이너의 별칭을 여기 추가하면 router 코드 수정 없이 Dev Proxy/App
+#. Routes 대상으로 쓸 수 있습니다. 인프라 설정으로 고정해두는 값이라 계속
+#. 켜둬도 안전합니다(위 *_ALLOW_EXTERNAL_TARGETS와 달리 임시 디버그
+#. 우회용이 아님).
+#ROUTER_EXTRA_ALLOWED_TARGET_HOSTS= # 예: vnc-only,vnc-only2
 
 #. --- DNS 블록리스트 (dnsmasq builtin 소스) ---
 #. 둘 다 컨테이너 (재)생성 시에만 반영됩니다 - `docker compose restart`로는

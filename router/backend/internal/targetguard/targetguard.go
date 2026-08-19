@@ -33,6 +33,34 @@ var SelfHosts = map[string]bool{
 
 var targetRe = regexp.MustCompile(`^[a-zA-Z0-9_.:\[\]-]+$`)
 
+// ExtraAllowedHostsEnv widens both devproxy's and approutes' built-in
+// allowedTargetHosts map with a comma-separated list of extra hostnames —
+// e.g. a sibling project's compose overlay (see root CLAUDE.md's
+// EXTRA_INCLUDE/roblox-studio-docker integration) attaching its own
+// container to a network router can reach, without needing a router code
+// change to route to it. Unlike allowExternalEnv (which drops the allowlist
+// entirely), this stays within the same security model — it only adds
+// specific known-safe hosts — so it's meant to be left set permanently in
+// infra config, not used as an occasional debug escape hatch.
+const ExtraAllowedHostsEnv = "ROUTER_EXTRA_ALLOWED_TARGET_HOSTS"
+
+// WithExtraHosts returns a copy of base with any hostnames named in the
+// comma-separated ExtraAllowedHostsEnv environment variable added (lower-
+// cased, matching Validate's own host normalization).
+func WithExtraHosts(base map[string]bool) map[string]bool {
+	merged := make(map[string]bool, len(base))
+	for h := range base {
+		merged[h] = true
+	}
+	for _, h := range strings.Split(os.Getenv(ExtraAllowedHostsEnv), ",") {
+		h = strings.ToLower(strings.TrimSpace(h))
+		if h != "" {
+			merged[h] = true
+		}
+	}
+	return merged
+}
+
 // Validate checks target is a plain host:port with no whitespace or
 // Caddyfile syntax characters (braces, newlines) that could break out of a
 // generated fragment, that it never points back at router itself

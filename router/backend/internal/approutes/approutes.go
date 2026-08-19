@@ -78,10 +78,12 @@ type Info struct {
 // the same internal services Dev Proxy does, most commonly code-docker
 // itself (the shipped default app, see caddy-adapter.default.sh's seed
 // block, targets exactly this).
-var allowedTargetHosts = map[string]bool{
+// Extended at package init by targetguard.ExtraAllowedHostsEnv
+// (ROUTER_EXTRA_ALLOWED_TARGET_HOSTS) — see that const's own doc comment.
+var allowedTargetHosts = targetguard.WithExtraHosts(map[string]bool{
 	"code-docker": true,
 	"dind":        true,
-}
+})
 
 // ValidateTarget delegates to targetguard (shared with devproxy) for the
 // security-critical self-SSRF/self-host block, with App Routes' own

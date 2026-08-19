@@ -7,7 +7,42 @@
 
 **2026-08-19 업데이트**: KasmVNC/Guacamole 추가 리서치 완료, 구현 방향
 결정됨(noVNC+websockify, Selkies는 백로그) — 아래 "결정 사항" 섹션 참고.
-아직 구현은 시작 전.
+
+**2026-08-19 후속 업데이트 — 코드 구현 완료, e2e 미검증**: 경로 B-1과 그
+공통 후속 작업(아래 "이후 공통으로 필요한 작업")까지 코드로 구현함:
+- **router (이 repo)**: `targetguard.WithExtraHosts` + `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`
+  env var(`.env.router`, `ROUTER_ENV_VERSION` 5→6) 로 devproxy/approutes
+  allowlist를 코드 수정 없이 확장 가능하게 일반화 — 미해결 질문 3번 해결(env
+  var 방식 채택, router-manager 편집 UI는 아님 — SelfHosts류 보안 성격
+  리스트라 인프라 설정 고정 쪽이 일관적이라고 판단). `docs/dev-proxy.md`/
+  `docs/app-routes.md`도 갱신.
+  - **아직 이 repo 쪽에 안 한 것**: App Routes 항목 자체(`vnc-only:6080` →
+    `/app/studio-vnc/` 같은) 등록은 router-manager API/UI로 *런타임에* 하는
+    작업이라 코드 변경 대상이 아님 — 실제 인스턴스 띄운 뒤 수동으로(또는
+    다음 세션에) 등록 필요.
+- **`~/Projects/roblox-studio-docker`(sibling repo)**: wayvnc는 그대로 두고
+  앞단에 noVNC+websockify(`[program:novnc]`, `VNC_WEB_PORT` 기본 6080) 추가 —
+  같은 `VNC_BIND_ALIAS` fail-closed 격리를 websockify의 listen/target 양쪽에
+  동일 적용. 상세는 그 repo의 `CLAUDE.md`("VNC embedding" 절)/`plan.md`
+  (10번)/`SETUP.md`/`code-docker-integration-plan.md` 참고.
+
+**2026-08-19 e2e 실측 완료 (같은 날 후속)**: `.allow-test` 확인된 이 checkout에서
+실제로 `docker compose build`(양쪽 repo) → `EXTRA_INCLUDE`+
+`CODE_DOCKER_EXTRA_INTERNAL_NETWORKS=roblox-studio-vnc`로 6개 컨테이너 전부
+기동 → router-manager API로 `vnc-only:6080` App Routes 항목 실제 등록 →
+Claude-in-Chrome으로 `/app/studio-vnc/vnc.html` 직접 열어 확인:
+- 격리(코드에서 vnc-only resolve 불가, router는 가능), 서브패스 에셋 로딩,
+  WebSocket 업그레이드+RFB 배너 수신, 브라우저 "Connected (unencrypted) to
+  WayVNC" 상태 + 마우스 이동까지 전부 실측 확인. 경로 B-1은 **동작 확인됨**.
+- **미해결로 남은 실제 이슈**: `VNC_PASSWORD` 설정 시 noVNC가
+  `Unsupported security types (types: 262)`로 실패 — wayvnc가 제공하는
+  VeNCrypt X509Plain 서브타입을 이 noVNC 릴리스가 구현하지 않아서 생기는
+  실제 버전 호환성 문제(raw RFB 프로브로 근본원인까지 확인, 배선 버그
+  아님). 임시 완화책: 웹 경로는 `VNC_PASSWORD` 대신 App Routes의
+  `requireAuth`(tinyauth)로 게이팅. 상세는 roblox-studio-docker
+  `CLAUDE.md`의 "VNC embedding" 절 참고. 테스트에 쓴 App Routes 항목
+  (`studio-vnc`)과 `.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`는
+  이 테스트 checkout에 남겨둠(`.allow-test` 환경이라 정리 불필요).
 
 ## 동기
 
@@ -112,8 +147,14 @@ App Routes가 유효한 전송 경로가 됨. 두 옵션:
    워크플로우(실사용자 존재)를 나란히 유지할지.~~ → wayvnc 유지, TigerVNC/KRDC
    워크플로우도 나란히 유지(raw RFB 5900은 그대로 열어둠, noVNC는 그 앞에
    추가되는 것이지 대체가 아님).
-3. `allowedTargetHosts`를 어떤 형태로 일반화할지(env var vs router-manager
-   편집 UI) — netgate forwards 쪽에도 같은 패턴이 필요한지 함께 검토. (미결)
+3. ~~`allowedTargetHosts`를 어떤 형태로 일반화할지(env var vs router-manager
+   편집 UI)~~ → env var(`ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`, targetguard.WithExtraHosts)
+   로 결정 — SelfHosts와 같은 보안 성격 목록이라 라이브 편집 UI보다 인프라
+   설정으로 고정하는 쪽이 기존 `ALLOWED_HOSTS`/`ALLOWED_EXPORT_HOSTS` 패턴과도
+   일관됨. netgate forwards 쪽 동일 패턴 필요 여부는 별도로 미검토 상태로 남음
+   (forwards는 애초에 임의 host:port를 이미 허용하는 별개 메커니즘이라 이
+   allowlist 문제 자체가 없음 — 재확인 필요하면 `router/backend/internal/netgate`
+   참고).
 
 ## 결정 사항 (2026-08-19)
 
