@@ -21,11 +21,9 @@ FROM docker:dind AS dind
 # PID 1 init so that loop's forked `ip`/`getent` children get reaped once
 # dockerd takes over as PID 1 - see dind-entrypoint.sh's own comment on this.
 RUN apk add --no-cache iproute2 tini
-# script/netshare/ is a hand-synced copy of the repo-root netshare/ module
-# (see root CLAUDE.md's "netshare" section) - this subtree's own isolated
-# build context can't COPY repo-root files directly. Run vendor-netshare.sh
-# after editing netshare/, before rebuilding this image.
-COPY script/netshare /netshare
+# netshare is qwreey/router-docker-client's own subdirectory - fetched directly at build
+# time (floating #main ref, see that repo's own CLAUDE.md), not a local checkout.
+ADD https://github.com/qwreey/router-docker-client.git#main:netshare /netshare
 COPY script/dind-entrypoint.sh /dind-entrypoint.sh
 ENTRYPOINT ["/dind-entrypoint.sh"]
 

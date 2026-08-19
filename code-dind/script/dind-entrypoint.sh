@@ -104,12 +104,10 @@ fi
 # instead of apply_nameserver's plain fallback-nameserver approach (see
 # .claude/backlog/dns-local-servfail-fix.md's "code-docker-dind" section for
 # why dind hasn't gotten the same fix yet, and what it'd take).
-# apply_default_route/apply_nameserver are shared with
-# netinit/script/netinit-entrypoint.sh - see root CLAUDE.md's "netshare"
-# section; this subtree's own isolated build context can't reach
-# repo-root netshare/ directly, so /netshare here is a hand-synced copy
-# (code-dind/script/netshare/, run vendor-netshare.sh after editing
-# netshare/).
+# apply_default_route/apply_nameserver are shared with router-docker-client's own
+# netinit/netinit-entrypoint.sh - see root CLAUDE.md's "netshare" section. /netshare here
+# comes from qwreey/router-docker-client's netshare/ subdirectory, fetched directly at
+# build time (see this Dockerfile's own ADD line), not a local checkout.
 if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
 	router_hostname="${ROUTER_HOSTNAME:-router}"
 	. /netshare/wait-until.sh

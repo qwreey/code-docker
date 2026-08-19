@@ -37,12 +37,12 @@ already recorded there.
   correct DNS baked in from their very first `docker run`, not just once
   the background loop's first tick lands) and then kept current by a
   background loop, same shape as before.
-- `script/netshare/` - a hand-synced copy of the repo-root `netshare/`
-  module (see root `CLAUDE.md`'s "netshare" section) - this subtree's own
-  isolated Dockerfile build context can't `COPY` repo-root files directly.
-  Run `vendor-netshare.sh` (repo root) after editing anything under
-  `netshare/`, before rebuilding this image - don't hand-edit
-  `script/netshare/*.sh` directly, it'll just get overwritten next sync.
+- `netshare` functions (`apply_default_route`/`apply_nameserver`) come from
+  [qwreey/router-docker-client](https://github.com/qwreey/router-docker-client)'s
+  `netshare/` subdirectory, fetched directly into the image via the
+  Dockerfile's own `ADD https://github.com/qwreey/router-docker-client.git#main:netshare /netshare`
+  (floating `#main` ref, not a local checkout/submodule) - see that repo's
+  own `CLAUDE.md` for why.
 - `dind-authz/` - the authz plugin's Go source (own `go.mod`, standalone
   module, `go test ./...` runs directly from here).
 - `config/dind-authz/*.default.json` - baked-in allow-list defaults for the

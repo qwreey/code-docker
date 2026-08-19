@@ -1,11 +1,11 @@
 FROM docker:latest AS docker-bin
 
-# code-docker-dind (code-dind/Dockerfile) and code-docker-netinit
-# (netinit/Dockerfile) have moved out to their own subtrees, same pattern as
-# router/ - see root CLAUDE.md's "docker-compose topology"/"router" sections
-# and code-dind/CLAUDE.md / netinit/CLAUDE.md. docker-compose.yml's
-# code-docker-dind/code-docker-netinit services now build from those
-# directories as their own contexts instead of a stage here.
+# code-docker-dind (code-dind/Dockerfile) has moved out to its own subtree, same pattern
+# as router/ - see root CLAUDE.md's "docker-compose topology" section and
+# code-dind/CLAUDE.md. code-docker-netinit went a step further: it's not even a local
+# directory anymore, it builds directly from qwreey/router-docker-client's own repo (see
+# docker-compose.yml's build.context for that service). docker-compose.yml's
+# code-docker-dind service still builds from code-dind/ as its own local context.
 
 # webmanager/frontend no longer imports @code-docker/router-frontend
 # (2026-08-08 decoupling - see .claude/backlog/router-frontend-decouple-plan.md
@@ -82,7 +82,9 @@ RUN mkdir -p /var/log/code /var/log/sshd /var/log/webmanager /var/log/nginx \
 RUN mkdir -p /etc/code-docker/supervisord
 
 # Copy config & static files
-COPY --chown=root:root netshare /etc/code-docker/netshare
+# netshare is qwreey/router-docker-client's own subdirectory now - fetched directly at
+# build time (floating #main ref, see that repo's own CLAUDE.md), not a local checkout.
+ADD --chown=root:root https://github.com/qwreey/router-docker-client.git#main:netshare /etc/code-docker/netshare
 COPY --chown=root:root \
     config script/entrypoint.sh script/code-service.sh \
     script/user-init.sh script/get-user-shell.sh script/sshd-service.sh \

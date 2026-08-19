@@ -196,9 +196,11 @@ services:
   code-docker-netinit:
     container_name: "${PREFIX:-}code-docker-netinit"
     build:
-      # netinit/ is its own self-contained subtree (own Dockerfile), same
-      # pattern as router/ and code-dind/ below - see netinit/CLAUDE.md.
-      context: "${BUILD_CONTEXT:-.}/netinit"
+      # netinit is now qwreey/router-docker-client's own subdirectory, built
+      # directly from its git repo (Compose's native remote-git build
+      # context, not a local checkout/submodule) - floating #main ref,
+      # deliberately unpinned, see that repo's own CLAUDE.md for why.
+      context: "https://github.com/qwreey/router-docker-client.git#main:netinit"
       network: host
     network_mode: "service:code-docker"
     cap_add:
@@ -338,20 +340,25 @@ services:
   # own comment above) - anyone who could already reach dind gets
   # host-kernel-equivalent access, so this doesn't introduce a new class of
   # risk on top of what's already accepted. Deliberately its own minimal
-  # image (netfilter-fix/, own Dockerfile) rather than added onto an
-  # existing service, so this trust tier stays scoped to one tiny
-  # single-purpose container instead of expanding code-docker/router's own.
+  # image (qwreey/router-docker-client's netfilter-fix/, see build.context
+  # below) rather than added onto an existing service, so this trust tier
+  # stays scoped to one tiny single-purpose container instead of expanding
+  # code-docker/router's own.
   #
   # Tied to `docker compose down`/`up` on purpose instead of a host-level
   # systemd unit: the exemption's lifetime matches this container's (it
-  # deletes its own rule on SIGTERM, see netfilter-fix/fix.sh), and running
-  # it as a compose service means a multi-instance (PREFIX) deployment gets
-  # one of these automatically per instance with no separate per-PREFIX
-  # systemd unit to remember to install.
+  # deletes its own rule on SIGTERM, see router-docker-client's
+  # netfilter-fix/fix.sh), and running it as a compose service means a
+  # multi-instance (PREFIX) deployment gets one of these automatically per
+  # instance with no separate per-PREFIX systemd unit to remember to
+  # install.
   code-docker-netfilter-fix:
     container_name: "${PREFIX:-}code-docker-netfilter-fix"
     build:
-      context: "${BUILD_CONTEXT:-.}/netfilter-fix"
+      # netfilter-fix is now qwreey/router-docker-client's own subdirectory,
+      # built directly from its git repo (same remote-git build context
+      # mechanism as code-docker-netinit above).
+      context: "https://github.com/qwreey/router-docker-client.git#main:netfilter-fix"
       network: host
     network_mode: host
     cap_add:
