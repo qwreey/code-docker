@@ -7,7 +7,7 @@ webmanager(`/manager`)는 code-docker 컨테이너 안 nginx가 한 origin으로
 종단합니다 — code-docker는 더 이상 `code-docker-external`에 붙지 않아
 외부에서 직접 닿지 않고, host에 퍼블리시된 포트도 router의 80번 하나뿐입니다
 (자세한 경위는
-[dev-proxy.md의 "바깥 리버스 프록시 연결하기"](dev-proxy.md#바깥-리버스-프록시-연결하기)
+[dev-proxy.md의 "바깥 리버스 프록시 연결하기"](../router/docs/dev-proxy.md#바깥-리버스-프록시-연결하기)
 참고). 그래서 앞단 리버스 프록시는 **router 컨테이너 하나(`routerip:80`)**만
 바라보면 됩니다.
 
@@ -15,9 +15,9 @@ webmanager(`/manager`)는 code-docker 컨테이너 안 nginx가 한 origin으로
 다룹니다 - 이것과 별개로, webmanager 자체 비밀번호 게이트
 ([webmanager-config.md의 비밀번호 게이트](webmanager-config.md#비밀번호-게이트),
 `WEBMANAGER_AUTH_PASSWORD_HASH`), router-manager 자체 관리 API 비밀번호
-([router.md의 router-manager 자체 인증](router.md#router-manager-자체-인증),
+([router.md의 router-manager 자체 인증](../router/docs/router.md#router-manager-자체-인증),
 `ROUTER_MANAGER_AUTH_PASSWORD_HASH`), Dev Proxy/App Routes 라우트별
-인증([router.md의 tinyauth](router.md#tinyauth), `TINYAUTH_AUTH_USERS`)이
+인증([router.md의 tinyauth](../router/docs/router.md#tinyauth), `TINYAUTH_AUTH_USERS`)이
 서로 독립된 별도의 인증 계층으로 따로 존재합니다 - 이 문서에서 다루는 앞단
 SSO를 켜둔다고 해서 저 세 가지가 자동으로 켜지거나 대체되지 않으며, 반대로
 저것들을 켜둔다고 code-server 자체가 보호되지도 않습니다.
@@ -86,7 +86,7 @@ server {
 ## 여러 서브도메인 한 번에 로그인 (SSO) — `ROUTER_MANAGER_HOSTS` 등
 
 [router.md의 "공유 origin과 전용
-도메인"](router.md#보안-공유-origin과-전용-도메인routermanagerhosts)에서 설명하는
+도메인"](../router/docs/router.md#보안-공유-origin과-전용-도메인routermanagerhosts)에서 설명하는
 `ROUTER_MANAGER_HOSTS`(예: `router.code.yaeji.moe`)처럼, code-docker 관련
 서비스를 완전히 별도 서브도메인으로 분리해서 노출하는 경우가 있습니다. 위
 Caddy/nginx 예시는 `code.yaeji.moe` 한 도메인만 다루므로, 이런 서브도메인을

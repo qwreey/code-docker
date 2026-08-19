@@ -53,8 +53,8 @@ cat .env.webmanager | tee -a .env.webmanager.bak | docker compose exec -T code-d
 > **주의: webmanager는 자체 비밀번호 게이트를 지원합니다(선택 사항, 기본은 꺼짐).**
 > `WEBMANAGER_AUTH_PASSWORD_HASH` 환경변수에 argon2id로 해시한 비밀번호를 설정하면
 > `/api/auth/unlock`으로 풀기 전까진 접근할 수 없는 라우트가 생깁니다(쓰기 작업 재확인
-> 기준 10분). [Dev Proxy 인증](dev-proxy.md#인증)은 이제 별개의 도구
-> ([tinyauth](router.md#tinyauth), router 컨테이너)가 담당하므로 이 잠금과는 완전히
+> 기준 10분). [Dev Proxy 인증](../router/docs/dev-proxy.md#인증)은 이제 별개의 도구
+> ([tinyauth](../router/docs/router.md#tinyauth), router 컨테이너)가 담당하므로 이 잠금과는 완전히
 > 무관합니다 — 예전엔 같은 토큰을 공유했지만, Dev Proxy가 router로 옮겨가면서 분리됐습니다.
 > **해시는 컨테이너가 이미 떠 있는 상태에서 아래 명령으로 직접
 > 생성합니다**(비밀번호를 두 번 입력받아 오타를 확인하고, 화면엔 안 보이며, 결과로
@@ -80,9 +80,9 @@ cat .env.webmanager | tee -a .env.webmanager.bak | docker compose exec -T code-d
 > gitignore 편집 포함), SSH Keys 추가·삭제, Projects 탭 상세 시트의 git worktree
 > 삭제 등이 여기 해당합니다. Dev Proxy/Tailscale은 이제 router 컨테이너의
 > 자체 API(router-manager)를 호출하므로 이 게이트 대상이 아닙니다(개별 라우트의
-> "인증 요구"는 대신 [tinyauth](router.md#tinyauth)가 담당) — router-manager는
+> "인증 요구"는 대신 [tinyauth](../router/docs/router.md#tinyauth)가 담당) — router-manager는
 > `ROUTER_MANAGER_AUTH_PASSWORD_HASH`로 켜는 자기 자신만의 별도 비밀번호 게이트를
-> 갖고 있습니다([router.md](router.md#router-manager-자체-인증) 참고). 예외로 **Terminal, 파일 탭, Logs, Sessions,
+> 갖고 있습니다([router.md](../router/docs/router.md#router-manager-자체-인증) 참고). 예외로 **Terminal, 파일 탭, Logs, Sessions,
 > Supervisor의 프로그램별 로그 조회, Claude Code 탭의 대화 세션 로그 서브탭(Projects
 > 탭 상세 시트에서 프로젝트별로 필터링해 재사용하는 곳 포함)은
 > 조회까지 통째로 게이트**됩니다(각각 root 쉘/임의 파일 접근/로그 속 시크릿

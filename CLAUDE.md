@@ -54,7 +54,7 @@ Multi-stage: `docker:latest` is used only as a source to `COPY --from=docker-bin
 
 Two user-defined networks: `code-docker-external` (has internet/host access) and `code-docker-internal` (`internal: true`, no outside route) — router's tailscale `forwards:` feature (see "router" below) also resolves via a `forward` alias on `code-docker-internal` rather than a dedicated network of its own; there used to be a third `code-docker-forwards` network, dropped once the port-namespace collision it existed to prevent stopped being possible (see the "tailscale" bullet under "router" below). As of the egress lockdown (see "router" below), neither `code-docker` nor `code-docker-dind` (the `docker:dind` sidecar, used so `docker`/`docker compose`/`docker buildx` work *inside* code-docker via `DOCKER_HOST=tcp://dind:2375`) is attached to `code-docker-external` anymore — both live on `code-docker-internal` only, and reach the internet exclusively through the default route their respective netinit-style loop keeps planting, pointed at the `code-docker-router` service, the only container attached to both networks. All service/network names are prefixed with `${PREFIX:-}` to let multiple instances coexist on one host without name collisions (set `PREFIX` in `.env`).
 
-`code-docker-netfilter-fix` (own minimal image, `netfilter-fix/`) is a `network_mode: host` + `NET_ADMIN` + read-only docker.sock-mounted service that installs a `DOCKER-USER` exemption for `code-docker-internal` (and any networks named in `CODE_DOCKER_EXTRA_INTERNAL_NETWORKS`) — added because a Docker Engine 29.x hardening change started blocking router's own FORWARD traffic to `code-docker-internal` at the host netfilter level, a class of blocking `NET_ADMIN` inside router's own netns can't reach. Tied to compose lifecycle (deletes its own rule on SIGTERM) rather than a host systemd unit, so a multi-instance (`PREFIX`) deployment gets one automatically per instance. See `docs/egress-netgate.md` for the detailed mechanism. The top-level `include: - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}` (default: a committed empty file, no-op) is the hook a sibling project clones into `builds/<name>/` and integrates through without ever touching this repo's own `docker-compose.yml` — `CODE_DOCKER_EXTRA_INTERNAL_NETWORKS` is what such a sibling sets when it attaches router to its own dedicated `internal: true` network too. See `example-env`'s own comments on both vars and `.claude/archive/roblox-studio-vnc-isolation-plan-done.md` for the concrete roblox-studio-docker case this was built for.
+`code-docker-netfilter-fix` (own minimal image, `netfilter-fix/`) is a `network_mode: host` + `NET_ADMIN` + read-only docker.sock-mounted service that installs a `DOCKER-USER` exemption for `code-docker-internal` (and any networks named in `CODE_DOCKER_EXTRA_INTERNAL_NETWORKS`) — added because a Docker Engine 29.x hardening change started blocking router's own FORWARD traffic to `code-docker-internal` at the host netfilter level, a class of blocking `NET_ADMIN` inside router's own netns can't reach. Tied to compose lifecycle (deletes its own rule on SIGTERM) rather than a host systemd unit, so a multi-instance (`PREFIX`) deployment gets one automatically per instance. See `router/docs/egress-netgate.md` for the detailed mechanism (lives in the `router/` submodule now, see "router" below). The top-level `include: - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}` (default: a committed empty file, no-op) is the hook a sibling project clones into `builds/<name>/` and integrates through without ever touching this repo's own `docker-compose.yml` — `CODE_DOCKER_EXTRA_INTERNAL_NETWORKS` is what such a sibling sets when it attaches router to its own dedicated `internal: true` network too. See `example-env`'s own comments on both vars and `.claude/archive/roblox-studio-vnc-isolation-plan-done.md` for the concrete roblox-studio-docker case this was built for.
 
 `code-docker-dind` doesn't use the stock `docker:dind` entrypoint directly — the `dind` stage in `code-dind/Dockerfile` (`FROM docker:dind`) `COPY`s in `code-dind/script/dind-entrypoint.sh` as its `ENTRYPOINT`, and `code-docker-dind` builds a stage derived from it (`target: "${DIND_TARGET:-dind-authz}"` in docker-compose.yml — `dind-authz` is the default, layering an authorization plugin that denies privileged/host-escalation container creation on top of the plain `dind` stage; `dind-authz-remap` adds userns-remap on top of that; see the Dockerfile's own stage comments and `docs/tips/dind.md`) instead of using `image: docker:dind`, so the daemon binds only to its `code-docker-internal` IP instead of the image's hardcoded `0.0.0.0:2375` (it picks that IP dynamically at startup, by finding the interface with no default route — `code-docker-internal` being the only network without one — rather than hardcoding an address). Baking it in at build time (rather than bind-mounting the script at runtime) means it isn't tied to the compose file's on-disk location — same `context:` override pattern as `router`'s own self-contained subtree (see `code-dind/CLAUDE.md`'s "Naming" section for why this subtree is called `code-dind`, not `dind`). Being `privileged: true` already, it manages its own default route and `/etc/resolv.conf` directly (via `netshare`'s `apply_default_route`/`apply_nameserver`, see the "netshare" section above) instead of needing a `netinit`-style sidecar — but unlike code-docker (which only ever *waits* for a route netinit already set), dind applies both once, synchronously, *before* `dockerd` starts, then keeps a background loop running for upkeep. That synchronous-first step matters: `dockerd` snapshots `/etc/resolv.conf` at its own startup to seed the DNS every nested `docker run` container gets from then on, so backgrounding this unconditionally (the original implementation) could lose a race against `dockerd`'s own startup and leave nested containers with no working upstream DNS baked in for the rest of the daemon's life, even though dind's own `/etc/resolv.conf` looked correct moments later.
 
@@ -68,355 +68,46 @@ Two user-defined networks: `code-docker-external` (has internet/host access) and
 
 ### router
 
-A separate container (`code-docker-router`, `router/` — its own subtree with its own
-`CLAUDE.md`/`plan.md`) that owns everything about code-docker's network boundary — it has
-meaningfully higher trust than code-docker, the same "국경을 넘는 컨테이너" framing as
-dind-authz. It grew from a pure egress-filtering sidecar (originally named
-`code-docker-netgate`) into the full boundary container described here across a staged
-migration; see `router/.claude/functional-router-plan.md` for the vision/every decision
-and `.claude/backlog/egress-netgate-plan.md` for the original egress design router's
-netgate feature area is still built on. User-facing docs: `docs/router.md`,
-`docs/egress-netgate.md`, `docs/dev-proxy.md`, `docs/tailscale.md` (now a short pointer
-into `docs/router.md`).
+`router/` is a git submodule pointing at
+[qwreey/router-docker](https://github.com/qwreey/router-docker) — a fully standalone
+project (own repo, own `docker-compose.router.yml`, own `envmigrate` submodule, builds and
+runs outside code-docker too) that code-docker "uses" rather than contains, the same
+pattern as `code-server-autoinstall`. It owns everything about code-docker's network
+boundary — meaningfully higher trust than code-docker, the same "국경을 넘는 컨테이너"
+framing as dind-authz — across four feature areas: netgate (egress lockdown), tailscale,
+Dev Proxy/App Routes, and tinyauth, all exposed through its own `router-manager` Go
+backend + SPA at `/router/`. See `router/CLAUDE.md` for the full architecture/feature
+breakdown and `router/docs/*.md` for user-facing docs (`docs/index.md` links into these);
+this section only covers code-docker's own side of the contract.
 
-Four feature areas, each its own supervisord programs (`router/config/supervisord.d/*.conf`,
-git-tracked built-in program definitions — see `router/config/netgate/supervisord.default.conf`'s
-own comment on the two `[include]` globs, one git-tracked for built-ins, one gitignored for
-user overrides, same auto-include idiom as the main image's `config/supervisord.default.conf`):
+`router/docker-compose.router.yml` defines the `code-docker-router` service; code-docker's
+own `docker-compose.yml` includes it via a fixed path (not the optional `EXTRA_INCLUDE`
+hook — router is core, always-present topology) and merges in `env_file: .env.router` and
+the `ROUTER_VOLUME` bind mount itself, since those relative paths need to resolve against
+code-docker's own file location, not the submodule's (see that file's own comments).
+`code-docker-netinit`'s and `code-docker-dind`'s own routing loops keep code-docker's
+default route pointed at router via the `ROUTER_HOSTNAME` network alias (default `router`)
+— `NETGATE_ENABLED` (default `true`) is a **behavioral** opt-out only for all of
+netinit/dind/router's loops, it does not undo the compose topology itself (see
+`example-env`'s own comments on both). `ALLOWED_HOSTS`/`NGINX_BLOCK_LOOPBACK`/
+`TRUSTED_PROXIES`/`NGINX_LOG_LEVEL` are genuinely shared between code-docker's and router's
+own nginx (both read the same `.env` values), so they stay in code-docker's own
+`example-env` rather than `router/example-env.router`.
 
-- **netgate (egress lockdown)** — netinit-style routing enforcement (code-docker/dind side)
-  plus router's own filtering (DNS-level content blocklist via dnsmasq, RFC1918/CIDR
-  blocking, inbound port-forwarding). `code-docker-netinit` is a small sidecar built from its
-  own self-contained subtree (`netinit/` — own Dockerfile/build context, see
-  `netinit/CLAUDE.md`; same pattern as `router/` and `code-dind/`). It runs with
-  `network_mode: service:code-docker` (shares code-docker's
-  netns entirely — same interfaces/IP/routing table, not a separate IP) and
-  `cap_add: [NET_ADMIN]`, a capability code-docker itself never gets. `netinit/script/netinit-entrypoint.sh`
-  loops every 5s doing `ip route replace default via <router's resolved IP>`, defensively
-  (never exits non-zero, tolerates `router` not resolving) — this is what keeps code-docker's
-  default route pointed at router without code-docker ever being able to undo it.
-  `code-docker-dind` needs no separate sidecar for the same mechanism — it's already
-  `privileged: true`, so `code-dind/script/dind-entrypoint.sh` runs the identical loop itself
-  (backgrounded before its final `exec`, wrapped in `tini` so dockerd-as-PID-1 doesn't
-  accumulate zombies from the loop's repeated `ip`/`getent` forks). `script/entrypoint.sh`
-  gates everything network-sensitive (starting with `user-init.sh`'s qwreey-fish curl)
-  behind a bounded poll (60s timeout) for `ip route show default` to be non-empty — this is
-  what code-docker waits on for netinit to have planted a route, without a compose-level
-  `depends_on` cycle (route *reads* need no capability, only *writes* do). `router` is the
-  only container attached to both `code-docker-internal` and `code-docker-external`,
-  `cap_add: [NET_ADMIN]` only (no `privileged: true`).
-  - `[program:netgate-firewall]` (`router/config/netgate/firewall.default.sh`) loops every
-    30s reading `router/config/netgate/config.default.yaml` (override pattern) via `yq -r`
-    and translating it into iptables: an ordered `outbound:` allow/block CIDR list
-    (first-match-wins, specific exceptions before broad blocks — default blocks RFC1918 +
-    link-local + loopback) and a `forwards:` port-forwarding list (default: host `80` →
-    `code-docker:80`, generalized to any `code-docker-internal` hostname, not hardcoded). A
-    forward's ACCEPT rule always lands before the CIDR blocks, since the target's own IP is
-    itself in RFC1918 range. A stateful `ESTABLISHED,RELATED` ACCEPT rule comes first of all
-    — without it, return traffic for an already-permitted connection (e.g. the port-80
-    DNAT's reply) gets re-evaluated against the block rules and dropped, since Docker's own
-    bridge subnets are themselves RFC1918 addresses. `net.ipv4.ip_forward=1` is set via this
-    service's own `sysctls:` in docker-compose.yml, not a runtime `sysctl -w` — Docker keeps
-    `/proc/sys` read-only for non-privileged containers regardless of `NET_ADMIN`, so a
-    runtime write silently fails with permission denied. Same-subnet traffic (code-docker↔dind,
-    code-docker↔router) never reaches this chain at all — connected-route traffic bypasses
-    the gateway entirely, so no RFC1918 exception is needed for `code-docker-internal`'s own
-    CIDR.
-  - `[program:dns]` (`router/config/dns/dns.default.sh` +
-    `router/config/dns/dnsmasq.default.conf`) is code-docker/dind's upstream DNS resolver —
-    `code-docker-internal` being `internal: true` means Docker's own embedded DNS
-    (`127.0.0.11`) refuses to forward queries externally, so both eventually point at router
-    instead (see `router/.claude/router-dns-plan.md`) — code-docker itself does this
-    indirectly now, through its own local `dns-local` resolver (`config/dns-local/`, see
-    `.claude/backlog/dns-local-servfail-fix.md`) rather than router directly in
-    `/etc/resolv.conf`; `code-docker-dind` still points its own `/etc/resolv.conf` at router
-    the plain way. dnsmasq forwards upstream using router's own (working, non-internal) `/etc/resolv.conf`
-    by default, or a fixed custom upstream list (e.g. `1.1.1.1`) if configured — see
-    "DNS management" below. This also doubles as the content blocklist enforcement point:
-    dnsmasq's `addn-hosts=` answers `0.0.0.0` for any domain in the baked-in StevenBlack/hosts
-    file (no format conversion needed — dnsmasq reads hosts-format directly), now web-managed
-    (multiple sources, not a single static file — see "DNS management" below) rather than a
-    build-time-only `blocklist.default.hosts`/`blocklist.override.hosts` pair. This
-    replaced an earlier squid-based intercept/SNI-block approach (`REDIRECT` on ports 80/443
-    to squid, blocking by `dstdomain`/SNI) — removed because squid's `ssl_bump` anti-spoofing
-    check false-positived on CDN-style domains with rotating IP pools (e.g.
-    `registry-1.docker.io`), breaking `docker pull`. Block-only, no whitelist mode, and
-    still explicitly best-effort/passive (adblock-like) — the hard boundary remains the
-    RFC1918/CIDR FORWARD rules above.
-  - `NETGATE_ENABLED` (env, default `true`) is a **behavioral** opt-out only — `false`
-    makes the netinit/dind/router loops idle and skips entrypoint.sh's wait gate. It does
-    **not** restore `code-docker-external`/`ports: - 80:80` on code-docker or dind —
-    Compose can't conditionally attach a network or publish a port based on a runtime env
-    var, so a full topology rollback is a deliberate manual edit to docker-compose.yml (same
-    spirit as `DIND_TARGET=dind` to fully disable dind-authz) — see example-env's
-    `NETGATE_ENABLED` comment for the exact steps. `profiles:` was considered for this
-    opt-out and rejected: Compose profiles are opt-in by nature (a profiled service only
-    starts when its profile is explicitly activated), which can't express "on by default
-    even with zero `.env` file" — a hard requirement here per this repo's "works with no
-    `.env` at all" philosophy.
-- **tailscale** — `tailscaled`, `tailscale-forward`, and `tailscale-publish` run as three
-  separate, single-responsibility supervisord programs (`router/config/tailscale/*.default.sh`),
-  deliberately kept apart so e.g. editing `config.yaml` and restarting `tailscale-forward`
-  never touches the `tailscaled` login session or `tailscale-publish`. Moved here from
-  code-docker in full (daemon+login+forwards+publish, not partial) — code-docker itself has
-  zero tailscale processes/packages now. `TAILSCALE_ENABLED`/`TAILSCALE_LOGIN_SERVER`/
-  `TAILSCALE_HOSTNAME` (docker-compose env, same names as before the move) configure it.
-  `TAILSCALE_LOGIN_SERVER` is also settable from the Tailscale tab's own "기본 설정"
-  (`config.yaml`'s `login_server` field, alongside `forwards:`/`publish:` — see below) —
-  the env var always wins when set (an infra-as-code pin, same priority
-  `ROUTER_MANAGER_AUTH_PASSWORD_HASH`/`TINYAUTH_AUTH_USERS` already use), and the UI
-  field renders read-only with a note in that case (`router/backend/internal/tailscale`'s
-  `GlobalConfig.LoginServer`/`LoginServerPinned`/`EffectiveLoginServer`). An unset UI
-  value behaves identically to today's unset-env default (tailscale.com's own SaaS) — the
-  field is never prefilled. The Tailscale tab's "재인증" button (`tailscale up
-  --force-reauth`, `POST /api/tailscale/login/start` with `{"forceReauth": true}`) issues a
-  fresh login URL even while already logged in; switching to a genuinely different login
-  server on an already-authenticated node still goes through the pre-existing "wipe
-  `tailscale/state` and restart" procedure (`docs/router.md`) rather than "재인증" alone,
-  since `tailscale up`'s own flag semantics around that combination aren't confirmed safe.
-  Inbound: `tailscaled`'s netstack auto-forwards any tailnet connection to the same port on
-  `127.0.0.1`, unconditionally, for any port with no `tailscale serve` rule (core
-  `tailscaled` behavior) — since code-docker no longer runs tailscaled at all, this only
-  matters for router's own ports now, not code-docker's. Outbound (forwards): `socat` piped
-  through `tailscaled`'s local SOCKS5 proxy, listening on router's own `forward` alias on
-  `code-docker-internal` (moved from code-docker's own now-removed dedicated
-  `code-docker-forwards` network — forwards/publish sharing a port namespace was only ever
-  a risk while both lived inside code-docker itself; now that forwards' socat and publish's
-  `tailscale serve` both live on router, and publish proxies to a *different* container
-  rather than binding a local port at all, that collision can't happen, so the extra network
-  was dropped) so `forward:<port>` still resolves from inside code-docker, now pointing at
-  router.
-  `${ROUTER_VOLUME:-./data/router}/tailscale/config.yaml` (seeded from
-  `router/config/tailscale/tailscale-config.default.yaml`) drives `forwards:`/`publish:` —
-  MagicDNS names are deliberately never used as forward/publish targets (too dynamic,
-  can even point at something outside the tailnet on self-hosted control servers), only
-  tailscale hostnames/IPs. `publish:` entries name their own `target_host` (any
-  `code-docker-internal` hostname/IP reachable from router — a plain compose service
-  hostname works the same way code-docker's does, no alias dance needed — that was only
-  ever about dodging code-docker's *own* tailscaled's auto-exposure, moot once tailscaled
-  isn't there); omitting `target_host` defaults to `code-docker` for entries written
-  before the field existed.
-  router-manager (below) replaces the old status-polling shell script with a real read-only
-  HTTP endpoint, and its own `/api/tailscale/forwards`/`/api/tailscale/publish`
-  CRUD already persists+restarts the affected program in one call — editing
-  `config.yaml` by hand and reloading via `docker compose exec
-  code-docker-router supervisorctl restart ...` (see docs/router.md) is only
-  needed if you bypass that API. `bin/forward-reload` (the old code-docker-side
-  shortcut for printing that command) was removed since it couldn't actually
-  reach router's supervisorctl socket from a different container and the API
-  path above makes it unnecessary.
-- **Dev Proxy** — an internal Caddy instance (`caddy-adapter` program,
-  `router/config/caddy-adapter/caddy-adapter.default.sh`) exposing dev servers on wildcard
-  subdomains, managed via router-manager's API (`router/backend/internal/devproxy`,
-  `CADDY_ADAPTER_ENABLED`/`CADDY_ADAPTER_PORT` env, same names as before the move — also
-  read by code-docker's nginx to build its `/exports/` proxy target). Moved here from
-  code-docker in full, same reasoning as tailscale.
-- **tinyauth** — router's own forward-auth, run as a plain supervisord program inside
-  router itself (`router/config/tinyauth/tinyauth.default.sh`), not a separate compose
-  service — `router/Dockerfile` multi-stage-extracts the prebuilt binary straight from
-  `ghcr.io/tinyauthapp/tinyauth` (its own Dockerfile requires a mandatory pnpm/Vue
-  frontend build ahead of its Go build, so it isn't rebuilt from source like dind-authz,
-  but the finished binary itself needs no such step and copies over cleanly). Sleeps
-  instead of starting when `TINYAUTH_APPURL` is unset (tinyauth refuses to boot without a
-  real URL) — same opt-out idiom as `CADDY_ADAPTER_ENABLED`/`TAILSCALE_ENABLED`, and what
-  keeps an unconfigured instance from crash-looping. Protects individual Dev Proxy routes
-  that opt into "require auth" (Caddy `forward_auth` → tinyauth's `/api/auth/caddy` on
-  `127.0.0.1:3000`) — a separate, lighter tool from webmanager's own `internal/authgate`,
-  which stays exactly as-is, scoped only to webmanager's own Terminal/File Manager/Logs.
-  `TINYAUTH_AUTH_USERS` (docker-compose env) is empty by default — no one can log in until
-  set (`docker run --rm ghcr.io/tinyauthapp/tinyauth:v5 user create --username <u>
-  --password <p> --docker` generates the value). The recommended path is now per-user
-  add/delete via router-manager's own API/UI (`router/backend/internal/tinyauthusers`,
-  a "설정" tab in router's own SPA — see "router-manager" below) instead of hand-editing
-  that one env var — tinyauth itself only reads it at process start, so every add/delete
-  restarts the `tinyauth` supervisord program via the same `restartSupervisorProgram`
-  helper tailscale forwards/publish already use. `TINYAUTH_AUTH_USERS` still wins when
-  actually set (an infra-as-code pin, same priority as `ROUTER_MANAGER_AUTH_PASSWORD_HASH`
-  vs its own file-backed store) — the UI shows a read-only notice instead of an edit form
-  in that case.
-
-router-manager is router's own Go backend (`router/backend`, mirrors webmanager's own
-backend pattern) — router's own nginx (not code-docker's) terminates host:80 directly and
-proxies to it over a unix socket (`/run/router-manager.sock`) under one unified `/router/`
-location (`router/config/nginx/nginx.default.conf`, also serving the built SPA — see
-"router's own frontend" below); router-manager itself opens no TCP port by default
-(`ROUTER_MANAGER_ADDR` is an opt-in TCP escape hatch for local dev outside the container).
-The old per-feature code-docker-nginx locations (`/tailscale/`, `/dev-proxy/`,
-`/router-auth/`) are gone — code-docker isn't even attached to `code-docker-external`
-anymore, so it was never a legitimate proxy point for this. Routes router-manager serves:
-full tailscale CRUD (`GET`/`PUT
-/api/tailscale/config`, `GET`/`POST`/`DELETE /api/tailscale/forwards[/{name}]`,
-same for `/publish`, `GET /api/tailscale/status`, `POST /api/tailscale/login/
-{start,cancel}`, plus the original read-only `GET /api/tailscale/state`
-— `{backendState, authUrl}`, same shape the old status-polling script wrote —
-code-server's sign-in banner, `config/code/code-patch/tailscale-notify.default.js`,
-polls this now instead of a static file), the Dev Proxy expose CRUD, the App Routes expose
-CRUD (`router/backend/internal/approutes`, sharing self-SSRF target validation with Dev
-Proxy via `internal/targetguard`), netgate's outbound/forwards/bandwidth-shaping CRUD
-("Net 관리" tab, `router/backend/internal/netgate` — bandwidth is `GET`/`PUT
-/api/netgate/bandwidth`, applied via a `tc` HTB tree on the default interface by its own
-`netgate-shaping` supervisord program, see `router/config/netgate/shaping.default.sh` and
-docs/egress-netgate.md's "대역폭 제한" section), tinyauth user CRUD (`router/backend/internal/
-tinyauthusers`, "tinyauth" tab), DNS management (`router/backend/internal/dns`,
-`GET /api/dns/blocklist-sources` + `POST`/`PUT`/`DELETE` for custom sources +
-`GET`/`POST /api/dns/blocklist-sources/builtin/{status,pull,ignore}` for the
-hash-tracked builtin source, `GET`/`PUT /api/dns/custom-hosts`,
-`GET`/`PUT /api/dns/resolver` — see "DNS management" below), and
-`POST /api/auth/unlock` + `GET /api/auth/status` for
-router-manager's own admin-API password gate (see below). `/exports/` (actual
-end-user traffic to an exposed dev server) and `/app/` (App Routes end-user traffic) are
-both separate nginx locations from `/router/` (the admin API + SPA) — don't confuse them.
-
-**DNS management** (2026-08-08, `router/.claude/dns-blocklist-management-plan.md`) —
-DNS content blocklist and resolver override, previously pure build-time
-default/override files with no runtime API, are now web-managed like
-tailscale/Dev Proxy. Three pieces, all under `/var/lib/code-docker-router/dns/`:
-(1) blocklist sources, one hosts-format file per source under
-`dns/blocklist-sources/` — `builtin.hosts` is seeded from
-`blocklist.default.hosts` **only** (deliberately not `.override.hosts` —
-that file has always been an unconditional, purely additive extra
-`--addn-hosts=` flag layered on top, not a replacement for the default, and
-folding it into this seed step would have silently reversed that for
-anyone already relying on it; it keeps working exactly as before,
-independent of everything below) using `config/code/code-patch.default.sh`'s
-own hash-tracking algorithm (`dns.default.sh`'s own `seed_builtin_blocklist`,
-on every `dns` program start): missing → copy; shipped-content unchanged →
-no-op; shipped-content changed and the live copy still matches what was
-last seeded → silently re-copy (safe, no customization exists yet to lose);
-shipped-content changed and the live copy has diverged (edited via the web
-UI) → leave it alone, and `GET /api/dns/blocklist-sources/builtin/status`
-reports `updateAvailable` with an added/removed host diff sample plus
-pull/ignore actions — this is the one behavioral difference from
-code-patch, which just leaves a diverged file alone forever with no
-follow-up. Any number of additional custom sources can be added via the web
-UI (`POST /api/dns/blocklist-sources`) — dnsmasq accepts `--addn-hosts=`
-repeated, so `dns.default.sh` just globs every file in the directory.
-(2) `dns/custom-hosts.yaml`/`.hosts` — MagicDNS-style custom hostname→real-IP
-entries (`GET`/`PUT /api/dns/custom-hosts`, whole-list replace), loaded
-*before* every blocklist source in `dns.default.sh`'s `--addn-hosts=`
-sequence (a fixed precedence decision, not user-configurable — see the plan
-doc for why dnsmasq's own multi-file-hosts precedence isn't reliable enough
-to fully resolve a host appearing in both, and how `duplicateHosts` in
-`GET /api/dns/blocklist-sources` surfaces that ambiguity as a warning
-instead). (3) `dns/config.yaml`'s `resolver: {mode, servers}` — `auto`
-(default, unchanged: dnsmasq reads this container's own `/etc/resolv.conf`)
-or `custom` (a fixed upstream list, e.g. `1.1.1.1` — `--no-resolv --server=`
-flags, confirmed feasible in userspace). `dnsmasq.default.conf`'s own static
-`addn-hosts=` line was removed since it can't reflect any of this at
-runtime. Applying the same reconcile pattern to netgate's firewall config
-was considered and explicitly deferred — see the plan doc's own section on
-why that needs netgate to first adopt the same "seeded live copy" model
-before hash-reconcile means anything coherent there (netgate today reads
-`config.default.yaml`/`.override.yaml` directly, with no seeded copy to
-diverge from).
-
-router's own frontend (`router/frontend`, `@code-docker/router-frontend` — an npm workspace
-package, root `package.json`'s `workspaces:`) owns the actual page components (Dev Proxy,
-App Routes, Tailscale, DNS, Net 관리, tinyauth). Since a 2026-08-08 decoupling pass (see
-`router/CLAUDE.md` and `.claude/archive/router-frontend-decouple-plan-done.md`), webmanager
-no longer imports any of these components directly — it `<iframe>`-embeds router's own
-`/router/` page instead (`webmanager/frontend/src/components/RouterEmbed/RouterFrame.tsx` —
-see "webmanager" below), and `webmanager/frontend/package.json` carries zero
-`@code-docker/router-frontend` dependency at all anymore. The generic UI primitives
-webmanager used to borrow from that package (`ErrorBanner`/`Sheet`/`Skeleton`) were
-hand-duplicated into webmanager's own tree as part of the same pass. `router/frontend`'s own
-`App.tsx` (a plain tab switcher, no react-router) is also
-built into a real SPA now — `router/Dockerfile` has its own Node build stage (using
-`router/frontend/package-lock.json`, generated standalone since this Dockerfile's build
-context is `router/` only and can't reach the repo-root workspace lockfile) and
-`router/backend/static.go` (ported from `webmanager/backend/static.go`) serves it directly
-at `/router/`, replacing the old password-only `handlers_ui.go` page — so App
-Routes/Dev Proxy/Tailscale/tinyauth users can all be managed without webmanager at all, only
-router-manager's own API. First-run password setup/change now lives in this SPA too
-(`RouterAuthPanel`, a React port of the old inline-JS page), under a "설정" tab alongside a
-new `TinyauthUsers` panel (see below). `router/frontend/vite.config.ts`'s build `base` is
-`'./'` (relative), not an absolute prefix like webmanager's own `'/manager/'` — this SPA is
-served from two different depths depending on deployment (the shared hostname's `/router/`
-path, or the root of a dedicated `ROUTER_MANAGER_HOSTS` domain, see below), and only a
-relative base resolves correctly under both as long as the page itself is always linked with
-a trailing slash. Confirmed live that an absolute `/` base 404s every asset under `/router/`,
-since the browser resolves a root-absolute `src` against the origin root, bypassing the
-`/router/` prefix entirely.
-
-router-manager's own admin-API auth (`router/backend/internal/authgate`) is opt-in via
-`ROUTER_MANAGER_AUTH_PASSWORD_HASH` and gates every *mutating* route above (tailscale
-config/forwards/publish/login writes, dev-proxy expose writes) — reads (state, config,
-list, status) stay open. The recommended path is setting a password in-app at
-`/router/` instead of via env var, though — see docs/router.md's "router-manager 자체
-인증" for the file-backed store (`ROUTER_VOLUME`), setup/change UI, and forgot-password
-recovery; the env var remains as an infra-as-code pin that always wins over the
-in-app-set one when present. A separate gate/cookie from webmanager's own
-`internal/authgate` below (different process, different secret) — `router-manager
---hash-password` generates the argon2id hash. `RouterUnlockModalHost` (mounted in
-webmanager's `App.tsx` next to its own `UnlockModalHost`) pops on any 401 from a gated
-router-manager route, same "prompt → retry once" pattern webmanager's own gate uses. See
-`router/plan.md` for the design history (this closed out the item that was previously
-tracked there as "보류/미정").
-
-The unlock cookie (`router_manager_unlock`) is host-only with no Domain attribute, and
-`/router/` is reachable on the *shared* hostname by default (same origin as code-server/
-webmanager/every `/exports/` and `/app/` target) — so a compromise anywhere on that shared
-origin (XSS, a poisoned agent writing to the page) can ride the cookie into router-manager's
-API via a same-origin `fetch()`; HttpOnly/SameSite=Strict only stop cross-origin/JS-read
-access, not same-origin script. Router's own nginx strips the cookie from the proxied
-`Cookie` header on `/exports/` and `/app/` (`router_manager_cookie_stripped` map in
-`router/config/nginx/nginx.default.conf`) so an untrusted Dev Proxy/App Routes target can't
-read it directly — but that doesn't close the same-origin-script vector. `ROUTER_MANAGER_HOSTS`
-(`router/example-env.router`, comma-separated, default empty) is the actual fix: it adds a
-second `server{}` block (env-only/restart-required, same trust tier as `ALLOWED_HOSTS`/
-`ALLOWED_EXPORT_HOSTS` — never made in-app-editable) that serves router-manager's SPA+API
-standalone on a dedicated hostname via nginx `server_name` matching, so its cookie is scoped
-to that origin alone. `router/frontend`'s `RouterAuthPanel`/`RouterTrustedHostsPanel`/
-`OriginWarningBanner` show the currently-configured value read-only and warn when accessed
-over localhost or over the shared path despite a dedicated domain being configured — see
-docs/router.md's "보안: 공유 origin과 전용 도메인" section.
-
-`ROUTER_MANAGER_HOSTS` also changes how webmanager itself embeds the Dev
-Proxy/App Routes/Tailscale/DNS/Net 관리/tinyauth/설정 tabs — see "webmanager" below and
-`webmanager/frontend/src/components/RouterEmbed/RouterFrame.tsx` — switching the
-`<iframe>`'s `src` from the same-origin `/router/` path (the default, when
-`ROUTER_MANAGER_HOSTS` is unset) to the dedicated cross-origin domain instead, which is what
-actually closes the ambient-cookie gap for those tabs: a same-origin iframe still shares a
-browsing context whose DOM anything compromising webmanager itself could reach, while a true
-cross-origin iframe has none. Both cases are an `<iframe>` — there is no same-origin
-direct-render fallback (that existed before the 2026-08-08 decoupling above, since removed).
-`router/frontend/src/embedTheme.ts`'s `?theme=`/`postMessage` handling
-(and the matching `[data-theme]` CSS blocks in `router/frontend/src/index.css`, mirroring
-webmanager's own `theme.ts` idiom) keep the embedded iframe's light/dark choice in sync with
-webmanager's, since a cross-origin iframe can't read the parent's `data-theme` attribute
-directly the way a same-origin embed implicitly could.
 
 router's own feature-specific env vars (tailscale, Dev Proxy exposure policy,
-`ROUTER_MANAGER_AUTH_PASSWORD_HASH`, tinyauth, `/exports/` allowlists — everything above
-that isn't shared with code-docker or tied to compose topology) live in
+`ROUTER_MANAGER_AUTH_PASSWORD_HASH`, tinyauth, `/exports/` allowlists — everything that
+isn't shared with code-docker or tied to compose topology) live in
 `router/example-env.router` (copy to `.env.router` — deliberately flat, alongside
-`docker-compose.yml`/`.env`/`.env.webmanager`, not `router/.env.router`: `docker-compose.yml`'s
-`env_file:` path is resolved relative to wherever the compose file itself lives, which in the
-recommended split-directory deploy — clone into `builds/code-docker/`, copy `docker-compose.yml`
-out one level, see `docs/index.md` — is not the same directory as the `router/` subtree, and
-`required: false` means a file left under `builds/code-docker/router/` is silently never read),
-not the repo-root `example-env` — mirrors webmanager's `.env.webmanager` pattern, including a
-`router-manager --env-migrate` CLI and startup version-mismatch warning
-(`ROUTER_ENV_VERSION`/`ROUTER_ENV_TEMPLATE_PATH`). The migration logic itself
-(reconcile-against-template, `#!important`/`#!` markers, `#~` dead-key archival) is a
-shared Go module, `github.com/qwreey/envmigrate` — originally extracted from webmanager's
-own `internal/envmigrate` and parameterized (version-key name, file names) so both tools
-use it; now its own standalone repo, brought in as a git submodule (same pattern as
-`code-server-autoinstall`). webmanager's Dockerfile stage `COPY`s the repo-root
-`envmigrate/` submodule directly (its build context is already repo root). router/backend's
-build context is deliberately isolated to `router/` (see `router/CLAUDE.md`), so — since
-`router/` is mid-extraction into its own standalone project (see that file's own note) —
-router carries its *own* `envmigrate` submodule at `router/envmigrate` rather than reaching
-outside `router/` into the repo-root one; `go mod vendor` materializes it into
-`router/backend/vendor/` instead, which *is* inside router's own build context and gets
-committed like any other source. Run `router/vendor-envmigrate.sh` after updating the
-`router/envmigrate` submodule and before rebuilding router's image — `go build` fails
-loudly on a stale/inconsistent `vendor/`, so this can't silently drift. `ROUTER_HOSTNAME` (default `router`) is a similar
-compose-topology-vs-feature-var split example in the other direction: it stays in the
-repo-root `example-env` (not `router/example-env.router`) because code-docker,
-code-docker-netinit, and code-docker-dind all resolve it too (`getent hosts
-"$ROUTER_HOSTNAME"` in their own entrypoint scripts) and code-docker-router's own network
-alias must stay in sync with the same value.
+`docker-compose.yml`/`.env`/`.env.webmanager`, not `router/.env.router`, for the same
+split-directory-deploy reason `env_file`/`ROUTER_VOLUME` above stay in code-docker's own
+`docker-compose.yml`), including its own `router-manager --env-migrate` CLI and
+version-mismatch warning (`ROUTER_ENV_VERSION`/`ROUTER_ENV_TEMPLATE_PATH`) via
+`github.com/qwreey/envmigrate` — the same shared, standalone Go module (own git submodule,
+same pattern as `code-server-autoinstall`) code-docker's own webmanager uses; router
+carries its *own* `envmigrate` submodule (`router/envmigrate` from code-docker's side)
+rather than reaching into code-docker's copy, since router builds standalone too. See
+`router/CLAUDE.md`'s own "Feature areas (detailed)" section for the rest.
 
 `config/code/code-patch/` is a generic mechanism, not tailscale-specific: any `<name>.default.<ext>` there (with an optional matching gitignored `<name>.override.<ext>`) gets seeded by `code-patch.default.sh` into `/code/.local/share/code-docker/code/patch/<name>.<ext>` — code-server-autoinstall auto-injects every top-level `patch/*.js` as a `<script>` tag on every start (see "코드 서버 패치" in README). Re-seeded on *every* boot, but only when the live target's content still hashes to what was seeded last time (`/code/.local/share/code-docker/code/.code-patch-manifest` now tracks `<name>\t<hash>` pairs, not just names) — i.e. a bundled `.default.`/`.override.` fix actually reaches an already-running container instead of the old "only copy if missing" behavior silently freezing the target at whatever was first seeded forever. If the live file's hash doesn't match (user edited it directly, or there's no recorded hash yet — e.g. a target that predates this hash-tracking), it's left alone; a `.default.` file removed in a later code-docker version still gets its old target removed too instead of orphaned forever. Because there's no historical hash for anything seeded before this behavior shipped, upgrading alone won't retroactively re-apply a fixed default to an already-seeded file that was never otherwise touched — delete the file under `/code/.local/share/code-docker/code/patch/` once to force a fresh reseed with hash-tracking from then on. `code-patch.default.sh` is invoked from `code-service.default.sh` (not `user-init.default.sh` — that one's scoped to home-folder/shell setup like fish config, not code-server internals), deliberately *after* `install.sh` so `/code/.local/share/code-docker/code` actually exists by the time it runs.
 
@@ -426,4 +117,4 @@ A browser admin panel (Go backend + Vite/React frontend, `webmanager/` — its o
 
 ## Documentation
 
-`README.md` is now just a short intro (screenshot + one paragraph + a pointer into `docs/`) — as of 2026-08-05 the actual user-facing content that used to live there (setup, the override customization system mirroring the "override pattern" above but from a user's perspective, and a "tips" section per integration: ssh, adb, Discord presence, dind, clipboard, multi-instance via `PREFIX`) moved to `docs/index.md`, with per-topic detail pages alongside it (`docs/build-customization.md`, `docs/router.md` (the router container's own doc — tailscale/Dev Proxy/tinyauth), `docs/tailscale.md` (now just a short pointer into `docs/router.md`), `docs/dev-proxy.md`, `docs/egress-netgate.md`, `docs/webmanager.md`, `docs/webmanager-config.md`, `docs/security-login.md`, `docs/code-server-patch.md`, `docs/tips/*.md`). This was done anticipating that `docs/` gets bundled/rendered inside webmanager itself someday (see `webmanager/.claude/research/guide-plan.md`) — keeping it as its own directory rather than scattered across the repo root makes that easier. When adding a new customizable file or a new environment trick, add a matching entry to `docs/index.md` (or the relevant `docs/*.md` page) in the same style as the existing ones — not `README.md`. A revamp plan for the now-short `README.md` itself (badges, a tighter intro) is tracked in `.claude/backlog/readme-revamp-plan.md`.
+`README.md` is now just a short intro (screenshot + one paragraph + a pointer into `docs/`) — as of 2026-08-05 the actual user-facing content that used to live there (setup, the override customization system mirroring the "override pattern" above but from a user's perspective, and a "tips" section per integration: ssh, adb, Discord presence, dind, clipboard, multi-instance via `PREFIX`) moved to `docs/index.md`, with per-topic detail pages alongside it (`docs/build-customization.md`, `docs/webmanager.md`, `docs/webmanager-config.md`, `docs/security-login.md`, `docs/code-server-patch.md`, `docs/tips/*.md` — router's own docs, `router.md`/`egress-netgate.md`/`dev-proxy.md`/`app-routes.md`/`tailscale.md`, moved into the `router/` submodule's own `router/docs/` when it became a standalone repo, see "router" above; `docs/index.md` still links into them). This was done anticipating that `docs/` gets bundled/rendered inside webmanager itself someday (see `webmanager/.claude/research/guide-plan.md`) — keeping it as its own directory rather than scattered across the repo root makes that easier. When adding a new customizable file or a new environment trick, add a matching entry to `docs/index.md` (or the relevant `docs/*.md` page) in the same style as the existing ones — not `README.md`. A revamp plan for the now-short `README.md` itself (badges, a tighter intro) is tracked in `.claude/backlog/readme-revamp-plan.md`.

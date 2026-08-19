@@ -39,7 +39,7 @@ ssh/scp 접속에도 그대로 적용). `/code/.ssh/authorized_keys` 목록 조�
 (`ROUTER_MANAGER_HOSTS`가 비어 있으면 기본값인 같은 origin의 `/router/`를, 설정돼
 있으면 그 전용 도메인을 cross-origin으로 embed — webmanager는 이제
 `@code-docker/router-frontend`를 빌드 의존성으로 갖지 않습니다. 자세한 내용은
-[router.md](router.md#보안-공유-origin과-전용-도메인) 참고). 이름(내부
+[router.md](../router/docs/router.md#보안-공유-origin과-전용-도메인) 참고). 이름(내부
 식별자, 파일명 + Caddyfile matcher 토큰으로만 쓰임)과 host(실제로 노출할 전체 도메인,
 예: `dev.example.com`이나 `*.staging.example.com`)로 먼저 expose를 만들고, 그 아래에
 라우트(매치 path, target `host:port`, strip prefix, 리버스프록시 path, `route`/`handle`
@@ -51,7 +51,7 @@ ssh/scp 접속에도 그대로 적용). `/code/.ssh/authorized_keys` 목록 조�
 `caddy reload`로 무중단 반영합니다(검증 실패 시 반영 없이 에러만 표시). 폼이 못 다루는
 케이스는 같은 화면에서 `.caddy` 파일 자체를 원본 편집할 수 있습니다(간단한 텍스트 영역 —
 webmanager의 다른 곳에서 쓰는 CodeMirror 에디터는 아닙니다). 자세한 내용은
-[dev 서버 노출 문서](dev-proxy.md)를 확인하세요.
+[dev 서버 노출 문서](../router/docs/dev-proxy.md)를 확인하세요.
 
 ### App Routes
 
@@ -62,7 +62,7 @@ Dev Proxy와 같은 위치(`router` 컨테이너 안 `caddy-adapter`)에서 관�
 target(`host:port`) 두 값만으로 앱 하나를 등록합니다 — 경로 모양이
 `/app/<이름>/*` 하나로 고정이라 path/strip prefix/매칭 방식 같은 필드 자체가
 없습니다. 최초 부팅 시 `code → code-docker:80` 앱이 자동 생성되고, 지우거나
-바꾸면 다시 생성되지 않습니다. 자세한 내용은 [app-routes.md](app-routes.md)를
+바꾸면 다시 생성되지 않습니다. 자세한 내용은 [app-routes.md](../router/docs/app-routes.md)를
 확인하세요.
 
 ### Tailscale
@@ -71,7 +71,7 @@ Dev Proxy와 같은 방식(router의 `/router/` 페이지를 iframe으로 embed)
 tailscale의 전역 설정(SOCKS 주소/재시도 간격)·forwards·publish 추가/삭제와
 로그인 시작/취소, 상태(내 정보/피어 목록) 조회를 이 탭에서 전부 할 수 있습니다.
 tailscale 데몬 자체는 router 컨테이너에서 돌고, webmanager는 router-manager API를
-호출할 뿐입니다. 자세한 내용은 [router.md](router.md#tailscale)를 확인하세요.
+호출할 뿐입니다. 자세한 내용은 [router.md](../router/docs/router.md#tailscale)를 확인하세요.
 
 ### DNS
 
@@ -82,8 +82,8 @@ router 컨테이너의 dnsmasq가 쓰는 DNS 콘텐츠 블록리스트·MagicDNS
 하나당 하나)로 커스텀 소스 추가/삭제가 가능하고, 기본 내장 소스(builtin)는 이미지가
 갱신될 때 해시 비교로 업데이트 여부(추가/삭제된 호스트 diff 샘플 포함)를 보여주고
 반영(pull)하거나 무시(ignore)할 수 있습니다. `dig` 스타일 DNS 조회 도구도 이 탭에
-포함되어 있습니다. 자세한 내용은 [router.md](router.md)와
-[egress-netgate.md](egress-netgate.md)를 확인하세요.
+포함되어 있습니다. 자세한 내용은 [router.md](../router/docs/router.md)와
+[egress-netgate.md](../router/docs/egress-netgate.md)를 확인하세요.
 
 ### Net 관리
 
@@ -94,7 +94,7 @@ allow/block 규칙(순서 있는 first-match-wins 목록)과 인바운드 포트
 컨테이너별 독립적인 하드 리밋(`services[]`)을 `tc` 기반으로 적용해, 네트워크 소진
 공격을 막습니다. 변경 사항은 파일에 저장되는 즉시(별도 재시작 없이) router의
 `netgate-firewall`/`netgate-shaping` 프로그램이 30초 주기로 다시 읽어 반영합니다.
-자세한 내용은 [egress-netgate.md](egress-netgate.md)를 확인하세요.
+자세한 내용은 [egress-netgate.md](../router/docs/egress-netgate.md)를 확인하세요.
 
 ### tinyauth
 
@@ -103,7 +103,7 @@ Dev Proxy/Tailscale과 같은 방식(iframe embed)으로, Dev Proxy/App Routes �
 비밀번호를 변경합니다(`TINYAUTH_AUTH_USERS` 환경변수로 인프라 차원에서 고정한
 경우 읽기 전용 안내로 대체됩니다). 사용자 추가/삭제/비밀번호 변경 시 router의
 `tinyauth` 프로그램이 자동으로 재시작되어 바로 반영됩니다. 자세한 내용은
-[router.md](router.md#tinyauth)를 확인하세요.
+[router.md](../router/docs/router.md#tinyauth)를 확인하세요.
 
 ### Router 설정
 
@@ -113,7 +113,7 @@ Dev Proxy/Tailscale과 같은 방식(iframe embed)으로, router-manager 자신�
 화면입니다. 이전에는 webmanager 쪽에는 router 비밀번호 미설정 경고 배너만 있고 실제
 설정 화면 자체는 router를 직접 열어야만 접근할 수 있었는데, 다른 탭들과 마찬가지로
 이제 webmanager 안에서도 바로 설정할 수 있습니다. 자세한 내용은
-[router.md](router.md#router-manager-자체-인증)를 확인하세요.
+[router.md](../router/docs/router.md#router-manager-자체-인증)를 확인하세요.
 
 ### Logs
 
