@@ -7,3 +7,6 @@
 [submodule "router"]
 	path = router
 	url = https://github.com/qwreey/router-docker
+[submodule "code-dind"]
+	path = code-dind
+	url = https://github.com/qwreey/dind-authz-docker

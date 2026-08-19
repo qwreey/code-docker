@@ -1,8 +1,0 @@
-{
-  "allowed_caps": {
-    "NET_BIND_SERVICE": true
-  },
-  "bind_allow_prefixes": [
-    "/code/"
-  ]
-}
