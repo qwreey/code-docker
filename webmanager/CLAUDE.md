@@ -258,7 +258,28 @@ exactly as fetched, and responds 502 on any failure so nginx's
 `error_page 502 503 504 = @manifest_fallback` — the same idiom
 `/_code_not_ready.html` already uses — falls back to code-server's own
 manifest directly; code-server-autoinstall's vendored manifest route itself
-is never touched. An "열린 세션" (open sessions)
+is never touched by `manifestpatch` — but `code-server-autoinstall/start.sh`'s
+own `apply_pwa_metadata_patch()` does patch it directly (a `sed` against the
+*installed* code-server, gitignored inside that submodule, not anything
+checked in), the same way it already handles `PWA_NAME`/`PWA_SHORT_NAME`/
+`PWA_ICON_PREFIX`: a `PWA_DISPLAY_MODE` env var (root `example-env`, same
+unprefixed tier as those three — it configures code-server's own manifest,
+not anything webmanager-specific) now overrides code-server's hardcoded
+`display: "fullscreen"` the same way, so `manifestpatch.Fetch` picks the
+right value up automatically as part of the real upstream manifest with no
+webmanager-side override logic at all. Added for Android PWA shells that
+hide code-server's own top bar/menus in `fullscreen` mode until the system
+status bar is swiped back into view; `standalone` keeps the status bar
+visible without that problem. A short-lived 2026-08-18→20 detour first
+added a second, genuinely-separate `/manager/`-only installable manifest
+(re-introducing the exact "double the installed-app icon count per
+instance" outcome this section's first sentence explains was rejected),
+then a `WEBMANAGER_PWA_DISPLAY_MODE`-driven override inside `manifestpatch`
+itself — both were reverted in favor of the code-server-autoinstall-side fix
+above, which is simpler and means even a direct hit on code-server's own
+port (bypassing webmanager/nginx entirely) gets the right `display` value.
+There is deliberately only ever one installable PWA (code-server's). An
+"열린 세션" (open sessions)
 tab (`.claude/archive/session-heartbeat-plan-done.md`, `internal/
 sessionheartbeat`) lists which code-server browser tabs are currently
 connected and what folder each has open, fed by a client-generated UUID that

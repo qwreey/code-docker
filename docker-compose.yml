@@ -73,6 +73,7 @@ services:
     environment:
       PWA_NAME: "${PWA_NAME:-code-docker}"
       PWA_SHORT_NAME: "${PWA_SHORT_NAME:-code-docker}"
+      PWA_DISPLAY_MODE: "${PWA_DISPLAY_MODE:-}"
       TZ: "${TZ:-}"
       LANG: "${LANG:-}"
       # Default matches the "dind" alias below - see example-env before

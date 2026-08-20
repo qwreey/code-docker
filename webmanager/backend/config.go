@@ -35,15 +35,13 @@ type Config struct {
 	// unnecessary hairpin).
 	CodeServerManifestURL string
 
-	// PWADisplayMode is the `display` field of webmanager's own separate PWA
-	// manifest (internal/webmanager-manifest.json, see
-	// handlers_webmanager_manifest.go) — deliberately not the same manifest
-	// code-server serves (CodeServerManifestURL above), since a manifest
-	// `shortcuts` entry always inherits its parent app's display mode (no
-	// per-shortcut override exists in the spec), so this is the only way to
-	// give webmanager's own home-screen install different chrome than
-	// code-server's without touching code-server's manifest at all.
-	PWADisplayMode string
+	// PWA_NAME/PWA_SHORT_NAME/PWA_ICON_PREFIX/PWA_DISPLAY_MODE (code-server's
+	// own manifest fields) are deliberately NOT config fields here —
+	// code-server-autoinstall's own start.sh patches them directly into the
+	// installed code-server's manifest route (process.env reads baked
+	// straight into vscode.js at install time), so manifestpatch.Fetch above
+	// picks them up automatically as part of the real upstream manifest it
+	// fetches. No webmanager-side override needed.
 
 	SystemHistoryIntervalSeconds string
 	SystemHistoryWindowMinutes   string
@@ -184,14 +182,6 @@ func loadConfig() Config {
 		// actually binds code-server, so overriding that one var moves this
 		// target along with it instead of needing to be kept in sync by hand.
 		CodeServerManifestURL: getenv("WEBMANAGER_CODE_SERVER_MANIFEST_URL", "http://"+getenv("CODE_SERVER_BIND_ADDR", "private:8080")+"/manifest.json"),
-
-		// "browser" (full address bar, always visible) rather than
-		// "standalone"/"fullscreen" — code-server's own PWA is expected to
-		// hide browser chrome, webmanager's is not (see doc comment on the
-		// struct field above). "minimal-ui" is a valid alternative some
-		// users may prefer, but isn't the default since Firefox/Samsung
-		// Internet don't support it and silently fall back to "standalone".
-		PWADisplayMode: getenv("WEBMANAGER_PWA_DISPLAY_MODE", "browser"),
 
 		SystemHistoryIntervalSeconds: getenv("WEBMANAGER_SYSTEM_HISTORY_INTERVAL_SECONDS", "5"),
 		SystemHistoryWindowMinutes:   getenv("WEBMANAGER_SYSTEM_HISTORY_WINDOW_MINUTES", "10"),

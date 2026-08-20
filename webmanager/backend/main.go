@@ -420,13 +420,6 @@ func main() {
 	// something code-server already serves unauthenticated.
 	mux.HandleFunc("GET /manifest.json", s.handleManifestPassthrough)
 
-	// webmanager's own, separate PWA manifest — not the same resource as
-	// GET /manifest.json above (code-server's, merged with a shortcuts
-	// entry). See handlers_webmanager_manifest.go's doc comment for why a
-	// second manifest is needed. Ungated for the same reason as the route
-	// above: a pure, unauthenticated-anyway read.
-	mux.HandleFunc("GET /webmanager-manifest.json", s.handleWebmanagerManifest)
-
 	mux.Handle("GET /", staticHandler(cfg.StaticDir))
 
 	httpServer := &http.Server{

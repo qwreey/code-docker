@@ -5,7 +5,10 @@
 // design/rationale. Every field other than "shortcuts" passes through
 // exactly as fetched (name/icons/start_url/scope/display/...) so upstream
 // code-server changes are picked up automatically instead of drifting out
-// of sync with a hand-maintained copy.
+// of sync with a hand-maintained copy — including PWA_NAME/PWA_SHORT_NAME/
+// PWA_DISPLAY_MODE, which code-server-autoinstall's own start.sh patches
+// directly into the manifest route at install time, so there is nothing
+// left for this package to override.
 package manifestpatch
 
 import (
