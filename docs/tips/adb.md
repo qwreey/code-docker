@@ -16,7 +16,7 @@
 
 code-docker의 요청이 나가는 네트워크를 잘 구성했다면, 호스트 시스템의 tailscale ip 등의 서브넷으로도 요청을 전송할 수 있습니다. 따라서 환경 변수로써 `ANDROID_ADB_SERVER_ADDRESS` 와 `ANDROID_ADB_SERVER_PORT` 를 적절한 tailscale ip, private ip로 설정하면 항상 원하는 기기의 adb 서버를 사용하게 됩니다.
 
-가장 간단한 방법은 [router 문서의 forwards 설정](../router.md#forwards--publish)입니다 - 그 방식대로 원하는 기기의 5037 포트(adb 서버)를 가져오면, `ANDROID_ADB_SERVER_ADDRESS=forward` / `ANDROID_ADB_SERVER_PORT=5037` 로 설정하는 것만으로 항상 그 기기의 adb 서버를 쓰게 됩니다.
+가장 간단한 방법은 [router 문서의 forwards 설정](../../router/docs/router.md#forwards--publish)입니다 - 그 방식대로 원하는 기기의 5037 포트(adb 서버)를 가져오면, `ANDROID_ADB_SERVER_ADDRESS=forward` / `ANDROID_ADB_SERVER_PORT=5037` 로 설정하는 것만으로 항상 그 기기의 adb 서버를 쓰게 됩니다.
 
 ## 확인 & 흔한 문제
 

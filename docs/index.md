@@ -23,7 +23,7 @@ touch empty-extra-include.yml # docker-compose.yml의 include: 대상 - 없으�
 > 위치)에서 한 번 `touch empty-extra-include.yml`만 실행하면 됩니다 - 그 외엔 아무
 > 것도 안 바뀝니다. 이 파일/`EXTRA_INCLUDE`가 실제로 뭘 위한 것인지는
 > `example-env`의 `EXTRA_INCLUDE` 항목과
-> `.claude/archive/roblox-studio-vnc-isolation-plan-done.md` 참고.
+> [tips/roblox-studio.md](tips/roblox-studio.md)(실사용 예시)를 참고.
 
 이제 `docker compose build` 를 수행하고 잘 빌드가 되는지 확인합니다.
 만약 빌드에 성공했다면 `docker compose up -d` 를 수행하세요.
@@ -102,6 +102,12 @@ vscord 확장으로 Discord Rich Presence를 연동하고, ssh 소켓 포워딩�
 `code-docker-dind` 서비스로 redis, postgres 등 개발용 컨테이너를 code-docker 안에서 바로 `docker run`으로 띄울 수 있습니다.
 
 자세한 내용은 [tips/dind.md](tips/dind.md)를 확인하세요.
+
+## roblox-studio-docker 연동
+
+`EXTRA_INCLUDE` 훅으로 완전히 독립된 별도 프로젝트([roblox-studio-docker](https://github.com/qwreey/roblox-studio-docker))를 code-docker 옆에 붙이는 예시입니다 - submodule이 아니라, `docker-compose.yml`이 제공하는 범용 오버레이 메커니즘을 씁니다.
+
+자세한 내용은 [tips/roblox-studio.md](tips/roblox-studio.md)를 확인하세요.
 
 ## router (네트워크 경계 컨테이너)
 

@@ -35,13 +35,12 @@
 # 클론한 프로젝트)를 이 프로젝트와 함께 띄우고 싶을 때만, 버전관리 대상이 아닌
 # 자신만의 extra-include.yml을 만들고 여기서 그 경로를 가리키세요 - 원본
 # docker-compose.yml은 전혀 건드리지 않아도 되므로 `git pull`과 절대 충돌하지
-# 않습니다. 구체적인 예시는 .claude/archive/roblox-studio-vnc-isolation-plan-done.md
-# 참고.
+# 않습니다. 구체적인 예시는 docs/tips/roblox-studio.md 참고.
 #EXTRA_INCLUDE="empty-extra-include.yml"
 
 # EXTRA_INCLUDE로 붙인 다른 프로젝트가 자기 서비스를 code-docker-internal이 아니라
 # 별도의 `internal: true` 네트워크(예: roblox-studio-docker의 VNC 전용 네트워크,
-# .claude/archive/roblox-studio-vnc-isolation-plan-done.md 참고)에 붙이고 router가 그
+# docs/tips/roblox-studio.md 참고)에 붙이고 router가 그
 # 네트워크도 넘나들게 하려면, 최신 Docker Engine의 DOCKER-INTERNAL 체인이 그
 # 네트워크에 대해서도 router의 FORWARD 트래픽을 막는다 - code-docker-netfilter-fix
 # 서비스가 이 값을 읽어 그 네트워크들에도 같은 DOCKER-USER 예외를 걸어줍니다.
