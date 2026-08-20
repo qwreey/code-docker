@@ -62,19 +62,20 @@
 #PWA_NAME="code-docker"
 #PWA_SHORT_NAME="code-docker"
 
-# code-server 자체 manifest.json의 display 필드를 강제로 덮어씁니다
+# code-server 자체 manifest.json의 display 필드를 덮어씁니다
 # (code-server-autoinstall/start.sh의 apply_pwa_metadata_patch가 PWA_NAME/
 # PWA_SHORT_NAME/PWA_ICON_PREFIX와 똑같은 방식으로, 설치된 code-server의
-# manifest 라우트에 직접 patch합니다). code-server의 원본 manifest는 항상
-# "fullscreen"으로 고정되어 있는데, 일부 Android PWA 셸에서는 이 모드일 때
-# 시스템 상태바(시계 포함)와 code-server 자체 상단 메뉴까지 함께 숨겨져서,
-# 위에서 아래로 쓸어내려 상태바를 꺼내야만 메뉴가 같이 나타나는 문제가
-# 있습니다. "standalone"으로 설정하면 브라우저 주소창은 계속 숨긴 채
-# 시스템 상태바만 항상 보이게 할 수 있습니다. 비워두면(기본값) manifest를
-# 전혀 건드리지 않습니다. 브라우저는 "홈 화면에 추가" 하는 그 순간에만
-# manifest를 읽으므로, 이미 설치된 앱이 있다면 값을 바꿔도 소급 적용되지
-# 않습니다 - 삭제 후 다시 추가해야 새 값이 반영됩니다.
-#PWA_DISPLAY_MODE="standalone"
+# manifest 라우트에 직접 patch합니다). code-server 업스트림의 원본 manifest는
+# "fullscreen"으로 고정되어 있지만, code-docker는 기본값을 "standalone"으로
+# 바꿔서 patch합니다 - Termux/Termix 등 일반적인 개발용 앱들이 보통 풀스크린으로
+# 뜨지 않는 것과 같은 이유이기도 하고, 일부 Android PWA 셸에서는 진짜
+# "fullscreen"일 때 시스템 상태바(시계 포함)와 code-server 자체 상단 메뉴까지
+# 함께 숨겨져서 위에서 아래로 쓸어내려 상태바를 꺼내야만 메뉴가 같이 나타나는
+# 문제도 있기 때문입니다. 진짜 풀스크린을 원한다면 이 값을 "fullscreen"으로
+# 켜서 opt-in 하세요. 브라우저는 "홈 화면에 추가" 하는 그 순간에만 manifest를
+# 읽으므로, 이미 설치된 앱이 있다면 값을 바꿔도 소급 적용되지 않습니다 -
+# 삭제 후 다시 추가해야 새 값이 반영됩니다.
+#PWA_DISPLAY_MODE="fullscreen"
 
 # 호스트에 마운트할 볼륨 경로. 기본은 저장소 안 ./data/code, ./data/sshd,
 # ./data/dind 등 - 소스 디렉토리(code-dind/, router/, ...)와 헷갈리지 않도록

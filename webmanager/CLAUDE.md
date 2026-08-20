@@ -264,13 +264,17 @@ own `apply_pwa_metadata_patch()` does patch it directly (a `sed` against the
 checked in), the same way it already handles `PWA_NAME`/`PWA_SHORT_NAME`/
 `PWA_ICON_PREFIX`: a `PWA_DISPLAY_MODE` env var (root `example-env`, same
 unprefixed tier as those three — it configures code-server's own manifest,
-not anything webmanager-specific) now overrides code-server's hardcoded
-`display: "fullscreen"` the same way, so `manifestpatch.Fetch` picks the
-right value up automatically as part of the real upstream manifest with no
-webmanager-side override logic at all. Added for Android PWA shells that
-hide code-server's own top bar/menus in `fullscreen` mode until the system
+not anything webmanager-specific) overrides code-server's hardcoded
+`display: "fullscreen"`, and code-docker's own default (when the env var is
+unset) is patched to `"standalone"` rather than passing `"fullscreen"`
+through unmodified — most general-purpose dev-tool PWAs (Termux, Termix,
+...) aren't fullscreen by default either, and some Android PWA shells hide
+code-server's own top bar/menus in real `fullscreen` mode until the system
 status bar is swiped back into view; `standalone` keeps the status bar
-visible without that problem. A short-lived 2026-08-18→20 detour first
+visible without that problem. Set `PWA_DISPLAY_MODE=fullscreen` to opt back
+into the upstream default. `manifestpatch.Fetch` picks whichever value is
+live up automatically as part of the real upstream manifest, with no
+webmanager-side override logic at all. A short-lived 2026-08-18→20 detour first
 added a second, genuinely-separate `/manager/`-only installable manifest
 (re-introducing the exact "double the installed-app icon count per
 instance" outcome this section's first sentence explains was rejected),
