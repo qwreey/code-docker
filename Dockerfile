@@ -94,6 +94,11 @@ COPY --chown=root:root code-server-autoinstall/*.sh \
     /etc/code-docker/code-server-autoinstall/
 COPY --chown=root:root bin /usr/local/bin/
 
+# fish completion for `attach` (see config/shell/completions/attach.fish) -
+# /etc/fish/completions is fish's own system-wide completion path, so this
+# is picked up for root or any other user with no per-user setup needed.
+COPY --chown=root:root config/shell/completions/attach.fish /etc/fish/completions/attach.fish
+
 # Setup user shell and home
 RUN chsh root --shell $(/etc/code-docker/get-user-shell.sh) &&\
     sed -E 's|^(root:[^:]*:[^:]*:[^:]*:[^:]*:)/root(:[^:]*)$|\1/code\2|' -i /etc/passwd &&\

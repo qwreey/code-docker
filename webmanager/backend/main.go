@@ -54,6 +54,12 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "--attach" {
 		os.Exit(attachCmd(loadConfig(), os.Args[2:]))
 	}
+	// CLI helper mode: `webmanager --list-sessions` prints existing terminal
+	// session names, one per line, for `attach`'s fish completion to shell
+	// out to — never starts the server. See listsessionscmd.go's doc comment.
+	if len(os.Args) > 1 && os.Args[1] == "--list-sessions" {
+		os.Exit(listSessionsCmd(loadConfig()))
+	}
 
 	cfg := loadConfig()
 
