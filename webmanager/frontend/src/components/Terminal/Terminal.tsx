@@ -171,6 +171,12 @@ export function Terminal({
   const fitAddonRef = useRef<FitAddon | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const armedModifierRef = useRef<ModifierId | null>(null)
+  // Only ever set on touch devices (see the mobile input workaround below).
+  // focusTerminal() needs this: xterm's own public `.focus()` always
+  // targets its real textarea directly, which would silently re-enable
+  // predictive-text buffering (the exact bug the workaround exists to
+  // avoid) the moment any toolbar button is pressed if left unchecked.
+  const mobileInputRef = useRef<HTMLInputElement | null>(null)
 
   const [state, setState] = useState<ConnectionState>('connecting')
   const [settings, setSettings] = useState<TerminalSettings | null>(null)
@@ -385,16 +391,31 @@ export function Terminal({
     }
   }, [fontSize, sendResize])
 
-  // Re-focuses xterm's hidden input textarea. Used as a safety net after
-  // every mobile-toolbar interaction (button tap, sticky-modifier arm, and
-  // the toolbar's own touchend below) — on mobile, tapping/scrolling the
-  // on-screen control bar can otherwise steal focus away from that textarea
-  // (see TerminalControls.tsx's own preventDefault handling for the other
-  // half of this fix), which both drops xterm's own focus state and closes
-  // the virtual keyboard. Calling this from inside the same synchronous
-  // touch-derived event handler keeps it within the user-gesture context
-  // most mobile browsers require to reopen the keyboard programmatically.
+  // Re-focuses the terminal. Used after every mobile-toolbar key/zoom
+  // button action (see TerminalControls.tsx) since tapping a button would
+  // otherwise shift DOM focus to the button itself (`preventFocusSteal`'s
+  // onMouseDown there stops most of that, this is the rest), which both
+  // drops xterm's own focus state and closes the virtual keyboard. Calling
+  // this from inside the same synchronous touch-derived event handler keeps
+  // it within the user-gesture context most mobile browsers require to
+  // reopen the keyboard programmatically.
+  //
+  // When the mobile-input-workaround is active, focus MUST go straight to
+  // it, not to xterm's own real textarea — `XTerm.focus()` always targets
+  // that real textarea directly, and while its own onTextareaFocus listener
+  // (below) does redirect that back here, going through xterm briefly
+  // focuses the real textarea first, which is exactly the element the
+  // workaround exists to keep real keystrokes away from. Short-circuiting
+  // straight to mobileInputRef skips that round-trip entirely — confirmed
+  // live, 2026-08-21, as more than theoretical: a version of this that
+  // called `XTerm.focus()` unconditionally let one toolbar button press
+  // silently revive the predictive-text buffering bug for the rest of that
+  // typing session.
   const focusTerminal = useCallback(() => {
+    if (mobileInputRef.current) {
+      mobileInputRef.current.focus()
+      return
+    }
     termRef.current?.focus()
   }, [])
 
@@ -494,6 +515,57 @@ export function Terminal({
     term.open(container)
     fitAddon.fit()
 
+    // xterm.js v6 doesn't scroll its scrollback via a plain native
+    // `overflow-y: auto` div — .xterm-viewport is wrapped in a vendored
+    // copy of Monaco's virtualized ScrollableElement widget, which owns
+    // `scrollTop` internally and only moves in response to its own wheel/
+    // scrollbar-drag handlers (confirmed by reading node_modules/@xterm/xterm
+    // — writing viewport.scrollTop directly, tried first, silently did
+    // nothing). The supported way in is the public `term.scrollLines(n)`
+    // API, which both this Terminal instance and xterm's own wheel handler
+    // route through — so translate vertical touch-drag distance into line
+    // counts using the container's actual per-row pixel height instead.
+    // Only engages past a small movement threshold so an ordinary tap still
+    // reaches xterm's own click-to-focus/cursor-position handling
+    // unhindered — only a real drag preventDefault()s (dropping the
+    // synthetic click that would otherwise follow). The threshold is
+    // deliberately generous (mobile touch "slop" from natural hand tremor
+    // easily exceeds a few px) so a genuine tap-to-focus isn't misread as a
+    // drag and swallowed.
+    const TOUCH_SCROLL_THRESHOLD = 16
+    let startY = 0
+    let lastY = 0
+    let dragging = false
+    let lineRemainder = 0
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return
+      startY = e.touches[0].clientY
+      lastY = startY
+      dragging = false
+      lineRemainder = 0
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return
+      const y = e.touches[0].clientY
+      if (!dragging && Math.abs(y - startY) < TOUCH_SCROLL_THRESHOLD) return
+      dragging = true
+      const rowHeight = container.clientHeight / (term.rows || 1) || 18
+      lineRemainder += (lastY - y) / rowHeight
+      lastY = y
+      const lines = Math.trunc(lineRemainder)
+      if (lines !== 0) {
+        term.scrollLines(lines)
+        lineRemainder -= lines
+      }
+      e.preventDefault()
+    }
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchmove', onTouchMove, { passive: false })
+    const touchCleanup = () => {
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchmove', onTouchMove)
+    }
+
     // Mobile virtual keyboards (Gboard etc.) run predictive/autocorrect text
     // through the same DOM composition API (compositionstart/update/end)
     // real IME composition (Hangul assembly, etc.) needs, so xterm.js's
@@ -520,9 +592,20 @@ export function Terminal({
     // already uses — xterm itself never receives real keystrokes on a
     // touch device, this input does. Left a no-op on desktop (mouse/
     // trackpad users never hit the buffering bug, and this is a real
-    // behavior swap not worth the risk there). This is a first pass, not
-    // verified against every Android keyboard app / iOS Safari — expect to
-    // iterate against real-device testing.
+    // behavior swap not worth the risk there).
+    //
+    // A 2026-08-21 detour tried instead overlaying this input directly on
+    // top of the whole terminal (full size, still invisible) so a tap would
+    // land on it AS the real target with no redirect needed — that did make
+    // open/close/reopen fully native, but it also meant EVERY touch was
+    // swallowed by this input before it could ever reach xterm's own mouse
+    // handling, breaking mouse-click-driven terminal UIs entirely on touch
+    // (tmux pane selection, vim/htop mouse mode, Claude Code's own
+    // click-driven interactive prompts) — confirmed a hard requirement, not
+    // optional, so that approach was reverted back to this redirect-based
+    // one despite its own on-screen-keyboard-dismiss quirks (see
+    // focusTerminal() above for the one concrete bug that detour did
+    // legitimately catch and that's kept fixed here too).
     const isTouchDevice =
       loadMobileInputWorkaroundEnabled() &&
       typeof window.matchMedia === 'function' &&
@@ -550,7 +633,13 @@ export function Terminal({
       mobileInput.tabIndex = -1
       // Same fully-invisible, off-screen placement as xterm's own hidden
       // textarea (xterm.css's .xterm-helper-textarea) - never meant to be
-      // seen, only to hold real DOM/keyboard focus.
+      // seen, only to hold real DOM/keyboard focus. Deliberately NOT
+      // overlaying the terminal (tried, reverted — see the doc comment
+      // above): staying off to the side and out of the hit-testing path
+      // entirely is what lets a real tap land on xterm's own screen/textarea
+      // first, so xterm's normal mouse-click handling (cursor positioning,
+      // mouse-tracking-protocol apps) keeps working; onTextareaFocus below
+      // is what redirects the resulting focus attempt here afterward.
       Object.assign(mobileInput.style, {
         position: 'absolute',
         opacity: '0',
@@ -563,6 +652,7 @@ export function Terminal({
         padding: '0',
       })
       container.appendChild(mobileInput)
+      mobileInputRef.current = mobileInput
 
       // Confirmed live (2026-08-19): fully clearing the field to '' after
       // every keystroke breaks backspace — deleting from an already-empty
@@ -649,24 +739,29 @@ export function Terminal({
           sendBytes('\r')
         }
       }
+      mobileInput.addEventListener('compositionstart', onCompositionStart)
+      mobileInput.addEventListener('compositionend', onCompositionEnd)
+      mobileInput.addEventListener('input', onInput)
+      mobileInput.addEventListener('keydown', onKeyDown)
+
       // Whenever xterm's own textarea would become focused - its internal
       // click-to-focus handler, or any focusTerminal() call elsewhere in
       // this file - immediately steal focus back to this input instead.
       // This is what keeps the keyboard in password mode across every
       // existing focus path without having to special-case each call site.
+      // (focusTerminal() itself also short-circuits straight to
+      // mobileInputRef now, skipping this round-trip when it's the one
+      // calling — this listener is what covers every OTHER path, above all
+      // xterm's own real click-to-focus.)
       const onTextareaFocus = () => {
         mobileInput.focus()
       }
-
-      mobileInput.addEventListener('compositionstart', onCompositionStart)
-      mobileInput.addEventListener('compositionend', onCompositionEnd)
-      mobileInput.addEventListener('input', onInput)
-      mobileInput.addEventListener('keydown', onKeyDown)
       term.textarea.addEventListener('focus', onTextareaFocus)
 
       mobileInputCleanup = () => {
         term.textarea?.removeEventListener('focus', onTextareaFocus)
         mobileInput.remove()
+        mobileInputRef.current = null
       }
     }
 
@@ -722,6 +817,7 @@ export function Terminal({
 
     return () => {
       resizeObserver.disconnect()
+      touchCleanup?.()
       mobileInputCleanup?.()
       oscDisposable.dispose()
       dataDisposable.dispose()
@@ -1107,7 +1203,6 @@ export function Terminal({
             armedModifier={armedModifier}
             onArmModifier={armModifier}
             onSendBytes={sendBytes}
-            onFocusTerminal={focusTerminal}
             onZoom={zoom}
           />
         )}

@@ -280,6 +280,14 @@
   background-color: var(--term-bg, #000) !important;
 }
 
+.terminal-container .xterm-screen {
+  /* .xterm-screen (not .xterm-viewport) is what actually receives touch
+     input — see the touch-scroll handler in Terminal.tsx. Disabling the
+     browser's own pan/zoom gestures here hands touch-drag fully to that JS
+     handler instead of fighting it with overscroll bounce. */
+  touch-action: none;
+}
+
 .terminal-controls {
   display: flex;
   flex-wrap: nowrap;
