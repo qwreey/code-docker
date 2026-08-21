@@ -39,6 +39,16 @@ interface SidebarProps {
   // (App.tsx), same split as order/onReorder.
   collapsed: boolean
   onToggleCollapsed: () => void
+  // True while the caller is still resolving the final item list
+  // asynchronously (e.g. SidebarContainer waiting on Tailscale's
+  // enabled/disabled status). Rather than tracking which individual item is
+  // uncertain, this just paints an opaque skeleton over the whole list
+  // while `items` might still be wrong, then fades it out once the caller
+  // flips this to false - the real list underneath can be whatever it will
+  // eventually be the entire time, since nothing behind the overlay is ever
+  // actually visible until it's already correct, so no row ever visibly
+  // shifts.
+  loading?: boolean
 }
 
 // Applies a persisted id order on top of the current items list: known ids
@@ -76,6 +86,7 @@ export function Sidebar({
   onClose,
   collapsed,
   onToggleCollapsed,
+  loading,
 }: SidebarProps) {
   const sections = order.length > 0 ? reconcileOrder(items, order) : items
   const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -165,6 +176,19 @@ export function Sidebar({
               )
             })}
           </ul>
+          <div
+            className={'sidebar-skeleton-overlay' + (loading ? '' : ' sidebar-skeleton-overlay-hidden')}
+            aria-hidden="true"
+          >
+            {sections.map((section) => (
+              <div key={section.id} className="sidebar-item sidebar-item-skeleton">
+                <span className="sidebar-icon-slot">
+                  <span className="sidebar-skeleton-icon" />
+                </span>
+                <span className="sidebar-skeleton-label" />
+              </div>
+            ))}
+          </div>
         </div>
         {footer}
       </nav>

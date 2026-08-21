@@ -90,7 +90,9 @@ export function SidebarContainer({
   // TAILSCALE_ENABLED=false (router's own env, see docs/router.md#tailscale)
   // idles router's tailscaled entirely - hide the tab once we know it's off
   // rather than embedding a Tailscale management page for a daemon that was
-  // never started on purpose.
+  // never started on purpose. null = still loading - the real item list can
+  // just assume "enabled" for now since Sidebar's loading overlay keeps it
+  // hidden until this resolves either way (see Sidebar.tsx's `loading` prop).
   const tailscaleEnabled = useTailscaleEnabled()
   const items = tailscaleEnabled === false ? ITEMS.filter((i) => i.id !== 'tailscale') : ITEMS
 
@@ -127,6 +129,7 @@ export function SidebarContainer({
       onClose={onClose}
       collapsed={collapsed}
       onToggleCollapsed={onToggleCollapsed}
+      loading={tailscaleEnabled === null}
     />
   )
 }

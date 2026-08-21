@@ -6,8 +6,10 @@ const POLL_INTERVAL_MS = 5000
 // GET /api/tailscale/status is unauthenticated (reads stay open per
 // router-manager's authgate convention), and this is router-manager's own
 // backend, not webmanager's (api/client.ts's api.get always targets
-// /manager/api/...). null = still loading; the sidebar just shows the tab
-// until this resolves rather than flashing a false "removed" state. A fetch
+// /manager/api/...). null = still loading; SidebarContainer.tsx passes that
+// straight through to Sidebar's `loading` overlay, which hides the whole
+// tab list until this resolves either way, rather than showing the real tab
+// list first and risking it visibly changing shape a moment later. A fetch
 // failure also resolves to true - degrading to "enabled" (the old,
 // always-shown behavior) is safer than hiding the tab over a transient
 // error.

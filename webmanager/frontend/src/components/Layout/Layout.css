@@ -75,6 +75,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  position: relative;
 }
 
 .sidebar-list {
@@ -166,6 +167,72 @@
   color: var(--text-muted);
   border: 1px solid var(--border);
   white-space: nowrap;
+}
+
+/* Covers the whole tab list while its final shape is still uncertain (e.g.
+   SidebarContainer waiting on Tailscale's enabled/disabled status) - the
+   real list underneath (.sidebar-list) can just render whatever it will
+   eventually show the entire time, since it's never actually visible until
+   this overlay has already faded out, so no row below it is ever seen to
+   shift. Row count mirrors the real list so the fade-out handoff lines up
+   in height. Positioned relative to .sidebar-list-wrap, above .sidebar-list
+   in stacking order for free (it's the only positioned child). */
+.sidebar-skeleton-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: var(--surface);
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar-skeleton-overlay-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Placeholder row rendered inside the overlay above - same box model as
+   .sidebar-item so it matches real row height. Non-interactive: no
+   hover/active state, not draggable. */
+.sidebar-item-skeleton {
+  cursor: default;
+}
+
+.sidebar-skeleton-icon,
+.sidebar-skeleton-label {
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--color-gray-bg) 25%, var(--surface-hover) 50%, var(--color-gray-bg) 75%);
+  background-size: 200% 100%;
+  animation: sidebar-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.sidebar-skeleton-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.sidebar-skeleton-label {
+  height: 0.8rem;
+  width: 55%;
+}
+
+@keyframes sidebar-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-skeleton-icon,
+  .sidebar-skeleton-label {
+    animation: none;
+    background: var(--color-gray-bg);
+  }
 }
 
 .sidebar-backdrop {
