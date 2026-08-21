@@ -41,7 +41,7 @@ webmanager's own feature: each always `<iframe>`-embeds router's own
 `/router/` page (`components/RouterEmbed/RouterFrame.tsx`), pointed at the
 same-origin `/router/` path by default or, when `ROUTER_MANAGER_HOSTS` is
 configured, a cross-origin `<iframe>` into that dedicated domain instead (see
-`docs/router.md`'s "보안: 공유 origin과 전용 도메인") — both cases are an
+`router/docs/router.md`'s "보안: 공유 origin과 전용 도메인") — both cases are an
 iframe, there is no same-origin direct-render fallback anymore. As of the
 2026-08-08 decoupling (`router/CLAUDE.md`, `.claude/archive/router-frontend-decouple-plan-done.md`)
 webmanager's frontend has zero `@code-docker/router-frontend` dependency at
@@ -50,7 +50,7 @@ all — the handful of generic UI primitives it still needs (`ErrorBanner`/
 package. webmanager's own `internal/tailscale` backend
 package (config CRUD, status,
 login) was fully deleted when tailscale moved to the `router/` container —
-see `router/CLAUDE.md` and `docs/router.md#tailscale` for the current
+see `router/CLAUDE.md` and `router/docs/router.md#tailscale` for the current
 design. Logs (real vector-backed data, time-range filter + cursor
 pagination, sticky filters with an internally-scrolling table, live mode that
 appends instead of replacing), a "작업 관리자" (Task Manager) tab — renamed
@@ -219,7 +219,9 @@ shimmer placeholder (`components/common/Skeleton.tsx`) that cross-fades
 into the real content via the same utility instead of snapping — see
 "First-load skeleton" under Ground rules below for the pattern to follow
 when adding a new tab. A `.env.webmanager` migration tool
-(`webmanager --env-migrate`, `internal/envmigrate` — see
+(`webmanager --env-migrate`, `backend/envmigratecmd.go` calling the
+`github.com/qwreey/envmigrate` submodule (root `envmigrate/`, not an
+`internal/` package) — see
 `.claude/archive/env-migration-plan-done.md`): reconciles a user's file
 against the image's current `example-env.webmanager`, archiving removed keys
 into a `#~` section and preserving both the user's actively-set values and
@@ -306,7 +308,7 @@ devproxy` package, the `caddy-adapter` supervisord program, and
 `internal/authgate`'s `forward_auth`/`/manager/dev-auth` wiring described in
 that archive doc were all deleted — Caddy now lives on the `router`
 container and per-expose auth goes through tinyauth instead (see
-`router/CLAUDE.md` and `docs/dev-proxy.md`). `internal/authgate` here is
+`router/CLAUDE.md` and `router/docs/dev-proxy.md`). `internal/authgate` here is
 back to gating only webmanager's own write-gate (10 min TTL), with no
 second forward-auth TTL to carry. A
 per-project git status panel (`.claude/qa-request/project-git-status-plan-done.md`,

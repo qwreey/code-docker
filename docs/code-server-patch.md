@@ -21,7 +21,7 @@ css, js 를 변경한 경우 코드 터미널에서 `restart` 를 입력하고, 
 
 ## PWA 이름과 아이콘
 
-앱의 이름은 `PWA_NAME`, `PWA_SHORT_NAME` 환경변수를 변경하여 설정할 수 있습니다. docker-compose.yml 을 편집하세요.
+앱의 이름은 `PWA_NAME`, `PWA_SHORT_NAME` 환경변수를 변경하여 설정할 수 있습니다. `.env` 파일에 추가하세요 (`example-env` 참고).
 
 아이콘을 추가하려면 patch 디렉터리에 `icons/pwa-icon-512.png` 와 `icons/pwa-icon-192.png` 를 크기에 맞게 생성하세요.
 

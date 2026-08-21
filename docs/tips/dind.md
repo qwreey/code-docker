@@ -7,11 +7,11 @@ dind 로 생성된 컨테이너는 `code-docker-internal` 네트워크에 묶여
 <details>
 <summary>왜 <code>code-docker-dind</code> 대신 <code>dind</code> 를 써야 하는지</summary>
 
-code-docker 가 `code-docker-external`/`code-docker-internal` 양쪽에 다 붙어있어서, `code-docker-dind` 라는 이름이 두 네트워크 모두에 등록되어있는 탓에 어느 쪽 IP로 해석될지 비결정적입니다 (dind 데몬 자체가 internal 쪽에만 바인드되어있으므로, 잘못 해석되면 연결이 안됩니다). `dind` 는 `code-docker-internal` 에만 등록되는 별도 alias라 항상 올바른 쪽으로 resolve 됩니다.
+기본 상태에서는 code-docker/code-docker-dind 둘 다 `code-docker-internal` 에만 붙어있어서 `code-docker-dind` 라는 이름도 딱 한 네트워크에만 등록되어있으므로 당장은 모호하지 않습니다. 하지만 `code-docker-external` 을 수동으로 다시 붙이는 순간(둘 중 하나에라도) `code-docker-dind` 라는 이름이 두 네트워크 모두에 등록될 수 있어 어느 쪽 IP로 해석될지 비결정적이게 됩니다 (dind 데몬 자체가 internal 쪽에만 바인드되어있으므로, 잘못 해석되면 연결이 안됩니다). `dind` 는 `code-docker-internal` 에만 등록되는 별도 alias라 이 경우에도 항상 올바른 쪽으로 resolve되므로, 상황과 무관하게 `dind` 를 쓰는 것이 안전합니다.
 
 </details>
 
-`code-docker-dind` 는 `code-docker-internal` 에만 연결되어있고, 데몬 소켓도 그 네트워크의 IP에만 바인드되어있어 컨테이너 바깥(인터넷)에서는 노출되지 않습니다. `docker pull` 등 인터넷 접근이 필요한 요청은 `code-docker-router`(egress netgate - [`../egress-netgate.md`](../egress-netgate.md) 참고)를 게이트웨이로 거쳐 나갑니다.
+`code-docker-dind` 는 `code-docker-internal` 에만 연결되어있고, 데몬 소켓도 그 네트워크의 IP에만 바인드되어있어 컨테이너 바깥(인터넷)에서는 노출되지 않습니다. `docker pull` 등 인터넷 접근이 필요한 요청은 `code-docker-router`(egress netgate - [egress-netgate.md](../../router/docs/egress-netgate.md) 참고)를 게이트웨이로 거쳐 나갑니다.
 
 <details>
 <summary>기술적으로 어떻게 막혀있는지</summary>
@@ -51,7 +51,7 @@ dind 쪽에는 `./data/dind:/var/lib/docker` 볼륨이 마운트되어있어 컨
 
 ## 추가 경화: userns-remap (dind-authz-remap)
 
-`DIND_TARGET=dind-authz-remap`으로 설정하면, dind-authz가 막는 요청 목록에 더해 dind 내부 dockerd 자체에 [userns-remap](https://docs.docker.com/engine/security/userns-remap/)이 적용됩니다 — dind가 만드는 컨테이너 안의 UID 0(root)가 호스트에서는 비특권 UID(`dockremap` 유저, 고정 범위 `165536:165536` — `docker:dind` 베이스 이미지가 이미 이 유저/subuid/subgid를 갖고 있어서 별도로 만들 필요가 없었습니다)로 매핑됩니다. dind-authz가 어떤 이유로든(플러그인 버그, CVE-2026-34040류의 authz 우회 등) 뚫리더라도, `--privileged` 요청은 데몬 자체가 독립적으로 한 번 더 거부하게 되는 2중 방어선입니다.
+`DIND_TARGET=dind-authz-remap`으로 설정하면, dind-authz가 막는 요청 목록에 더해 dind 내부 dockerd 자체에 [userns-remap](https://docs.docker.com/engine/security/userns-remap/)이 적용됩니다 — dind가 만드는 컨테이너 안의 UID 0(root)가 호스트에서는 비특권 UID(`dockremap` 유저, 고정 범위 `165536:65536` — `docker:dind` 베이스 이미지가 이미 이 유저/subuid/subgid를 갖고 있어서 별도로 만들 필요가 없었습니다)로 매핑됩니다. dind-authz가 어떤 이유로든(플러그인 버그, CVE-2026-34040류의 authz 우회 등) 뚫리더라도, `--privileged` 요청은 데몬 자체가 독립적으로 한 번 더 거부하게 되는 2중 방어선입니다.
 
 **기본값이 아닙니다 (`DIND_TARGET`을 명시적으로 바꿔야 켜집니다).** 이유:
 

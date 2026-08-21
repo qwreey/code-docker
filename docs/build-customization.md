@@ -66,10 +66,10 @@ code-server 설정 파일입니다. **매 시작마다 `/code/.local/share/code-
 
 ### `recommendations.*.yaml` (추천 목록)
 
-webmanager의 "Code Extensions" 탭이 추천 목록으로 보여주는 code-server 익스텐션 목록입니다
-(추후 mise 도구 추천 목록도 이 파일에 `mise:` 최상위 키로 추가될 예정). 여러 사용자에게
-같은 이미지를 배포하는 경우, 이 파일을 override해서 조직에 맞는 추천 목록으로 완전히
-교체할 수 있습니다.
+webmanager의 "Code Extensions" 탭이 추천 목록으로 보여주는 code-server 익스텐션 목록(`extensions:`
+최상위 키)과, "mise" 탭이 추천 목록으로 보여주는 mise 도구 목록(`mise:` 최상위 키, 카테고리별
+그룹)이 같이 들어있습니다. 여러 사용자에게 같은 이미지를 배포하는 경우, 이 파일을 override해서
+조직에 맞는 추천 목록으로 완전히 교체할 수 있습니다.
 
 ### `supervisor-metadata.*.yaml` (Supervisor 탭 메타데이터)
 
