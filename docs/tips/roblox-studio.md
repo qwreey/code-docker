@@ -50,9 +50,10 @@ code-docker/dind(임의 웹브라우징 + npm/pip 설치 + MCP 툴콜을 하는,
 
 이 네트워크가 `code-docker-internal`이 아닌 별도 네트워크이기 때문에, 최신 Docker Engine의
 `DOCKER-USER`/`DOCKER-INTERNAL` 하드닝이 router의 forward 트래픽을 막습니다 -
-`.env`에서 `CODE_DOCKER_EXTRA_INTERNAL_NETWORKS=roblox-studio-vnc`를 설정하면
+`.env`에서 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=roblox-studio-vnc`를 설정하면
 `code-docker-netfilter-fix`가 그 네트워크에도 같은 예외 규칙을 걸어줍니다
-(공백으로 구분해 여러 네트워크를 나열할 수 있습니다). `CODE_DOCKER_INTERNAL_NETWORK`
+(공백으로 구분해 여러 네트워크를 나열할 수 있습니다; 이름이 `NETFILTER_FIX_`인 이유는
+이 스크립트 자체가 qwreey/router-docker-client의 범용 도구라서입니다). `NETFILTER_FIX_INTERNAL_NETWORK`
 (code-docker 자신의 네트워크)과는 별개 변수이므로, 사이드 프로젝트 쪽 오버레이가 이 값을
 설정해도 code-docker 자신의 기본 예외 규칙을 덮어쓸 일은 없습니다.
 
@@ -61,7 +62,7 @@ code-docker/dind(임의 웹브라우징 + npm/pip 설치 + MCP 툴콜을 하는,
 `studio`만 따로 재생성하면 라우팅이 깨집니다. 합쳐서 다시 띄우려면:
 
 ```sh
-EXTRA_INCLUDE=extra-include.yml CODE_DOCKER_EXTRA_INTERNAL_NETWORKS=roblox-studio-vnc \
+EXTRA_INCLUDE=extra-include.yml NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=roblox-studio-vnc \
   docker compose up -d
 ```
 
@@ -82,4 +83,4 @@ target port는 `5900`. 이 forward는 compose에 박혀있지 않고 router-mana
   확인하세요.
 - forward를 추가했는데도 접속이 안 되면, `code-docker-netfilter-fix` 로그에서
   `roblox-studio-vnc`에 대한 예외 규칙이 실제로 걸렸는지 확인하세요
-  (`CODE_DOCKER_EXTRA_INTERNAL_NETWORKS` 오타/누락이 가장 흔한 원인입니다).
+  (`NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS` 오타/누락이 가장 흔한 원인입니다).

@@ -367,14 +367,18 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      CODE_DOCKER_INTERNAL_NETWORK: "${PREFIX:-}code-docker-internal"
+      # NETFILTER_FIX_* (not CODE_DOCKER_*) - the script itself is a generic
+      # qwreey/router-docker-client tool now, not code-docker-specific, and its env
+      # vars are named after the tool rather than this particular consumer (see that
+      # repo's own CLAUDE.md and netfilter-fix/fix.sh comments).
+      NETFILTER_FIX_INTERNAL_NETWORK: "${PREFIX:-}code-docker-internal"
       # Space-separated list of any OTHER internal: true networks router also needs a
       # DOCKER-USER exemption for (e.g. a sibling project's EXTRA_INCLUDE overlay
       # attaching router to a dedicated network - see example-env's own comment on this
       # var and .claude/archive/roblox-studio-vnc-isolation-plan-done.md). Left as a separate
-      # env var from CODE_DOCKER_INTERNAL_NETWORK above on purpose - see netfilter-fix/fix.sh's
+      # env var from NETFILTER_FIX_INTERNAL_NETWORK above on purpose - see netfilter-fix/fix.sh's
       # own comment on why.
-      CODE_DOCKER_EXTRA_INTERNAL_NETWORKS: "${CODE_DOCKER_EXTRA_INTERNAL_NETWORKS:-}"
+      NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS: "${NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS:-}"
     restart: unless-stopped
     logging:
       driver: "json-file"

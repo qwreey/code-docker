@@ -43,13 +43,16 @@
 # docs/tips/roblox-studio.md 참고)에 붙이고 router가 그
 # 네트워크도 넘나들게 하려면, 최신 Docker Engine의 DOCKER-INTERNAL 체인이 그
 # 네트워크에 대해서도 router의 FORWARD 트래픽을 막는다 - code-docker-netfilter-fix
-# 서비스가 이 값을 읽어 그 네트워크들에도 같은 DOCKER-USER 예외를 걸어줍니다.
+# 서비스가 이 값을 읽어 그 네트워크들에도 같은 DOCKER-USER 예외를 걸어줍니다. (이름이
+# CODE_DOCKER_가 아니라 NETFILTER_FIX_인 이유: netfilter-fix 스크립트 자체는
+# qwreey/router-docker-client의 범용 도구라 code-docker 전용이 아니고, env var 이름도
+# 그 도구 자신을 가리키도록 지어졌습니다 - 그 레포 자신의 CLAUDE.md 참고.)
 # 공백으로 구분된 네트워크 "이름" 목록입니다(PREFIX가 붙기 전, docker-compose.yml의
 # `networks:` 키 이름 그대로) - PREFIX/BUILD_CONTEXT와 마찬가지로 컨테이너 안
 # 환경변수가 아니라 code-docker-netfilter-fix 서비스 하나에만 전달됩니다.
 # code-docker-internal 자신은 항상 별도로 보호되므로 여기엔 "추가"할 네트워크만
 # 적으면 됩니다.
-#CODE_DOCKER_EXTRA_INTERNAL_NETWORKS=""
+#NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=""
 
 # code-docker-internal/external 두 네트워크의 enable_ipv6를 한 번에
 # 켭니다. PREFIX/BUILD_CONTEXT와 마찬가지로 컨테이너 안 환경변수가 아니라

@@ -28,7 +28,7 @@
 
 **2026-08-19 e2e 실측 완료 (같은 날 후속)**: `.allow-test` 확인된 이 checkout에서
 실제로 `docker compose build`(양쪽 repo) → `EXTRA_INCLUDE`+
-`CODE_DOCKER_EXTRA_INTERNAL_NETWORKS=roblox-studio-vnc`로 6개 컨테이너 전부
+`NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=roblox-studio-vnc`로 6개 컨테이너 전부
 기동 → router-manager API로 `vnc-only:6080` App Routes 항목 실제 등록 →
 Claude-in-Chrome으로 `/app/studio-vnc/vnc.html` 직접 열어 확인:
 - 격리(코드에서 vnc-only resolve 불가, router는 가능), 서브패스 에셋 로딩,
@@ -134,7 +134,7 @@ App Routes가 유효한 전송 경로가 됨. 두 옵션:
 
 이후 공통으로 필요한 작업:
 - `targetguard.allowedTargetHosts`를 하드코딩 map에서 확장 가능한 형태로
-  일반화(예: `CODE_DOCKER_EXTRA_INTERNAL_NETWORKS` 인접 호스트를 읽거나,
+  일반화(예: `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS` 인접 호스트를 읽거나,
   router-manager에서 편집 가능한 allowlist)한 뒤 `studio`/`vnc-only` 추가.
 - `roblox-studio-vnc` 네트워크의 격리 모델을 App Routes 경유 시나리오에 맞게
   재검토(Caddy가 router 컨테이너 안에서 도는 건 동일하므로 "국경은 router만"
