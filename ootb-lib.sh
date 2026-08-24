@@ -48,3 +48,38 @@ locate_target_dir() {
   echo "-> $TARGET_DIR"
   echo
 }
+
+resolve_target_dir() {
+  # resolve_target_dir [target_dir] - $1이 있으면(ootb.sh/migrate.sh가 이미
+  # 확인해서 서브스크립트로 넘겨주는 경우) 그걸 그대로 SCRIPT_DIR/TARGET_DIR로
+  # 쓰고, 없으면(단독 실행) locate_target_dir로 대화형 확인.
+  if [ -n "${1:-}" ]; then
+    SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+    TARGET_DIR="$(realpath "$1")"
+  else
+    locate_target_dir
+  fi
+}
+
+set_env_var() {
+  # set_env_var <file> <key> <raw_value>  - 기존 (주석 처리됐든 아니든) 라인을
+  # 찾아 교체하거나, 없으면 파일 끝에 추가. sed 대신 awk -v를 쓰는 이유는
+  # <raw_value>에 argon2 해시처럼 sed 치환 특수문자($, &, |, \)가 그대로
+  # 들어있을 수 있어서 - awk -v로 넘긴 값은 정규식/백레퍼런스로 재해석되지
+  # 않고 문자열 그대로 print된다.
+  file=$1 key=$2 value=$3
+  touch "$file"
+  awk -v k="$key" -v v="$value" '
+    $0 ~ "^#?" k "=" { print k "=" v; done=1; next }
+    { print }
+    END { if (!done) print k "=" v }
+  ' "$file" > "$file.ootb.tmp" && mv "$file.ootb.tmp" "$file"
+}
+
+get_env_var() {
+  file=$1 key=$2
+  val=$(grep -E "^${key}=" "$file" 2>/dev/null | tail -1 | cut -d= -f2-)
+  val=${val%\"}; val=${val#\"}
+  val=${val%\'}; val=${val#\'}
+  printf '%s' "$val"
+}

@@ -7,22 +7,11 @@
 # 해줍니다. 여러 번 다시 실행해도 안전하도록 만들어졌습니다 - 이미 존재하는
 # .env/.env.webmanager/.env.router는 덮어쓰지 않고 건너뜁니다.
 #
-# 사이드 프로젝트 연동(roblox-studio-docker 등, docs/tips/roblox-studio.md 참고)도
-# 이 스크립트가 대화형으로 clone + extra-include.yml 작성까지 해줍니다 - 단,
-# code-docker가 특정 사이드 프로젝트를 알 필요가 없도록 범용 메커니즘으로
-# 동작합니다: 각 사이드 프로젝트가 자기 레포 루트에 `ootb-manifest.env`라는
-# plain shell env 파일을 들고 있으면 그걸 읽어 자동 연동하고, 없으면 클론만 하고
-# 건너뜁니다. 매니페스트 스키마는 docs/tips/ootb-manifest.md 참고, 요약하면:
-#
-#   OOTB_NAME="표시 이름"                                   # 필수
-#   OOTB_DESCRIPTION="한 줄 설명"                            # 선택
-#   OOTB_COMPOSE_INCLUDE="상대/경로/overlay.yml"             # 필수 (레포 루트 기준)
-#   OOTB_EXTRA_INTERNAL_NETWORKS="네트워크1 네트워크2"        # 선택
-#   OOTB_ENV_TARGET=".env"                                  # 선택, 기본 .env
-#   OOTB_ENV_PROMPT_1="이름:설명 텍스트:secret|plain"          # 선택, 1부터 번호를 이어서
-#   OOTB_ENV_PROMPT_2="이름2:설명 텍스트2:plain"               # 몇 개든 추가 (설명에 공백 가능 -
-#                                                            # 공백구분 리스트가 아니라 번호가
-#                                                            # 붙은 개별 변수라서 안전함)
+# .env 값 설정은 ootb-config.sh, 사이드 프로젝트(roblox-studio-docker 등,
+# docs/tips/roblox-studio.md 참고) 연동은 ootb-extra.sh에 각각 위임합니다 - 둘 다
+# 설치 이후에도(값 재설정, 사이드 프로젝트 나중에 추가) 단독으로 다시 실행할 수
+# 있어서, 이 스크립트는 "새로 설치"에만 필요한 부분(파일 복사, build/up)만
+# 담당합니다.
 #
 # 호스트에는 git/docker(compose)/bash/awk/realpath 외에 아무 것도 있다고
 # 가정하지 않습니다 (컨테이너 안에서만 쓰는 yq 등은 여기서 쓰지 않습니다).
@@ -34,29 +23,6 @@ set -u
 
 require_cmds git docker awk realpath
 
-set_env_var() {
-  # set_env_var <file> <key> <raw_value>  - 기존 (주석 처리됐든 아니든) 라인을
-  # 찾아 교체하거나, 없으면 파일 끝에 추가. sed 대신 awk -v를 쓰는 이유는
-  # <raw_value>에 argon2 해시처럼 sed 치환 특수문자($, &, |, \)가 그대로
-  # 들어있을 수 있어서 - awk -v로 넘긴 값은 정규식/백레퍼런스로 재해석되지
-  # 않고 문자열 그대로 print된다.
-  file=$1 key=$2 value=$3
-  touch "$file"
-  awk -v k="$key" -v v="$value" '
-    $0 ~ "^#?" k "=" { print k "=" v; done=1; next }
-    { print }
-    END { if (!done) print k "=" v }
-  ' "$file" > "$file.ootb.tmp" && mv "$file.ootb.tmp" "$file"
-}
-
-get_env_var() {
-  file=$1 key=$2
-  val=$(grep -E "^${key}=" "$file" 2>/dev/null | tail -1 | cut -d= -f2-)
-  val=${val%\"}; val=${val#\"}
-  val=${val%\'}; val=${val#\'}
-  printf '%s' "$val"
-}
-
 copy_if_missing() {
   src=$1 dst=$2
   if [ -e "$dst" ]; then
@@ -65,15 +31,6 @@ copy_if_missing() {
     cp "$src" "$dst"
     echo "  - 생성: $dst"
   fi
-}
-
-prompt_set() {
-  # prompt_set <file> <key> <프롬프트 텍스트> - 값을 큰따옴표로 감싸 저장
-  # (example-env류가 이미 쓰는 관례: PREFIX="", TZ="", ... 형태).
-  file=$1 key=$2 prompt=$3
-  printf '%s: ' "$prompt"
-  read -r val
-  [ -n "$val" ] && set_env_var "$file" "$key" "\"$val\""
 }
 
 echo "=== code-docker ootb 설치 ==="
@@ -94,94 +51,10 @@ set_env_var "$TARGET_DIR/.env" BUILD_CONTEXT "\"$REL_BUILD_CONTEXT\""
 echo "BUILD_CONTEXT=\"$REL_BUILD_CONTEXT\" 로 설정했습니다."
 echo
 
-echo "=== 기본 환경 값 설정 (Enter로 기본값 유지) ==="
-prompt_set "$TARGET_DIR/.env" PREFIX "여러 인스턴스를 한 호스트에 띄울 때 붙일 접두사 (PREFIX)"
-prompt_set "$TARGET_DIR/.env" TZ "타임존 (예: Asia/Seoul, 비우면 UTC)"
-prompt_set "$TARGET_DIR/.env" CODE_CPU_LIMIT "code-docker CPU 제한 (예: 4, 비우면 무제한)"
-prompt_set "$TARGET_DIR/.env" CODE_MEM_LIMIT "code-docker 메모리 제한 (예: 4g, 비우면 무제한)"
-prompt_set "$TARGET_DIR/.env" DIND_CPU_LIMIT "code-docker-dind CPU 제한 (비우면 무제한)"
-prompt_set "$TARGET_DIR/.env" DIND_MEM_LIMIT "code-docker-dind 메모리 제한 (비우면 무제한)"
-prompt_set "$TARGET_DIR/.env" ROUTER_CPU_LIMIT "code-docker-router CPU 제한 (비우면 무제한)"
-prompt_set "$TARGET_DIR/.env" ROUTER_MEM_LIMIT "code-docker-router 메모리 제한 (비우면 무제한)"
-echo
+bash "$SCRIPT_DIR/ootb-config.sh" "$TARGET_DIR"
 
-echo "=== 추가 프로젝트 연동 (선택, 없으면 그냥 Enter) ==="
-echo "roblox-studio-docker 등 EXTRA_INCLUDE로 붙일 사이드 프로젝트의 git URL을"
-echo "입력하세요. 여러 개 등록 가능, 빈 값을 입력하면 다음 단계로 넘어갑니다."
-linked_any=0
-while :; do
-  printf "추가 프로젝트 git URL: "
-  read -r url
-  [ -z "$url" ] && break
-
-  name="$(basename "$url" .git)"
-  clone_dir="$TARGET_DIR/builds/$name"
-  if [ -d "$clone_dir" ]; then
-    echo "  - 이미 클론됨: $clone_dir (건너뜀)"
-  else
-    if ! git clone "$url" "$clone_dir"; then
-      echo "  ! 클론 실패, 이 프로젝트는 건너뜁니다."
-      continue
-    fi
-  fi
-
-  manifest="$clone_dir/ootb-manifest.env"
-  if [ ! -f "$manifest" ]; then
-    echo "  ! $name 에 ootb-manifest.env가 없어 자동 연동을 건너뜁니다."
-    echo "    수동 연동 방법은 docs/tips/roblox-studio.md를 참고하세요."
-    continue
-  fi
-
-  unset OOTB_NAME OOTB_DESCRIPTION OOTB_COMPOSE_INCLUDE OOTB_EXTRA_INTERNAL_NETWORKS OOTB_ENV_TARGET
-  for v in $(compgen -v OOTB_ENV_PROMPT_ 2>/dev/null); do unset "$v"; done
-  # shellcheck disable=SC1090
-  . "$manifest"
-
-  if [ -z "${OOTB_COMPOSE_INCLUDE:-}" ]; then
-    echo "  ! $name/ootb-manifest.env에 OOTB_COMPOSE_INCLUDE가 없어 연동을 건너뜁니다."
-    continue
-  fi
-
-  echo "  - ${OOTB_NAME:-$name} 연동 중..."
-  [ -n "${OOTB_DESCRIPTION:-}" ] && echo "    ${OOTB_DESCRIPTION}"
-
-  extra_include="$TARGET_DIR/extra-include.yml"
-  if [ ! -s "$extra_include" ]; then
-    printf 'include:\n' > "$extra_include"
-  fi
-  printf '  - path: builds/%s/%s\n' "$name" "$OOTB_COMPOSE_INCLUDE" >> "$extra_include"
-  linked_any=1
-
-  if [ -n "${OOTB_EXTRA_INTERNAL_NETWORKS:-}" ]; then
-    current="$(get_env_var "$TARGET_DIR/.env" NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS)"
-    merged="$(printf '%s %s' "$current" "$OOTB_EXTRA_INTERNAL_NETWORKS" | xargs)"
-    set_env_var "$TARGET_DIR/.env" NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS "\"$merged\""
-  fi
-
-  env_target="${OOTB_ENV_TARGET:-.env}"
-  i=1
-  while :; do
-    var="OOTB_ENV_PROMPT_$i"
-    item="${!var:-}"
-    [ -z "$item" ] && break
-    pname="$(echo "$item" | cut -d: -f1)"
-    pdesc="$(echo "$item" | cut -d: -f2)"
-    pkind="$(echo "$item" | cut -d: -f3)"
-    if [ "$pkind" = "secret" ]; then
-      printf '    %s (%s, 비밀값, 비우면 미설정): ' "$pname" "$pdesc"
-      read -r -s pval
-      echo
-    else
-      printf '    %s (%s, 비우면 미설정): ' "$pname" "$pdesc"
-      read -r pval
-    fi
-    [ -n "$pval" ] && set_env_var "$TARGET_DIR/$env_target" "$pname" "\"$pval\""
-    i=$((i + 1))
-  done
-done
-if [ "$linked_any" = "1" ]; then
-  set_env_var "$TARGET_DIR/.env" EXTRA_INCLUDE "extra-include.yml"
-  echo "EXTRA_INCLUDE=extra-include.yml 로 설정했습니다."
+if confirm "사이드 프로젝트(EXTRA_INCLUDE)를 지금 연동할까요? (roblox-studio-docker 등, 나중에 ootb-extra.sh로도 가능)" n; then
+  bash "$SCRIPT_DIR/ootb-extra.sh" "$TARGET_DIR"
 fi
 echo
 

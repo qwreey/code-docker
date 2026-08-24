@@ -20,11 +20,21 @@ builds/code-docker/ootb.sh
 
 빌드한 이미지로 `--hash-password` 같은 CLI 서브커맨드만 딱
 실행(`docker compose run --rm --entrypoint`)하는 방식으로 컨테이너를 아예 띄우지 않고도 비밀번호
-해시를 만듭니다. `docs/tips/roblox-studio.md`처럼 `EXTRA_INCLUDE`로 붙이는 사이드
-프로젝트도 같은 스크립트 안에서 연동할 수 있습니다 - 그 프로젝트가 어떻게 자기
-자신을 이 스크립트에 알리는지는 [ootb-manifest.md](tips/ootb-manifest.md) 참고.
-여러 번 다시 실행해도 안전합니다(이미 있는 `.env`류는 덮어쓰지 않음) - CI나 비대화형
-환경에서는 아래 수동 절차를 그대로 쓰세요.
+해시를 만듭니다. 여러 번 다시 실행해도 안전합니다(이미 있는 `.env`류는 덮어쓰지 않음) -
+CI나 비대화형 환경에서는 아래 수동 절차를 그대로 쓰세요.
+
+`.env` 값 입력(`PREFIX`/`TZ`/리소스 제한/`ROUTER_HTTP_BIND`/`ROUTER_HTTP_PORT`/
+`TRUSTED_PROXIES` 등)과 사이드 프로젝트 연동은 각각 `ootb-config.sh`/`ootb-extra.sh`에
+위임되어 있고, 둘 다 설치 이후에도 단독으로 다시 실행할 수 있습니다:
+
+```sh
+builds/code-docker/ootb-config.sh              # .env 값을 새로 입력(Enter로 스킵)
+RECONFIGURE=1 builds/code-docker/ootb-config.sh # 현재 값을 보여주고 바꿀지부터 확인
+builds/code-docker/ootb-extra.sh                # 사이드 프로젝트 연동을 나중에 추가
+```
+
+`docs/tips/roblox-studio.md`처럼 `EXTRA_INCLUDE`로 붙이는 사이드 프로젝트가 어떻게
+자기 자신을 `ootb-extra.sh`에 알리는지는 [ootb-manifest.md](tips/ootb-manifest.md) 참고.
 
 ## 수동으로 설치하기
 
@@ -71,6 +81,11 @@ git pull → 손 안 댄 `docker-compose.yml`이면 최신으로 갱신(직접 �
 --entrypoint`로 딱 그 명령만 실행 - `ootb.sh`의 `--hash-password`와 같은 기법) →
 `docker compose up -d` 순서로 매 단계 물어보며 진행합니다. 최상위 `.env`는
 마이그레이션 도구가 없으므로(모든 키가 기본값을 가지므로 안전) 건드리지 않습니다.
+
+빌드 이후, `up` 하기 전에 "설정값을 다시 검토할까요?"/"새 사이드 프로젝트를
+추가할까요?"도 물어봅니다 - 각각 `RECONFIGURE=1 ootb-config.sh`(현재 값을 보여주고
+바꿀지부터 확인)와 `ootb-extra.sh`를 그대로 호출하는 것입니다 - 위
+"ootb.sh로 한 번에 설치하기" 절 참고.
 
 # 기타 환경에 대한 노트와 팁 모음
 

@@ -11,7 +11,9 @@
 # (빌드 직후 이미지로 `docker compose run --rm --entrypoint`만 실행 - 컨테이너를
 # 실제로 띄우지 않음, ootb.sh의 --hash-password와 같은 기법. script/entrypoint.sh/
 # router/script/netgate-entrypoint.sh 둘 다 CMD를 무시하고 항상 supervisord를
-# 띄우므로 --entrypoint 우회가 필요합니다), 5) docker compose up -d.
+# 띄우므로 --entrypoint 우회가 필요합니다), 5) 원하면 ootb-config.sh를
+# RECONFIGURE=1로/ootb-extra.sh를 다시 실행해 설정값 재검토/사이드 프로젝트
+# 추가, 6) docker compose up -d.
 #
 # 최상위 .env는 마이그레이션 도구가 없으므로(example-env 자체 주석 참고) 건드리지
 # 않습니다 - 새 키는 전부 합리적인 기본값이 있어 그대로 둬도 안전합니다.
@@ -110,6 +112,15 @@ if [ "$built" = "1" ]; then
   done
   echo
 fi
+
+echo "=== 5. 설정 재검토 ==="
+if confirm "설정값을 다시 검토할까요? (PREFIX/TZ/리소스 제한/ROUTER_HTTP_BIND 등)" n; then
+  RECONFIGURE=1 bash "$SCRIPT_DIR/ootb-config.sh" "$TARGET_DIR"
+fi
+if confirm "새 사이드 프로젝트를 추가할까요? (기존에 연동된 것들은 위 3단계에서 이미 git pull됨)" n; then
+  bash "$SCRIPT_DIR/ootb-extra.sh" "$TARGET_DIR"
+fi
+echo
 
 if confirm "지금 docker compose up -d를 수행할까요?" y; then
   docker compose up -d
