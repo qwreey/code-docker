@@ -87,6 +87,13 @@ git pull → 손 안 댄 `docker-compose.yml`이면 최신으로 갱신(직접 �
 바꿀지부터 확인)와 `ootb-extra.sh`를 그대로 호출하는 것입니다 - 위
 "ootb.sh로 한 번에 설치하기" 절 참고.
 
+`migrate.sh` 자신은 git pull까지만 하고, 그 이후(docker-compose.yml 갱신부터 `up`까지)는
+`migrate-continue.sh`라는 별도 파일에 `exec`로 넘겨서 진행합니다 - 방금 pull로 받은
+`migrate.sh`/`migrate-continue.sh`의 새 내용이 이번 실행에도 바로 반영되게 하기
+위해서입니다(실행 중인 스크립트 자신이 git pull로 바뀌면, bash는 그 이후 코드를 여전히
+pull 전 내용으로 실행할 수 있습니다 - 완전히 새 프로세스로 넘겨야 안전합니다). 직접
+`migrate-continue.sh`를 실행할 일은 없습니다.
+
 # 기타 환경에 대한 노트와 팁 모음
 
 code-docker 환경은 컨테이너 내부에서 기본적으로 root 유저를 사용합니다. CAP을 따로 추가하지 않고 컨테이너의 네트워크를 적절히 분리한 경우 큰 문제가 되지 않습니다.
