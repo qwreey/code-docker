@@ -123,13 +123,16 @@ mise 환경이 제공되므로 `mise use -g node`, `mise use -g rust`, `mise use
 
 ## 타임존
 
-기본값은 UTC입니다. `docker-compose.yml`의 `TZ` 환경변수를 원하는 타임존 이름
-(예: `Asia/Seoul`)으로 설정하면 됩니다 — `tzdata` 패키지가 이미 설치되어 있어서
-`/etc/localtime` 심볼릭 링크를 따로 만들거나 entrypoint를 수정할 필요 없이, glibc가
-`TZ` 값만으로 바로 시간대를 계산합니다(`date`, supervisord 로그 타임스탬프,
-code-server/Node 등 대부분의 프로세스가 이 방식을 따릅니다). 값을 바꾼 뒤에는
-`docker compose up -d`로 재기동하세요(재빌드는 필요 없습니다 — 환경변수만 바뀌는
-것이므로).
+기본값은 UTC입니다. `.env`의 `CODE_TZ` 값을 원하는 타임존 이름(예: `Asia/Seoul`)으로
+설정하면 됩니다 — `tzdata` 패키지가 이미 설치되어 있어서 `/etc/localtime` 심볼릭 링크를
+따로 만들 필요는 없습니다. `.env`에서 이름이 `TZ`가 아니라 `CODE_TZ`인 이유: Compose의
+`${VAR}` 치환은 `.env` 값보다 `docker compose`를 실행하는 쉘 자신이 이미 export해둔
+동일 이름 변수를 우선하는데, `TZ`는 흔히 로그인 쉘이 기본으로 export해두는 변수라
+그대로 쓰면 `.env`에 뭘 적어도 조용히 무시될 수 있었습니다 - `script/entrypoint.sh`가
+컨테이너 시작 시 `CODE_TZ`를 진짜 `TZ`로 다시 export해주고, 그 뒤로는 glibc가 `TZ` 값만으로
+바로 시간대를 계산합니다(`date`, supervisord 로그 타임스탬프, code-server/Node 등
+대부분의 프로세스가 이 방식을 따릅니다). 값을 바꾼 뒤에는 `docker compose up -d`로
+재기동하세요(재빌드는 필요 없습니다 — 환경변수만 바뀌는 것이므로).
 
 ## ssh 연결
 
@@ -204,7 +207,7 @@ code-docker/code-docker-dind/code-docker-router 각 컨테이너에 CPU/메모�
 
 ## 환경 변수 설정 (.env)
 
-`PWA_NAME`, `TZ`, `LANG`, 마운트할 볼륨 경로(`HOME_VOLUME`/`SSHD_VOLUME`/`DIND_VOLUME`/`ROUTER_VOLUME`), 아웃바운드 격리 관련 값(`NETGATE_ENABLED`, `ROUTER_HOSTNAME`), 로그 상세도 등 `docker-compose.yml`이 읽는 값들은 모두 `example-env`에 설명과 함께 정리되어 있습니다. `example-env`를 `.env`로 복사한 뒤 필요한 값만 주석을 풀어 쓰세요 - 전부 합리적인 기본값이 있어 이 파일이 없어도 정상 동작합니다. 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다.
+`PWA_NAME`, `CODE_TZ`, `CODE_LANG`, 마운트할 볼륨 경로(`HOME_VOLUME`/`SSHD_VOLUME`/`DIND_VOLUME`/`ROUTER_VOLUME`), 아웃바운드 격리 관련 값(`NETGATE_ENABLED`, `ROUTER_HOSTNAME`), 로그 상세도 등 `docker-compose.yml`이 읽는 값들은 모두 `example-env`에 설명과 함께 정리되어 있습니다. `example-env`를 `.env`로 복사한 뒤 필요한 값만 주석을 풀어 쓰세요 - 전부 합리적인 기본값이 있어 이 파일이 없어도 정상 동작합니다. 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다.
 
 ```sh
 cp example-env .env

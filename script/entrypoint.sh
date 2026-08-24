@@ -52,6 +52,13 @@ fi
 mkdir -p /run/xdg && chmod 700 /run/xdg
 export XDG_RUNTIME_DIR=/run/xdg
 
+# docker-compose.yml passes these in as CODE_TZ/CODE_LANG, not TZ/LANG directly -
+# see that file's own comment on why. Re-export under the real names so glibc/date/
+# supervisord and everything it spawns below (user-init.sh included) pick them up
+# the normal way.
+export TZ="${CODE_TZ:-}"
+export LANG="${CODE_LANG:-}"
+
 # Run home-folder migrations before any supervisord program can touch $HOME
 # - several programs below start at the same priority and would otherwise
 # race user-init creating/moving their state dirs (see

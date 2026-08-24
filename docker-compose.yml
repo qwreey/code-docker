@@ -74,8 +74,14 @@ services:
       PWA_NAME: "${PWA_NAME:-code-docker}"
       PWA_SHORT_NAME: "${PWA_SHORT_NAME:-code-docker}"
       PWA_DISPLAY_MODE: "${PWA_DISPLAY_MODE:-}"
-      TZ: "${TZ:-}"
-      LANG: "${LANG:-}"
+      # Named CODE_TZ/CODE_LANG here, not the bare TZ/LANG a shell would usually
+      # export - Compose's ${VAR:-default} substitution prefers a variable already
+      # exported in the shell invoking `docker compose` over the same-named value in
+      # .env, so a plain `TZ: "${TZ:-}"` here silently ignored .env's TZ/LANG on any
+      # host whose login shell already sets them (most do). script/entrypoint.sh
+      # re-exports these under the real TZ/LANG names for every process it starts.
+      CODE_TZ: "${CODE_TZ:-}"
+      CODE_LANG: "${CODE_LANG:-}"
       # Default matches the "dind" alias below - see example-env before
       # overriding.
       DOCKER_HOST: "${DOCKER_HOST:-tcp://dind:2375}"

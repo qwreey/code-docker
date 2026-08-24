@@ -66,9 +66,19 @@ code-docker/dind(임의 웹브라우징 + npm/pip 설치 + MCP 툴콜을 하는,
 (code-docker 자신의 네트워크)과는 별개 변수이므로, 사이드 프로젝트 쪽 오버레이가 이 값을
 설정해도 code-docker 자신의 기본 예외 규칙을 덮어쓸 일은 없습니다.
 
-두 서비스(`studio`, `studio-netinit`)는 항상 함께 재생성해야 합니다 - `studio`는
-`network_mode: service:studio-netinit`으로 붙어 네트워크 네임스페이스를 공유하므로,
-`studio`만 따로 재생성하면 라우팅이 깨집니다. 합쳐서 다시 띄우려면:
+`roblox-studio-vnc` 네트워크 자신의 이름도 `roblox-studio-docker`의 `roblox-studio-code-docker.yml`
+쪽에서 `${PREFIX:-}roblox-studio-vnc`로 정의돼 있습니다(컨테이너 이름 `roblox-studio`도
+마찬가지) - `PREFIX`가 다른 code-docker 인스턴스 두 개가 각자 roblox-studio-docker를
+연동해도 컨테이너/네트워크 이름이 안 겹치게 하기 위해서입니다. `ootb.sh`/`ootb-extra.sh`로
+연동했다면 위 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS` 값도 자동으로 같은 `PREFIX`가
+붙어서 저장되므로 신경 쓸 게 없지만, 수동으로 연동하거나 값을 직접 바꾼다면 두 값(네트워크
+이름과 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS`)이 실제 `PREFIX`까지 포함해서 정확히 일치해야
+합니다.
+
+두 서비스(`studio`, `studio-netinit`)는 항상 함께 재생성해야 합니다 - `studio-netinit`은
+`network_mode: service:studio`로 붙어 `studio`의 네트워크 네임스페이스를 공유하므로,
+`studio`만 따로 재생성하면 라우팅이 깨집니다. 합쳐서 다시 띄우려면 (`PREFIX`를 쓰는
+배포라면 아래 값도 그만큼 바꾸세요):
 
 ```sh
 EXTRA_INCLUDE=extra-include.yml NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=roblox-studio-vnc \

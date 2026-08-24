@@ -91,7 +91,7 @@ if [ "$built" = "1" ]; then
 fi
 
 echo "=== 5. 설정 재검토 ==="
-if confirm "설정값을 다시 검토할까요? (PREFIX/TZ/리소스 제한/ROUTER_HTTP_BIND 등)" n; then
+if confirm "설정값을 다시 검토할까요? (PREFIX/CODE_TZ/리소스 제한/ROUTER_HTTP_BIND 등)" n; then
   RECONFIGURE=1 bash "$SCRIPT_DIR/ootb-config.sh" "$TARGET_DIR"
 fi
 if confirm "새 사이드 프로젝트를 추가할까요? (기존에 연동된 것들은 위 3단계에서 이미 git pull됨)" n; then

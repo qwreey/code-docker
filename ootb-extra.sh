@@ -61,6 +61,14 @@ while :; do
 
   unset OOTB_NAME OOTB_DESCRIPTION OOTB_COMPOSE_INCLUDE OOTB_EXTRA_INTERNAL_NETWORKS OOTB_ENV_TARGET
   for v in $(compgen -v OOTB_ENV_PROMPT_ 2>/dev/null); do unset "$v"; done
+  # PREFIX를 미리 환경에 내보내는 이유: 매니페스트가 OOTB_EXTRA_INTERNAL_NETWORKS
+  # 같은 값 안에 "${PREFIX}"를 그대로 써서(예: roblox-studio-docker) 자기 사이드
+  # 네트워크 이름을 code-docker 쪽 PREFIX와 맞출 수 있게 하기 위함 - source 시점에
+  # 일반 쉘 변수 치환으로 풀린다. PREFIX가 아직 .env에 없으면(신규 설치, ootb.sh가
+  # ootb-config.sh보다 먼저 이 스크립트를 부르는 경우는 없지만 단독 실행 대비)
+  # 빈 문자열로 취급된다.
+  PREFIX="$(get_env_var "$TARGET_DIR/.env" PREFIX)"
+  export PREFIX
   # shellcheck disable=SC1090
   . "$manifest"
 

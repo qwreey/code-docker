@@ -98,14 +98,20 @@
 
 # Timezone for all processes in the container (glibc reads this
 # directly via tzdata, already installed - no /etc/localtime symlink
-# or entrypoint change needed). Empty means UTC. e.g. "Asia/Seoul".
-#TZ=""
+# needed). Empty means UTC. e.g. "Asia/Seoul". Named CODE_TZ, not TZ -
+# script/entrypoint.sh re-exports it as the real TZ once the container starts
+# (see docker-compose.yml's own comment): keeping the .env-side name off TZ
+# means your own shell's TZ (if it happens to have one exported) can never
+# silently outrank this value the way Compose's ${VAR} substitution otherwise
+# would.
+#CODE_TZ=""
 
-# Locale for all processes (glibc LANG format, e.g. "ko_KR.UTF-8").
-# Left unset - the base image already behaves reasonably (C.UTF-8)
-# without it. Anything beyond C.UTF-8 needs locale-gen at build time
-# (see build.*.sh override), which this image doesn't do by default.
-#LANG=""
+# Locale for all processes (glibc LANG format, e.g. "ko_KR.UTF-8"). Same
+# CODE_-prefixed/entrypoint-re-exported deal as CODE_TZ above. Left unset -
+# the base image already behaves reasonably (C.UTF-8) without it. Anything
+# beyond C.UTF-8 needs locale-gen at build time (see build.*.sh override),
+# which this image doesn't do by default.
+#CODE_LANG=""
 
 # Add docker in docker host. Uses the internal-only alias (not the plain
 # "code-docker-dind" service name) - dind only actually listens on its
