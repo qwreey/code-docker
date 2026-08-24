@@ -24,7 +24,7 @@ const LOAD_SETTLE_MS = 200
 const LOAD_HARD_CAP_MS = 3000
 
 interface RouterFrameProps {
-  tab: 'dev-proxy' | 'app-routes' | 'tailscale' | 'dns' | 'net' | 'tinyauth' | 'settings'
+  tab: 'dev-proxy' | 'app-routes' | 'vnc' | 'tailscale' | 'dns' | 'net' | 'tinyauth' | 'settings'
 }
 
 /**
@@ -63,7 +63,17 @@ function RouterIframe({ host, tab }: { host?: string; tab: RouterFrameProps['tab
   // the iframe by changing its src.
   const [src] = useState(() => {
     const base = host ? `https://${host}` : ''
-    return `${base}/router/?embed=1&tab=${tab}&theme=${theme}`
+    // ?origin= tells the embedded SPA which origin *this* page is on. The
+    // VNC tab needs it: its viewer loads /app/<name>/..., which router's
+    // nginx serves only on the shared hostname, never on a dedicated
+    // ROUTER_MANAGER_HOSTS domain (that block deliberately serves
+    // router-manager alone, so user-registered app content stays off
+    // router-manager's own origin). Without this the embedded tab would
+    // have no way to know the shared origin at all and could only refuse
+    // to render a viewer - see router/frontend's own useViewerOrigin.ts.
+    // Harmless for every other tab, which simply never reads it.
+    const origin = encodeURIComponent(window.location.origin)
+    return `${base}/router/?embed=1&tab=${tab}&theme=${theme}&origin=${origin}`
   })
   const targetOrigin = host ? `https://${host}` : window.location.origin
 
@@ -110,6 +120,11 @@ function RouterIframe({ host, tab }: { host?: string; tab: RouterFrameProps['tab
         onLoad={handleLoad}
         className="router-frame-iframe"
         title={`router-manager: ${tab}`}
+        // The VNC tab nests a third iframe (the viewer) inside this one,
+        // and a fullscreen/clipboard request only reaches the top document
+        // if EVERY ancestor iframe allows it - so this outermost hop has to
+        // grant it too, not just the viewer's own iframe.
+        allow="fullscreen; clipboard-read; clipboard-write"
       />
     </div>
   )

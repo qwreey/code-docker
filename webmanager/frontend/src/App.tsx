@@ -66,6 +66,7 @@ function saveSidebarCollapsed(collapsed: boolean) {
 const IFRAME_SECTIONS = new Set<SectionId>([
   'dev-proxy',
   'app-routes',
+  'vnc',
   'tailscale',
   'dns',
   'net',
@@ -210,6 +211,7 @@ function App() {
           {active === 'git-config' && <GitConfig />}
           {active === 'dev-proxy' && <RouterFrame tab="dev-proxy" />}
           {active === 'app-routes' && <RouterFrame tab="app-routes" />}
+          {active === 'vnc' && <RouterFrame tab="vnc" />}
           {active === 'tailscale' && <RouterFrame tab="tailscale" />}
           {active === 'dns' && <RouterFrame tab="dns" />}
           {active === 'net' && <RouterFrame tab="net" />}

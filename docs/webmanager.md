@@ -65,6 +65,18 @@ target(`host:port`) 두 값만으로 앱 하나를 등록합니다 — 경로 �
 바꾸면 다시 생성되지 않습니다. 자세한 내용은 [app-routes.md](../router/docs/app-routes.md)를
 확인하세요.
 
+### VNC
+
+router에 붙어 있는 GUI 컨테이너의 화면을 브라우저에서 바로 보고 조작하는
+탭 — 이 탭도 Dev Proxy와 같은 방식(router의 `/router/` 페이지를 iframe으로
+embed)으로 보여줍니다. 대상을 하나 등록하면 위 App Routes 항목이 같은
+이름으로 함께 생성되고(실제 중계는 전적으로 App Routes가 담당합니다),
+목록에서 "보기"를 누르면 같은 페이지 안에 뷰어가 열립니다. 대상 주소는 raw
+RFB 포트(`5900`)가 아니라 대상 컨테이너가 띄운 웹 VNC 포트(noVNC/websockify,
+보통 `6080`)여야 합니다 — router의 Caddy는 HTTP/WebSocket만 중계할 수 있기
+때문입니다. 네이티브 VNC 클라이언트로 붙고 싶다면 대신 아래 Net 관리 탭의
+Forwards를 쓰세요. 자세한 내용은 [vnc.md](../router/docs/vnc.md)를 확인하세요.
+
 ### Tailscale
 
 Dev Proxy와 같은 방식(router의 `/router/` 페이지를 iframe으로 embed)으로,

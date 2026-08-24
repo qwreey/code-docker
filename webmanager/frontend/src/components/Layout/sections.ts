@@ -4,6 +4,7 @@ export type SectionId =
   | 'git-config'
   | 'dev-proxy'
   | 'app-routes'
+  | 'vnc'
   | 'tailscale'
   | 'dns'
   | 'net'
@@ -33,6 +34,7 @@ export const SECTIONS: SectionMeta[] = [
   { id: 'git-config', label: 'Git Config', implemented: true },
   { id: 'dev-proxy', label: 'Dev Proxy', implemented: true },
   { id: 'app-routes', label: 'App Routes', implemented: true },
+  { id: 'vnc', label: 'VNC', implemented: true },
   { id: 'tailscale', label: 'Tailscale', implemented: true },
   { id: 'dns', label: 'DNS', implemented: true },
   { id: 'net', label: 'Net 관리', implemented: true },

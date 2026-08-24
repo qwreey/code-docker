@@ -36,6 +36,13 @@
     결론("지금은 못 뗀다")과 달리 실제로는 2026-08-08 데카플링에서 바로
     실행되어 완료됨 — 최신 설계는 `router/CLAUDE.md`/`webmanager/CLAUDE.md`
     참고
+  - `router-vnc-tab-plan-done.md` — router의 VNC 탭(브라우저에 GUI 컨테이너
+    화면을 임베드) 아이디어 → 리서치(wayvnc/neatvnc 성능 실태, KasmVNC/
+    Guacamole/Selkies 비교) → 경로 B-1 결정 → 구현까지의 전 과정. 문서 앞머리에
+    완료 요약이 붙어 있음 — 현재 상태는 `router/CLAUDE.md`의 "VNC" 절과
+    `router/docs/vnc.md`. Selkies 전환과 `wayvnc --gpu` 하드웨어 인코딩은 이
+    문서 안에 트리거 조건과 함께 백로그로 남아 있음(실사용 중 성능 문제를
+    겪으면 그때)
 
 - **`backlog/`** — 아직 착수하지 않은 브레인스토밍/아이디어(webmanager에 국한되지
   않는 것). `archive/`와 달리 "완료된 것"이 아니라 "언젠가 할 수도 있는 것" — 실제로

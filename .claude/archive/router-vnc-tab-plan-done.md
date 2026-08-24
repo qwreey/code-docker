@@ -1,4 +1,43 @@
-# router VNC 탭 (아이디어 정리 — 구현 전, 사용자 노트 + 리서치 종합)
+# router VNC 탭 (완료 — 2026-08-25)
+
+**2026-08-25 완료**: 문서 제목이자 경로 B의 정의였던 "진짜 VNC 탭"까지 구현하고
+라이브 검증함 — 이 문서가 backlog에서 archive로 옮겨진 이유. 이전 업데이트들이
+구현한 건 전송 경로(B-1)까지였고 탭 자체는 없었음.
+
+구현된 것:
+- **router**: `backend/internal/vnc` (타겟 레지스트리 +
+  `/var/lib/code-docker-router/vnc/targets.json`, App Route를 lockstep으로
+  생성/수정/삭제, `List`가 매번 approutes를 다시 읽어 drift 보고),
+  `backend/handlers_vnc.go` (`/api/vnc/targets[/{name}]`),
+  `frontend/src/components/Vnc/` (목록 + 추가/편집 다이얼로그 + iframe 뷰어 +
+  전체화면/새 탭), `docs/vnc.md`.
+- **code-docker**: webmanager 사이드바에 VNC 탭 추가(`RouterFrame tab="vnc"`),
+  `RouterFrame`이 자기 origin을 `?origin=`으로 전달 + `allow="fullscreen;
+  clipboard-*"` (중첩 iframe 3단이라 모든 조상이 허용해야 함),
+  `docs/index.md`/`docs/webmanager.md` 갱신.
+
+설계 결정 두 가지가 이 문서에 없던 것으로, 구현 중 추가로 정해짐:
+- **탭은 App Routes 위의 얇은 층** — 새 프록시 메커니즘이 아니라 App Route를
+  자동으로 만들어 주는 레지스트리. 대신 반대쪽(App Routes 탭)에서 손댄 변경이
+  묻히지 않도록 캐시 대신 매번 대조해 `routeMissing`/`routeDiverged`로 표시하고,
+  없어진 route는 편집-저장으로 self-heal.
+- **뷰어 origin 문제** — `/app/`은 공유 호스트네임에만 서비스되고
+  `ROUTER_MANAGER_HOSTS` 전용 도메인에는 의도적으로 없음. 그래서 뷰어 iframe이
+  `window.location.origin`을 그냥 쓸 수 없고, webmanager 임베드가 `?origin=`으로
+  알려주며, 전용 도메인을 직접 연 경우엔 뷰어 대신 설명을 띄움
+  (`useViewerOrigin.ts`).
+
+라이브 검증(이 checkout, `.allow-test`): API 전 경로(생성/이름변경/삭제/
+drift 4종/self-heal/allowlist·self-SSRF·잘못된 backend 거부), router `/router/`
+탭에서 실제 labwc 데스크톱 임베드 + 마우스 입력 반영, webmanager `/manager/vnc`
+3단 중첩 iframe에서도 동일, `ROUTER_MANAGER_HOSTS` 전용 도메인 거부 문구까지
+전부 확인. **`VNC_PASSWORD` VeNCrypt 이슈는 그대로 남아 있음**(아래 e2e 절
+참고) — 검증 중 재현되어, 그 값을 비운 상태에서 연결 성공을 확인했고 이후
+원복함. `docs/vnc.md`의 "알려진 제약"에 사용자용으로 기록됨.
+
+---
+
+# (원문) router VNC 탭 (아이디어 정리 — 구현 전, 사용자 노트 + 리서치 종합)
 
 2026-08-18, 사용자가 다른 여러 요청과 함께 남긴 노트를 정리한 문서. 조사(3개
 서브에이전트: wayvnc/neatvnc 성능 실태, wlroots용 대안 스택 비교, router

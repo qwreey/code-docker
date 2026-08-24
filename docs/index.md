@@ -262,6 +262,18 @@ tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열�
 - [알려진 한계 — 절대경로 응답은 제한적으로만 다뤄집니다](../router/docs/app-routes.md#알려진-한계--절대경로-응답은-제한적으로만-다뤄집니다)
 - [인증](../router/docs/app-routes.md#인증)
 
+## VNC (GUI 컨테이너 화면 보기)
+
+router에 붙어 있는 GUI 컨테이너(예: Wine/labwc 위 Roblox Studio)의 화면을 브라우저에서 바로 보고 조작하는 기능입니다. 대상 컨테이너가 띄운 웹 VNC 프런트엔드(noVNC/websockify)를 App Route로 태워 임베드하는 방식이라 실제 중계는 App Routes와 같은 경로를 씁니다 — router의 Caddy는 HTTP/WebSocket만 중계할 수 있어 raw RFB(5900번)는 태울 수 없고, 네이티브 VNC 클라이언트로 붙는 경로는 Net 관리 탭의 Forwards가 담당합니다. [webmanager의 VNC 탭](webmanager.md#vnc) 또는 `http://<host>/router/`에서 관리합니다.
+
+자세한 내용은 [vnc.md](../router/docs/vnc.md)를 확인하세요.
+
+- [어떻게 동작하는가](../router/docs/vnc.md#어떻게-동작하는가-읽고-시작하는-편이-좋습니다)
+- [대상 추가하기](../router/docs/vnc.md#대상-추가하기) — sibling 프로젝트의 컨테이너를 대상으로 삼으려면 `.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`가 필요합니다
+- [뷰어 백엔드](../router/docs/vnc.md#뷰어-백엔드)
+- [보기 (뷰어)](../router/docs/vnc.md#보기-뷰어) — 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`)을 직접 열었을 때의 제약 포함
+- [알려진 제약](../router/docs/vnc.md#알려진-제약) — noVNC와 `VNC_PASSWORD`(VeNCrypt)는 함께 쓸 수 없습니다
+
 ## webmanager (관리자 패널)
 
 80번 포트의 code-server 와 같은 origin, `/manager` 경로에 브라우저 관리자 패널이 함께 떠 있습니다 (Go 백엔드 + React 프론트엔드, `webmanager/` 폴더에서 개발됩니다) — 컨테이너 안 nginx가 `/manager`를 webmanager로, 나머지를 code-server로 라우팅해줍니다. 별도 포트로 직접 열고 싶다면(예: nginx를 거치지 않고 붙고 싶은 경우) `.env.webmanager`의 `WEBMANAGER_ADDR`를 `:81`로 바꾸고 `docker-compose.yml`의 주석 처리된 `81:81` 매핑을 되살리세요.
@@ -273,6 +285,7 @@ tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열�
 - [Git Config](webmanager.md#git-config)
 - [Dev Proxy](webmanager.md#dev-proxy)
 - [App Routes](webmanager.md#app-routes)
+- [VNC](webmanager.md#vnc)
 - [Tailscale](webmanager.md#tailscale)
 - [Logs](webmanager.md#logs)
 - [Task Manager](webmanager.md#task-manager)
