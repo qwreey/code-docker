@@ -36,7 +36,7 @@ fi
 echo "=== 1. code-docker 자신 업데이트 ==="
 OLD_HEAD="$(git -C "$SCRIPT_DIR" rev-parse HEAD)"
 if confirm "code-docker($SCRIPT_DIR)를 git pull로 최신화할까요?" y; then
-  if ! git -C "$SCRIPT_DIR" pull origin master --recurse-submodules; then
+  if ! git -C "$SCRIPT_DIR" pull origin main --recurse-submodules; then
     echo "  ! git pull 실패 - 지금 체크아웃된 상태로 계속 진행합니다."
   fi
 fi

@@ -62,7 +62,7 @@ touch empty-extra-include.yml # docker-compose.yml의 include: 대상 - 없으�
 만약 빌드에 성공했다면 `docker compose up -d` 를 수행하세요.
 잘 구동된다면 성공입니다!
 > Note: 시스템 패키지 업데이트를 위해 주기적으로 build 와 up 을 다시 수행해주세요.
-> Note: code-docker 업데이트를 수행하려면 `git -C builds/code-docker pull origin master --recurse-submodules` 를 수행하세요 - 아래 "업데이트하기" 절이 이 과정 전체를 대신 해줍니다.
+> Note: code-docker 업데이트를 수행하려면 `git -C builds/code-docker pull origin main --recurse-submodules` 를 수행하세요 - 아래 "업데이트하기" 절이 이 과정 전체를 대신 해줍니다.
 
 ## 업데이트하기
 
