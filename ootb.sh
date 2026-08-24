@@ -29,33 +29,10 @@
 
 set -u
 
-for cmd in git docker awk realpath; do
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    echo "ootb.sh: '$cmd' 명령을 찾을 수 없습니다. 설치 후 다시 실행하세요." >&2
-    exit 1
-  fi
-done
+# shellcheck disable=SC1091
+. "$(realpath "$(dirname "$0")")/ootb-lib.sh"
 
-SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-if [ ! -f "$SCRIPT_DIR/docker-compose.yml" ]; then
-  echo "ootb.sh: $SCRIPT_DIR 에서 docker-compose.yml을 찾을 수 없습니다 - code-docker 레포 안에서 실행 중인지 확인하세요." >&2
-  exit 1
-fi
-
-DEFAULT_TARGET_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-
-confirm() {
-  # confirm "질문" [기본값 y|n]
-  default=${2:-y}
-  if [ "$default" = "y" ]; then hint="[Y/n]"; else hint="[y/N]"; fi
-  printf '%s %s ' "$1" "$hint"
-  read -r ans
-  [ -z "$ans" ] && ans=$default
-  case "$ans" in
-    [yY]*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
+require_cmds git docker awk realpath
 
 set_env_var() {
   # set_env_var <file> <key> <raw_value>  - 기존 (주석 처리됐든 아니든) 라인을
@@ -100,17 +77,7 @@ prompt_set() {
 }
 
 echo "=== code-docker ootb 설치 ==="
-echo "설치 대상 디렉터리(기본값): $DEFAULT_TARGET_DIR"
-printf "다른 경로를 쓰려면 입력하세요 (Enter면 위 기본값 사용): "
-read -r custom_target
-if [ -n "$custom_target" ]; then
-  TARGET_DIR="$(realpath -m "$custom_target")"
-else
-  TARGET_DIR="$DEFAULT_TARGET_DIR"
-fi
-mkdir -p "$TARGET_DIR"
-echo "-> $TARGET_DIR 에 설치합니다."
-echo
+locate_target_dir
 
 echo "=== 기본 파일 복사 ==="
 cp "$SCRIPT_DIR/docker-compose.yml" "$TARGET_DIR/docker-compose.yml"

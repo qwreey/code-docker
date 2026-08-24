@@ -18,8 +18,8 @@ git clone --recurse-submodules https://github.com/qwreey/code-docker.git builds/
 builds/code-docker/ootb.sh
 ```
 
-빌드한 이미지로 `--hash-password`/향후 `--env-migrate` 같은 CLI 서브커맨드만 딱
-실행(`docker compose run --rm`)하는 방식으로 컨테이너를 아예 띄우지 않고도 비밀번호
+빌드한 이미지로 `--hash-password` 같은 CLI 서브커맨드만 딱
+실행(`docker compose run --rm --entrypoint`)하는 방식으로 컨테이너를 아예 띄우지 않고도 비밀번호
 해시를 만듭니다. `docs/tips/roblox-studio.md`처럼 `EXTRA_INCLUDE`로 붙이는 사이드
 프로젝트도 같은 스크립트 안에서 연동할 수 있습니다 - 그 프로젝트가 어떻게 자기
 자신을 이 스크립트에 알리는지는 [ootb-manifest.md](tips/ootb-manifest.md) 참고.
@@ -52,7 +52,25 @@ touch empty-extra-include.yml # docker-compose.yml의 include: 대상 - 없으�
 만약 빌드에 성공했다면 `docker compose up -d` 를 수행하세요.
 잘 구동된다면 성공입니다!
 > Note: 시스템 패키지 업데이트를 위해 주기적으로 build 와 up 을 다시 수행해주세요.
-> Note: code-docker 업데이트를 수행하려면 `git -C builds/code-docker pull origin master --recurse-submodules` 를 수행하세요
+> Note: code-docker 업데이트를 수행하려면 `git -C builds/code-docker pull origin master --recurse-submodules` 를 수행하세요 - 아래 "업데이트하기" 절이 이 과정 전체를 대신 해줍니다.
+
+## 업데이트하기
+
+이미 설치된 배포(위 두 방법 중 어느 쪽으로 설치했든)를 최신 버전으로 올리려면:
+
+```sh
+builds/code-docker/migrate.sh
+```
+
+`ootb.sh`가 처음 설치 전용이라면(이미 있는 `.env`류를 절대 안 건드림), `migrate.sh`는
+그 반대로 기존 배포 전용입니다: code-docker 자신(및 `builds/` 아래 사이드 프로젝트)을
+git pull → 손 안 댄 `docker-compose.yml`이면 최신으로 갱신(직접 고쳤으면 자동으로
+덮어쓰지 않고 diff만 보여줌) → `docker compose build` → 빌드 직후 이미지로
+`.env.webmanager`/`.env.router`를 각각 `webmanager --env-migrate`/`router-manager
+--env-migrate`로 마이그레이션(컨테이너를 실제로 안 띄우고 `docker compose run --rm
+--entrypoint`로 딱 그 명령만 실행 - `ootb.sh`의 `--hash-password`와 같은 기법) →
+`docker compose up -d` 순서로 매 단계 물어보며 진행합니다. 최상위 `.env`는
+마이그레이션 도구가 없으므로(모든 키가 기본값을 가지므로 안전) 건드리지 않습니다.
 
 # 기타 환경에 대한 노트와 팁 모음
 

@@ -54,3 +54,9 @@ OOTB_ENV_PROMPT_1="VNC_PASSWORD:VNC 접속 비밀번호(선택, 비우면 미설
 - `ootb.sh`가 이 파일을 신뢰하고 그대로 실행한다는 점(`git clone`한 임의의
   Dockerfile을 `docker compose build`가 빌드하는 것과 같은 신뢰 수준)을
   기억하세요 - 사용자가 이미 그 URL을 직접 입력해 clone하기로 선택했다는 전제입니다.
+- `migrate.sh`(기존 배포 업데이트 스크립트, [index.md](../index.md#업데이트하기))는
+  `builds/` 아래 사이드 프로젝트를 git pull까지만 해주고, 사이드 프로젝트 자신의
+  env 마이그레이션은 아직 안 해줍니다 - webmanager/router-manager처럼 자기만의
+  `--env-migrate` CLI를 갖춘 사이드 프로젝트가 실제로 생기면, 이 매니페스트에
+  `OOTB_ENVMIGRATE_BIN`/`OOTB_ENVMIGRATE_SERVICE` 같은 필드를 추가해 확장할 수
+  있을 것입니다 - 지금은 실제로 쓰는 곳이 없어 구현하지 않았습니다.
