@@ -6,6 +6,29 @@ mkdir -p ~/code-docker # 데이터와 빌드 파일을 담을 공간을 생성
 cd ~/code-docker
 mkdir builds # 빌드용 레포지토리 복사
 git clone --recurse-submodules https://github.com/qwreey/code-docker.git builds/code-docker
+```
+
+## ootb.sh로 한 번에 설치하기
+
+아래 "수동으로 설치하기" 절의 모든 단계(컴포즈 파일/`example-env`류 복사, `.env`
+값 설정, `docker compose build`/`up`, 심지어 `WEBMANAGER_AUTH_PASSWORD_HASH`/
+`ROUTER_MANAGER_AUTH_PASSWORD_HASH` 생성까지)를 대화형으로 대신 해주는 스크립트입니다:
+
+```sh
+builds/code-docker/ootb.sh
+```
+
+빌드한 이미지로 `--hash-password`/향후 `--env-migrate` 같은 CLI 서브커맨드만 딱
+실행(`docker compose run --rm`)하는 방식으로 컨테이너를 아예 띄우지 않고도 비밀번호
+해시를 만듭니다. `docs/tips/roblox-studio.md`처럼 `EXTRA_INCLUDE`로 붙이는 사이드
+프로젝트도 같은 스크립트 안에서 연동할 수 있습니다 - 그 프로젝트가 어떻게 자기
+자신을 이 스크립트에 알리는지는 [ootb-manifest.md](tips/ootb-manifest.md) 참고.
+여러 번 다시 실행해도 안전합니다(이미 있는 `.env`류는 덮어쓰지 않음) - CI나 비대화형
+환경에서는 아래 수동 절차를 그대로 쓰세요.
+
+## 수동으로 설치하기
+
+```sh
 cp builds/code-docker/docker-compose.yml ./ # 컴포즈 파일 복사
 touch empty-extra-include.yml # docker-compose.yml의 include: 대상 - 없으면 아예 실행이 안 됨, 아래 참고
 ```

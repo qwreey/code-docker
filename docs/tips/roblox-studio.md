@@ -7,7 +7,16 @@ Studio 컨테이너, GPU passthrough + headless Wayland + wayvnc)는 code-docker
 붙습니다. 이 문서는 code-docker 쪽에서 알아야 할 연동 방법만 다룹니다 - roblox-studio-docker
 자신의 설정은 그 repo의 문서를 참고하세요.
 
-## EXTRA_INCLUDE로 연결하기
+## ootb.sh로 자동 연동하기 (권장)
+
+roblox-studio-docker는 [`ootb-manifest.env`](ootb-manifest.md)를 들고 있으므로,
+[`ootb.sh`](../index.md#ootbsh로-한-번에-설치하기) 실행 중 "추가 프로젝트 git URL"
+프롬프트에 `https://github.com/qwreey/roblox-studio-docker.git`을 입력하면 clone,
+`extra-include.yml` 작성, `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=roblox-studio-vnc`
+설정, `EXTRA_INCLUDE=extra-include.yml` 설정까지 전부 자동으로 됩니다 - 아래 "수동으로
+연동하기"는 `ootb.sh`를 안 쓰거나 이미 설치된 인스턴스에 나중에 붙일 때만 필요합니다.
+
+## 수동으로 연동하기
 
 `docker-compose.yml` 최상단에 `include: - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}`
 가 있습니다 - 기본값은 아무 것도 안 하는 빈 파일이라, 아무 설정도 안 하면 code-docker는
