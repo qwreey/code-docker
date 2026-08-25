@@ -33,7 +33,7 @@ OOTB_ENV_PROMPT_1="VNC_PASSWORD:VNC 접속 비밀번호(선택, 비우면 미설
 | `OOTB_NAME` | 필수 | 연동 중 진행 메시지에 표시할 이름 |
 | `OOTB_DESCRIPTION` | 선택 | 한 줄 설명, 연동 시작 시 같이 출력됨 |
 | `OOTB_COMPOSE_INCLUDE` | 필수 | 이 프로젝트 레포 루트 기준 상대경로 - `ootb.sh`가 `extra-include.yml`의 `include:` 목록에 `builds/<repo-이름>/<이 값>`을 추가함 |
-| `OOTB_EXTRA_INTERNAL_NETWORKS` | 선택 | 공백구분 네트워크 이름 목록 - `.env`의 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS`에 병합됨 (이 프로젝트가 `code-docker-internal`이 아닌 자기만의 `internal: true` 네트워크에 router를 끌어들이는 경우에만 필요 - roblox-studio-docker의 VNC 격리가 그 예시). 사이드 프로젝트 쪽 compose가 그 네트워크 이름을 `${PREFIX:-}`로 접두사 붙여 정의했다면(여러 code-docker 인스턴스가 각자 이 사이드 프로젝트를 연동해도 네트워크가 안 섞이게), 여기서도 값 안에 `${PREFIX}`를 그대로 써서 맞추세요(예: `"${PREFIX}roblox-studio-vnc"`) - `ootb-extra.sh`가 매니페스트를 source하기 전에 code-docker 쪽 `.env`의 현재 `PREFIX` 값을 환경에 내보내므로, 일반 쉘 변수 치환으로 자동으로 풀립니다. |
+| `OOTB_EXTRA_INTERNAL_NETWORKS` | 선택, **DEPRECATED** | 공백구분 네트워크 이름 목록 - `.env`의 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS`에 병합됨 (이 프로젝트가 `code-docker-internal`이 아닌 자기만의 `internal: true` 네트워크에 router를 끌어들이는 경우에만 쓰였음 - roblox-studio-docker의 VNC 격리가 그 예시). **이제는 사이드 프로젝트 자신의 compose 오버레이 파일이 그 네트워크에 `netinit.provider`/`netinit.exempt-forward: "true"` 라벨을 직접 다는 쪽을 씁니다** (자세한 라벨 스키마는 [roblox-studio.md](roblox-studio.md)와 `.claude/backlog/netinit-docker-plan.md` 참고) - 그러면 code-docker 쪽 `.env`를 이 필드로 건드릴 필요 자체가 없어집니다. 이 필드는 아직 라벨로 옮기지 않은 매니페스트를 위한 호환 경로로 한동안 남아있을 뿐이고, `netinit-docker`가 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS`를 읽으면 경고 로그를 남깁니다. 새 사이드 프로젝트는 라벨 쪽을 쓰세요. (레거시 병합 동작: 사이드 프로젝트 쪽 compose가 그 네트워크 이름을 `${PREFIX:-}`로 접두사 붙여 정의했다면, 여기서도 값 안에 `${PREFIX}`를 그대로 써서 맞추세요(예: `"${PREFIX}roblox-studio-vnc"`) - `ootb-extra.sh`가 매니페스트를 source하기 전에 code-docker 쪽 `.env`의 현재 `PREFIX` 값을 환경에 내보내므로, 일반 쉘 변수 치환으로 자동으로 풀립니다.) |
 | `OOTB_ENV_TARGET` | 선택, 기본 `.env` | 아래 `OOTB_ENV_PROMPT_*`로 물어본 값을 어느 env 파일에 쓸지 |
 | `OOTB_ENV_PROMPT_1`, `OOTB_ENV_PROMPT_2`, ... | 선택 | `이름:설명:secret\|plain` 형식, 1부터 번호를 이어서 몇 개든 추가. 없으면 다음 번호에서 중단됩니다. **공백구분 단일 리스트가 아니라 번호 붙은 개별 변수인 이유**: 설명 텍스트에 공백(특히 한글 설명)이 들어가면 셸 word-splitting으로 깨지기 때문입니다 - 각 항목이 독립된 변수라 안전합니다. `secret`이면 화면에 안 보이게 입력받습니다(`read -s`). 사용자가 빈 값을 입력하면 그 키는 그냥 건너뜁니다(주석 상태 유지). |
 
@@ -43,7 +43,7 @@ OOTB_ENV_PROMPT_1="VNC_PASSWORD:VNC 접속 비밀번호(선택, 비우면 미설
 
 1. `ootb-manifest.env`가 있으면 source (매 프로젝트마다 이전 값들은 초기화됨)
 2. `extra-include.yml`이 없거나 비어있으면 새로 만들고, `- path: builds/<이름>/$OOTB_COMPOSE_INCLUDE` 라인을 추가
-3. `OOTB_EXTRA_INTERNAL_NETWORKS`가 있으면 기존 `.env`의 값과 합쳐서 다시 씀 (덮어쓰지 않고 병합)
+3. `OOTB_EXTRA_INTERNAL_NETWORKS`가 있으면 기존 `.env`의 값과 합쳐서 다시 씀 (덮어쓰지 않고 병합) - 위 표에 적었듯 DEPRECATED 경로이므로, 새 사이드 프로젝트는 대신 자기 오버레이의 네트워크에 라벨을 직접 답니다
 4. `OOTB_ENV_PROMPT_*`를 순서대로 물어봐서 `$OOTB_ENV_TARGET`에 씀
 5. 하나 이상 연동됐으면 마지막에 `.env`의 `EXTRA_INCLUDE=extra-include.yml`을 설정
 

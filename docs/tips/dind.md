@@ -16,7 +16,7 @@ dind 로 생성된 컨테이너는 `code-docker-internal` 네트워크에 묶여
 <details>
 <summary>기술적으로 어떻게 막혀있는지</summary>
 
-`code-docker-internal` 은 `internal: true` 로 자체적으로는 인터넷 경로가 없으므로, `code-dind/script/dind-entrypoint.sh` 가 code-docker의 `code-docker-netinit` 과 동일한 방식으로 기본 게이트웨이를 `code-docker-router` 로 계속 재설정하는 루프를 돌립니다 - `docker pull` 은 이 경로를 통해 나갑니다. dind 데몬 자체는 같은 스크립트가 `code-docker-internal` 쪽 IP에만 바인드하도록 되어있어(스톡 `docker:dind` 이미지의 `--host=tcp://0.0.0.0:2375` 기본 동작을 오버라이드함), `code-docker-dind` 는 `code-docker-external` 에 아예 붙어있지 않으므로 소켓은 인터넷/호스트 어디서도 직접 접근할 수 없습니다.
+`code-docker-internal` 은 `internal: true` 로 자체적으로는 인터넷 경로가 없으므로, `code-dind/script/dind-entrypoint.sh` 가 기본 게이트웨이를 `code-docker-router` 로 계속 재설정하는 루프를 **자기 자신 안에서** 돌립니다 - `docker pull` 은 이 경로를 통해 나갑니다. `code-docker` 자신은 이런 루프가 없고, 대신 호스트에서 도는 `code-docker-netinit-docker` 에이전트가 컨테이너 밖에서(컨테이너에 `NET_ADMIN`을 주지 않은 채) 라우트를 심어줍니다 - dind는 이미 `privileged: true`라 스스로 라우트를 관리해도 잃을 게 없는 반대 케이스라 이 에이전트를 거칠 필요가 없습니다. dind 데몬 자체는 같은 스크립트가 `code-docker-internal` 쪽 IP에만 바인드하도록 되어있어(스톡 `docker:dind` 이미지의 `--host=tcp://0.0.0.0:2375` 기본 동작을 오버라이드함), `code-docker-dind` 는 `code-docker-external` 에 아예 붙어있지 않으므로 소켓은 인터넷/호스트 어디서도 직접 접근할 수 없습니다.
 
 </details>
 

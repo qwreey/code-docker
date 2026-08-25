@@ -2,10 +2,12 @@ FROM docker:latest AS docker-bin
 
 # code-docker-dind (code-dind/Dockerfile) has moved out to its own subtree, same pattern
 # as router/ - see root CLAUDE.md's "docker-compose topology" section and
-# code-dind/CLAUDE.md. code-docker-netinit went a step further: it's not even a local
-# directory anymore, it builds directly from qwreey/router-docker-client's own repo (see
-# docker-compose.yml's build.context for that service). docker-compose.yml's
-# code-docker-dind service still builds from code-dind/ as its own local context.
+# code-dind/CLAUDE.md. code-docker-netinit-docker (formerly code-docker-netfilter-fix;
+# the old code-docker-netinit sidecar is gone entirely, see CLAUDE.md) went a step
+# further: it's not even a local directory anymore, it builds directly from
+# qwreey/router-docker-client's own repo (see docker-compose.yml's build.context for that
+# service). docker-compose.yml's code-docker-dind service still builds from code-dind/ as
+# its own local context.
 
 # webmanager/frontend no longer imports @code-docker/router-frontend
 # (2026-08-08 decoupling - see .claude/backlog/router-frontend-decouple-plan.md

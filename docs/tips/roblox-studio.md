@@ -12,8 +12,11 @@ Studio 컨테이너, GPU passthrough + headless Wayland + wayvnc)는 code-docker
 roblox-studio-docker는 [`ootb-manifest.env`](ootb-manifest.md)를 들고 있으므로,
 [`ootb.sh`](../index.md#ootbsh로-한-번에-설치하기) 실행 중 "추가 프로젝트 git URL"
 프롬프트에 `https://github.com/qwreey/roblox-studio-docker.git`을 입력하면 clone,
-`extra-include.yml` 작성, `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=roblox-studio-vnc`
-설정, `EXTRA_INCLUDE=extra-include.yml` 설정까지 전부 자동으로 됩니다 - 아래 "수동으로
+`extra-include.yml` 작성, `EXTRA_INCLUDE=extra-include.yml` 설정까지 전부 자동으로
+됩니다 - `roblox-studio-vnc` 네트워크의 DOCKER-USER 예외는 이제 roblox-studio-docker
+자신의 오버레이 파일(`roblox-studio-code-docker.yml`)이 그 네트워크에
+`netinit.exempt-forward: "true"` 라벨을 직접 달아서 선언하므로, code-docker 쪽 `.env`를
+따로 건드릴 필요가 없습니다(아래 "VNC 전용 네트워크 격리" 참고) - 아래 "수동으로
 연동하기"는 `ootb.sh`를 안 쓰거나 이미 설치된 인스턴스에 나중에 붙일 때만 필요합니다.
 
 ## 수동으로 연동하기
@@ -58,31 +61,52 @@ code-docker/dind(임의 웹브라우징 + npm/pip 설치 + MCP 툴콜을 하는,
 그대로 적용한 것입니다.
 
 이 네트워크가 `code-docker-internal`이 아닌 별도 네트워크이기 때문에, 최신 Docker Engine의
-`DOCKER-USER`/`DOCKER-INTERNAL` 하드닝이 router의 forward 트래픽을 막습니다 -
-`.env`에서 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=roblox-studio-vnc`를 설정하면
-`code-docker-netfilter-fix`가 그 네트워크에도 같은 예외 규칙을 걸어줍니다
-(공백으로 구분해 여러 네트워크를 나열할 수 있습니다; 이름이 `NETFILTER_FIX_`인 이유는
-이 스크립트 자체가 qwreey/router-docker-client의 범용 도구라서입니다). `NETFILTER_FIX_INTERNAL_NETWORK`
-(code-docker 자신의 네트워크)과는 별개 변수이므로, 사이드 프로젝트 쪽 오버레이가 이 값을
-설정해도 code-docker 자신의 기본 예외 규칙을 덮어쓸 일은 없습니다.
+`DOCKER-USER`/`DOCKER-INTERNAL` 하드닝이 router의 forward 트래픽을 막습니다 - 그 예외
+규칙은 이제 roblox-studio-docker 자신의 `roblox-studio-code-docker.yml`이
+`roblox-studio-vnc` 네트워크에 직접 라벨을 달아서 선언합니다:
+
+```yaml
+networks:
+  roblox-studio-vnc:
+    labels:
+      netinit.provider: "${PREFIX:-}code-docker-netinit-docker"
+      netinit.exempt-forward: "true"
+```
+
+`code-docker-netinit-docker`(구 `code-docker-netfilter-fix` - DOCKER-USER 예외 동기화에
+더해 컨테이너의 기본 라우트를 호스트에서 심어주는 일도 겸하게 되면서 개명됨)가 이 라벨을
+보고 `roblox-studio-vnc`에도 `code-docker-internal`과 같은 DOCKER-USER 예외를 걸어줍니다 -
+code-docker 쪽 `.env`를 전혀 건드릴 필요가 없습니다. (예전에는 `.env`의
+`NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS`에 네트워크 이름을 나열해야 했습니다 - 그 값은
+아직 라벨로 옮기지 않은 배포를 위한 호환 경로로 한동안 남아있지만 **DEPRECATED**이고,
+`code-docker-netinit-docker`가 그 값을 읽으면 경고를 로그로 남깁니다. 설계 배경은
+`.claude/backlog/netinit-docker-plan.md` 참고.)
 
 `roblox-studio-vnc` 네트워크 자신의 이름도 `roblox-studio-docker`의 `roblox-studio-code-docker.yml`
 쪽에서 `${PREFIX:-}roblox-studio-vnc`로 정의돼 있습니다(컨테이너 이름 `roblox-studio`도
 마찬가지) - `PREFIX`가 다른 code-docker 인스턴스 두 개가 각자 roblox-studio-docker를
-연동해도 컨테이너/네트워크 이름이 안 겹치게 하기 위해서입니다. `ootb.sh`/`ootb-extra.sh`로
-연동했다면 위 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS` 값도 자동으로 같은 `PREFIX`가
-붙어서 저장되므로 신경 쓸 게 없지만, 수동으로 연동하거나 값을 직접 바꾼다면 두 값(네트워크
-이름과 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS`)이 실제 `PREFIX`까지 포함해서 정확히 일치해야
-합니다.
+연동해도 컨테이너/네트워크 이름이 안 겹치게 하기 위해서입니다. 위 `netinit.provider` 라벨
+값(`${PREFIX:-}code-docker-netinit-docker`)도 같은 오버레이 파일 안에서 같은 `PREFIX`를
+참조하므로 자동으로 일치합니다 - 예전처럼 code-docker 쪽 값과 사이드 프로젝트 쪽 값을 손으로
+맞출 필요가 없습니다.
 
-두 서비스(`studio`, `studio-netinit`)는 항상 함께 재생성해야 합니다 - `studio-netinit`은
-`network_mode: service:studio`로 붙어 `studio`의 네트워크 네임스페이스를 공유하므로,
-`studio`만 따로 재생성하면 라우팅이 깨집니다. 합쳐서 다시 띄우려면 (`PREFIX`를 쓰는
-배포라면 아래 값도 그만큼 바꾸세요):
+`studio-netinit` 사이드카는 더 이상 없습니다. 예전에는 `network_mode: service:studio`로
+붙어 `studio`의 네트워크 네임스페이스를 공유했는데, 컴포즈가 그 연결을 대상의 **컨테이너
+ID에 고정**해서 저장하는 바람에 `studio`를 재생성(재빌드, 혹은 붙은 네트워크 변경 등)할
+때마다 사이드카가 영구히 고아가 되는 문제가 있었습니다(`studio`는 `Up`인데 라우트만 없는
+채로, `docker ps`엔 안 보임) - 자세한 경위는 `.claude/backlog/netinit-docker-plan.md`
+참고. 지금은 `studio`가 `netinit.provider` 라벨 하나만으로 `code-docker-netinit-docker`에
+옵트인하고, 라우트는 호스트 쪽 에이전트가 컨테이너 밖에서 심어줍니다(`studio`는
+`NET_ADMIN`을 여전히 갖지 않습니다) - `studio` 하나만 단독으로 재생성해도 이제 안전합니다.
+대신 `studio`의 `entrypoint.sh`는 `NETINIT_WAIT=true`가 설정된 경우(코드-docker와 함께 뜨는
+`roblox-studio-code-docker.yml` 오버레이가 켭니다 - 단독 실행 시 기본값은 `false`) 자기
+기본 라우트가 생길 때까지 대기한 뒤에야 실제 워크로드를 시작합니다 - 호스트 에이전트는
+컨테이너가 뜬 *뒤에만* 라우트를 심을 수 있기 때문이고, 이 대기는 fail-closed입니다(타임아웃
+시 `NETINIT_WAIT_TIMEOUT`, 기본 60초 - 그냥 진행하지 않고 종료해서 `restart:
+unless-stopped`가 재시도하게 합니다).
 
 ```sh
-EXTRA_INCLUDE=extra-include.yml NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=roblox-studio-vnc \
-  docker compose up -d
+EXTRA_INCLUDE=extra-include.yml docker compose up -d
 ```
 
 ## router forwards로 VNC 접속하기
@@ -98,8 +122,14 @@ target port는 `5900`. 이 forward는 compose에 박혀있지 않고 router-mana
 - `docker compose config`로 오버레이가 실제로 병합됐는지(서비스 목록에 `studio` 등이
   보이는지) 먼저 확인하세요.
 - `studio` 컨테이너 안에서 `ip route show default`가 router를 가리키는 게 아니라면
-  `studio-netinit` 사이드카가 제대로 안 뜬 것입니다 - 두 서비스를 같이 재생성했는지
-  확인하세요.
-- forward를 추가했는데도 접속이 안 되면, `code-docker-netfilter-fix` 로그에서
-  `roblox-studio-vnc`에 대한 예외 규칙이 실제로 걸렸는지 확인하세요
-  (`NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS` 오타/누락이 가장 흔한 원인입니다).
+  `code-docker-netinit-docker`가 `studio`를 못 찾은 것입니다 - `studio`에
+  `netinit.provider` 라벨이 붙어있는지, 그 값(`${PREFIX:-}code-docker-netinit-docker`)이
+  실제 `PREFIX`까지 포함해서 `code-docker-netinit-docker` 컨테이너 이름과 정확히
+  일치하는지 확인하세요. `NETINIT_WAIT=true`가 켜져 있다면 라우트가 없는 동안 `studio`
+  자체가 재시작을 반복합니다(fail-closed) - `docker compose logs studio`에서 대기
+  타임아웃 로그를 확인할 수 있습니다.
+- forward를 추가했는데도 접속이 안 되면, `code-docker-netinit-docker` 로그에서
+  `roblox-studio-vnc`에 대한 DOCKER-USER 예외 규칙이 실제로 걸렸는지 확인하세요 - 그
+  네트워크에 `netinit.exempt-forward: "true"` 라벨이 붙어있는지가 가장 흔한 원인입니다
+  (아직 예전 방식인 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS`로 설정하고 있다면 그 값의
+  오타/누락도 확인하세요).

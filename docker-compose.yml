@@ -34,6 +34,21 @@ networks:
   code-docker-internal:
     name: "${PREFIX:-}code-docker-internal"
     internal: true
+    # Read by code-docker-netinit-docker (see that service below). The gateway is
+    # declared here, on the network, rather than on each workload: a container's
+    # default route goes out whichever of its networks names a gateway, so a
+    # multi-network workload needs no per-container wiring, and a network that names
+    # no gateway (a VNC-only or otherwise isolated one) can never become an egress
+    # path just by having a workload attached to it. `netinit.gateway` takes a
+    # container name only - a raw IP is refused on purpose, since accepting arbitrary
+    # gateways would let one line here point a workload at a LAN gateway and hand the
+    # agents this whole design fences in a route to RFC1918.
+    labels:
+      netinit.provider: "${PREFIX:-}code-docker-netinit-docker"
+      netinit.gateway: "${PREFIX:-}code-docker-router"
+      # Replaces the old NETFILTER_FIX_INTERNAL_NETWORK env var - the DOCKER-USER
+      # exemption is a property of the network, so it is declared on the network.
+      netinit.exempt-forward: "true"
     # Requires ipv6 support enabled in the docker engine daemon.json - see
     # example-env before enabling.
     enable_ipv6: ${ENABLE_IPV6:-false}
@@ -57,6 +72,15 @@ services:
   code-docker:
     container_name: "${PREFIX:-}code-docker"
     hostname: code-docker
+    # Opt in to code-docker-netinit-docker (see that service, and the
+    # netinit.gateway label on code-docker-internal above). This replaces the
+    # old code-docker-netinit sidecar; the capability separation is unchanged
+    # - code-docker still never gets NET_ADMIN, the route is planted from
+    # outside its netns. script/entrypoint.sh already blocks until that route
+    # exists before starting supervisord, which is what keeps the agent from
+    # running during the window before the provider has acted.
+    labels:
+      netinit.provider: "${PREFIX:-}code-docker-netinit-docker"
     build:
       # Defaults to "." (this docker-compose.yml living next to the repo).
       # If you cloned this docker-compose file to outside the repo (ex:
@@ -125,11 +149,11 @@ services:
       # code-docker-external deliberately NOT attached here anymore (see
       # .claude/backlog/egress-netgate-plan.md's "정정" section) - code-docker
       # must have no interface with a route to the internet of its own, or
-      # code-docker-netinit setting the default route below wouldn't be a
-      # real chokepoint (an agent could just... use the other interface).
-      # All outbound now transits the code-docker-router service (below)
-      # via the route code-docker-netinit continuously (re)plants in this
-      # netns.
+      # the default route planted below wouldn't be a real chokepoint (an
+      # agent could just... use the other interface). All outbound now
+      # transits the code-docker-router service (below) via the route
+      # code-docker-netinit-docker continuously (re)plants in this netns
+      # from outside it.
       code-docker-internal:
         # `private` is CODE_SERVER_BIND_ADDR/WEBMANAGER_ADDR's default bind
         # address (a dedicated non-loopback IP, see docs/tailscale.md) -
@@ -193,42 +217,22 @@ services:
     #  - video
     #  - render
 
-  # Phase 1 of egress-netgate-plan.md's outbound lockdown. Owns no network
-  # attachment of its own - network_mode below makes it share code-docker's
-  # netns entirely (same interfaces/IP/routing table), and it uses the
-  # NET_ADMIN code-docker itself deliberately never gets to keep code-docker's
-  # default route pointed at router (formerly netgate). See the plan doc for
-  # why code-docker stays the netns owner instead of the other way around
-  # ("왜 code-docker가 계속 소유주여야 하는가").
-  code-docker-netinit:
-    container_name: "${PREFIX:-}code-docker-netinit"
-    build:
-      # netinit is now qwreey/router-docker-client's own subdirectory, built
-      # directly from its git repo (Compose's native remote-git build
-      # context, not a local checkout/submodule) - floating #main ref,
-      # deliberately unpinned, see that repo's own CLAUDE.md for why.
-      context: "https://github.com/qwreey/router-docker-client.git#main:netinit"
-      network: host
-    network_mode: "service:code-docker"
-    cap_add:
-      - NET_ADMIN
-    environment:
-      NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
-      # Must match the alias on code-docker-router's own networks: block
-      # below - see example-env before overriding.
-      ROUTER_HOSTNAME: "${ROUTER_HOSTNAME:-router}"
-    depends_on:
-      code-docker:
-        condition: service_started
-    restart: unless-stopped
-    # Same reasoning as code-docker's own logging: block above - without
-    # this, a container that's respawned/restarted repeatedly (or just
-    # left running a long time) can accumulate unbounded log file growth.
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+  # The code-docker-netinit sidecar that used to live here is gone - its job moved
+  # to code-docker-netinit-docker (below), a host-side label-driven agent. Reason:
+  # `network_mode: "service:code-docker"` made Compose pin the sidecar to
+  # code-docker's *container ID* at create time, so any recreate of code-docker (a
+  # rebuild, or just a change to a network it is attached to) left the sidecar
+  # permanently unable to start - "No such container: <old-id>" retried forever by
+  # restart: unless-stopped - while code-docker itself stayed Up with no default
+  # route and no other visible symptom. Observed for real twice on 2026-08-25, once
+  # on roblox-studio and once here. netinit-docker holds no container reference at
+  # all (it re-resolves each SandboxKey every cycle), so that class of failure is
+  # gone. Full write-up: .claude/backlog/netinit-docker-plan.md.
+  #
+  # code-docker still gets no NET_ADMIN of its own - that was, and remains, the
+  # entire point. The upstream `netinit` sidecar itself is NOT retired; it stays in
+  # qwreey/router-docker-client as the engine-agnostic variant (k8s and friends),
+  # where this Docker-specific agent isn't an option.
 
   # Create docker in docker daemon. for creating dev dockers (redis, postgres, ...)
   # WARNING: this daemon is privileged and has no auth/TLS on its socket.
@@ -236,8 +240,10 @@ services:
   # gain root on the host. dind-entrypoint.sh binds it to code-docker-internal
   # only, and (egress-netgate-plan.md) it's not attached to
   # code-docker-external anymore either - it manages its own default route
-  # toward code-docker-router (formerly code-docker-netgate) the same way
-  # code-docker-netinit does for code-docker (see below). Still, treat
+  # toward code-docker-router (formerly code-docker-netgate) from inside itself -
+  # being privileged already, it needs neither the old netinit sidecar nor
+  # netinit-docker to do that, and its own loop is not container-ID pinned so it
+  # never had the orphaning failure those notes describe. Still, treat
   # code-docker-internal itself as fully trusted.
   code-docker-dind:
     container_name: "${PREFIX:-}code-docker-dind"
@@ -305,9 +311,10 @@ services:
       # code-docker-external deliberately NOT attached here either
       # (egress-netgate-plan.md - same reasoning as code-docker's own
       # networks: comment above). `docker pull` etc. now goes through
-      # code-docker-router via the route dind-entrypoint.sh's loop keeps
-      # planting here, same mechanism as code-docker-netinit uses for
-      # code-docker.
+      # code-docker-router via the route dind-entrypoint.sh's own loop keeps
+      # planting here - dind does this from inside itself (it is privileged
+      # already), unlike code-docker, whose route is planted from outside by
+      # code-docker-netinit-docker.
       code-docker-internal:
         # Extra name that only resolves on this network, so code-docker
         # can reach this daemon unambiguously - see DOCKER_HOST above.
@@ -332,22 +339,30 @@ services:
   # + filter traffic) at the host level, regardless of what router's own
   # iptables does internally. See docs/egress-netgate.md's "Docker의
   # DOCKER-INTERNAL 강제 격리" section for the full story and how this was
-  # diagnosed. This container's only job is to keep a host-level DOCKER-USER
-  # exemption in sync - DOCKER-USER is the chain Docker reserves for exactly
-  # this kind of override, always evaluated before DOCKER-FORWARD/
-  # DOCKER-INTERNAL.
+  # diagnosed. Keeping that host-level DOCKER-USER exemption in sync is one
+  # of this container's two jobs - DOCKER-USER is the chain Docker reserves
+  # for exactly this kind of override, always evaluated before
+  # DOCKER-FORWARD/DOCKER-INTERNAL. The other job is planting each opted-in
+  # container's default route from out here (which is why the service is no
+  # longer called netfilter-fix): see netinit-docker.sh's own header, and
+  # .claude/backlog/netinit-docker-plan.md for the design and the incident
+  # that prompted it.
   #
   # network_mode: host (no networks: attachment at all - it never joins
-  # code-docker-internal/external) + NET_ADMIN + a read-only docker.sock
-  # mount are all required just to reach the host's own netfilter tables at
-  # all (a container's NET_ADMIN alone only grants admin rights within its
-  # OWN netns) - this is a materially bigger trust tier than any other
+  # code-docker-internal/external) + NET_ADMIN + a docker.sock mount are all
+  # required just to reach the host's own netfilter tables at all (a
+  # container's NET_ADMIN alone only grants admin rights within its OWN
+  # netns). Note the socket is mounted :ro but that is NOT a mitigation -
+  # read-only applies to the inode, not to what may be written over the
+  # socket, and a :ro-mounted docker.sock still serves container-create calls
+  # (verified 2026-08-25). Treat this service as root-on-host equivalent:
+  # it is a materially bigger trust tier than any other
   # service here except code-docker-dind, which already runs privileged
   # with an unauthenticated Docker socket of its own (see that service's
   # own comment above) - anyone who could already reach dind gets
   # host-kernel-equivalent access, so this doesn't introduce a new class of
   # risk on top of what's already accepted. Deliberately its own minimal
-  # image (qwreey/router-docker-client's netfilter-fix/, see build.context
+  # image (qwreey/router-docker-client's netinit-docker/, see build.context
   # below) rather than added onto an existing service, so this trust tier
   # stays scoped to one tiny single-purpose container instead of expanding
   # code-docker/router's own.
@@ -355,36 +370,61 @@ services:
   # Tied to `docker compose down`/`up` on purpose instead of a host-level
   # systemd unit: the exemption's lifetime matches this container's (it
   # deletes its own rule on SIGTERM, see router-docker-client's
-  # netfilter-fix/fix.sh), and running it as a compose service means a
+  # netinit-docker/netinit-docker.sh), and running it as a compose service means a
   # multi-instance (PREFIX) deployment gets one of these automatically per
   # instance with no separate per-PREFIX systemd unit to remember to
   # install.
-  code-docker-netfilter-fix:
-    container_name: "${PREFIX:-}code-docker-netfilter-fix"
+  code-docker-netinit-docker:
+    container_name: "${PREFIX:-}code-docker-netinit-docker"
     build:
-      # netfilter-fix is now qwreey/router-docker-client's own subdirectory,
-      # built directly from its git repo (same remote-git build context
-      # mechanism as code-docker-netinit above).
-      context: "https://github.com/qwreey/router-docker-client.git#main:netfilter-fix"
+      # netinit-docker is qwreey/router-docker-client's own subdirectory, built
+      # directly from its git repo - Compose's native remote-git build context,
+      # not a local checkout/submodule, on a floating #main ref (deliberately
+      # unpinned; see that repo's own CLAUDE.md, and note Docker CACHES this
+      # fetch, so picking up an upstream change can need --no-cache).
+      # NETINIT_DOCKER_CONTEXT overrides it to build from a local checkout - see
+      # example-env. This service used to be called
+      # code-docker-netfilter-fix, back when the DOCKER-USER exemption was all it
+      # did - see that script's own header for the second job it grew.
+      context: "${NETINIT_DOCKER_CONTEXT:-https://github.com/qwreey/router-docker-client.git#main:netinit-docker}"
       network: host
     network_mode: host
     cap_add:
       - NET_ADMIN
+      # setns() into a target container's netns, so netinit-docker can plant that
+      # container's default route from out here instead of the target needing
+      # NET_ADMIN of its own. Note this does NOT raise this service's trust ceiling:
+      # the docker.sock below already makes it root-on-host equivalent (mounting a
+      # socket :ro restricts the inode, not what may be written over the socket - a
+      # :ro-mounted docker.sock still serves container-create calls). It widens the
+      # blast radius of a bug in that script, which is why the script is kept small.
+      - SYS_ADMIN
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Docker publishes each container's netns handle here, and netinit-docker
+      # nsenter's into it using the SandboxKey path docker inspect reports - hence
+      # mounting it at the identical path rather than somewhere tidier.
+      #
+      # rslave is MANDATORY, not stylistic: every entry under this directory is
+      # itself a bind mount, so with Docker's default rprivate propagation any
+      # container created AFTER this service starts appears here as an empty 0-byte
+      # file and nsenter fails with "setns(): can't reassociate to namespace 'net':
+      # Invalid argument". Verified both ways on 2026-08-25 - see
+      # .claude/backlog/netinit-docker-plan.md.
+      - /var/run/docker/netns:/var/run/docker/netns:ro,rslave
     environment:
-      # NETFILTER_FIX_* (not CODE_DOCKER_*) - the script itself is a generic
-      # qwreey/router-docker-client tool now, not code-docker-specific, and its env
-      # vars are named after the tool rather than this particular consumer (see that
-      # repo's own CLAUDE.md and netfilter-fix/fix.sh comments).
-      NETFILTER_FIX_INTERNAL_NETWORK: "${PREFIX:-}code-docker-internal"
-      # Space-separated list of any OTHER internal: true networks router also needs a
-      # DOCKER-USER exemption for (e.g. a sibling project's EXTRA_INCLUDE overlay
-      # attaching router to a dedicated network - see example-env's own comment on this
-      # var and .claude/archive/roblox-studio-vnc-isolation-plan-done.md). Left as a separate
-      # env var from NETFILTER_FIX_INTERNAL_NETWORK above on purpose - see netfilter-fix/fix.sh's
-      # own comment on why.
-      NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS: "${NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS:-}"
+      # Which agent owns a given container/network - targets opt in by carrying a
+      # matching `netinit.provider` label (see the networks: block at the top of this
+      # file). Matching is fail-closed: an unlabelled container is never touched, so
+      # two PREFIXed deployments on one host can't claim each other's containers.
+      NETINIT_DOCKER_PROVIDER_ID: "${PREFIX:-}code-docker-netinit-docker"
+      # Keeps NETGATE_ENABLED working as the single behavioural opt-out it is documented
+      # to be (example-env). The tool's own variable is namespaced to the tool, and this
+      # line is what maps code-docker's user-facing name onto it - the same relationship
+      # the old code-docker-netinit sidecar had, where NETGATE_ENABLED made it idle
+      # without touching routes. Only the route half is gated: the DOCKER-USER exemption
+      # never depended on the netgate being enabled and stays on either way.
+      NETINIT_DOCKER_ENABLED: "${NETGATE_ENABLED:-true}"
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -395,8 +435,11 @@ services:
   # router - the network-boundary container for code-docker. Started as
   # Phase 2 of egress-netgate-plan.md's outbound lockdown (service used to
   # be named code-docker-netgate): the actual filtering/forwarding
-  # chokepoint code-docker-netinit's and dind's own routing loops (above)
-  # point their default route at, via the `router` alias. DNS-level
+  # chokepoint every workload's default route points at: code-docker-netinit-docker
+  # (above) plants it for the containers that opt in by label, and dind's own
+  # loop does the same for itself. netinit-docker resolves this container by
+  # name off the `netinit.gateway` label on code-docker-internal, while dind
+  # still resolves it through the `router` alias. DNS-level
   # content-blocklist (dnsmasq), RFC1918/CIDR FORWARD filtering, and inbound
   # port-forwarding (DNAT) all live in this one container - see
   # docs/egress-netgate.md for the full design/reasoning, and CLAUDE.md's

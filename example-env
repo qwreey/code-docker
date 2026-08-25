@@ -38,21 +38,38 @@
 # 않습니다. 구체적인 예시는 docs/tips/roblox-studio.md 참고.
 #EXTRA_INCLUDE="empty-extra-include.yml"
 
+# [DEPRECATED - 이제 라벨로 대체됨. 다음 주기까지만 동작하고, 쓰이면 경고를 남깁니다]
 # EXTRA_INCLUDE로 붙인 다른 프로젝트가 자기 서비스를 code-docker-internal이 아니라
 # 별도의 `internal: true` 네트워크(예: roblox-studio-docker의 VNC 전용 네트워크,
-# docs/tips/roblox-studio.md 참고)에 붙이고 router가 그
-# 네트워크도 넘나들게 하려면, 최신 Docker Engine의 DOCKER-INTERNAL 체인이 그
-# 네트워크에 대해서도 router의 FORWARD 트래픽을 막는다 - code-docker-netfilter-fix
-# 서비스가 이 값을 읽어 그 네트워크들에도 같은 DOCKER-USER 예외를 걸어줍니다. (이름이
-# CODE_DOCKER_가 아니라 NETFILTER_FIX_인 이유: netfilter-fix 스크립트 자체는
-# qwreey/router-docker-client의 범용 도구라 code-docker 전용이 아니고, env var 이름도
-# 그 도구 자신을 가리키도록 지어졌습니다 - 그 레포 자신의 CLAUDE.md 참고.)
-# 공백으로 구분된 네트워크 "이름" 목록입니다(PREFIX가 붙기 전, docker-compose.yml의
-# `networks:` 키 이름 그대로) - PREFIX/BUILD_CONTEXT와 마찬가지로 컨테이너 안
-# 환경변수가 아니라 code-docker-netfilter-fix 서비스 하나에만 전달됩니다.
-# code-docker-internal 자신은 항상 별도로 보호되므로 여기엔 "추가"할 네트워크만
-# 적으면 됩니다.
+# docs/tips/roblox-studio.md 참고)에 붙이고 router가 그 네트워크도 넘나들게 하려면,
+# 최신 Docker Engine의 DOCKER-INTERNAL 체인이 그 네트워크에 대해서도 router의 FORWARD
+# 트래픽을 막습니다.
+#
+# 예전에는 그 네트워크 이름을 여기에 적어줘야 했지만, 이제는 **필요한 쪽이 자기
+# 네트워크에 직접 라벨을 답니다** - 그 프로젝트의 오버레이 파일에서:
+#
+#   networks:
+#     roblox-studio-vnc:
+#       labels:
+#         netinit.provider: "${PREFIX:-}code-docker-netinit-docker"
+#         netinit.exempt-forward: "true"
+#
+# 이렇게 바꾼 이유: 형제 프로젝트를 하나 붙일 때마다 code-docker 쪽 .env를 고쳐야 하는
+# 건 EXTRA_INCLUDE가 없애려던 결합 그 자체였습니다. 라벨은 그 방향을 뒤집어서, 붙는
+# 쪽이 자기 요구를 스스로 기술하게 합니다(ootb-extra.sh가 PREFIX를 이 값에 맞춰
+# 넣어주던 동기화도 함께 불필요해집니다). 자세한 내용은 docs/tips/roblox-studio.md와
+# .claude/backlog/netinit-docker-plan.md 참고.
+#
+# 아래 값은 아직 라벨로 옮기지 못한 기존 배포를 위한 호환 경로일 뿐입니다.
 #NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=""
+
+# netinit-docker(구 netfilter-fix) 이미지의 build context를 덮어씁니다. 기본값은
+# qwreey/router-docker-client의 원격 git URL이라 보통 건드릴 일이 없고, 그 도구를
+# 로컬 체크아웃에서 빌드해 시험할 때만 씁니다 (예:
+# NETINIT_DOCKER_CONTEXT=/path/to/router-docker-client/netinit-docker). 원격 git
+# context는 Docker가 캐시하므로, 업스트림이 바뀐 걸 반영하려면 --no-cache 재빌드가
+# 필요할 수 있습니다 - CLAUDE.md의 netshare 절 참고.
+#NETINIT_DOCKER_CONTEXT=""
 
 # code-docker-internal/external 두 네트워크의 enable_ipv6를 한 번에
 # 켭니다. PREFIX/BUILD_CONTEXT와 마찬가지로 컨테이너 안 환경변수가 아니라
@@ -274,20 +291,27 @@
 # 아웃바운드 네트워크 격리(egress lockdown) 관련 설정입니다. 자세한 설계는
 # .claude/backlog/egress-netgate-plan.md, 사용자 문서는 docs/egress-netgate.md
 # 참고. code-docker/dind는 code-docker-external에 더 이상 직접 붙지 않고,
-# code-docker-netinit(및 dind 자신)이 계속 심어주는 기본 라우트를 통해
+# code-docker-netinit-docker(호스트측 라벨 기반 에이전트, .claude/backlog/
+# netinit-docker-plan.md 참고. 및 dind 자신)가 계속 심어주는 기본 라우트를 통해
 # code-docker-router 서비스(실제 필터링/포트포워딩을 담당)를 거쳐서만 나갈 수
 # 있습니다.
 #
-# "false"로 끄면 code-docker-netinit/dind의 라우팅 루프, code-docker의
-# entrypoint 대기 가드, code-docker-router 자신의 방화벽(CIDR 차단/인바운드
-# 포트포워딩) 적용 루프가 아무것도 안 하고 idle 상태가 됩니다(기존
-# TAILSCALE_ENABLED와 같은 패턴) - router 컨테이너 자체나 DNS/tailscale/Dev
-# Proxy/tinyauth 같은 다른 기능은 계속 정상 동작합니다. 이건 이 기능의
-# "동작"만 끄는 것이지 networks:의 code-docker-external 제거 자체나 ports:의
-# 위치(code-docker가 아니라 code-docker-router에 있음)를 되돌리지는 않습니다.
-# Compose는 네트워크 attachment/포트 퍼블리시 여부를 런타임 환경변수로
-# 조건부 처리할 수 없어서, 완전히 예전(제한 없음) 토폴로지로 되돌리려면
-# docker-compose.yml의 code-docker / code-docker-dind 두 서비스의
+# "false"로 끄면 dind의 라우팅 루프, code-docker의 entrypoint 대기 가드,
+# code-docker-router 자신의 방화벽(CIDR 차단/인바운드 포트포워딩) 적용 루프가
+# 아무것도 안 하고 idle 상태가 됩니다(기존 TAILSCALE_ENABLED와 같은 패턴) -
+# router 컨테이너 자체나 DNS/tailscale/Dev Proxy/tinyauth 같은 다른 기능은
+# 계속 정상 동작합니다. code-docker-netinit-docker도 여기 포함됩니다 -
+# docker-compose.yml이 이 값을 그 컨테이너의 NETINIT_DOCKER_ENABLED로
+# 넘겨주기 때문입니다(netinit-docker는 router-docker-client의 범용 도구라 env
+# 이름이 자기 자신을 가리키고, 사용자 스위치 하나에 그걸 매핑하는 건
+# code-docker의 compose 파일입니다). 단 거기서 꺼지는 건 라우트 심기 절반뿐이고
+# DOCKER-USER 예외는 계속 유지됩니다 - 그건 netgate가 켜져 있는지와 무관하게
+# Docker 자신의 internal 네트워크 하드닝을 되돌리는 별개 작업입니다. 이건 이
+# 기능의 "동작"만 끄는 것이지 networks:의 code-docker-external 제거 자체나
+# ports:의 위치(code-docker가 아니라 code-docker-router에 있음)를 되돌리지는
+# 않습니다. Compose는 네트워크 attachment/포트 퍼블리시 여부를 런타임
+# 환경변수로 조건부 처리할 수 없어서, 완전히 예전(제한 없음) 토폴로지로
+# 되돌리려면 docker-compose.yml의 code-docker / code-docker-dind 두 서비스의
 # networks:에 `code-docker-external: {}`를 직접 다시 추가하고, code-docker의
 # ports:도 복구해야 합니다(`- 80:80`, `- 22:22`) - dind-authz를 완전히 끄고
 # 싶을 때 DIND_TARGET=dind로 명시적으로 바꾸는 것과 같은 성격의, 의도적으로
@@ -295,9 +319,11 @@
 # 필요하다면" 절에 정확한 절차가 있습니다.
 #NETGATE_ENABLED="true"
 
-# code-docker/code-docker-netinit/code-docker-dind가 라우터를 찾을 때 쓰는
-# 호스트네임입니다(entrypoint.sh/netinit-entrypoint.sh/dind-entrypoint.sh/
-# resolv-writer 전부 이 값으로 getent hosts를 호출). code-docker-router 서비스
+# code-docker/code-docker-dind가 라우터를 찾을 때 쓰는 호스트네임입니다
+# (entrypoint.sh/dind-entrypoint.sh가 이 값으로 getent hosts를 호출).
+# code-docker-netinit-docker는 이 값을 쓰지 않습니다 - `netinit.gateway`
+# 라벨이 컨테이너 이름을 직접 받습니다(.claude/backlog/netinit-docker-plan.md
+# 참고). code-docker-router 서비스
 # 자신의 code-docker-internal 별칭도 이 값을 그대로 씁니다 - docker-compose.yml
 # 한 곳에서 같은 변수를 참조하므로 둘이 어긋날 일은 없습니다. PREFIX가 이미
 # 네트워크 자체를 인스턴스별로 분리해주므로(각 인스턴스가 별도

@@ -87,6 +87,12 @@ while :; do
   printf '  - path: builds/%s/%s\n' "$name" "$OOTB_COMPOSE_INCLUDE" >> "$extra_include"
   linked_any=1
 
+  # DEPRECATED 경로. 이제 이런 네트워크는 자기 오버레이 파일에서 직접
+  # `netinit.exempt-forward: "true"` 라벨을 달면 되고, 그러면 code-docker의 .env를
+  # 고칠 일 자체가 없다 - 붙는 쪽이 자기 요구를 스스로 기술하는 게 애초에 EXTRA_INCLUDE의
+  # 취지였다(자세한 건 example-env의 해당 항목과 .claude/backlog/netinit-docker-plan.md).
+  # 아직 라벨로 옮기지 않은 매니페스트를 위해 한 주기 동안 남겨둔다 - netinit-docker가
+  # 이 env를 읽으면 경고를 남긴다.
   if [ -n "${OOTB_EXTRA_INTERNAL_NETWORKS:-}" ]; then
     current="$(get_env_var "$TARGET_DIR/.env" NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS)"
     merged="$(printf '%s %s' "$current" "$OOTB_EXTRA_INTERNAL_NETWORKS" | xargs)"

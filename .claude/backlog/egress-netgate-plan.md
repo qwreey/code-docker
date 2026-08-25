@@ -4,6 +4,15 @@
 "호스트에서 직접 해야 함"에서 **레포 내부(순수 docker-compose)로 구현 가능한 설계**로
 구체화한 문서. 아직 구현 전, 설계만 확정된 상태.
 
+**2026-08-25 업데이트**: 이 문서가 기록하는 Phase 1 `code-docker-netinit` 사이드카
+(`network_mode: service:code-docker` + NET_ADMIN, `script/netinit-entrypoint.sh`)는
+**제거됐다.** 아래 "moby/moby#50326이 이론이 아니라 실제로 재현됨"이 짚었던 바로 그
+컨테이너-ID 고정 문제가 2026-08-25에 실제 장애로 재발했고, 그 원인 클래스를 구조적으로
+없앤 호스트측 라벨 기반 에이전트 `code-docker-netinit-docker`로 대체됐다 — 설계/장애
+기록은 `.claude/backlog/netinit-docker-plan.md`, 현재 아키텍처는 루트 `CLAUDE.md`의
+"docker-compose topology" 절 참고. netgate(Phase 2, squid/CIDR 차단) 자체는 이 변경과
+무관하게 그대로 유지된다. 아래 본문은 원래 설계/구현 기록이라 손대지 않았다.
+
 ## 요구사항 (사용자 정의)
 
 1. code-docker(에이전트가 임의 셸을 실행하는 컨테이너) 자신이 아웃바운드 제어를

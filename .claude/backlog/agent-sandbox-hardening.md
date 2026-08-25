@@ -107,7 +107,11 @@ privileged 컨테이너는 호스트와 같은 커널을 공유하므로, dind �
   않고, `code-docker-netinit`(및 dind 자신)이 지속적으로 심어주는 라우트를 통해서만
   router를 거쳐 나갈 수 있다 — code-docker 자신은 `NET_ADMIN`이 없어
   이 경로를 스스로 바꿀 수 없다(요구사항 1 충족, "호스트에서 직접"이 아니라 컨테이너
-  네임스페이스 공유로 달성).
+  네임스페이스 공유로 달성). **2026-08-25 업데이트**: `code-docker-netinit`(컨테이너
+  ID 고정 사이드카)은 그 고정 방식 자체가 원인인 실제 장애 이후 제거됐고, 호스트측
+  라벨 기반 에이전트 `code-docker-netinit-docker`로 대체됐다 — code-docker의
+  `NET_ADMIN` 0개 원칙은 그대로다(라우트가 컨테이너 밖에서 심긴다는 점만 바뀜). 자세한
+  내용은 `.claude/backlog/netinit-docker-plan.md`.
 - router가 RFC1918 등 사설 대역을 차단하고(요구사항 2), dnsmasq의 DNS 레벨 블록리스트로
   콘텐츠 도메인을 차단한다(요구사항 4, best-effort — 원래는 squid HTTP(S) 인터셉트
   방식이었으나 CDN형 도메인 오탐 문제로 폐기, `router/.claude/router-dns-plan.md` 참고).

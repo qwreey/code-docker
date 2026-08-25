@@ -4,20 +4,24 @@ set -e
 . /etc/code-docker/netshare/wait-until.sh
 . /etc/code-docker/netshare/apply-nameserver.sh
 
-# Phase 1 of egress-netgate-plan.md's outbound lockdown: code-docker-netinit
-# (network_mode: service:code-docker, see docker-compose.yml) is the only
-# thing in this container's netns with NET_ADMIN, and it's what plants the
-# default route toward netgate - wait for it here, before anything below
-# does anything network-sensitive (starting with user-init.sh's qwreey-fish
-# curl). No cyclic compose dependency needed for this - reading the route
-# table needs no capability, only setting it does (see the plan doc's "순환
-# 의존성 걱정" for why this is a plain poll here and not a `depends_on`).
+# Phase 1 of egress-netgate-plan.md's outbound lockdown: this container has
+# zero NET_ADMIN of its own (unlike the old code-docker-netinit sidecar,
+# which shared this netns and held NET_ADMIN - see
+# .claude/backlog/netinit-docker-plan.md). The default route toward netgate
+# is instead planted from *outside* this netns by the host-side
+# code-docker-netinit-docker agent (nsenter into this container's SandboxKey
+# - see docker-compose.yml and root CLAUDE.md's "docker-compose topology"
+# section) - wait for it here, before anything below does anything
+# network-sensitive (starting with user-init.sh's qwreey-fish curl). No
+# cyclic compose dependency needed for this - reading the route table needs
+# no capability, only setting it does (see the plan doc's "순환 의존성 걱정"
+# for why this is a plain poll here and not a `depends_on`).
 # Skippable via NETGATE_ENABLED=false for hosts that opted out of the whole
 # feature (see example-env) - nothing will ever set this route in that
 # case, so waiting on it would hang forever.
 if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
-    if ! wait_until "netinit's default route" 60 2 sh -c 'ip route show default 2>/dev/null | grep -q .'; then
-        echo >&2 "entrypoint: no default route after 60s - netinit/netgate never came up. This is EXPECTED until netgate (Phase 2) is deployed - see .claude/backlog/egress-netgate-plan.md. Exiting so restart: unless-stopped retries."
+    if ! wait_until "netinit-docker's default route" 60 2 sh -c 'ip route show default 2>/dev/null | grep -q .'; then
+        echo >&2 "entrypoint: no default route after 60s - code-docker-netinit-docker never planted one. Exiting so restart: unless-stopped retries."
         exit 1
     fi
 

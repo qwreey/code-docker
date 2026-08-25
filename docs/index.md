@@ -197,7 +197,7 @@ API)를 code-server/webmanager와 같은 공유 origin이 아니라 별도 전�
 
 ### 아웃바운드 네트워크 격리 (netgate)
 
-code-docker/dind가 `code-docker-netinit`(및 dind 자신)이 계속 심어주는 라우트를 통해서만 아웃바운드로 나갈 수 있도록 강제하고, router 컨테이너가 실제 국경(사설 대역 차단, DNS 레벨 블록리스트, 인바운드 포트포워딩)을 담당하는 기능입니다 - 컨테이너 안 AI 에이전트가 임의로 인터넷/사설망에 접근하는 걸 막기 위한 것입니다. `docker compose up`만으로 바로 동작합니다.
+code-docker/dind가 각각 호스트에서 도는 `code-docker-netinit-docker` 에이전트(code-docker 쪽 - 컨테이너 자신은 `NET_ADMIN` 없이)와 dind 자기 자신의 루프가 계속 심어주는 라우트를 통해서만 아웃바운드로 나갈 수 있도록 강제하고, router 컨테이너가 실제 국경(사설 대역 차단, DNS 레벨 블록리스트, 인바운드 포트포워딩)을 담당하는 기능입니다 - 컨테이너 안 AI 에이전트가 임의로 인터넷/사설망에 접근하는 걸 막기 위한 것입니다. `docker compose up`만으로 바로 동작합니다.
 
 자세한 내용은 [egress-netgate.md](../router/docs/egress-netgate.md)를 확인하세요 - 기능 자체를 끄고 싶다면 [당장 인터넷이 필요하다면](../router/docs/egress-netgate.md#당장-인터넷이-필요하다면-기능-자체를-끄기) 절을 먼저 보세요.
 
