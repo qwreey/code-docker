@@ -25,7 +25,7 @@ AI 코딩 에이전트(Claude Code 등)가 프롬프트 인젝션, 버그, 혹�
 |---|---|---|---|---|
 | 1 | dind 소켓 접근을 에이전트 세션에서 기본 차단 | 최우선 (Critical) | 쉬움 | 부분적 (망 분리는 있음, 세션 단위 차단은 없음) |
 | 2 | 앞단 forward-auth 상시 유지 + webmanager authgate 이중화 | 최우선 (Critical) | 쉬움 | 있음 (권장 사항으로, 강제는 아님) |
-| 3 | 아웃바운드 LAN(사설망) 격리 | 높음 (High) | 보통 | **구현됨** (`.claude/backlog/egress-netgate-plan.md`, `docs/egress-netgate.md` - 레포 내부(순수 docker-compose)로 구현, 호스트 조작 불필요) |
+| 3 | 아웃바운드 LAN(사설망) 격리 | 높음 (High) | 보통 | **구현됨** (`.claude/archive/egress-netgate-plan-done.md`, `docs/egress-netgate.md` - 레포 내부(순수 docker-compose)로 구현, 호스트 조작 불필요) |
 | 4 | 에이전트 전용 git 계정 + fork 워크플로우 | 높음 (High) | 쉬움 | 없음 (운영 습관) |
 | 5 | cap_add 최소화 재검토 (`SYS_PTRACE`, `IPC_LOCK`) | 중간 (Medium) | 쉬움 | 이미 켜져 있음, 재검토 필요 |
 | 6 | 시크릿 노출 경로 주의 (`code-patch/`, `.git-credentials`, `.env*`) | 중간 (Medium) | 쉬움 | 부분 경고만 있음 |
@@ -100,7 +100,7 @@ privileged 컨테이너는 호스트와 같은 커널을 공유하므로, dind �
 `network_mode: service:code-docker`(netns 공유) + 별도 라우터 컨테이너 조합으로
 **순수 docker-compose만으로**(호스트 iptables/eBPF 등 손대지 않고) 구현 가능함을 확인하고
 실제로 구현/실측 검증까지 완료했다. 전체 설계와 검토했다가 기각한 대안(호스트 방화벽
-`DOCKER-USER` 체인 접근 포함)은 `.claude/backlog/egress-netgate-plan.md`, 사용자 문서는
+`DOCKER-USER` 체인 접근 포함)은 `.claude/archive/egress-netgate-plan-done.md`, 사용자 문서는
 `docs/egress-netgate.md` 참고. 요약:
 
 - code-docker/dind는 `code-docker-external`(인터넷 방향 네트워크)에 더 이상 직접 붙지
@@ -111,7 +111,7 @@ privileged 컨테이너는 호스트와 같은 커널을 공유하므로, dind �
   ID 고정 사이드카)은 그 고정 방식 자체가 원인인 실제 장애 이후 제거됐고, 호스트측
   라벨 기반 에이전트 `code-docker-netinit-docker`로 대체됐다 — code-docker의
   `NET_ADMIN` 0개 원칙은 그대로다(라우트가 컨테이너 밖에서 심긴다는 점만 바뀜). 자세한
-  내용은 `.claude/backlog/netinit-docker-plan.md`.
+  내용은 `.claude/archive/netinit-docker-plan-done.md`.
 - router가 RFC1918 등 사설 대역을 차단하고(요구사항 2), dnsmasq의 DNS 레벨 블록리스트로
   콘텐츠 도메인을 차단한다(요구사항 4, best-effort — 원래는 squid HTTP(S) 인터셉트
   방식이었으나 CDN형 도메인 오탐 문제로 폐기, `router/.claude/router-dns-plan.md` 참고).

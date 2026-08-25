@@ -1,5 +1,10 @@
 # dns-local: fixing getaddrinfo ESERVFAIL for platform.claude.com
 
+> Archived as done — the code-docker fix below shipped in commit `67757ee` and is live
+> architecture (see root `CLAUDE.md`'s "Process model"/"netshare" sections). The
+> `code-docker-dind` follow-up this doc deferred was split out to
+> `.claude/backlog/dind-dns-servfail.md`, which is still open.
+
 ## The bug
 
 Reported symptom: `claude auth login` (both via webmanager's `internal/claudecode.LoginManager`

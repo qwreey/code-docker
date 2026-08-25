@@ -80,7 +80,7 @@ code-docker 쪽 `.env`를 전혀 건드릴 필요가 없습니다. (예전에는
 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS`에 네트워크 이름을 나열해야 했습니다 - 그 값은
 아직 라벨로 옮기지 않은 배포를 위한 호환 경로로 한동안 남아있지만 **DEPRECATED**이고,
 `code-docker-netinit-docker`가 그 값을 읽으면 경고를 로그로 남깁니다. 설계 배경은
-`.claude/backlog/netinit-docker-plan.md` 참고.)
+`.claude/archive/netinit-docker-plan-done.md` 참고.)
 
 `roblox-studio-vnc` 네트워크 자신의 이름도 `roblox-studio-docker`의 `roblox-studio-code-docker.yml`
 쪽에서 `${PREFIX:-}roblox-studio-vnc`로 정의돼 있습니다(컨테이너 이름 `roblox-studio`도
@@ -94,7 +94,7 @@ code-docker 쪽 `.env`를 전혀 건드릴 필요가 없습니다. (예전에는
 붙어 `studio`의 네트워크 네임스페이스를 공유했는데, 컴포즈가 그 연결을 대상의 **컨테이너
 ID에 고정**해서 저장하는 바람에 `studio`를 재생성(재빌드, 혹은 붙은 네트워크 변경 등)할
 때마다 사이드카가 영구히 고아가 되는 문제가 있었습니다(`studio`는 `Up`인데 라우트만 없는
-채로, `docker ps`엔 안 보임) - 자세한 경위는 `.claude/backlog/netinit-docker-plan.md`
+채로, `docker ps`엔 안 보임) - 자세한 경위는 `.claude/archive/netinit-docker-plan-done.md`
 참고. 지금은 `studio`가 `netinit.provider` 라벨 하나만으로 `code-docker-netinit-docker`에
 옵트인하고, 라우트는 호스트 쪽 에이전트가 컨테이너 밖에서 심어줍니다(`studio`는
 `NET_ADMIN`을 여전히 갖지 않습니다) - `studio` 하나만 단독으로 재생성해도 이제 안전합니다.
