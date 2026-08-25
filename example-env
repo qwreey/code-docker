@@ -222,6 +222,28 @@
 # loses the tailnet-exposure protection this default provides.
 #CODE_SERVER_BIND_ADDR="private:8080"
 
+# code-server's own port-proxy routes (/proxy/<port>/, /absproxy/<port>/ and
+# the *.<proxy-domain> variants) are DISABLED by default - that default is
+# set by code-server-autoinstall's start.sh (CS_DISABLE_PROXY is
+# code-server's own env var; it just defaults it to 1 when unset), not by
+# code-docker, which only passes this value through to it.
+#
+# Those routes proxy to *any* port listening inside this container, guarded
+# by nothing but code-server's own auth - which here is `auth: none` (see
+# docs/security-login.md). Left on, anything that can reach code-server can
+# reach every port inside the container, including the ones VS Code's PORTS
+# tab auto-forwards as soon as a dev server starts listening. Expose what
+# you actually want reachable through router's Dev Proxy / App Routes
+# instead (router/docs/dev-proxy.md, router/docs/app-routes.md), which have
+# their own exposure policy and auth.
+#
+# Set 0 (or anything code-server doesn't read as truthy - it matches
+# /^(1|true)$/) to restore upstream code-server behavior, proxy enabled.
+# Note this can only be changed here, not in code-config.*.yaml: code-server
+# reads any boolean key present in that file as true, so `disable-proxy:
+# false` there would still disable it.
+#CS_DISABLE_PROXY="1"
+
 # Comma-separated allowlist of Host header values the in-container nginx
 # will accept on port 80 (e.g. "code.yaeji.moe" or "code.yaeji.moe,
 # 192.168.1.50"), no scheme/port. Empty (default) disables the check

@@ -111,6 +111,9 @@ services:
       DOCKER_HOST: "${DOCKER_HOST:-tcp://dind:2375}"
       NGINX_LOG_LEVEL: "${NGINX_LOG_LEVEL:-errors}"
       CODE_SERVER_BIND_ADDR: "${CODE_SERVER_BIND_ADDR:-private:8080}"
+      # code-server's own env var, passed straight through - the default
+      # (proxy off) lives in code-server-autoinstall's start.sh, not here.
+      CS_DISABLE_PROXY: "${CS_DISABLE_PROXY:-}"
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-}"
       NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
