@@ -81,11 +81,13 @@ project (own repo, own `docker-compose.router.yml`, own `envmigrate` submodule, 
 runs outside code-docker too) that code-docker "uses" rather than contains, the same
 pattern as `code-server-autoinstall`. It owns everything about code-docker's network
 boundary — meaningfully higher trust than code-docker, the same "국경을 넘는 컨테이너"
-framing as dind-authz — across four feature areas: netgate (egress lockdown), tailscale,
-Dev Proxy/App Routes, and tinyauth, all exposed through its own `router-manager` Go
-backend + SPA at `/router/`. See `router/CLAUDE.md` for the full architecture/feature
-breakdown and `router/docs/*.md` for user-facing docs (`docs/index.md` links into these);
-this section only covers code-docker's own side of the contract.
+framing as dind-authz — across five feature areas: netgate (egress lockdown), tailscale,
+Dev Proxy/App Routes, tinyauth, and VNC (a noVNC front end layered on App Routes, no
+process of its own — see `router/CLAUDE.md`'s own VNC bullet), all exposed through its own
+`router-manager` Go backend + SPA at `/router/`. See `router/CLAUDE.md` for the full
+architecture/feature breakdown and `router/docs/*.md` for user-facing docs
+(`docs/index.md` links into these); this section only covers code-docker's own side of
+the contract.
 
 `router/docker-compose.router.yml` defines the `code-docker-router` service; code-docker's
 own `docker-compose.yml` includes it via a fixed path (not the optional `EXTRA_INCLUDE`
