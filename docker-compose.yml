@@ -120,10 +120,20 @@ services:
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
       WEBMANAGER_ENV_TEMPLATE_PATH: "${WEBMANAGER_ENV_TEMPLATE_PATH:-/etc/code-docker/webmanager/example-env.webmanager}"
       # Egress lockdown (see .claude/backlog/egress-netgate-plan.md) - "false"
-      # skips entrypoint.sh's default-route wait gate. Does NOT restore
-      # code-docker-external/ports below - those are static compose topology
-      # and can't be conditioned on a runtime env var, see example-env.
+      # turns the whole router/netgate behaviour off (entrypoint.sh's DNS
+      # bootstrap here, dind's own routing loop, netinit-docker's route
+      # planting). Does NOT restore code-docker-external/ports below - those
+      # are static compose topology and can't be conditioned on a runtime env
+      # var, see example-env.
       NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
+      # netinit-docker's own name for "wait for an outside agent to plant my
+      # default route before starting the real workload" - the same pair
+      # roblox-studio-docker uses, since env names follow the owner of the
+      # behaviour (see entrypoint.sh's own comment). Passed through empty
+      # rather than defaulted here: entrypoint.sh falls back to
+      # NETGATE_ENABLED for it, so the existing single opt-out still works.
+      NETINIT_WAIT: "${NETINIT_WAIT:-}"
+      NETINIT_WAIT_TIMEOUT: "${NETINIT_WAIT_TIMEOUT:-}"
       # Hostname entrypoint.sh/resolv-writer resolve to find router - must
       # match the alias on code-docker-router's own networks: block below.
       # See example-env before overriding.
@@ -284,6 +294,29 @@ services:
       # Must match the alias on code-docker-router's own networks: block
       # below - see example-env before overriding.
       ROUTER_HOSTNAME: "${ROUTER_HOSTNAME:-router}"
+    # dind plants its own default route and /etc/resolv.conf from inside
+    # itself (see code-dind/script/dind-entrypoint.sh) - and used to do it
+    # silently, so a container that never found router still reported `Up`
+    # forever with nothing but one wait_until timeout in its log. Surface that
+    # state as `unhealthy` instead: dockerd actually answering, plus a fresh
+    # heartbeat file from that entrypoint's own upkeep loop (absent = no
+    # route/DNS, stale = the loop died), skipped when the netgate is off since
+    # then nothing is supposed to plant a route at all. The heartbeat exists
+    # so this check never runs a name lookup itself - `getent hosts` blocks
+    # for the whole resolver timeout precisely when router is missing, which
+    # reported an opaque "health check exceeded timeout" instead of the real
+    # failure. $$ (not $) so Compose leaves the expansion to the container.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "docker -H unix:///var/run/docker.sock version >/dev/null 2>&1 || exit 1; [ $${NETGATE_ENABLED:-true} = false ] && exit 0; find /run/dind-netgate-ok -mmin -1 2>/dev/null | grep -q ."
+      interval: 30s
+      timeout: 10s
+      # dind-entrypoint.sh waits up to 60s for router before dockerd even
+      # starts, so anything shorter than this reports a false unhealthy on a
+      # cold boot where router comes up second.
+      start_period: 90s
+      retries: 3
     # Same resource-exhaustion guard as code-docker's own deploy: block
     # above - matters even more here, since containers created *inside*
     # dind (e.g. a stray `docker run` loop) share this one cgroup and

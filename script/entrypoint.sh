@@ -16,15 +16,30 @@ set -e
 # cyclic compose dependency needed for this - reading the route table needs
 # no capability, only setting it does (see the plan doc's "순환 의존성 걱정"
 # for why this is a plain poll here and not a `depends_on`).
-# Skippable via NETGATE_ENABLED=false for hosts that opted out of the whole
-# feature (see example-env) - nothing will ever set this route in that
-# case, so waiting on it would hang forever.
-if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
-    if ! wait_until "netinit-docker's default route" 60 2 sh -c 'ip route show default 2>/dev/null | grep -q .'; then
-        echo >&2 "entrypoint: no default route after 60s - code-docker-netinit-docker never planted one. Exiting so restart: unless-stopped retries."
+# Skippable for hosts that opted out of the whole feature (see example-env) -
+# nothing will ever set this route in that case, so waiting on it would hang
+# forever.
+#
+# Two switches here, deliberately not one (they were a single `if` until
+# 2026-08-26). Waiting for a route *someone else* plants is netinit-docker's
+# behaviour, and that tool's own name for the knob is NETINIT_WAIT
+# (+ NETINIT_WAIT_TIMEOUT) - the same pair roblox-studio-docker's entrypoint
+# already uses, since an env var's name follows whoever owns the behaviour,
+# not whoever calls it. NETGATE_ENABLED stays code-docker's own router/netgate
+# switch, covering the DNS bootstrap below, dind's own routing loop, and the
+# NETINIT_DOCKER_ENABLED mapping in docker-compose.yml. NETINIT_WAIT defaults
+# to whatever NETGATE_ENABLED says, so the documented NETGATE_ENABLED=false
+# opt-out keeps working unchanged and nobody ever has to set both.
+netinit_wait="${NETINIT_WAIT:-${NETGATE_ENABLED:-true}}"
+netinit_wait_timeout="${NETINIT_WAIT_TIMEOUT:-60}"
+if [ "$netinit_wait" != "false" ]; then
+    if ! wait_until "netinit-docker's default route" "$netinit_wait_timeout" 2 sh -c 'ip route show default 2>/dev/null | grep -q .'; then
+        echo >&2 "entrypoint: no default route after ${netinit_wait_timeout}s - code-docker-netinit-docker never planted one. Exiting so restart: unless-stopped retries."
         exit 1
     fi
+fi
 
+if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
     # code-docker-internal is `internal: true`, so Docker's own embedded DNS
     # (127.0.0.11) refuses to forward queries externally - router runs a real
     # forwarder instead (see router/.claude/router-dns-plan.md). Do this
@@ -46,7 +61,12 @@ if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
     # section.
     router_hostname="${ROUTER_HOSTNAME:-router}"
     if wait_until "router's DNS forwarder" 60 2 getent hosts "$router_hostname"; then
-        apply_nameserver "$router_hostname"
+        # `|| true`: apply_nameserver returns non-zero when the hostname
+        # stops resolving, and `set -e` above would turn that into a dead
+        # container rather than a degraded one. The wait just succeeded so
+        # this is a narrow race, but it's the same shape as the bug that
+        # crash-looped dind (see code-dind/script/dind-entrypoint.sh).
+        apply_nameserver "$router_hostname" || true
     else
         echo >&2 "entrypoint: could not resolve '$router_hostname' after 60s - continuing without DNS, dns-local will keep retrying once supervisord starts"
     fi

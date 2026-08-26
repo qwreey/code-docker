@@ -342,5 +342,63 @@ env → 라벨 전환은 정확히 같은 모양의 변경이다. 따라서:
 - push 후 소비 측은 **`--no-cache` 재빌드** 필요 (Docker가 원격 git fetch를 캐시함 —
   CLAUDE.md의 netshare 절에 기록된 전례와 동일한 함정).
 - roblox-studio-docker의 로컬 `netinit/` 디렉터리는 이제 아무 데서도 참조되지 않는다.
-- dind는 이 고장 클래스에는 해당 없지만, 자기 `wait_until` 루프에 갇히면 조용히 부팅을
-  못 끝낸다는 별개의 취약점이 이번에 드러났다 (위 "마이그레이션 시 주의" 참고).
+- ~~dind는 이 고장 클래스에는 해당 없지만, 자기 `wait_until` 루프에 갇히면 조용히 부팅을
+  못 끝낸다는 별개의 취약점이 이번에 드러났다 (위 "마이그레이션 시 주의" 참고).~~
+  **2026-08-26 해결.** 아래 "후속 2건 처리" 참고.
+
+## 후속 2건 처리 (2026-08-26)
+
+### 1. `NETGATE_ENABLED` / `NETINIT_WAIT` 이름 공존
+
+통일하지 않고 **경계를 갈랐다**. 둘은 같은 것의 다른 이름이 아니라 실제로 다른 스위치다:
+
+- `NETGATE_ENABLED` = "이 배포가 router를 거쳐 나가는가" (code-docker 소유). DNS 부트스트랩,
+  dind 자기 라우팅 루프, compose의 `NETINIT_DOCKER_ENABLED` 매핑을 계속 담당.
+- `NETINIT_WAIT` (+`NETINIT_WAIT_TIMEOUT`, 기본 60) = "바깥에서 누가 내 기본 라우트를
+  심어줄 때까지 기다린다" (netinit-docker 소유). roblox-studio-docker가 이미 쓰던 그 이름 쌍.
+
+`script/entrypoint.sh`의 단일 `if`를 둘로 쪼개고, `NETINIT_WAIT`의 기본값을
+`${NETINIT_WAIT:-${NETGATE_ENABLED:-true}}`로 뒀다 — 기존 `NETGATE_ENABLED=false` 옵트아웃이
+그대로 동작하고 둘을 각각 설정할 필요가 없으므로 폐기 주기도 필요 없다. 6가지 조합 실측 확인.
+
+### 2. dind가 조용히 부팅을 못 끝내는 문제
+
+원인이 하나가 아니라 셋이었고, 셋 다 고쳤다.
+
+1. **`set -e` + 비-0 리턴 = 즉사.** `apply_default_route`/`apply_nameserver`는 이름이
+   해석되지 않으면 1을 리턴하도록 *설계된* 함수인데(호출자가 판단하라고), 호출부가 맨몸이었고
+   스크립트는 `set -eu`였다. 즉 router 별칭이 사라진 순간 60초 대기 직후 PID 1이 그냥 죽고
+   `restart: unless-stopped`가 이를 무한 재시작으로 만들었다 — 로그에 남는 건 `wait_until`
+   타임아웃 한 줄뿐. 백그라운드 업키프 루프도 첫 실패 틱에 서브셸째 죽었다("다음 틱에
+   재시도한다"는 자기 주석과 정반대로). 전 호출부 `|| true`/조건문 처리.
+2. **`wait_until`의 타임아웃이 벽시계가 아니었다.** `_waited += interval`로 *반복 횟수*를
+   셌기 때문에 테스트 명령 자체가 블로킹하면 사실상 무제한이 된다. 그리고 여기 테스트 명령이
+   바로 `getent hosts router`인데, resolv.conf의 fallback 네임서버가 죽으면 매 시도마다 리졸버
+   타임아웃 전체를 잡아먹는다. 실측: 명목 20초 대기가 **119초**(6배)로 늘어났고, 명목 60초면
+   6분 넘게 "waiting for..." 한 줄만 띄운 채 dockerd가 시작조차 안 한다 — 이게 원래 관찰된
+   "조용히 부팅을 못 끝냄"의 정체. `netshare/wait-until.sh`를 벽시계 기준(`date +%s` 데드라인)
+   으로 고치고, 각 시도도 남은 시간만큼 `timeout`으로 묶었다. **이 파일은
+   `router-docker-client` 소유이고 소비 측은 floating `#main`으로 가져가므로, push + 소비 측
+   `--no-cache` 재빌드가 있어야 실제로 반영된다.**
+3. **실패해도 아무 신호가 없었다.** 업키프 루프는 완전 무음이라, 라우트 없는 컨테이너가
+   `Up`으로 보이는 상태가 영구히 지속됐다. 이제 상태 *전이*에만 로그를 남기고(5초마다
+   찍으면 `docker compose logs`를 덮으므로), compose `healthcheck`를 붙여 그 상태가
+   `unhealthy`로 드러나게 했다.
+
+healthcheck 설계에서 두 번 갈아엎은 부분(둘 다 실측으로 드러남):
+
+- 처음엔 healthcheck가 직접 `getent hosts $ROUTER_HOSTNAME`을 돌렸다. router가 없을 때
+  바로 그 호출이 10초 healthcheck 타임아웃을 넘겨 블로킹해서, 결과가 `unhealthy`이긴 해도
+  이유가 "health check exceeded timeout"이라는 무의미한 문구로 찍혔다. → 엔트리포인트 루프가
+  `/run/dind-netgate-ok` 하트비트 파일을 갱신하고 healthcheck는 그 파일의 존재+신선도만 본다
+  (없으면 라우트/DNS 없음, 오래되면 루프 자체가 죽은 것 — 구분할 필요 없음).
+- 그 다음, 루프의 판정 기준을 "이번 틱의 apply 성공 여부"로 뒀더니 **정상 상태에서 영구
+  unhealthy**가 됐다. `apply_nameserver`가 router를 두 번째 네임서버로 넣는 순간 dind 안에서
+  `getent hosts router`가 아예 실패하기 시작하기 때문(musl 병렬 질의 + router dnsmasq의
+  NXDOMAIN이 이김 — `.claude/backlog/dind-dns-servfail.md`에 실측 기록). → 판정을 관측 가능한
+  *상태*(기본 라우트 존재 + 127.0.0.11 아닌 네임서버 존재)로 바꿨다. 이름 해석에 전혀 의존하지
+  않으므로 흔들리지 않고, 2026-08-25에 실제로 터진 "떠서 라우트를 끝내 못 받은 컨테이너"는
+  그대로 잡는다.
+
+실측 검증: router를 내린 채 dind 재생성 → 재시작 0회로 정상 부팅(예전이라면 크래시 루프),
+`unhealthy` 전환, 다운/복구 전이 로그 각 1줄, router 복구 후 healthy, 이후 90초 무플랩.

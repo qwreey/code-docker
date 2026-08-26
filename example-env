@@ -318,7 +318,8 @@
 # code-docker-router 서비스(실제 필터링/포트포워딩을 담당)를 거쳐서만 나갈 수
 # 있습니다.
 #
-# "false"로 끄면 dind의 라우팅 루프, code-docker의 entrypoint 대기 가드,
+# "false"로 끄면 dind의 라우팅 루프, code-docker의 entrypoint 대기 가드(정확히는
+# 아래 NETINIT_WAIT의 기본값이 이 값을 따라갑니다),
 # code-docker-router 자신의 방화벽(CIDR 차단/인바운드 포트포워딩) 적용 루프가
 # 아무것도 안 하고 idle 상태가 됩니다(기존 TAILSCALE_ENABLED와 같은 패턴) -
 # router 컨테이너 자체나 DNS/tailscale/Dev Proxy/tinyauth 같은 다른 기능은
@@ -340,6 +341,26 @@
 # 눈에 띄는 수동 작업입니다. docs/egress-netgate.md의 "당장 인터넷이
 # 필요하다면" 절에 정확한 절차가 있습니다.
 #NETGATE_ENABLED="true"
+
+# code-docker가 "바깥에서 누가 내 기본 라우트를 심어줄 때까지" 기다릴지 여부와
+# 그 타임아웃(초)입니다. code-docker-netinit-docker는 컨테이너가 이미 뜬 뒤에야
+# 동작할 수 있으므로(호스트측 에이전트가 SandboxKey로 netns에 들어가는 구조),
+# 그 사이 code-docker가 라우트 없이 네트워크를 쓰는 창을 막기 위한 게이트입니다.
+# 타임아웃되면 non-zero로 종료해 restart: unless-stopped가 다시 시도하게 합니다
+# (라우트 없이 계속 돌지 않는 fail-closed).
+#
+# 이름이 NETGATE_* 가 아니라 NETINIT_* 인 이유: 이 동작의 주인은 범용 도구인
+# netinit-docker(router-docker-client)이고, roblox-studio-docker 등 다른
+# 클라이언트도 이미 같은 이름 쌍을 씁니다(env 이름은 구현자가 아니라 소유자를
+# 따른다는 기존 원칙). NETGATE_ENABLED는 "이 배포가 router를 거쳐 나가는가"라는
+# code-docker 자신의 스위치로 남습니다.
+#
+# 기본값은 NETGATE_ENABLED를 그대로 따라갑니다 - 즉 아무것도 설정하지 않으면
+# 기다리고, NETGATE_ENABLED="false"만 설정해도 예전처럼 이 대기까지 같이
+# 꺼집니다. 둘을 각각 설정할 필요는 없고, netgate는 켜둔 채 대기만 끄고 싶은
+# (라우트를 다른 방법으로 심는) 특수한 경우에만 NETINIT_WAIT="false"를 씁니다.
+#NETINIT_WAIT=""
+#NETINIT_WAIT_TIMEOUT="60"
 
 # code-docker/code-docker-dind가 라우터를 찾을 때 쓰는 호스트네임입니다
 # (entrypoint.sh/dind-entrypoint.sh가 이 값으로 getent hosts를 호출).

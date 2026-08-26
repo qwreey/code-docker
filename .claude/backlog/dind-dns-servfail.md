@@ -56,3 +56,39 @@ Not a mechanical port of `dns-local` because dind's constraints differ:
    resolv.conf snapshot) and whether pointing them at dind's own real IP instead of
    `127.0.0.1` is the right fix — this is genuinely new design work, not a mechanical
    port of code-docker's fix.
+
+## 2026-08-26: step 1 partially done — reproduced from dind's own shell, and it's worse than expected
+
+Confirmed from `code-docker-dind`'s own shell, on the live test stack. The observed failure
+isn't the SERVFAIL-failover shape this doc was written around, though — it's a distinct and
+strictly worse one on the same `/etc/resolv.conf`:
+
+```
+# /etc/resolv.conf inside dind, exactly what apply_nameserver writes:
+#   nameserver 127.0.0.11
+#   nameserver 172.18.0.5      <- router
+$ getent hosts router          ; echo $?      # -> 2, every single time
+$ nslookup router 127.0.0.11   # -> 172.18.0.5, correct
+$ nslookup router 172.18.0.5   # -> NXDOMAIN
+```
+
+Each nameserver alone behaves correctly. Together they don't: musl queries every nameserver
+in `resolv.conf` **in parallel** and takes the first answer, and router's own dnsmasq answers
+`NXDOMAIN` for `router` (a Docker-internal-only name it has no business knowing) faster than
+127.0.0.11 answers `A`. So adding router as a *fallback* nameserver doesn't just fail to help
+for internal names — it actively breaks them, deterministically.
+
+Consequences worth noting for whoever picks this up:
+
+- This is not "fallback ordering that some resolvers don't honor". musl has no ordering to
+  honor; `options ndots:0` doesn't change it either. Any fix that leaves two nameservers with
+  disjoint knowledge in one `resolv.conf` is wrong for dind regardless of resolver quirks,
+  which strengthens the case for step 2's local-resolver approach over any reordering tweak.
+- It means `dind-entrypoint.sh`'s upkeep loop can never trust `getent hosts "$ROUTER_HOSTNAME"`
+  after its own first successful `apply_nameserver` — the loop's health reporting was
+  deliberately moved off per-tick resolution and onto observable state (a default route + a
+  non-127.0.0.11 nameserver present) on 2026-08-26 for exactly this reason; see that script's
+  own comment. Whoever fixes the DNS here should revisit that, since a local resolver would
+  make per-tick resolution trustworthy again.
+- Not yet checked: the same reproduction from inside a container `docker run` from within dind
+  (step 3's question). Still open.
