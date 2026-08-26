@@ -92,3 +92,38 @@ Consequences worth noting for whoever picks this up:
   make per-tick resolution trustworthy again.
 - Not yet checked: the same reproduction from inside a container `docker run` from within dind
   (step 3's question). Still open.
+
+### Consequence found the same day: dind can't re-plant its own default route after a router restart
+
+Observed end-to-end on the live stack: stop router, recreate dind (so it boots with no
+route), then start router again. dind does *not* recover on its own. Final state, minutes
+after router is back and healthy:
+
+```
+$ cat /etc/resolv.conf     # nameserver 127.0.0.11 + nameserver 172.18.0.5, i.e. poisoned
+$ ip -4 route show default # (empty - never planted)
+$ getent ahostsv4 router   # 2
+$ getent hosts   router    # 2
+```
+
+The two `apply_*` helpers don't use the same lookup: `apply_default_route` uses `getent
+ahostsv4` (A only, deliberately - see its own comment about not clobbering the v4 default
+route with an AAAA answer), while `apply_nameserver` uses `getent hosts` (AF_UNSPEC). Under
+the parallel-query race above those behave differently, and on the recovery tick the
+AF_UNSPEC one won while the v4-only one lost. So `apply_nameserver` succeeded, wrote router
+into resolv.conf - poisoning it - and from that point `apply_default_route` could never
+resolve again. The loop was left running correctly against a resolver that had been broken
+by its own sibling one tick earlier.
+
+Confirmed by clearing the second nameserver by hand: the very next tick planted the route,
+logged its recovery line, and the container went healthy. So the upkeep loop is fine; the
+resolver underneath it isn't.
+
+Note this is not a regression from the 2026-08-26 work - before it, the loop was already
+dead (via `set -e`) after its first failing tick, so recovery was impossible rather than
+unreliable. What changed is only that the state is now visible instead of silent.
+
+Anything that fixes the top-level bug fixes this too. A narrower workaround (pin the
+router's address into dind's `/etc/hosts` so the name never goes through the poisoned
+resolver at all) was considered and deliberately not taken: it needs its own lookup path to
+stay fresh across a router IP change, which is the same problem again.
