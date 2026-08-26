@@ -23,12 +23,13 @@ builds/code-docker/ootb.sh
 해시를 만듭니다. 여러 번 다시 실행해도 안전합니다(이미 있는 `.env`류는 덮어쓰지 않음) -
 CI나 비대화형 환경에서는 아래 수동 절차를 그대로 쓰세요.
 
-`.env` 값 입력(`PREFIX`/`TZ`/리소스 제한/`ROUTER_HTTP_BIND`/`ROUTER_HTTP_PORT`/
-`TRUSTED_PROXIES` 등)과 사이드 프로젝트 연동은 각각 `ootb-config.sh`/`ootb-extra.sh`에
+값 입력(`.env`의 `PREFIX`/`TZ`/리소스 제한/`ROUTER_HTTP_BIND`/`ROUTER_HTTP_PORT`/
+`TRUSTED_PROXIES` 등과 `.env.router`의 `TAILSCALE_ENABLED`/`ROUTER_MANAGER_HOSTS`)과
+사이드 프로젝트 연동은 각각 `ootb-config.sh`/`ootb-extra.sh`에
 위임되어 있고, 둘 다 설치 이후에도 단독으로 다시 실행할 수 있습니다:
 
 ```sh
-builds/code-docker/ootb-config.sh              # .env 값을 새로 입력(Enter로 스킵)
+builds/code-docker/ootb-config.sh              # 값을 새로 입력(Enter로 스킵)
 RECONFIGURE=1 builds/code-docker/ootb-config.sh # 현재 값을 보여주고 바꿀지부터 확인
 builds/code-docker/ootb-extra.sh                # 사이드 프로젝트 연동을 나중에 추가
 ```

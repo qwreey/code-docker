@@ -15,6 +15,7 @@
 #   OOTB_DESCRIPTION="한 줄 설명"                            # 선택
 #   OOTB_COMPOSE_INCLUDE="상대/경로/overlay.yml"             # 필수 (레포 루트 기준)
 #   OOTB_EXTRA_INTERNAL_NETWORKS="네트워크1 네트워크2"        # 선택
+#   OOTB_ROUTER_ALLOWED_TARGET_HOSTS="호스트1 호스트2"        # 선택
 #   OOTB_ENV_TARGET=".env"                                  # 선택, 기본 .env
 #   OOTB_ENV_PROMPT_1="이름:설명 텍스트:secret|plain"          # 선택, 1부터 번호를 이어서
 #   OOTB_ENV_PROMPT_2="이름2:설명 텍스트2:plain"               # 몇 개든 추가 (설명에 공백 가능 -
@@ -59,7 +60,8 @@ while :; do
     continue
   fi
 
-  unset OOTB_NAME OOTB_DESCRIPTION OOTB_COMPOSE_INCLUDE OOTB_EXTRA_INTERNAL_NETWORKS OOTB_ENV_TARGET
+  unset OOTB_NAME OOTB_DESCRIPTION OOTB_COMPOSE_INCLUDE OOTB_EXTRA_INTERNAL_NETWORKS
+  unset OOTB_ROUTER_ALLOWED_TARGET_HOSTS OOTB_ENV_TARGET
   for v in $(compgen -v OOTB_ENV_PROMPT_ 2>/dev/null); do unset "$v"; done
   # PREFIX를 미리 환경에 내보내는 이유: 매니페스트가 OOTB_EXTRA_INTERNAL_NETWORKS
   # 같은 값 안에 "${PREFIX}"를 그대로 써서(예: roblox-studio-docker) 자기 사이드
@@ -97,6 +99,32 @@ while :; do
     current="$(get_env_var "$TARGET_DIR/.env" NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS)"
     merged="$(printf '%s %s' "$current" "$OOTB_EXTRA_INTERNAL_NETWORKS" | xargs)"
     set_env_var "$TARGET_DIR/.env" NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS "\"$merged\""
+  fi
+
+  # router의 Dev Proxy/App Routes(VNC 탭 포함) 대상 호스트 allowlist. 기본값은
+  # code-docker/dind 둘뿐이라, 사이드 프로젝트가 자기 컨테이너를 대상으로 쓰려면
+  # 여기 등록돼야 한다 - 안 하면 컨테이너는 멀쩡히 뜨는데 대상 등록만 거부돼서
+  # ("target host ...가 allowlist에 없음") ootb로 깔고도 .env.router를 손으로 열게 된다.
+  #
+  # OOTB_ENV_PROMPT_*로 물어보지 않고 매니페스트가 값을 직접 선언하는 이유:
+  # 사용자는 어떤 호스트네임이 필요한지 알 도리가 없고 붙는 프로젝트만 안다.
+  # OOTB_EXTRA_INTERNAL_NETWORKS와 같은 declarative merge지만, 그쪽과 달리 Docker
+  # 라벨로 옮길 수 없다 - router-manager는 (자기가 보안 경계라서) docker.sock을
+  # 의도적으로 안 갖고 있어서 라벨을 읽을 수단이 없다. 자세한 건 docs/tips/ootb-manifest.md.
+  #
+  # 매니페스트는 공백/콤마 아무거나 써도 되고, 여기서 ROUTER_EXTRA_ALLOWED_TARGET_HOSTS가
+  # 파싱하는 콤마 구분으로 정규화하면서 기존 값과 합치고 중복을 제거한다.
+  if [ -n "${OOTB_ROUTER_ALLOWED_TARGET_HOSTS:-}" ]; then
+    current="$(get_env_var "$TARGET_DIR/.env.router" ROUTER_EXTRA_ALLOWED_TARGET_HOSTS)"
+    merged="$(printf '%s,%s' "$current" "$OOTB_ROUTER_ALLOWED_TARGET_HOSTS" | awk '
+      {
+        n = split($0, a, /[, \t]+/)
+        for (i = 1; i <= n; i++)
+          if (a[i] != "" && !seen[a[i]]++) out = (out == "" ? a[i] : out "," a[i])
+        print out
+      }')"
+    set_env_var "$TARGET_DIR/.env.router" ROUTER_EXTRA_ALLOWED_TARGET_HOSTS "\"$merged\""
+    echo "    - ROUTER_EXTRA_ALLOWED_TARGET_HOSTS=$merged (router 대상 allowlist)"
   fi
 
   env_target="${OOTB_ENV_TARGET:-.env}"

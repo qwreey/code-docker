@@ -7,7 +7,7 @@
 # 해줍니다. 여러 번 다시 실행해도 안전하도록 만들어졌습니다 - 이미 존재하는
 # .env/.env.webmanager/.env.router는 덮어쓰지 않고 건너뜁니다.
 #
-# .env 값 설정은 ootb-config.sh, 사이드 프로젝트(roblox-studio-docker 등,
+# .env/.env.router 값 설정은 ootb-config.sh, 사이드 프로젝트(roblox-studio-docker 등,
 # docs/tips/roblox-studio.md 참고) 연동은 ootb-extra.sh에 각각 위임합니다 - 둘 다
 # 설치 이후에도(값 재설정, 사이드 프로젝트 나중에 추가) 단독으로 다시 실행할 수
 # 있어서, 이 스크립트는 "새로 설치"에만 필요한 부분(파일 복사, build/up)만
