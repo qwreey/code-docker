@@ -16,7 +16,10 @@ roblox-studio-docker는 [`ootb-manifest.env`](ootb-manifest.md)를 들고 있으
 됩니다 - `roblox-studio-vnc` 네트워크의 DOCKER-USER 예외는 이제 roblox-studio-docker
 자신의 오버레이 파일(`roblox-studio-code-docker.yml`)이 그 네트워크에
 `netinit.exempt-forward: "true"` 라벨을 직접 달아서 선언하므로, code-docker 쪽 `.env`를
-따로 건드릴 필요가 없습니다(아래 "VNC 전용 네트워크 격리" 참고) - 아래 "수동으로
+따로 건드릴 필요가 없습니다(아래 "VNC 전용 네트워크 격리" 참고). router가 VNC를 프록시
+대상으로 삼을 수 있게 하는 allowlist 등록(`.env.router`의
+`ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`에 `vnc-only` 추가)도 매니페스트의
+`OOTB_ROUTER_ALLOWED_TARGET_HOSTS` 필드를 통해 자동으로 됩니다 - 아래 "수동으로
 연동하기"는 `ootb.sh`를 안 쓰거나 이미 설치된 인스턴스에 나중에 붙일 때만 필요합니다.
 
 ## 수동으로 연동하기
@@ -50,6 +53,18 @@ roblox-studio-docker가 정의한 서비스(`studio` 등)가 같이 뜨고 code-
 > `docker-compose.yml`만 한 단계 위로 복사해 쓰는 배포 구조([기본 사용법](../index.md)
 > 참고)라면, roblox-studio-docker도 같은 위치 기준 `builds/roblox-studio-docker/`에
 > 클론해야 경로가 맞습니다.
+
+마지막으로, router의 VNC 탭/App Routes/Dev Proxy가 Studio를 대상으로 삼을 수 있도록
+`.env.router`에 대상 호스트를 허용해줘야 합니다 - 기본 allowlist는 `code-docker`/`dind`
+둘뿐이라([대상 호스트 allowlist](../../router/docs/vnc.md#대상-호스트-allowlist) 참고),
+이걸 빼먹으면 스택은 멀쩡히 뜨는데 대상 등록만 `target host ... is not in the allowed
+target host list`로 거부됩니다:
+
+```sh
+ROUTER_EXTRA_ALLOWED_TARGET_HOSTS=vnc-only
+```
+
+(`ootb.sh`로 연동했다면 매니페스트가 이 값을 선언하고 있어 자동으로 병합됩니다.)
 
 ## VNC 전용 네트워크 격리
 
@@ -112,10 +127,21 @@ EXTRA_INCLUDE=extra-include.yml docker compose up -d
 ## router forwards로 VNC 접속하기
 
 VNC는 host에 직접 노출되지 않으므로, [router 문서의 forwards 설정](../../router/docs/router.md#forwards--publish)으로
-`studio`의 5900 포트를 원하는 host 포트에 매핑해야 실제로 접속할 수 있습니다 -
-target host는 `studio`(roblox-studio-vnc 네트워크 위에서 router가 알아서 resolve),
-target port는 `5900`. 이 forward는 compose에 박혀있지 않고 router-manager UI/API로 실행
-중에 추가/삭제하는 값입니다.
+Studio의 5900 포트를 원하는 host 포트에 매핑해야 실제로 접속할 수 있습니다 -
+target host는 **`studio`가 아니라 `vnc-only`**, target port는 `5900`입니다. 이 forward는
+compose에 박혀있지 않고 router-manager UI/API로 실행 중에 추가/삭제하는 값입니다.
+
+> **`studio`를 쓰면 안 되는 이유**: `studio` 컨테이너는 `code-docker-internal`과
+> `roblox-studio-vnc` 두 망에 모두 붙어있고 router도 그 둘에 다 붙어있으므로, router가
+> `studio`를 resolve하면 A 레코드가 **두 개** 돌아옵니다(어느 쪽이 먼저 올지는 보장되지
+> 않음). netgate의 forwards는 그 중 첫 번째 IP를 골라 DNAT 규칙으로 굳혀버리는데
+> (`config/netgate/firewall.default.sh`의 `getent hosts`), wayvnc는 `VNC_BIND_ALIAS`가
+> resolve된 IP - 즉 `roblox-studio-vnc` 쪽 IP - 에만 바인딩합니다. `code-docker-internal`
+> 쪽 IP가 뽑히면 그 포트엔 아무도 듣고 있지 않아 `connection refused`가 되고, 재적용될
+> 때마다 결과가 달라질 수 있습니다. `vnc-only`는 `roblox-studio-vnc` 위에만 존재하는
+> 별칭이라 항상 정확히 하나의 IP로 풀립니다(그게 이 별칭을 따로 둔 이유 전부입니다 -
+> `roblox-studio-code-docker.yml`의 `VNC_BIND_ALIAS` 주석 참고). router의 VNC 탭/App
+> Routes도 같은 이유로 대상을 `vnc-only:6080`으로 잡습니다.
 
 ## 확인 & 흔한 문제
 
@@ -128,6 +154,11 @@ target port는 `5900`. 이 forward는 compose에 박혀있지 않고 router-mana
   일치하는지 확인하세요. `NETINIT_WAIT=true`가 켜져 있다면 라우트가 없는 동안 `studio`
   자체가 재시작을 반복합니다(fail-closed) - `docker compose logs studio`에서 대기
   타임아웃 로그를 확인할 수 있습니다.
+- router의 VNC 탭/App Routes에서 대상을 추가할 때 `target host ... is not in the allowed
+  target host list`가 뜨면 `.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`에
+  `vnc-only`가 들어있는지 확인하세요(위 "수동으로 연동하기" 참고) - 컨테이너 자체는
+  정상적으로 뜨기 때문에 다른 증상은 안 보입니다. 이 값은 `.env`가 아니라 `.env.router`에
+  있어야 하고, 고친 뒤 router 컨테이너를 재시작해야 반영됩니다.
 - forward를 추가했는데도 접속이 안 되면, `code-docker-netinit-docker` 로그에서
   `roblox-studio-vnc`에 대한 DOCKER-USER 예외 규칙이 실제로 걸렸는지 확인하세요 - 그
   네트워크에 `netinit.exempt-forward: "true"` 라벨이 붙어있는지가 가장 흔한 원인입니다
