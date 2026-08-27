@@ -83,3 +83,105 @@ get_env_var() {
   val=${val%\'}; val=${val#\'}
   printf '%s' "$val"
 }
+
+# --- 사이드 프로젝트 매니페스트(ootb-manifest.env) --------------------------
+# 매니페스트를 읽어 code-docker 쪽 env에 반영하는 로직은 두 곳에서 씁니다:
+# ootb-extra.sh(처음 연동할 때)와 migrate-continue.sh(이미 연동된 프로젝트를
+# git pull한 뒤 재적용할 때). 한쪽에만 두면 매니페스트에 declarative 필드가
+# 새로 생길 때마다 "새로 까는 사람한테는 먹는데 기존 배포엔 안 먹는" 격차가
+# 그대로 반복됩니다 - OOTB_ROUTER_ALLOWED_TARGET_HOSTS가 실제로 그랬습니다
+# (스택은 멀쩡히 뜨는데 router 대상 등록만 조용히 거부되는 증상).
+# 스키마 전체는 docs/tips/ootb-manifest.md 참고.
+
+load_manifest() {
+  # load_manifest <clone_dir> - 매니페스트를 source해서 OOTB_* 변수를 채웁니다.
+  # 여러 프로젝트를 연속으로 처리할 때 앞 프로젝트의 값이 새지 않도록 먼저
+  # 전부 unset합니다. 매니페스트가 없으면 1, 필수 필드가 없으면 (사유를
+  # 출력하고) 2를 반환합니다 - "없음"과 "잘못됨"은 호출부가 다르게 안내해야
+  # 해서 구분합니다.
+  _lm_dir="${1%/}"
+  _lm_manifest="$_lm_dir/ootb-manifest.env"
+
+  unset OOTB_NAME OOTB_DESCRIPTION OOTB_COMPOSE_INCLUDE OOTB_EXTRA_INTERNAL_NETWORKS
+  unset OOTB_ROUTER_ALLOWED_TARGET_HOSTS OOTB_ENV_TARGET
+  for _lm_v in $(compgen -v OOTB_ENV_PROMPT_ 2>/dev/null); do unset "$_lm_v"; done
+
+  [ -f "$_lm_manifest" ] || return 1
+
+  # PREFIX를 미리 환경에 내보내는 이유: 매니페스트가 OOTB_EXTRA_INTERNAL_NETWORKS
+  # 같은 값 안에 "${PREFIX}"를 그대로 써서(예: roblox-studio-docker) 자기 사이드
+  # 네트워크 이름을 code-docker 쪽 PREFIX와 맞출 수 있게 하기 위함 - source 시점에
+  # 일반 쉘 변수 치환으로 풀린다. PREFIX가 아직 .env에 없으면 빈 문자열로 취급된다.
+  PREFIX="$(get_env_var "$TARGET_DIR/.env" PREFIX)"
+  export PREFIX
+  # 매니페스트는 그냥 source된다 - 즉 그 레포가 준 쉘 코드를 그대로 실행한다.
+  # 이 스크립트들은 어차피 같은 레포를 git clone/pull하고 그 Dockerfile을
+  # docker compose build까지 하므로 신뢰 수준이 같다(docs/tips/ootb-manifest.md의
+  # "참고" 절). 사용자가 그 URL을 직접 입력해 붙이기로 한 것이 전제.
+  # shellcheck disable=SC1090
+  . "$_lm_manifest"
+
+  if [ -z "${OOTB_COMPOSE_INCLUDE:-}" ]; then
+    echo "  ! $(basename "$_lm_dir")/ootb-manifest.env에 OOTB_COMPOSE_INCLUDE가 없습니다." >&2
+    return 2
+  fi
+  return 0
+}
+
+apply_manifest_declarative() {
+  # apply_manifest_declarative [들여쓰기] - load_manifest로 읽어둔 매니페스트 중
+  # "사용자에게 묻지 않고 프로젝트가 값을 직접 선언하는" 필드들만 code-docker 쪽
+  # env 파일에 병합합니다 (OOTB_ENV_PROMPT_*처럼 사람에게 물어야 하는 건 여기
+  # 없음 - 그래서 migrate처럼 비대화형에 가까운 흐름에서도 그대로 부를 수 있다).
+  # 전부 additive 병합 + 중복 제거라 몇 번을 돌려도 결과가 같고, 실제로 값이
+  # 바뀐 항목만 출력합니다. 바뀐 게 하나라도 있으면 0, 없으면 1을 반환합니다.
+  _amd_indent="${1:-    }"
+  _amd_changed=0
+
+  # DEPRECATED 경로. 이제 이런 네트워크는 자기 오버레이 파일에서 직접
+  # `netinit.exempt-forward: "true"` 라벨을 달면 되고, 그러면 code-docker의 .env를
+  # 고칠 일 자체가 없다 - 붙는 쪽이 자기 요구를 스스로 기술하는 게 애초에 EXTRA_INCLUDE의
+  # 취지였다(자세한 건 example-env의 해당 항목과 .claude/archive/netinit-docker-plan-done.md).
+  # 아직 라벨로 옮기지 않은 매니페스트를 위해 한 주기 동안 남겨둔다 - netinit-docker가
+  # 이 env를 읽으면 경고를 남긴다.
+  if [ -n "${OOTB_EXTRA_INTERNAL_NETWORKS:-}" ]; then
+    _amd_cur="$(get_env_var "$TARGET_DIR/.env" NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS)"
+    _amd_new="$(printf '%s %s' "$_amd_cur" "$OOTB_EXTRA_INTERNAL_NETWORKS" | xargs)"
+    if [ "$_amd_new" != "$_amd_cur" ]; then
+      set_env_var "$TARGET_DIR/.env" NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS "\"$_amd_new\""
+      echo "${_amd_indent}- NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=$_amd_new (DEPRECATED - 오버레이 라벨로 옮기는 걸 권장)"
+      _amd_changed=1
+    fi
+  fi
+
+  # router의 Dev Proxy/App Routes(VNC 탭 포함) 대상 호스트 allowlist. 기본값은
+  # code-docker/dind 둘뿐이라, 사이드 프로젝트가 자기 컨테이너를 대상으로 쓰려면
+  # 여기 등록돼야 한다 - 안 하면 컨테이너는 멀쩡히 뜨는데 대상 등록만 거부돼서
+  # ("target host ...가 allowlist에 없음") ootb로 깔고도 .env.router를 손으로 열게 된다.
+  #
+  # OOTB_ENV_PROMPT_*로 물어보지 않고 매니페스트가 값을 직접 선언하는 이유:
+  # 사용자는 어떤 호스트네임이 필요한지 알 도리가 없고 붙는 프로젝트만 안다.
+  # OOTB_EXTRA_INTERNAL_NETWORKS와 같은 declarative merge지만, 그쪽과 달리 Docker
+  # 라벨로 옮길 수 없다 - router-manager는 (자기가 보안 경계라서) docker.sock을
+  # 의도적으로 안 갖고 있어서 라벨을 읽을 수단이 없다. 자세한 건 docs/tips/ootb-manifest.md.
+  #
+  # 매니페스트는 공백/콤마 아무거나 써도 되고, 여기서 ROUTER_EXTRA_ALLOWED_TARGET_HOSTS가
+  # 파싱하는 콤마 구분으로 정규화하면서 기존 값과 합치고 중복을 제거한다.
+  if [ -n "${OOTB_ROUTER_ALLOWED_TARGET_HOSTS:-}" ]; then
+    _amd_cur="$(get_env_var "$TARGET_DIR/.env.router" ROUTER_EXTRA_ALLOWED_TARGET_HOSTS)"
+    _amd_new="$(printf '%s,%s' "$_amd_cur" "$OOTB_ROUTER_ALLOWED_TARGET_HOSTS" | awk '
+      {
+        n = split($0, a, /[, \t]+/)
+        for (i = 1; i <= n; i++)
+          if (a[i] != "" && !seen[a[i]]++) out = (out == "" ? a[i] : out "," a[i])
+        print out
+      }')"
+    if [ "$_amd_new" != "$_amd_cur" ]; then
+      set_env_var "$TARGET_DIR/.env.router" ROUTER_EXTRA_ALLOWED_TARGET_HOSTS "\"$_amd_new\""
+      echo "${_amd_indent}- ROUTER_EXTRA_ALLOWED_TARGET_HOSTS=$_amd_new (router 대상 allowlist)"
+      _amd_changed=1
+    fi
+  fi
+
+  [ "$_amd_changed" = "1" ]
+}

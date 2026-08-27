@@ -64,7 +64,8 @@ target host list`로 거부됩니다:
 ROUTER_EXTRA_ALLOWED_TARGET_HOSTS=vnc-only
 ```
 
-(`ootb.sh`로 연동했다면 매니페스트가 이 값을 선언하고 있어 자동으로 병합됩니다.)
+(`ootb.sh`로 연동했다면 매니페스트가 이 값을 선언하고 있어 자동으로 병합되고,
+이미 연동된 배포도 `migrate.sh`가 사이드 프로젝트를 pull하면서 다시 반영해줍니다.)
 
 ## VNC 전용 네트워크 격리
 

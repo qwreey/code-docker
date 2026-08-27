@@ -13,7 +13,7 @@ set -u
 # shellcheck disable=SC1091
 . "$(realpath "$(dirname "$0")")/ootb-lib.sh"
 
-require_cmds git docker realpath
+require_cmds git docker realpath awk
 
 TARGET_DIR="$(realpath "$1")"
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
@@ -36,6 +36,11 @@ if [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
 fi
 
 echo "=== 3. 사이드 프로젝트 업데이트 ==="
+# EXTRA_INCLUDE로 실제 연동돼 있는 프로젝트만 매니페스트를 재적용하기 위해 미리
+# 읽어둔다 - builds/ 아래에 클론만 해두고 아직 안 붙인 프로젝트까지 자동으로
+# router allowlist에 넣어주면 곤란하다(경계 설정을 아무도 요구하지 않은 채
+# 넓히는 셈).
+extra_include_file="$(get_env_var "$TARGET_DIR/.env" EXTRA_INCLUDE)"
 if [ -d "$TARGET_DIR/builds" ] && confirm "builds/ 아래 사이드 프로젝트들도 git pull할까요?" y; then
   for dir in "$TARGET_DIR"/builds/*/; do
     [ -d "$dir/.git" ] || continue
@@ -43,7 +48,21 @@ if [ -d "$TARGET_DIR/builds" ] && confirm "builds/ 아래 사이드 프로젝트
     echo "  - $dir"
     if ! git -C "$dir" pull; then
       echo "    ! git pull 실패, 건너뜁니다."
+      continue
     fi
+
+    # 방금 pull로 매니페스트가 바뀌었을 수 있으므로 declarative 필드를 다시
+    # 반영한다(사람에게 묻는 OOTB_ENV_PROMPT_*는 건드리지 않음 - 그건 최초 연동
+    # 때 한 번 물어보는 값이다). 이게 없으면 매니페스트에 새 필드가 생길 때마다
+    # "새로 까는 사람한테만 먹고 기존 배포엔 안 먹는" 상태가 되고, 실제로
+    # OOTB_ROUTER_ALLOWED_TARGET_HOSTS가 그랬다 - 스택은 멀쩡히 뜨는데 router
+    # 대상 등록만 조용히 거부됐다. 병합은 additive + 중복 제거라 매번 돌아도
+    # 안전하고, 실제로 값이 바뀐 항목만 출력된다.
+    name="$(basename "$dir")"
+    [ -n "$extra_include_file" ] || continue
+    grep -qF "builds/$name/" "$TARGET_DIR/$extra_include_file" 2>/dev/null || continue
+    load_manifest "$dir" || continue
+    apply_manifest_declarative "    " && echo "    (위 값은 $name 의 ootb-manifest.env가 선언한 것입니다)"
   done
 fi
 echo

@@ -50,6 +50,22 @@ OOTB_ENV_PROMPT_1="VNC_PASSWORD:VNC 접속 비밀번호(선택, 비우면 미설
 5. `OOTB_ENV_PROMPT_*`를 순서대로 물어봐서 `$OOTB_ENV_TARGET`에 씀
 6. 하나 이상 연동됐으면 마지막에 `.env`의 `EXTRA_INCLUDE=extra-include.yml`을 설정
 
+이미 연동된 프로젝트는 [`migrate.sh`](../index.md#업데이트하기)가 3단계에서 git
+pull한 뒤 **3~4번(사용자에게 묻지 않는 declarative 필드)만 다시 반영**합니다 -
+`OOTB_ENV_PROMPT_*`처럼 사람에게 물어야 하는 값은 최초 연동 때 한 번만 묻고 다시
+건드리지 않습니다. 이 재적용이 없으면 매니페스트에 새 declarative 필드가 생길 때마다
+"새로 까는 사람한테만 먹고 기존 배포엔 안 먹는" 상태가 됩니다(실제로
+`OOTB_ROUTER_ALLOWED_TARGET_HOSTS`를 추가했을 때 그랬습니다 - 스택은 멀쩡히 뜨는데
+router 대상 등록만 조용히 거부됨). 병합은 전부 additive + 중복 제거라 몇 번을 돌려도
+결과가 같고, 실제로 값이 바뀐 항목만 출력됩니다. `extra-include.yml`에 등록돼 있는
+프로젝트만 대상입니다 - `builds/` 아래에 클론만 해두고 아직 안 붙인 프로젝트까지
+router allowlist를 넓혀주면 안 되기 때문입니다.
+
+두 진입점(`ootb-extra.sh`, `migrate-continue.sh`)이 쓰는 실제 구현은 `ootb-lib.sh`의
+`load_manifest`/`apply_manifest_declarative` 한 쌍입니다 - **새 필드를 추가할 때는 그
+두 함수만 고치면 양쪽에 동시에 반영됩니다.** 사람에게 묻는 필드가 아니라 프로젝트가
+값을 직접 선언하는 필드라면 `apply_manifest_declarative` 쪽에 넣으세요.
+
 ## 참고
 
 - 실제 예시는 [roblox-studio-docker](https://github.com/qwreey/roblox-studio-docker)의
@@ -58,8 +74,12 @@ OOTB_ENV_PROMPT_1="VNC_PASSWORD:VNC 접속 비밀번호(선택, 비우면 미설
   Dockerfile을 `docker compose build`가 빌드하는 것과 같은 신뢰 수준)을
   기억하세요 - 사용자가 이미 그 URL을 직접 입력해 clone하기로 선택했다는 전제입니다.
 - `migrate.sh`(기존 배포 업데이트 스크립트, [index.md](../index.md#업데이트하기))는
-  `builds/` 아래 사이드 프로젝트를 git pull까지만 해주고, 사이드 프로젝트 자신의
-  env 마이그레이션은 아직 안 해줍니다 - webmanager/router-manager처럼 자기만의
-  `--env-migrate` CLI를 갖춘 사이드 프로젝트가 실제로 생기면, 이 매니페스트에
+  `builds/` 아래 사이드 프로젝트를 git pull하고 위에서 설명한 declarative 필드를
+  다시 반영해줍니다. 다만 **사이드 프로젝트 자신의 env 마이그레이션**은 아직 안
+  해줍니다 - webmanager/router-manager처럼 자기만의 `--env-migrate` CLI를 갖춘
+  사이드 프로젝트가 실제로 생기면, 이 매니페스트에
   `OOTB_ENVMIGRATE_BIN`/`OOTB_ENVMIGRATE_SERVICE` 같은 필드를 추가해 확장할 수
   있을 것입니다 - 지금은 실제로 쓰는 곳이 없어 구현하지 않았습니다.
+- code-docker 쪽 `.env`/`.env.router`에 병합된 값은 그 뒤 `migrate.sh` 4단계의
+  `--env-migrate`를 거쳐도 그대로 유지됩니다(템플릿의 주석 처리된 기본값보다 사용자가
+  실제로 설정한 값이 우선 - `envmigrate`의 동작, `#!important` 강제 키가 아닌 한).

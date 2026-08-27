@@ -53,29 +53,16 @@ while :; do
     fi
   fi
 
-  manifest="$clone_dir/ootb-manifest.env"
-  if [ ! -f "$manifest" ]; then
+  if [ ! -f "$clone_dir/ootb-manifest.env" ]; then
     echo "  ! $name 에 ootb-manifest.env가 없어 자동 연동을 건너뜁니다."
     echo "    수동 연동 방법은 docs/tips/roblox-studio.md를 참고하세요."
     continue
   fi
-
-  unset OOTB_NAME OOTB_DESCRIPTION OOTB_COMPOSE_INCLUDE OOTB_EXTRA_INTERNAL_NETWORKS
-  unset OOTB_ROUTER_ALLOWED_TARGET_HOSTS OOTB_ENV_TARGET
-  for v in $(compgen -v OOTB_ENV_PROMPT_ 2>/dev/null); do unset "$v"; done
-  # PREFIX를 미리 환경에 내보내는 이유: 매니페스트가 OOTB_EXTRA_INTERNAL_NETWORKS
-  # 같은 값 안에 "${PREFIX}"를 그대로 써서(예: roblox-studio-docker) 자기 사이드
-  # 네트워크 이름을 code-docker 쪽 PREFIX와 맞출 수 있게 하기 위함 - source 시점에
-  # 일반 쉘 변수 치환으로 풀린다. PREFIX가 아직 .env에 없으면(신규 설치, ootb.sh가
-  # ootb-config.sh보다 먼저 이 스크립트를 부르는 경우는 없지만 단독 실행 대비)
-  # 빈 문자열로 취급된다.
-  PREFIX="$(get_env_var "$TARGET_DIR/.env" PREFIX)"
-  export PREFIX
-  # shellcheck disable=SC1090
-  . "$manifest"
-
-  if [ -z "${OOTB_COMPOSE_INCLUDE:-}" ]; then
-    echo "  ! $name/ootb-manifest.env에 OOTB_COMPOSE_INCLUDE가 없어 연동을 건너뜁니다."
+  # 매니페스트를 읽고 declarative 필드를 반영하는 로직 자체는 ootb-lib.sh에 있다 -
+  # migrate-continue.sh가 이미 연동된 프로젝트를 git pull한 뒤 같은 함수를 다시
+  # 부르기 때문(그 함수의 주석 참고).
+  if ! load_manifest "$clone_dir"; then
+    echo "  ! $name 자동 연동을 건너뜁니다."
     continue
   fi
 
@@ -86,46 +73,20 @@ while :; do
   if [ ! -s "$extra_include" ]; then
     printf 'include:\n' > "$extra_include"
   fi
-  printf '  - path: builds/%s/%s\n' "$name" "$OOTB_COMPOSE_INCLUDE" >> "$extra_include"
+  # 이미 같은 경로가 들어있으면 다시 붙이지 않는다 - 이미 클론된 프로젝트에
+  # 이 스크립트를 다시 돌리는 건(매니페스트가 새 declarative 필드를 들고 왔을 때)
+  # 정상적인 사용 경로라서 매번 줄이 하나씩 늘면 곤란하다. compose 자체는 같은
+  # 파일을 두 번 include해도 서비스/네트워크를 이름 기준으로 병합해서 실질적인
+  # 문제는 없지만(실측 확인), 파일이 지저분해질 이유가 없다.
+  include_line="  - path: builds/$name/$OOTB_COMPOSE_INCLUDE"
+  if grep -qxF "$include_line" "$extra_include"; then
+    echo "    (extra-include.yml에 이미 등록돼 있어 그대로 둡니다)"
+  else
+    printf '%s\n' "$include_line" >> "$extra_include"
+  fi
   linked_any=1
 
-  # DEPRECATED 경로. 이제 이런 네트워크는 자기 오버레이 파일에서 직접
-  # `netinit.exempt-forward: "true"` 라벨을 달면 되고, 그러면 code-docker의 .env를
-  # 고칠 일 자체가 없다 - 붙는 쪽이 자기 요구를 스스로 기술하는 게 애초에 EXTRA_INCLUDE의
-  # 취지였다(자세한 건 example-env의 해당 항목과 .claude/backlog/netinit-docker-plan.md).
-  # 아직 라벨로 옮기지 않은 매니페스트를 위해 한 주기 동안 남겨둔다 - netinit-docker가
-  # 이 env를 읽으면 경고를 남긴다.
-  if [ -n "${OOTB_EXTRA_INTERNAL_NETWORKS:-}" ]; then
-    current="$(get_env_var "$TARGET_DIR/.env" NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS)"
-    merged="$(printf '%s %s' "$current" "$OOTB_EXTRA_INTERNAL_NETWORKS" | xargs)"
-    set_env_var "$TARGET_DIR/.env" NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS "\"$merged\""
-  fi
-
-  # router의 Dev Proxy/App Routes(VNC 탭 포함) 대상 호스트 allowlist. 기본값은
-  # code-docker/dind 둘뿐이라, 사이드 프로젝트가 자기 컨테이너를 대상으로 쓰려면
-  # 여기 등록돼야 한다 - 안 하면 컨테이너는 멀쩡히 뜨는데 대상 등록만 거부돼서
-  # ("target host ...가 allowlist에 없음") ootb로 깔고도 .env.router를 손으로 열게 된다.
-  #
-  # OOTB_ENV_PROMPT_*로 물어보지 않고 매니페스트가 값을 직접 선언하는 이유:
-  # 사용자는 어떤 호스트네임이 필요한지 알 도리가 없고 붙는 프로젝트만 안다.
-  # OOTB_EXTRA_INTERNAL_NETWORKS와 같은 declarative merge지만, 그쪽과 달리 Docker
-  # 라벨로 옮길 수 없다 - router-manager는 (자기가 보안 경계라서) docker.sock을
-  # 의도적으로 안 갖고 있어서 라벨을 읽을 수단이 없다. 자세한 건 docs/tips/ootb-manifest.md.
-  #
-  # 매니페스트는 공백/콤마 아무거나 써도 되고, 여기서 ROUTER_EXTRA_ALLOWED_TARGET_HOSTS가
-  # 파싱하는 콤마 구분으로 정규화하면서 기존 값과 합치고 중복을 제거한다.
-  if [ -n "${OOTB_ROUTER_ALLOWED_TARGET_HOSTS:-}" ]; then
-    current="$(get_env_var "$TARGET_DIR/.env.router" ROUTER_EXTRA_ALLOWED_TARGET_HOSTS)"
-    merged="$(printf '%s,%s' "$current" "$OOTB_ROUTER_ALLOWED_TARGET_HOSTS" | awk '
-      {
-        n = split($0, a, /[, \t]+/)
-        for (i = 1; i <= n; i++)
-          if (a[i] != "" && !seen[a[i]]++) out = (out == "" ? a[i] : out "," a[i])
-        print out
-      }')"
-    set_env_var "$TARGET_DIR/.env.router" ROUTER_EXTRA_ALLOWED_TARGET_HOSTS "\"$merged\""
-    echo "    - ROUTER_EXTRA_ALLOWED_TARGET_HOSTS=$merged (router 대상 allowlist)"
-  fi
+  apply_manifest_declarative
 
   env_target="${OOTB_ENV_TARGET:-.env}"
   i=1

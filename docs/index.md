@@ -76,7 +76,10 @@ builds/code-docker/migrate.sh
 `ootb.sh`가 처음 설치 전용이라면(이미 있는 `.env`류를 절대 안 건드림), `migrate.sh`는
 그 반대로 기존 배포 전용입니다: code-docker 자신(및 `builds/` 아래 사이드 프로젝트)을
 git pull → 손 안 댄 `docker-compose.yml`이면 최신으로 갱신(직접 고쳤으면 자동으로
-덮어쓰지 않고 diff만 보여줌) → `docker compose build` → 빌드 직후 이미지로
+덮어쓰지 않고 diff만 보여줌) → 사이드 프로젝트의
+[`ootb-manifest.env`](tips/ootb-manifest.md)가 선언한 declarative 필드 재적용(pull로
+매니페스트에 새 필드가 생겼을 수 있으므로 - 사람에게 묻는 값은 다시 안 물어봅니다) →
+`docker compose build` → 빌드 직후 이미지로
 `.env.webmanager`/`.env.router`를 각각 `webmanager --env-migrate`/`router-manager
 --env-migrate`로 마이그레이션(컨테이너를 실제로 안 띄우고 `docker compose run --rm
 --entrypoint`로 딱 그 명령만 실행 - `ootb.sh`의 `--hash-password`와 같은 기법) →
