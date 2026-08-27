@@ -136,6 +136,17 @@ opposite, existing-deployment only. `migrate.sh` git-pulls code-docker and then 
 `migrate-continue.sh`, so a fix that just arrived in the pull applies in that same run
 rather than the next one. Both share helpers from `ootb-lib.sh`.
 
+Interactive `.env`/`.env.router` values are asked in exactly one place,
+`ootb-config.sh` — `ootb.sh` runs it plainly and `migrate-continue.sh` runs it with
+`RECONFIGURE=1` (show the current value, ask whether to change it), so **a new prompt added
+there reaches fresh installs and existing deployments at once**, the same single-source
+rule the manifest pair below follows. A prompt that only makes sense given another answer
+is gated by re-reading that key with `get_env_var` (see `ROUTER_APP_ORIGIN`, which is
+meaningless without `ROUTER_MANAGER_HOSTS`) rather than being asked unconditionally.
+Prefer one question that derives the rest over two questions with the same answer —
+`TINYAUTH_HOSTS` is asked, `TINYAUTH_APPURL` is derived from it at container start (see
+`router/CLAUDE.md`'s tinyauth bullet).
+
 A sibling project attaches by carrying its own `ootb-manifest.env` (schema:
 `docs/tips/ootb-manifest.md`) — code-docker never knows a sibling by name. **Reading and
 applying that manifest lives in exactly one place: `ootb-lib.sh`'s `load_manifest` +

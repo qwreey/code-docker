@@ -1,6 +1,7 @@
 #!/bin/bash
 # ootb-config.sh - .env(PREFIX/CODE_TZ/리소스 제한/router 바인딩 등)와
-# .env.router(tailscale on/off, router-manager 전용 도메인)의 값을 대화형으로
+# .env.router(tailscale on/off, router-manager 전용 도메인, tinyauth 로그인
+# 호스트네임)의 값을 대화형으로
 # 설정합니다. ootb.sh(신규 설치)/migrate.sh(RECONFIGURE=1로, 기존 값 보여주고
 # 바꿀지부터 물어봄)가 서브프로세스로 호출하지만, 언제든 단독으로도 실행할 수
 # 있습니다:
@@ -79,4 +80,18 @@ echo
 echo "=== router 설정 (.env.router, Enter로 기본값 유지) ==="
 prompt_bool .env.router TAILSCALE_ENABLED "tailscale을 쓸까요? (기본: 사용 - 안 쓸 거면 n을 넣으세요. 끄면 Tailscale 탭이 숨겨지고 데몬도 아무 것도 하지 않습니다)"
 prompt_set .env.router ROUTER_MANAGER_HOSTS "router-manager 전용 도메인 (예: router.code.example.com, 비우면 끔 - 설정하면 그 도메인에서만 router-manager를 쓸 수 있고 로그인 쿠키도 그 도메인에만 스코프됩니다. 리버스 프록시 도메인이 아직 없다면 Enter로 건너뛰고 나중에 .env.router에서 설정하세요)"
+
+# 전용 도메인을 실제로 쓰기로 한 경우에만 물어본다 - 안 쓰면 SPA가 열려 있는
+# origin이 곧 /app/을 서비스하므로 이 값 자체가 의미가 없고, 안 쓰는 사람에게
+# "공유 호스트네임이 뭐냐"고 묻는 건 답을 알 수 없는 질문이다.
+# (get_env_var로 방금 쓴 값을 되읽는 이유: prompt_set은 Enter를 누르면 아무
+# 것도 쓰지 않아서 반환값만으로는 "이미 설정돼 있었음"과 구분이 안 된다.)
+if [ -n "$(get_env_var "$TARGET_DIR/.env.router" ROUTER_MANAGER_HOSTS)" ]; then
+  prompt_set .env.router ROUTER_APP_ORIGIN "위 전용 도메인에서도 VNC 뷰어를 열 수 있게 할 공유 호스트네임의 origin (예: https://code.example.com, 비우면 전용 도메인의 VNC 탭에서는 뷰어가 안 뜹니다 - webmanager에 내장된 VNC 탭은 이 값 없이도 동작합니다)"
+fi
+
+# tinyauth: 로그인 화면을 서비스할 호스트네임 하나만 물어본다 - TINYAUTH_APPURL은
+# 비워두면 여기서 https://<첫 호스트>로 자동 유도되므로(router/config/tinyauth/
+# tinyauth.default.sh) 같은 값을 두 번 입력받지 않는다.
+prompt_set .env.router TINYAUTH_HOSTS "tinyauth 로그인 화면 호스트네임 (예: auth.example.com, 비우면 끔 - Dev Proxy/App Routes/VNC의 \"인증 요구\"를 쓰려면 반드시 필요합니다. 보호할 대상들과 같은 부모 도메인 아래로 고르면 로그인 한 번으로 전부 커버됩니다)"
 echo

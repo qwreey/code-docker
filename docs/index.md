@@ -223,7 +223,7 @@ cp example-env .env
   ```sh
   cp example-env.webmanager .env.webmanager
   ```
-- **router**(네트워크 경계 컨테이너, `.env.router`) - tailscale, Dev Proxy/App Routes 노출 정책, router-manager 자체 비밀번호(`ROUTER_MANAGER_AUTH_PASSWORD_HASH`), 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`, 아래 "router" 절 참고), tinyauth 등. 자세한 내용은 [router.md](../router/docs/router.md) 참고. 템플릿 파일 자체는 `router/example-env.router`에 있지만, 복사한 결과물은 `router/` 안이 아니라 `.env`/`.env.webmanager`와 같은 위치(`docker-compose.yml` 옆)에 `.env.router`로 둡니다 - `builds/code-docker`에 클론해 쓰는 배포 구조에서는 `router/` 안에 두면 컨테이너에 전달되지 않습니다.
+- **router**(네트워크 경계 컨테이너, `.env.router`) - tailscale, Dev Proxy/App Routes 노출 정책, router-manager 자체 비밀번호(`ROUTER_MANAGER_AUTH_PASSWORD_HASH`), 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`, `ROUTER_APP_ORIGIN`, 아래 "router" 절 참고), tinyauth(로그인 화면 호스트네임 `TINYAUTH_HOSTS` 포함) 등. 자세한 내용은 [router.md](../router/docs/router.md) 참고. 템플릿 파일 자체는 `router/example-env.router`에 있지만, 복사한 결과물은 `router/` 안이 아니라 `.env`/`.env.webmanager`와 같은 위치(`docker-compose.yml` 옆)에 `.env.router`로 둡니다 - `builds/code-docker`에 클론해 쓰는 배포 구조에서는 `router/` 안에 두면 컨테이너에 전달되지 않습니다.
   ```sh
   cp router/example-env.router .env.router
   ```
@@ -251,7 +251,7 @@ tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열�
 - [켜고 끄기 / 기본 설정](../router/docs/dev-proxy.md#켜고-끄기--기본-설정)
 - [expose 추가하기](../router/docs/dev-proxy.md#expose-추가하기)
 - [바깥 리버스 프록시 연결하기](../router/docs/dev-proxy.md#바깥-리버스-프록시-연결하기)
-- [인증](../router/docs/dev-proxy.md#인증) — [router의 tinyauth](../router/docs/router.md#tinyauth)에 최소 한 명의 사용자가 등록되어 있어야 합니다, 놓치기 쉬운 필수 설정입니다 (`/router/`의 "설정" 탭에서 관리)
+- [인증](../router/docs/dev-proxy.md#인증) — [router의 tinyauth](../router/docs/router.md#tinyauth)에 최소 한 명의 사용자가 등록되어 있어야 하고(`/router/`의 "tinyauth" 탭에서 관리), 로그인 화면을 서비스할 `TINYAUTH_HOSTS`(`.env.router`)도 설정되어 있어야 합니다 - 둘 다 놓치기 쉬운 필수 설정입니다
 
 ## 경로 기반 앱 라우팅 (App Routes)
 
