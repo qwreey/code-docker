@@ -129,6 +129,30 @@ rather than reaching into code-docker's copy, since router builds standalone too
 
 `config/code/code-patch/` is a generic mechanism, not tailscale-specific: any `<name>.default.<ext>` there (with an optional matching gitignored `<name>.override.<ext>`) gets seeded by `code-patch.default.sh` into `/code/.local/share/code-docker/code/patch/<name>.<ext>` — code-server-autoinstall auto-injects every top-level `patch/*.js` as a `<script>` tag on every start (see "코드 서버 패치" in README). Re-seeded on *every* boot, but only when the live target's content still hashes to what was seeded last time (`/code/.local/share/code-docker/code/.code-patch-manifest` now tracks `<name>\t<hash>` pairs, not just names) — i.e. a bundled `.default.`/`.override.` fix actually reaches an already-running container instead of the old "only copy if missing" behavior silently freezing the target at whatever was first seeded forever. If the live file's hash doesn't match (user edited it directly, or there's no recorded hash yet — e.g. a target that predates this hash-tracking), it's left alone; a `.default.` file removed in a later code-docker version still gets its old target removed too instead of orphaned forever. Because there's no historical hash for anything seeded before this behavior shipped, upgrading alone won't retroactively re-apply a fixed default to an already-seeded file that was never otherwise touched — delete the file under `/code/.local/share/code-docker/code/patch/` once to force a fresh reseed with hash-tracking from then on. `code-patch.default.sh` is invoked from `code-service.default.sh` (not `user-init.default.sh` — that one's scoped to home-folder/shell setup like fish config, not code-server internals), deliberately *after* `install.sh` so `/code/.local/share/code-docker/code` actually exists by the time it runs.
 
+### ootb.sh / migrate.sh
+
+`ootb.sh` is first-install only (it never touches an existing `.env*`); `migrate.sh` is the
+opposite, existing-deployment only. `migrate.sh` git-pulls code-docker and then `exec`s
+`migrate-continue.sh`, so a fix that just arrived in the pull applies in that same run
+rather than the next one. Both share helpers from `ootb-lib.sh`.
+
+A sibling project attaches by carrying its own `ootb-manifest.env` (schema:
+`docs/tips/ootb-manifest.md`) — code-docker never knows a sibling by name. **Reading and
+applying that manifest lives in exactly one place: `ootb-lib.sh`'s `load_manifest` +
+`apply_manifest_declarative` pair**, called from both `ootb-extra.sh` (first link — it also
+owns the `OOTB_ENV_PROMPT_*` questions, which stay out of the shared function precisely
+because they need a human) and `migrate-continue.sh`'s step 3 (re-apply after each
+successful pull, gated on the project actually being listed in `EXTRA_INCLUDE` so a
+merely-cloned `builds/` project can't widen router's target allowlist). A new declarative
+field therefore goes into `apply_manifest_declarative` and reaches both paths at once —
+before that split existed the two were separate, and `OOTB_ROUTER_ALLOWED_TARGET_HOSTS`
+landed for fresh installs while silently never reaching existing ones (the stack came up
+fine; only router target registration was rejected, so there was no other symptom). Merges
+are additive + dedup and only changed values print, so repeat runs are quiet; a value
+written this way survives step 4's `--env-migrate` (envmigrate lets a user-set value beat a
+commented template default unless the key is `#!important`). Live-verified end-to-end on
+the real server 2026-08-27.
+
 ### webmanager
 
 A browser admin panel (Go backend + Vite/React frontend, `webmanager/` — its own subtree, with its own `CLAUDE.md`/`plan.md`) running alongside code-server as another supervisord program, on port 81. Well beyond its original scope now: supervisord process management, SSH `authorized_keys`/`known_hosts`, git config (commit signing/GPG, git-lfs, raw `.gitconfig` editing, global gitignore/`core.excludesFile` management), the vector-backed logs pipeline described above, an OS-level process/port viewer with resource-history graphs, a Projects-folder browser whose per-project detail sheet carries a git status panel, git worktree list/remove, a project-scoped Claude Code session history (reusing the Claude Code tab's own gated session-log viewer, filtered to that project), and a Claude Code auto-memory viewer (`CLAUDE_CONFIG_DIR/projects/<slug>/memory/`, ungated — curated notes, not raw conversation content), code-server extension and mise tool management, a Claude Code status tab, Docker/dind management, a Dev Proxy tab (`<iframe>`-embeds router's own `/router/` page — see "router" above, the actual Caddy instance/backend live on the router container, not here), a VNC tab (same `<iframe>` embed of router's own tab — see "router" below), a web terminal (ephemeral PTY sessions), and a full file manager — see `webmanager/plan.md` for the up-to-date implemented/TODO split. Most of it still has no login of its own and relies entirely on the same reverse-proxy forward-auth as code-server; an opt-in shared password gate (`internal/authgate`, off by default) additionally protects the Terminal/File Manager/Logs/Sessions tabs entirely and gates write actions elsewhere (see `webmanager/.claude/archive/authgate-plan-done.md`) — note this gate no longer covers Dev Proxy or Tailscale at all; both moved to router-manager's own API and are gated by router-manager's own separate `internal/authgate` instance instead (`ROUTER_MANAGER_AUTH_PASSWORD_HASH` — see "router" above).
