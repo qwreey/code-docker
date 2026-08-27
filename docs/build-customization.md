@@ -144,6 +144,13 @@ SERVFAIL을 건너뛰고 router로 넘어가는 폴백 자체를 dnsmasq 내부�
 클라이언트를 쓰든 결과가 같아집니다. `router`의 IP는 컨테이너가 재생성되면 바뀔 수 있어
 5초마다 다시 조회하고, 바뀌면 dnsmasq를 재시작해 반영합니다.
 
+> 2026-08-27부터 리졸버 본체는 code-docker가 아니라
+> [qwreey/router-docker-client](https://github.com/qwreey/router-docker-client)의
+> `dns-local/`에 있고, 이미지 빌드 때 받아옵니다 — 애초에 code-docker 전용이 아니었고,
+> roblox-studio-docker가 똑같은 버그를 (더 나쁜 형태로) 겪었기 때문입니다. 여기 있는
+> `dns-local.default.sh`는 이 이미지의 경로/기본값만 넘겨주는 얇은 래퍼가 됐지만,
+> `dns-local.override.sh`로 통째로 갈아끼우는 방식은 그대로입니다.
+
 ### `code-patch.*.sh` (code-patch 심기 스크립트)
 
 `code-patch/` 폴더(아래 참고)의 내용을 `/code/.local/share/code-docker/code/patch/` 로 심는 스크립트입니다. `user-init` 과 마찬가지로 매 부팅마다 항상 실행되지만, `user-init` 과는 별도로 `code-service.*.sh` 에서 (`install.sh` 로 실제 `/code/.local/share/code-docker/code` 가 만들어진 *이후에*) 실행됩니다 - `user-init` 은 fish 설정 등 홈 폴더/셸 초기화를 위한 곳이라, code-server 내부(`/code/.local/share/code-docker/code`)를 다루는 이 로직과는 관심사를 분리했습니다.

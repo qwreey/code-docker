@@ -87,6 +87,13 @@ RUN mkdir -p /etc/code-docker/supervisord
 # netshare is qwreey/router-docker-client's own subdirectory now - fetched directly at
 # build time (floating #main ref, see that repo's own CLAUDE.md), not a local checkout.
 ADD --chown=root:root https://github.com/qwreey/router-docker-client.git#main:netshare /etc/code-docker/netshare
+# dns-local moved out to that same repo on 2026-08-27 - it was never
+# code-docker-specific (roblox-studio-docker hit the identical bug), so the
+# script lives there and config/dns-local/dns-local.default.sh is now just
+# the thin wrapper that supplies this image's own paths/defaults. Installed
+# beside netshare rather than into /etc/code-docker/dns-local/, which is
+# where the COPY below puts config/dns-local/'s own git-tracked files.
+ADD --chown=root:root https://github.com/qwreey/router-docker-client.git#main:dns-local /etc/code-docker/router-client/dns-local
 COPY --chown=root:root \
     config script/entrypoint.sh script/code-service.sh \
     script/user-init.sh script/get-user-shell.sh script/sshd-service.sh \

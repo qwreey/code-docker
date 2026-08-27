@@ -1,95 +1,37 @@
 #!/bin/sh
 set -u
 
-# Fixes a getaddrinfo ESERVFAIL class of bug: code-docker-internal is
-# `internal: true`, so Docker's own embedded DNS (127.0.0.11) refuses to
-# forward any name it doesn't already own with a definitive SERVFAIL
-# instead of a timeout - it still needs to be consulted first, since it's
-# what resolves same-network aliases like `router`/`dind`. The resolv.conf
-# this replaced (127.0.0.11 first, router second as a plain fallback
-# nameserver, written by the old resolv-writer program + apply_nameserver)
-# only worked for clients whose resolver actually retries the next
-# nameserver after a *definitive* SERVFAIL - glibc's own NSS stack does
-# (`getent`), but plain `dig` and Claude Code's own Node runtime don't, and
-# just report the first server's SERVFAIL straight back to the caller
-# (empirically confirmed, not just suspected - see the investigation this
-# fix came out of).
+# code-docker's side of the shared dns-local program. The resolver itself -
+# and the whole writeup of the getaddrinfo ESERVFAIL bug it exists for -
+# lives in qwreey/router-docker-client's own dns-local/, fetched at build
+# time by this image's Dockerfile alongside netshare. It started here
+# (2026-08-10) and moved out on 2026-08-27, when roblox-studio-docker turned
+# out to have the identical bug in a worse form: only 127.0.0.11 in its
+# resolv.conf, so no client class had external DNS at all and Roblox Studio
+# failed at launch. Nothing about the fix was ever code-docker-specific, and
+# code-docker-dind is the third known case (see
+# .claude/backlog/dind-dns-servfail.md).
 #
-# The fix: run a local dnsmasq in --strict-order mode as the *only*
-# nameserver code-docker itself ever talks to (127.0.0.1). strict-order
-# dnsmasq itself *does* retry the next --server= entry on SERVFAIL
-# (confirmed empirically against this exact 127.0.0.11-then-router setup),
-# so the failover now happens once, correctly, inside dnsmasq - every
-# client downstream just sees one nameserver and either gets a real answer
-# or a real failure, never a spurious SERVFAIL from a server that simply
-# doesn't own the name it was asked about.
-#
-# code-docker-dind has the same underlying resolv.conf shape (see
-# netshare/apply-nameserver.sh) and is very likely exposed to the same
-# class of bug, but isn't fixed by this - see
-# .claude/backlog/dns-local-servfail-fix.md's "code-docker-dind" section
-# for the deferred follow-up plan.
+# What stays here is exactly what's local to this image: where netshare was
+# installed, and the fact that NETGATE_ENABLED is code-docker's single
+# documented "there is no router in this deployment" switch. Overriding any
+# of this is still the usual dns-local.override.sh (see docs/index.md's
+# customization section) - this file being a wrapper doesn't change that.
 
-. /etc/code-docker/netshare/wait-until.sh
+# NETGATE_ENABLED=false means the whole router boundary is behaviorally off,
+# so there is nothing for the local resolver to forward to. DNS_LOCAL_ENABLED
+# is the shared script's own switch and wins if it's set explicitly.
+DNS_LOCAL_ENABLED="${DNS_LOCAL_ENABLED:-${NETGATE_ENABLED:-true}}"
+export DNS_LOCAL_ENABLED
 
-if [ "${NETGATE_ENABLED:-true}" = "false" ]; then
-    echo "dns-local: NETGATE_ENABLED=false, idling without starting a local resolver"
-    while true; do sleep 3600; done
-fi
+# Only used for a bounded, well-logged first wait on router's DNS forwarder;
+# the shared script retries on its own if this isn't set.
+NETSHARE_DIR="${NETSHARE_DIR:-/etc/code-docker/netshare}"
+export NETSHARE_DIR
 
-ROUTER_HOSTNAME="${ROUTER_HOSTNAME:-router}"
-RUN_DIR=/run/code-docker
-mkdir -p "$RUN_DIR"
+# Kept at code-docker's own historical path rather than the shared default,
+# so nothing that looked for the pid file here has to move.
+DNS_LOCAL_RUN_DIR="${DNS_LOCAL_RUN_DIR:-/run/code-docker}"
+export DNS_LOCAL_RUN_DIR
 
-DNSMASQ_PID=""
-LAST_ROUTER_IP=""
-
-# Restarting dnsmasq (rather than SIGHUP-reloading a --servers-file) on a
-# router IP change is deliberately simple: this only happens when router
-# itself gets recreated, a rare event, and a ~1s DNS blip during the swap
-# is an acceptable trade for not depending on --servers-file's SIGHUP
-# reload semantics, which weren't verified as part of this fix.
-start_dnsmasq() {
-    router_ip="$(getent hosts "$ROUTER_HOSTNAME" 2>/dev/null | awk '{ print $1; exit }')"
-    [ -z "$router_ip" ] && return 1
-    dnsmasq --no-daemon --no-resolv --strict-order \
-        --listen-address=127.0.0.1 --bind-interfaces \
-        --server=127.0.0.11 --server="$router_ip" \
-        --pid-file="$RUN_DIR/dns-local.pid" &
-    DNSMASQ_PID=$!
-    LAST_ROUTER_IP="$router_ip"
-}
-
-trap 'kill "$DNSMASQ_PID" 2>/dev/null; exit 0' TERM INT
-
-wait_until "router's DNS forwarder" 60 2 getent hosts "$ROUTER_HOSTNAME" \
-    || echo >&2 "dns-local: could not resolve '$ROUTER_HOSTNAME' after 60s - starting anyway, will keep retrying"
-
-until start_dnsmasq; do
-    sleep 2
-done
-
-# A bind failure (port 53 already taken, etc) makes dnsmasq exit almost
-# immediately - a short pause then checking it's still alive is a good
-# enough proxy for "started cleanly" without needing a real query round-trip.
-sleep 1
-if kill -0 "$DNSMASQ_PID" 2>/dev/null; then
-    # Direct redirect (truncate-in-place), not tmp-file+mv - /etc/resolv.conf
-    # is a bind-mounted file, and `mv` onto a bind-mount target fails with
-    # "Resource busy" (same reason netshare/apply-nameserver.sh avoids it).
-    printf 'nameserver 127.0.0.1\noptions ndots:0\n' > /etc/resolv.conf
-    echo "dns-local: /etc/resolv.conf now points at the local resolver (router=$LAST_ROUTER_IP)"
-else
-    echo >&2 "dns-local: dnsmasq failed to start, leaving /etc/resolv.conf untouched"
-fi
-
-while true; do
-    sleep 5
-    router_ip="$(getent hosts "$ROUTER_HOSTNAME" 2>/dev/null | awk '{ print $1; exit }')"
-    if [ -n "$router_ip" ] && [ "$router_ip" != "$LAST_ROUTER_IP" ]; then
-        echo "dns-local: router IP changed ($LAST_ROUTER_IP -> $router_ip), restarting local resolver"
-        kill "$DNSMASQ_PID" 2>/dev/null
-        wait "$DNSMASQ_PID" 2>/dev/null
-        start_dnsmasq
-    fi
-done
+exec /etc/code-docker/router-client/dns-local/dns-local.sh

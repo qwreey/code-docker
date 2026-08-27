@@ -1,5 +1,16 @@
 # code-docker-dind: possible getaddrinfo ESERVFAIL exposure (unconfirmed)
 
+> **2026-08-27 update — the hard part is now off the shelf.** `dns-local` was extracted
+> out of code-docker into `qwreey/router-docker-client`'s own `dns-local/` when
+> roblox-studio-docker hit this same bug (in its worst form: only `127.0.0.11` in
+> `resolv.conf`, so *no* client class had external DNS and Roblox Studio failed at
+> launch). So this item is no longer "port a code-docker-specific script"; it's a
+> Dockerfile `ADD`, a `dnsmasq` package, and a wrapper setting `DNS_LOCAL_ENABLED` -
+> exactly what the studio side needed. What still needs its own thought is the part
+> below: dockerd snapshots `/etc/resolv.conf` at *its* startup, so dind needs the local
+> resolver up and `/etc/resolv.conf` rewritten **before** `dockerd` starts, which is a
+> different ordering problem from "run it as a supervised program".
+
 Split out from `.claude/archive/dns-local-servfail-fix-done.md`, which fixed the
 equivalent bug for `code-docker` itself via the `dns-local` local resolver. This is the
 one part of that investigation that was deliberately deferred rather than fixed — see
