@@ -268,15 +268,15 @@ tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열�
 
 ## VNC (GUI 컨테이너 화면 보기)
 
-router에 붙어 있는 GUI 컨테이너(예: Wine/labwc 위 Roblox Studio)의 화면을 브라우저에서 바로 보고 조작하는 기능입니다. 대상 컨테이너가 띄운 웹 VNC 프런트엔드(noVNC/websockify)를 App Route로 태워 임베드하는 방식이라 실제 중계는 App Routes와 같은 경로를 씁니다 — router의 Caddy는 HTTP/WebSocket만 중계할 수 있어 raw RFB(5900번)는 태울 수 없고, 네이티브 VNC 클라이언트로 붙는 경로는 Net 관리 탭의 Forwards가 담당합니다. [webmanager의 VNC 탭](webmanager.md#vnc) 또는 `http://<host>/router/`에서 관리합니다.
+router에 붙어 있는 GUI 컨테이너(예: Wine/labwc 위 Roblox Studio)의 화면을 브라우저에서 바로 보고 조작하는 기능입니다. 대상마다 두 가지 뷰어 백엔드 중 하나를 고릅니다 — 기본값인 `rfb`는 router-manager 자신이 noVNC 뷰어를 서비스하며 대상의 raw RFB 포트(보통 5900번)에 직접 브리지하므로 대상은 VNC만 말하면 되고 App Route도 생기지 않으며, `novnc`는 대상이 띄운 웹 VNC 프런트엔드(noVNC/websockify, 보통 6080번)를 App Route로 리버스 프록시하는 이전 방식입니다(router의 Caddy는 HTTP/WebSocket만 중계할 수 있어 raw RFB는 이 경로로 태울 수 없기 때문). 네이티브 VNC 클라이언트로 붙는 경로는 백엔드와 무관하게 Net 관리 탭의 Forwards가 담당합니다. [webmanager의 VNC 탭](webmanager.md#vnc) 또는 `http://<host>/router/`에서 관리합니다.
 
 자세한 내용은 [vnc.md](../router/docs/vnc.md)를 확인하세요.
 
-- [어떻게 동작하는가](../router/docs/vnc.md#어떻게-동작하는가-읽고-시작하는-편이-좋습니다)
+- [어떻게 동작하는가](../router/docs/vnc.md#어떻게-동작하는가-읽고-시작하는-편이-좋습니다) — `rfb`(router 중계, 기본값)와 `novnc`(대상이 서비스하는 웹 VNC) 두 백엔드의 차이
 - [대상 추가하기](../router/docs/vnc.md#대상-추가하기) — sibling 프로젝트의 컨테이너를 대상으로 삼으려면 `.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`가 필요합니다
 - [뷰어 백엔드](../router/docs/vnc.md#뷰어-백엔드)
-- [보기 (뷰어)](../router/docs/vnc.md#보기-뷰어) — 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`)을 직접 열었을 때의 제약 포함
-- [알려진 제약](../router/docs/vnc.md#알려진-제약) — noVNC와 `VNC_PASSWORD`(VeNCrypt)는 함께 쓸 수 없습니다
+- [보기 (뷰어)](../router/docs/vnc.md#보기-뷰어) — 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`)을 직접 열었을 때의 차이(`rfb`는 그대로 동작, `novnc`는 `ROUTER_APP_ORIGIN` 필요)
+- [알려진 제약](../router/docs/vnc.md#알려진-제약) — noVNC와 `VNC_PASSWORD`(VeNCrypt)는 백엔드와 무관하게 함께 쓸 수 없습니다
 
 ## webmanager (관리자 패널)
 

@@ -1,5 +1,32 @@
 # router VNC 탭 (완료 — 2026-08-25)
 
+**2026-08-27 후속 — 뷰어가 router 안으로 들어옴 (`rfb` 백엔드)**: 이 문서가
+정한 "탭은 App Routes 위의 얇은 층" 결정이 뒤집혔다. 이유는 그 결정 자체가
+틀려서가 아니라(전송 경로로서는 정확히 맞았다) 그 결과로 **router의 1급
+기능이 사용자가 등록한 제3자 앱과 구분이 안 되게** 됐고, 그 대가를 하나씩
+우회로 갚고 있었기 때문:
+`ROUTER_MANAGER_HOSTS` 전용 도메인에서 뷰어를 아예 못 띄움(→ 아래 "뷰어 origin
+문제", 결국 `ROUTER_APP_ORIGIN`이라는 변수를 하나 더 만들어 막음), 접근 제어에
+tinyauth forward-auth 경로 전체가 필요함, 대상 컨테이너마다 웹 VNC 스택을
+따로 심어야 함, noVNC의 0x0 desktop 버그를 대상마다 각각 패치해야 함.
+VNC는 앱이 아니라 **프로토콜(계층)** 이므로 클라이언트 쪽을 router가 갖는 게
+맞는 모양이라는 판단(사용자 결정, 2026-08-27).
+
+바뀐 것: `Backend`가 "누가 뷰어를 서비스하는가" 축이 되고 기본값이 `rfb`로
+바뀜 — router가 noVNC를 이미지에 vendoring해서(`NOVNC_VERSION`, 0x0 패치 포함)
+`/router/novnc/`에서 직접 서비스하고, `GET /api/vnc/targets/{name}/ws`가
+브라우저 WebSocket을 대상의 **raw RFB 포트**로 중계한다. App Route를 안 만들고,
+뷰어가 항상 SPA와 same-origin이며(전용 도메인에서 그냥 됨), 접근 제어는
+router-manager 자신의 authgate다. 기존 `novnc` 백엔드는 **폐기가 아니라 유지** —
+Selkies처럼 raw RFB 포트가 없는 프런트엔드는 웹 프런트엔드를 프록시하는 것
+말고는 방법이 없으므로, 둘은 같은 일의 신구 버전이 아니라 서로 다른 전송
+경로다. 자세한 내용은 `router/CLAUDE.md`의 VNC 항목과
+`router/backend/internal/vnc`의 패키지 doc comment.
+
+라이브 검증(2026-08-27, 이 checkout): 실제 브라우저에서 `rfb` 대상 연결
+(`RFB 003.008` 배너 → security types 협상 → 화면 표시), router-manager 잠금 시
+안내 표시 + 해제 후 즉시 재연결, 백엔드 전환 시 옛 App Route 삭제 확인.
+
 **2026-08-25 완료**: 문서 제목이자 경로 B의 정의였던 "진짜 VNC 탭"까지 구현하고
 라이브 검증함 — 이 문서가 backlog에서 archive로 옮겨진 이유. 이전 업데이트들이
 구현한 건 전송 경로(B-1)까지였고 탭 자체는 없었음.

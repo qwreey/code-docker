@@ -141,8 +141,12 @@ compose에 박혀있지 않고 router-manager UI/API로 실행 중에 추가/삭
 > 쪽 IP가 뽑히면 그 포트엔 아무도 듣고 있지 않아 `connection refused`가 되고, 재적용될
 > 때마다 결과가 달라질 수 있습니다. `vnc-only`는 `roblox-studio-vnc` 위에만 존재하는
 > 별칭이라 항상 정확히 하나의 IP로 풀립니다(그게 이 별칭을 따로 둔 이유 전부입니다 -
-> `roblox-studio-code-docker.yml`의 `VNC_BIND_ALIAS` 주석 참고). router의 VNC 탭/App
-> Routes도 같은 이유로 대상을 `vnc-only:6080`으로 잡습니다.
+> `roblox-studio-code-docker.yml`의 `VNC_BIND_ALIAS` 주석 참고). router의 VNC 탭도 같은
+> 이유로 대상 호스트를 항상 `vnc-only`로 잡습니다 - 권장 구성은 `rfb` 백엔드로
+> `vnc-only:5900`을 대상으로 등록하는 것입니다(wayvnc가 이미 그 별칭의 `5900`번에
+> 바인딩하고 있으므로 roblox-studio-docker 쪽 변경은 필요 없습니다). 대상 자신의 웹
+> VNC 프런트엔드를 거치는 `novnc` 백엔드(App Routes를 통한 경로, `vnc-only:6080`)도
+> 여전히 쓸 수 있습니다.
 
 ## 확인 & 흔한 문제
 

@@ -82,8 +82,12 @@ runs outside code-docker too) that code-docker "uses" rather than contains, the 
 pattern as `code-server-autoinstall`. It owns everything about code-docker's network
 boundary — meaningfully higher trust than code-docker, the same "국경을 넘는 컨테이너"
 framing as dind-authz — across five feature areas: netgate (egress lockdown), tailscale,
-Dev Proxy/App Routes, tinyauth, and VNC (a noVNC front end layered on App Routes, no
-process of its own — see `router/CLAUDE.md`'s own VNC bullet), all exposed through its own
+Dev Proxy/App Routes, tinyauth, and VNC (router serves noVNC itself and bridges the
+browser's WebSocket to a target's raw RFB port — as of 2026-08-27; the older
+"proxy the target's own web VNC front end through an App Route" transport is still
+available per target, for a front end that isn't noVNC. No process of its own either way,
+it's router-manager plus vendored static files — see `router/CLAUDE.md`'s own VNC bullet),
+all exposed through its own
 `router-manager` Go backend + SPA at `/router/`. See `router/CLAUDE.md` for the full
 architecture/feature breakdown and `router/docs/*.md` for user-facing docs
 (`docs/index.md` links into these); this section only covers code-docker's own side of

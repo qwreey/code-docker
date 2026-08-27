@@ -69,13 +69,15 @@ target(`host:port`) 두 값만으로 앱 하나를 등록합니다 — 경로 �
 
 router에 붙어 있는 GUI 컨테이너의 화면을 브라우저에서 바로 보고 조작하는
 탭 — 이 탭도 Dev Proxy와 같은 방식(router의 `/router/` 페이지를 iframe으로
-embed)으로 보여줍니다. 대상을 하나 등록하면 위 App Routes 항목이 같은
-이름으로 함께 생성되고(실제 중계는 전적으로 App Routes가 담당합니다),
-목록에서 "보기"를 누르면 같은 페이지 안에 뷰어가 열립니다. 대상 주소는 raw
-RFB 포트(`5900`)가 아니라 대상 컨테이너가 띄운 웹 VNC 포트(noVNC/websockify,
-보통 `6080`)여야 합니다 — router의 Caddy는 HTTP/WebSocket만 중계할 수 있기
-때문입니다. 네이티브 VNC 클라이언트로 붙고 싶다면 대신 아래 Net 관리 탭의
-Forwards를 쓰세요. 자세한 내용은 [vnc.md](../router/docs/vnc.md)를 확인하세요.
+embed)으로 보여줍니다. 대상마다 두 가지 뷰어 백엔드 중 하나를 고릅니다.
+기본값인 `rfb`는 router-manager 자신이 noVNC 뷰어를 서비스하면서 대상의
+**raw RFB 포트**(보통 `5900`)에 직접 브리지하므로 App Route가 전혀 생기지
+않고, 대상은 VNC만 말하면 됩니다. `novnc`는 이전 방식 그대로 — 대상이 띄운
+웹 VNC 포트(noVNC/websockify, 보통 `6080`)를 위 App Routes 항목으로 등록해
+리버스 프록시합니다(router의 Caddy가 HTTP/WebSocket만 중계할 수 있기
+때문입니다). 목록에서 "보기"를 누르면 같은 페이지 안에 뷰어가 열립니다.
+네이티브 VNC 클라이언트로 붙고 싶다면 대신 아래 Net 관리 탭의 Forwards를
+쓰세요. 자세한 내용은 [vnc.md](../router/docs/vnc.md)를 확인하세요.
 
 ### Tailscale
 
