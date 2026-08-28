@@ -9,7 +9,12 @@ webmanager(`/manager`)는 code-docker 컨테이너 안 nginx가 한 origin으로
 (자세한 경위는
 [dev-proxy.md의 "바깥 리버스 프록시 연결하기"](../router/docs/dev-proxy.md#바깥-리버스-프록시-연결하기)
 참고). 그래서 앞단 리버스 프록시는 **router 컨테이너 하나(`routerip:80`)**만
-바라보면 됩니다.
+바라보면 됩니다 — 다만 프록시 대상이 하나라는 것이지 호스트네임까지 하나는
+아닙니다. router-manager 전용 도메인(`ROUTER_MANAGER_HOSTS`)이나 tinyauth
+로그인 화면(`TINYAUTH_HOSTS`)을 쓴다면 같은 대상을 가리키는 사이트 블록을
+도메인마다 하나씩 만들어야 합니다 — 아래
+["여러 서브도메인 한 번에 로그인"](#여러-서브도메인-한-번에-로그인-sso--router_manager_hosts--tinyauth_hosts)
+참고.
 
 이 문서는 code-server 자체를 앞단(바깥) 리버스 프록시로 어떻게 보호할지만
 다룹니다 - 이것과 별개로, webmanager 자체 비밀번호 게이트
@@ -83,13 +88,24 @@ server {
 
 </details>
 
-## 여러 서브도메인 한 번에 로그인 (SSO) — `ROUTER_MANAGER_HOSTS` 등
+## 여러 서브도메인 한 번에 로그인 (SSO) — `ROUTER_MANAGER_HOSTS` / `TINYAUTH_HOSTS`
 
-[router.md의 "공유 origin과 전용
-도메인"](../router/docs/router.md#보안-공유-origin과-전용-도메인routermanagerhosts)에서 설명하는
-`ROUTER_MANAGER_HOSTS`(예: `router.code.yaeji.moe`)처럼, code-docker 관련
-서비스를 완전히 별도 서브도메인으로 분리해서 노출하는 경우가 있습니다. 위
-Caddy/nginx 예시는 `code.yaeji.moe` 한 도메인만 다루므로, 이런 서브도메인을
+code-docker 관련 서비스 중 일부는 공유 호스트네임(`code.yaeji.moe`)의 경로가
+아니라 **완전히 별도 서브도메인**으로 노출됩니다. 현재 두 가지가 있습니다:
+
+- [`ROUTER_MANAGER_HOSTS`](../router/docs/router.md#보안-공유-origin과-전용-도메인router_manager_hosts)
+  (예: `router.code.yaeji.moe`) — router-manager 전용 관리 도메인. 선택 사항이지만
+  프로덕션에서는 권장됩니다.
+- [`TINYAUTH_HOSTS`](../router/docs/router.md#tinyauth) (예: `auth.code.yaeji.moe`) —
+  tinyauth 로그인 화면. Dev Proxy 라우트/App Routes 앱의 "인증 요구"를 하나라도
+  쓸 거라면 **선택이 아니라 필수**입니다. tinyauth의 SPA는 base path를 지원하지
+  않아 호스트네임 하나를 통째로 써야 합니다.
+
+둘 다 DNS 레코드와 바깥 리버스 프록시 등록이 따로 필요하지만, 프록시 대상은
+여전히 `routerip:80` 하나입니다 — router 자신의 nginx가 Host 헤더를 보고 각
+전용 `server{}` 블록으로 갈라줍니다.
+
+위 Caddy/nginx 예시는 `code.yaeji.moe` 한 도메인만 다루므로, 이런 서브도메인을
 추가할 때마다 forward-auth 설정을 새로 붙여야 합니다 — 그리고 기본
 forward-auth 방식(위 예시가 쓰는 "단일 애플리케이션" 모드)으로 그냥 도메인만
 늘리면, 각 서브도메인이 서로 다른 세션 쿠키를 발급받아서 `code.yaeji.moe`에
@@ -113,10 +129,10 @@ auth](https://docs.goauthentik.io/add-secure-apps/providers/proxy/forward_auth/)
 Caddy 문서도 같은 지시문을 그대로 씁니다), SSO 여부를 가르는 건 오직
 Authentik provider의 Cookie domain/모드 설정입니다.
 
-위 [Caddy 예시](#caddy-예시)에 `router.code.yaeji.moe` 사이트 블록을 그대로
-하나 더 추가하면 됩니다 - target은 여전히 `routerip:80` 하나입니다(router
-자신의 nginx가 `ROUTER_MANAGER_HOSTS`로 지정된 Host를 보고 이 도메인 전용
-`server{}` 블록으로 갈라태우므로, 바깥 Caddy는 도메인 하나가 늘었다는 것
+위 [Caddy 예시](#caddy-예시)에 쓰는 서브도메인마다 사이트 블록을 그대로 하나씩
+더 추가하면 됩니다 - target은 여전히 `routerip:80` 하나입니다(router 자신의
+nginx가 `ROUTER_MANAGER_HOSTS`/`TINYAUTH_HOSTS`로 지정된 Host를 보고 각 도메인
+전용 `server{}` 블록으로 갈라태우므로, 바깥 Caddy는 도메인이 늘었다는 것
 말고는 신경 쓸 게 없습니다):
 
 ```Caddy
@@ -144,7 +160,23 @@ router.code.yaeji.moe {
   reverse_proxy /outpost.goauthentik.io/* http://authentik:9000
   reverse_proxy http://routerip:80   # 같은 routerip:80 - Host 헤더로 router 자신의 nginx가 ROUTER_MANAGER_HOSTS 전용 server{} 블록으로 갈라줍니다
 }
+
+auth.code.yaeji.moe {
+  # TINYAUTH_HOSTS - tinyauth 로그인 화면. 여기도 PWA 설치 경로가 없으므로
+  # 예외 없이 전체를 덮어도 됩니다. 앞단 SSO를 걸지 말지는 선택인데,
+  # 도메인 레벨 모드(Cookie domain=code.yaeji.moe)라면 이 도메인도 같은 쿠키로
+  # 커버되므로 SSO 로그인이 한 번 더 뜨지 않습니다 - 그래서 걸어두는 쪽을
+  # 권장합니다.
+  forward_auth http://authentik:9000 {
+    uri /outpost.goauthentik.io/auth/caddy
+    trusted_proxies private_ranges
+  }
+  reverse_proxy /outpost.goauthentik.io/* http://authentik:9000
+  reverse_proxy http://routerip:80   # 역시 같은 routerip:80 - TINYAUTH_HOSTS 전용 server{} 블록으로 갈라집니다
+}
 ```
+
+### router-manager 도메인에서 주의할 점
 
 `ROUTER_MANAGER_HOSTS`로 분리한 도메인을 이 SSO 뒤에 두는 것도 이 문서
 서두의 원칙과 동일합니다 - 앞단 SSO를 켠다고 router-manager 자체 비밀번호
@@ -153,6 +185,30 @@ router.code.yaeji.moe {
 자기 자신을 향한 PWA 설치 경로가 없으므로(위 "PWA 설치가 안 되는 이유"는
 code-server 전용), 이 도메인은 예외 경로 없이 forward-auth로 전체를 덮어도
 됩니다.
+
+### tinyauth 도메인에서 주의할 점
+
+- **부모 도메인을 맞추세요.** tinyauth는 세션 쿠키를 자기 호스트네임의 **부모
+  도메인**에 겁니다(`auth.subdomainsenabled` 기본 on — 실측: `auth.example.com`
+  로그인 시 `Domain=example.com`). 위 예시처럼 `auth.code.yaeji.moe`를 고르면
+  쿠키가 `code.yaeji.moe`에 걸려서 `code.yaeji.moe/app/...`과
+  `router.code.yaeji.moe`를 한 번의 tinyauth 로그인으로 전부 커버합니다.
+  보호 대상과 다른 가지에 있는 호스트네임(예: `auth.yaeji.moe`)을 고르면 쿠키
+  범위가 필요 이상으로 넓어지거나 어긋납니다.
+- **`X-Forwarded-Proto`를 반드시 넘기세요.** tinyauth는 이 헤더로 로그인 후
+  돌아갈 URL의 스킴을 만듭니다 — 비어 있으면 router의 nginx가 자기 스킴(평문
+  `http`)으로 채워 넣어서, https로 접속했는데 로그인 후 `http://`로 튕기는
+  증상이 납니다. Caddy의 `reverse_proxy`는 기본으로 넣어주므로 위 예시는 그대로
+  두면 되고, 바깥 프록시가 nginx라면 `proxy_set_header X-Forwarded-Proto
+  $scheme;`를 직접 넣어야 합니다. https 뒤에 둔다면 `.env.router`의
+  `TINYAUTH_AUTH_SECURECOOKIE=true`도 같이 켜세요(기본 false).
+- **앞단 SSO는 tinyauth를 대체하지 않습니다.** 이 문서 서두의 원칙과 같습니다 —
+  둘은 보호 대상이 다릅니다. 앞단 SSO는 공유 호스트네임 전체를, tinyauth는
+  Dev Proxy/App Routes **항목별로** "인증 요구"를 켠 것만 잠급니다. 그래서
+  `/exports/`·`/app/`을 앞단 SSO 없이 특정 인원에게만 열어주는 용도로 쓸 수
+  있습니다. 반대로 `rfb` 백엔드 VNC 대상은 tinyauth가 아니라 router-manager
+  자신의 비밀번호(`ROUTER_MANAGER_AUTH_PASSWORD_HASH`)로 잠기므로 이 도메인과
+  무관합니다.
 
 ## 주의사항
 
