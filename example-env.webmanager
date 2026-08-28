@@ -28,7 +28,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=15
+WEBMANAGER_ENV_VERSION=16
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -138,6 +138,12 @@ WEBMANAGER_ENV_VERSION=15
 #WEBMANAGER_TERMINAL_SESSION_SCROLLBACK_BYTES=262144
 #. 홈 탭에 저장하는 세션 실행 프로파일(이름 + 시작 위치/명령) 저장 경로.
 #WEBMANAGER_TERMINAL_PROFILES_PATH=
+#. 아래 비밀번호 게이트가 켜져 있을 때, `attach`가 비밀번호를 받아 얻은 인증
+#. 쿠키를 캐시해두는 경로(0600). 물어볼 터미널이 없는 CLI 경로 - 지금은
+#. `attach`의 셸 자동완성이 쓰는 `webmanager --list-sessions` 하나 - 가 이걸
+#. 재사용합니다. 쿠키는 게이트의 TTL(10분)이 지나거나 webmanager가 재시작하면
+#. 그냥 거절되므로, 지워도 자동완성이 잠잠해질 뿐 다른 영향은 없습니다.
+#WEBMANAGER_ATTACH_COOKIE_PATH=
 
 #. --- 폰트 매니저 ---
 #. "false"로 끄면 컨테이너 첫 부팅 시 기본 번들 폰트(Victor Mono, IBM Plex Mono

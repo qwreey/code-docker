@@ -18,6 +18,7 @@ import (
 	"github.com/coder/websocket"
 	"golang.org/x/term"
 
+	"webmanager/internal/atomicfile"
 	"webmanager/internal/authgate"
 )
 
@@ -68,7 +69,7 @@ func attachCmd(cfg Config, args []string) int {
 	}
 
 	baseURL := "http://" + cfg.Addr
-	cookie, err := attachAuthenticate(baseURL)
+	cookie, err := attachAuthenticate(baseURL, cfg.AttachCookiePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "attach: %v\n", err)
 		return 1
@@ -181,6 +182,43 @@ func fetchDetachSequence(baseURL, cookie string) []byte {
 	return []byte(settings.DetachSequence)
 }
 
+// saveAttachCookie caches a freshly-obtained unlock cookie so the CLI paths
+// that have no terminal to prompt on can reuse it - today just
+// `webmanager --list-sessions`, which is what `attach`'s shell completion
+// shells out to, and which therefore offered *nothing* whenever the
+// password gate was on. That silence is worse than it sounds: the default
+// session names contain a space ("세션 1"), so with no completion to quote
+// them, `attach 세션 1` splits into name + start-dir and quietly creates a
+// session named "세션" instead of joining the one meant.
+//
+// No expiry bookkeeping here on purpose: the token carries its own signed
+// issue time, the gate rejects it past its TTL, and webmanager's HMAC
+// secret is regenerated on every restart - so a stale file simply stops
+// working (completion goes quiet again until the next attach), it can never
+// grant more than the gate itself would. Every failure is ignored: this is
+// a convenience cache, never a reason to fail an attach that already
+// authenticated successfully.
+func saveAttachCookie(path, cookie string) {
+	if path == "" {
+		return
+	}
+	_ = atomicfile.Write(path, []byte(cookie+"\n"), 0o600, 0o755)
+}
+
+// loadAttachCookie reads back whatever saveAttachCookie last stored. An
+// empty string means "nothing usable" - missing file, unreadable, empty -
+// and every caller treats that the same as having no cookie at all.
+func loadAttachCookie(path string) string {
+	if path == "" {
+		return ""
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
 // sessionExists reports whether name is already a live session, so the
 // banner above can say "joining" instead of "creating". known is false when
 // that couldn't be determined at all (network error, non-200 - e.g. an
@@ -241,8 +279,9 @@ func describeDetachSequence(seq []byte) string {
 // configured, prompts for it (stdin echo disabled) and exchanges it for the
 // unlock cookie via POST /api/auth/unlock. Returns "" (no error) when no
 // password is configured at all - the common case in this test environment
-// and for anyone who hasn't opted into the gate.
-func attachAuthenticate(baseURL string) (string, error) {
+// and for anyone who hasn't opted into the gate. A successful unlock is
+// cached via saveAttachCookie for the CLI paths that can't prompt.
+func attachAuthenticate(baseURL, cookiePath string) (string, error) {
 	resp, err := http.Get(baseURL + "/api/auth/status")
 	if err != nil {
 		return "", fmt.Errorf("checking auth status: %w", err)
@@ -285,7 +324,9 @@ func attachAuthenticate(baseURL string) (string, error) {
 	}
 	for _, c := range unlockResp.Cookies() {
 		if c.Name == authgate.CookieName {
-			return c.Name + "=" + c.Value, nil
+			cookie := c.Name + "=" + c.Value
+			saveAttachCookie(cookiePath, cookie)
+			return cookie, nil
 		}
 	}
 	return "", fmt.Errorf("unlock succeeded but no cookie was returned")

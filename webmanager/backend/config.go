@@ -75,6 +75,17 @@ type Config struct {
 	// (see internal/terminalprofiles).
 	TerminalProfilesPath string
 
+	// AttachCookiePath is where `webmanager --attach` caches the unlock
+	// cookie it obtained by prompting for the password, for the
+	// non-interactive CLI paths that have no way to ask for one themselves
+	// - today just `webmanager --list-sessions`, which backs `attach`'s
+	// shell completion (see listsessioncmd.go and attachcmd.go's
+	// saveAttachCookie). Root-only (0600) inside this container, which is
+	// not a meaningful boundary on its own - anything that can read it
+	// could equally read the terminal PTYs through /proc - but it keeps the
+	// file out of the way of anything sharing the volume.
+	AttachCookiePath string
+
 	// BrowserNamesPath is where user-assigned friendly names for a
 	// heartbeat-reported browserId are persisted (see internal/browsernames).
 	BrowserNamesPath string
@@ -202,6 +213,7 @@ func loadConfig() Config {
 
 		TerminalSettingsPath: getenv("WEBMANAGER_TERMINAL_SETTINGS_PATH", "/code/.local/share/code-docker/webmanager/terminal-settings.json"),
 		TerminalProfilesPath: getenv("WEBMANAGER_TERMINAL_PROFILES_PATH", "/code/.local/share/code-docker/webmanager/terminal-profiles.json"),
+		AttachCookiePath:     getenv("WEBMANAGER_ATTACH_COOKIE_PATH", "/code/.local/share/code-docker/webmanager/attach-cookie"),
 		BrowserNamesPath:     getenv("WEBMANAGER_BROWSER_NAMES_PATH", "/code/.local/share/code-docker/webmanager/browser-names.json"),
 		SidebarOrderPath:     getenv("WEBMANAGER_SIDEBAR_ORDER_PATH", "/code/.local/share/code-docker/webmanager/sidebar-order.json"),
 

@@ -15,10 +15,11 @@ import (
 // (fish/bash/zsh) in their own completion languages.
 //
 // Deliberately silent on any failure - a connection error, a non-OK status,
-// a decode error, or (see below) an authgate password requirement all just
-// mean "no completions offered" (exit 0, no output), never a scary error or
-// a hang firing on every TAB press. Same "non-essential setup degrades
-// gracefully" convention as root CLAUDE.md.
+// a decode error, or (see below) an authgate password requirement with no
+// cached unlock cookie to answer it all just mean "no completions offered"
+// (exit 0, no output), never a scary error or a hang firing on every TAB
+// press. Same "non-essential setup degrades gracefully" convention as root
+// CLAUDE.md.
 func listSessionsCmd(cfg Config) int {
 	baseURL := "http://" + cfg.Addr
 	client := &http.Client{Timeout: 800 * time.Millisecond}
@@ -35,15 +36,31 @@ func listSessionsCmd(cfg Config) int {
 	if statusErr != nil {
 		return 0
 	}
-	// Unlike attachCmd, there's no terminal here to prompt for a password on
-	// - and no cookie jar persisted across separate CLI invocations to reuse
-	// one already entered elsewhere. A configured gate just means this
-	// command has nothing to offer, not a prompt firing mid-completion.
+	// There's no terminal here to prompt for a password on, so a configured
+	// gate is answered with whatever unlock cookie the last `webmanager
+	// --attach` cached (see attachcmd.go's saveAttachCookie) - and with
+	// nothing at all if there is none, or it has expired. Without that
+	// reuse this command went silent for the entire time the gate was on,
+	// which is exactly when `attach`'s completion is most needed: the
+	// default session names contain a space, and an unquoted `attach
+	// 세션 1` silently creates a session named "세션" instead of joining
+	// the one meant.
+	cookie := ""
 	if status.Required {
-		return 0
+		cookie = loadAttachCookie(cfg.AttachCookiePath)
+		if cookie == "" {
+			return 0
+		}
 	}
 
-	sessionsResp, err := client.Get(baseURL + "/api/terminal/sessions")
+	req, err := http.NewRequest(http.MethodGet, baseURL+"/api/terminal/sessions", nil)
+	if err != nil {
+		return 0
+	}
+	if cookie != "" {
+		req.Header.Set("Cookie", cookie)
+	}
+	sessionsResp, err := client.Do(req)
 	if err != nil {
 		return 0
 	}
