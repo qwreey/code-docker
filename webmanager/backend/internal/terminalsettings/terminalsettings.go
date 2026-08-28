@@ -57,8 +57,10 @@ type Settings struct {
 	// Ctrl+Q) that `webmanager --attach` (main package's attachcmd.go)
 	// watches stdin for to detach from a shared session without touching
 	// it - see that file's detachMatcher. Empty means "use the built-in
-	// default" (also Ctrl+P Ctrl+Q, Docker's own convention) - attachcmd.go
-	// decides that default, not this package, so a config value literally
+	// default" (Ctrl+], i.e. "\x1d" - Docker's own Ctrl+P Ctrl+Q was the
+	// first choice but collides with code-server's Quick Open, see
+	// attachcmd.go's defaultDetachSequence) - attachcmd.go decides that
+	// default, not this package, so a config value literally
 	// equal to the default and "unset" are indistinguishable on purpose
 	// (same "" -> built-in idiom as FontFamily above). This is the one
 	// field in this blob read by attachcmd.go (a CLI, not the browser) -

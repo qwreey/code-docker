@@ -37,6 +37,24 @@ const terminalKillGrace = 3 * time.Second
 // just the stalled one.
 const terminalWriteTimeout = 10 * time.Second
 
+// scrollbackChunkBytes bounds each individual WebSocket message used to
+// replay a session's scrollback on attach. A WebSocket client's read limit
+// applies per *message*, and coder/websocket - the library
+// `webmanager --attach` uses (see attachcmd.go) - defaults that limit to
+// 32KiB, while the scrollback buffer holds up to
+// WEBMANAGER_TERMINAL_SESSION_SCROLLBACK_BYTES (256KiB by default). Sent as
+// one message, the replay therefore made that client abort the connection
+// with StatusMessageTooBig the moment it attached to any session that had
+// ever produced more than 32KiB of output - and silently, since it surfaced
+// as a plain read error and exit code 0. The visible symptom was `attach
+// <a session you'd actually been working in>` dropping straight back to the
+// outer shell while `attach <brand new name>` (empty scrollback, replay
+// skipped entirely) worked perfectly. Live output was never affected:
+// pump() reads at most terminalReadBufferSize per chunk, already under the
+// limit. Kept well below 32KiB rather than exactly at it so any client's
+// own default has headroom too.
+const scrollbackChunkBytes = 16 * 1024
+
 // terminalControlMessage is the JSON shape of text WebSocket frames sent by
 // the client. M1 only defines "resize"; unknown types are ignored so the
 // protocol can grow without breaking older clients.
@@ -233,18 +251,7 @@ func relayTerminalSession(ctx context.Context, conn *websocket.Conn, sess *terms
 	}()
 
 	if len(scrollback) > 0 {
-		// Clear+home before replaying: the ring buffer is raw bytes, not
-		// parsed terminal state, so relative cursor-movement escapes in it
-		// only render correctly against a known-blank starting screen. The
-		// browser frontend already gets this for free (term.reset() before
-		// reconnecting - see Terminal.tsx), but webmanager --attach
-		// (attachcmd.go) hands this straight to a real terminal with
-		// whatever was on it before, so the clear has to happen here,
-		// covering both callers identically.
-		if werr := writeWithTimeout(ctx, conn, []byte("\x1b[2J\x1b[H")); werr != nil {
-			return
-		}
-		if werr := writeWithTimeout(ctx, conn, scrollback); werr != nil {
+		if werr := writeScrollback(ctx, conn, scrollback); werr != nil {
 			return
 		}
 	}
@@ -302,6 +309,38 @@ func (s *Server) handleClaudeInteractiveLoginTerminal(w http.ResponseWriter, r *
 	}
 
 	relayTerminalSession(context.Background(), conn, sess, "claude-interactive-login")
+}
+
+// writeScrollback replays a session's scrollback into a freshly-attached
+// connection: a clear+home first, then the buffer itself in
+// scrollbackChunkBytes-sized messages.
+//
+// The clear is needed because the ring buffer is raw bytes, not parsed
+// terminal state, so relative cursor-movement escapes in it only render
+// correctly against a known-blank starting screen. The browser frontend
+// already gets that for free (term.reset() before reconnecting - see
+// Terminal.tsx), but webmanager --attach (attachcmd.go) hands this straight
+// to a real terminal with whatever was on it before, so it has to happen
+// here, covering both callers identically.
+//
+// The chunking is what keeps the replay under a client's per-message read
+// limit - see scrollbackChunkBytes for the bug that caused. Message order
+// on a single WebSocket connection is guaranteed, so splitting is
+// indistinguishable from one big write on the receiving end.
+func writeScrollback(ctx context.Context, conn *websocket.Conn, scrollback []byte) error {
+	if err := writeWithTimeout(ctx, conn, []byte("\x1b[2J\x1b[H")); err != nil {
+		return err
+	}
+	for off := 0; off < len(scrollback); off += scrollbackChunkBytes {
+		end := off + scrollbackChunkBytes
+		if end > len(scrollback) {
+			end = len(scrollback)
+		}
+		if err := writeWithTimeout(ctx, conn, scrollback[off:end]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // writeWithTimeout writes p to conn as a binary frame, bounded by

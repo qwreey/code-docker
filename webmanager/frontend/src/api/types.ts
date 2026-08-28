@@ -640,7 +640,7 @@ export interface TerminalSettings {
   customThemes: TerminalTheme[]
   homeLabel: string // custom Home tab title, "" = use the default "홈"
   fontFamily: string // selected Font Manager family for webmanager's own web terminal, "" = built-in var(--mono) stack
-  detachSequence: string // literal bytes `webmanager --attach` watches stdin for to detach, "" = built-in default (Ctrl+P Ctrl+Q)
+  detachSequence: string // literal bytes `webmanager --attach` watches stdin for to detach, "" = built-in default (Ctrl+], i.e. "\x1d")
 }
 
 // Mirrors internal/fonts.Font — one uploaded (or default-seeded) font file.

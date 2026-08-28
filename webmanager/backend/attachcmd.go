@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/coder/websocket"
@@ -71,6 +74,27 @@ func attachCmd(cfg Config, args []string) int {
 	}
 	detachSeq := fetchDetachSequence(baseURL, cookie)
 
+	// Say what this attach is about to do, before the connection replaces
+	// the screen. Landing silently in *a* shell, with no way to tell "joined
+	// the session you meant" from "created a brand new one under a name
+	// nothing had", is what made a real mismatch take a whole debugging
+	// session to pin down - and `attach <name with a space>` splitting into
+	// name + start-dir makes creating-instead-of-joining easy to hit by
+	// accident. The detach key rides on the same line because it's the other
+	// thing there's no way to discover from inside: it's configurable (see
+	// fetchDetachSequence), and a wrong guess at it leaves Ctrl+D - which
+	// exits the shell and so destroys the session for the browser tab too -
+	// as the only exit that appears to work.
+	detachHint := describeDetachSequence(detachSeq)
+	switch exists, known := sessionExists(baseURL, cookie, name); {
+	case !known:
+		fmt.Fprintf(os.Stderr, "attach: connecting to session %q (%s to detach)\n", name, detachHint)
+	case exists:
+		fmt.Fprintf(os.Stderr, "attach: joining existing session %q (%s to detach)\n", name, detachHint)
+	default:
+		fmt.Fprintf(os.Stderr, "attach: creating new session %q (%s to detach)\n", name, detachHint)
+	}
+
 	query := url.Values{"session": {name}}
 	if len(args) == 2 {
 		query.Set("cwd", args[1])
@@ -87,9 +111,19 @@ func attachCmd(cfg Config, args []string) int {
 		fmt.Fprintf(os.Stderr, "attach: connecting to session %q: %v\n", name, err)
 		return 1
 	}
+	// coder/websocket defaults to a 32KiB per-message read limit, which the
+	// server's scrollback replay used to exceed on any session with real
+	// history (see handlers_terminal.go's scrollbackChunkBytes for the whole
+	// story). That replay is chunked now, so this is belt-and-braces: it
+	// keeps a client from silently dying on any future server-side write
+	// that grows past the default. The peer here is this container's own
+	// webmanager, which is already handing us a root shell, so a generous
+	// bound costs nothing in trust - it's only here so a runaway message
+	// can't grow the buffer without limit.
+	conn.SetReadLimit(8 << 20)
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
-	return attachRelay(ctx, conn, detachSeq)
+	return attachRelay(ctx, conn, detachSeq, name)
 }
 
 // defaultDetachSequence is Ctrl+] - telnet's own traditional escape
@@ -144,6 +178,61 @@ func fetchDetachSequence(baseURL, cookie string) []byte {
 		return defaultDetachSequence
 	}
 	return []byte(settings.DetachSequence)
+}
+
+// sessionExists reports whether name is already a live session, so the
+// banner above can say "joining" instead of "creating". known is false when
+// that couldn't be determined at all (network error, non-200 - e.g. an
+// unexpectedly stale cookie - or an unparseable body), in which case the
+// caller says less rather than failing the attach, same graceful-degrade
+// rule as fetchDetachSequence.
+func sessionExists(baseURL, cookie, name string) (exists, known bool) {
+	req, err := http.NewRequest(http.MethodGet, baseURL+"/api/terminal/sessions", nil)
+	if err != nil {
+		return false, false
+	}
+	if cookie != "" {
+		req.Header.Set("Cookie", cookie)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false, false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false, false
+	}
+	var sessions []struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&sessions); err != nil {
+		return false, false
+	}
+	for _, s := range sessions {
+		if s.Name == name {
+			return true, true
+		}
+	}
+	return false, true
+}
+
+// describeDetachSequence renders a byte sequence the way a human types it
+// ("Ctrl+]", or "Ctrl+P Ctrl+Q" for Docker's two-key one), for the banner
+// and the detach message. Anything that isn't a C0 control byte is printed
+// as-is so a custom sequence never renders as a lie.
+func describeDetachSequence(seq []byte) string {
+	parts := make([]string, 0, len(seq))
+	for _, b := range seq {
+		switch {
+		case b < 0x20:
+			parts = append(parts, fmt.Sprintf("Ctrl+%c", b+0x40))
+		case b == 0x7f:
+			parts = append(parts, "Backspace")
+		default:
+			parts = append(parts, string(rune(b)))
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 // attachAuthenticate handles internal/authgate the same way the frontend's
@@ -254,7 +343,7 @@ func (d *detachMatcher) feed(chunk []byte) (forward []byte, detached bool) {
 // since there's no tmux-style prefix key to reserve a binding on here;
 // closing the surrounding SSH connection or terminal window works exactly
 // the same way.
-func attachRelay(ctx context.Context, conn *websocket.Conn, detachSeq []byte) int {
+func attachRelay(ctx context.Context, conn *websocket.Conn, detachSeq []byte, name string) int {
 	fd := int(os.Stdin.Fd())
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
@@ -290,6 +379,12 @@ func attachRelay(ctx context.Context, conn *websocket.Conn, detachSeq []byte) in
 		}
 	}()
 
+	// Set before the detach message is printed (and so before the deferred
+	// cancel below unblocks the read loop), so the loop's own exit message
+	// can tell a deliberate detach apart from the session ending underneath
+	// it - Ctrl+D exits the shell, which ends the session for every other
+	// client including the browser tab, and that difference was invisible.
+	var detachedByUser atomic.Bool
 	go func() {
 		defer cancel()
 		matcher := &detachMatcher{seq: detachSeq}
@@ -304,7 +399,8 @@ func attachRelay(ctx context.Context, conn *websocket.Conn, detachSeq []byte) in
 					}
 				}
 				if detached {
-					fmt.Fprintln(os.Stderr, "\r\n[detached]")
+					detachedByUser.Store(true)
+					fmt.Fprintf(os.Stderr, "\r\n[detached from %q - it keeps running]\r\n", name)
 					return
 				}
 			}
@@ -314,14 +410,32 @@ func attachRelay(ctx context.Context, conn *websocket.Conn, detachSeq []byte) in
 		}
 	}()
 
+	var readErr error
 	for {
 		msgType, data, rerr := conn.Read(ctx)
 		if rerr != nil {
+			readErr = rerr
 			break
 		}
 		if msgType == websocket.MessageBinary {
 			_, _ = os.Stdout.Write(data)
 		}
+	}
+	switch {
+	case detachedByUser.Load():
+		// Already announced by the stdin goroutine.
+	case websocket.CloseStatus(readErr) == websocket.StatusNormalClosure || errors.Is(readErr, context.Canceled):
+		// The session ended (its shell exited - Ctrl+D, `exit`, a kill).
+		// It's gone for the browser tab too, which is exactly the outcome
+		// someone reaching for Ctrl+D as "how do I get out of attach"
+		// doesn't expect.
+		fmt.Fprintf(os.Stderr, "\r\n[session %q ended - use %s next time to leave it running]\r\n", name, describeDetachSequence(detachSeq))
+	default:
+		// Anything else is this client giving up, not the session ending -
+		// print it instead of exiting silently. A silent exit 0 here is
+		// what made an oversized scrollback replay (see the read-limit
+		// comment above) look like "attach just drops me back to my shell".
+		fmt.Fprintf(os.Stderr, "\r\n[disconnected from %q: %v]\r\n", name, readErr)
 	}
 	return 0
 }

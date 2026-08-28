@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
 
 func feedAll(seq []byte, chunks ...[]byte) (forward []byte, detached bool) {
 	m := &detachMatcher{seq: seq}
@@ -77,5 +82,61 @@ func TestDetachMatcherSingleByteSequence(t *testing.T) {
 	}
 	if string(forward) != "x" {
 		t.Fatalf("forward = %q, want %q", forward, "x")
+	}
+}
+
+func TestDescribeDetachSequence(t *testing.T) {
+	cases := []struct {
+		seq  []byte
+		want string
+	}{
+		{defaultDetachSequence, "Ctrl+]"},
+		{[]byte{0x10, 0x11}, "Ctrl+P Ctrl+Q"},
+		{[]byte{0x01}, "Ctrl+A"},
+		{[]byte{'q'}, "q"},
+	}
+	for _, c := range cases {
+		if got := describeDetachSequence(c.seq); got != c.want {
+			t.Errorf("describeDetachSequence(%q) = %q, want %q", c.seq, got, c.want)
+		}
+	}
+}
+
+// sessionExists drives the "joining existing" vs "creating new" wording of
+// attachCmd's banner, so a wrong answer here is exactly the silent
+// mismatch that banner exists to make visible.
+func TestSessionExists(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Cookie") != "webmanager_unlock=tok" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		fmt.Fprint(w, `[{"name":"quad"},{"name":"세션 1"}]`)
+	}))
+	defer srv.Close()
+
+	for _, c := range []struct {
+		name       string
+		wantExists bool
+		wantKnown  bool
+	}{
+		{"quad", true, true},
+		{"세션 1", true, true},
+		{"quad2", false, true},
+	} {
+		exists, known := sessionExists(srv.URL, "webmanager_unlock=tok", c.name)
+		if exists != c.wantExists || known != c.wantKnown {
+			t.Errorf("sessionExists(%q) = (%v, %v), want (%v, %v)", c.name, exists, known, c.wantExists, c.wantKnown)
+		}
+	}
+
+	// A gate rejecting the cookie (or any other non-200) must report
+	// "unknown", not "doesn't exist" - the banner then says less rather
+	// than claiming a join is a create.
+	if exists, known := sessionExists(srv.URL, "", "quad"); exists || known {
+		t.Errorf("sessionExists with rejected cookie = (%v, %v), want (false, false)", exists, known)
+	}
+	if exists, known := sessionExists("http://127.0.0.1:1", "", "quad"); exists || known {
+		t.Errorf("sessionExists against a dead server = (%v, %v), want (false, false)", exists, known)
 	}
 }
