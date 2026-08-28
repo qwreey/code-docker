@@ -28,7 +28,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=16
+WEBMANAGER_ENV_VERSION=17
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -160,6 +160,27 @@ WEBMANAGER_ENV_VERSION=16
 #WEBMANAGER_SIDEBAR_ORDER_PATH=
 
 #. --- 잘 안 건드리는 값들 ---
+#. --- PWA 바로가기 (설치된 앱 아이콘 우클릭 / 길게 누르기 메뉴) ---
+#. 형식: WEBMANAGER_MANIFEST_SHORTCUT_<아이디>="<이름>|<주소>[|<설명>]"
+#. 키 이름의 `WEBMANAGER_MANIFEST_SHORTCUT_` 뒷부분이 그대로 아이디가 됩니다
+#. (소문자로 바뀌고 `_`는 `-`가 됩니다).
+#.
+#. code-server의 PWA 매니페스트에 항목을 덧붙입니다("관리 패널 열기"가 원래
+#. 들어있는 그 목록). 주소가 `/`로 시작하면 그대로 쓰이고, 다른 도메인을
+#. 가리키는 절대 URL이면 같은 origin의 `/goto/<아이디>`가 매니페스트에 실리고
+#. 그 경로가 실제 주소로 리다이렉트합니다 - 매니페스트 바로가기는 다른
+#. origin을 가리키면 브라우저가 **아무 말 없이 그 항목을 버리기** 때문입니다.
+#.
+#. 보통은 붙인 사이드 프로젝트의 compose 오버레이가 code-docker 서비스의
+#. environment에 직접 선언합니다(항목마다 키가 따로라 여러 프로젝트가 동시에
+#. 붙어도 서로 덮어쓰지 않습니다). 값을 비워두면 그 항목만 꺼집니다.
+#.
+#. 브라우저는 보통 앞의 4개까지만 보여줍니다(Chrome/Edge 기준) - 더 많이
+#. 넣어도 오류는 아니고 표시만 잘립니다. 매니페스트 변경이 이미 설치된
+#. PWA에 반영되기까지는 시간이 걸립니다(Chrome 기준 24시간 스로틀 + 창을 전부
+#. 닫아야 교체, 안드로이드는 WebAPK 재발급까지 필요).
+#WEBMANAGER_MANIFEST_SHORTCUT_TRILIUM= # 예: Trilium|https://note.example.com/|프로젝트 노트 열기
+
 #. 아래는 컨테이너의 기존 고정 경로와 이미 일치합니다. 그 경로 자체를 다른
 #. override로 옮긴 경우에만 관련 있습니다.
 #SUPERVISOR_SOCK=

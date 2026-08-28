@@ -202,6 +202,12 @@ vscord 확장으로 Discord Rich Presence를 연동하고, ssh 소켓 포워딩�
 
 자세한 내용은 [tips/roblox-studio.md](tips/roblox-studio.md)를 확인하세요.
 
+## Trilium 노트 연동
+
+`EXTRA_INCLUDE` 훅으로 [code-docker-trilium](https://github.com/qwreey/code-docker-trilium)을 붙이면, 프로젝트 지식을 담는 Trilium 인스턴스가 자기 도메인(`note.example.com` 같은)에서 서비스되고 code-docker 안의 Claude Code가 Trilium 내장 MCP로 그 노트를 읽고 정리할 수 있습니다. 설치된 PWA 아이콘 우클릭 메뉴에도 "Trilium" 항목이 생깁니다.
+
+자세한 내용은 [tips/trilium.md](tips/trilium.md)를 확인하세요.
+
 ## router (네트워크 경계 컨테이너)
 
 code-docker보다 신뢰 수준이 높은 별도 컨테이너(`code-docker-router`)가 code-docker의

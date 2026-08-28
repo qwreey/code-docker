@@ -426,6 +426,12 @@ func main() {
 	// something code-server already serves unauthenticated.
 	mux.HandleFunc("GET /manifest.json", s.handleManifestPassthrough)
 
+	// The same-origin stub a manifest shortcut aimed at another origin has to
+	// go through (see internal/manifestpatch.GotoPrefix). Also not under
+	// /api and also ungated — it is a redirect to a hostname this container
+	// was configured with, and the target's own auth is untouched.
+	mux.HandleFunc("GET /goto/{id}", s.handleGoto)
+
 	mux.Handle("GET /", staticHandler(cfg.StaticDir))
 
 	httpServer := &http.Server{

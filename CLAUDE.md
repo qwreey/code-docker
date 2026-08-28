@@ -81,8 +81,18 @@ project (own repo, own `docker-compose.router.yml`, own `envmigrate` submodule, 
 runs outside code-docker too) that code-docker "uses" rather than contains, the same
 pattern as `code-server-autoinstall`. It owns everything about code-docker's network
 boundary — meaningfully higher trust than code-docker, the same "국경을 넘는 컨테이너"
-framing as dind-authz — across five feature areas: netgate (egress lockdown), tailscale,
-Dev Proxy/App Routes, tinyauth, and VNC (router serves noVNC itself and bridges the
+framing as dind-authz — across six feature areas: netgate (egress lockdown), tailscale,
+Dev Proxy/App Routes, tinyauth, vhost (`ROUTER_VHOST_<NAME>="<host>=<upstream>"`, one env
+var per entry so two attached side projects can't overwrite each other's — generates a
+plain nginx `server{}` block giving a side project's container a whole hostname of its own,
+the same shape `ROUTER_MANAGER_HOSTS`/`TINYAUTH_HOSTS` already give router-manager and
+tinyauth, so the outer proxy points that hostname at `routerip:80` with no path rewrite.
+Reach for it over an App Route when the app must own an origin — either it can't live under
+a path prefix, or sharing code-server's origin would hand whatever runs inside that app
+same-origin reach into webmanager's terminal/file APIs. No per-route tinyauth here; that's
+Dev Proxy's job. The upstream goes through an nginx variable + `resolver` deliberately, so a
+stopped side project is a 502 on its own hostname instead of an nginx that refuses to start
+and takes the whole front door down with it — see `router/docs/vhost.md`), and VNC (router serves noVNC itself and bridges the
 browser's WebSocket to a target's raw RFB port — as of 2026-08-27; the older
 "proxy the target's own web VNC front end through an App Route" transport is still
 available per target, for a front end that isn't noVNC. No process of its own either way,
@@ -170,7 +180,16 @@ the real server 2026-08-27.
 
 ### webmanager
 
-A browser admin panel (Go backend + Vite/React frontend, `webmanager/` — its own subtree, with its own `CLAUDE.md`/`plan.md`) running alongside code-server as another supervisord program, on port 81. Well beyond its original scope now: supervisord process management, SSH `authorized_keys`/`known_hosts`, git config (commit signing/GPG, git-lfs, raw `.gitconfig` editing, global gitignore/`core.excludesFile` management), the vector-backed logs pipeline described above, an OS-level process/port viewer with resource-history graphs, a Projects-folder browser whose per-project detail sheet carries a git status panel, git worktree list/remove, a project-scoped Claude Code session history (reusing the Claude Code tab's own gated session-log viewer, filtered to that project), and a Claude Code auto-memory viewer (`CLAUDE_CONFIG_DIR/projects/<slug>/memory/`, ungated — curated notes, not raw conversation content), code-server extension and mise tool management, a Claude Code status tab, Docker/dind management, a Dev Proxy tab (`<iframe>`-embeds router's own `/router/` page — see "router" above, the actual Caddy instance/backend live on the router container, not here), a VNC tab (same `<iframe>` embed of router's own tab — see "router" below), a web terminal (ephemeral PTY sessions), and a full file manager — see `webmanager/plan.md` for the up-to-date implemented/TODO split. Most of it still has no login of its own and relies entirely on the same reverse-proxy forward-auth as code-server; an opt-in shared password gate (`internal/authgate`, off by default) additionally protects the Terminal/File Manager/Logs/Sessions tabs entirely and gates write actions elsewhere (see `webmanager/.claude/archive/authgate-plan-done.md`) — note this gate no longer covers Dev Proxy or Tailscale at all; both moved to router-manager's own API and are gated by router-manager's own separate `internal/authgate` instance instead (`ROUTER_MANAGER_AUTH_PASSWORD_HASH` — see "router" above).
+A browser admin panel (Go backend + Vite/React frontend, `webmanager/` — its own subtree, with its own `CLAUDE.md`/`plan.md`) running alongside code-server as another supervisord program, on port 81. Well beyond its original scope now: supervisord process management, SSH `authorized_keys`/`known_hosts`, git config (commit signing/GPG, git-lfs, raw `.gitconfig` editing, global gitignore/`core.excludesFile` management), the vector-backed logs pipeline described above, an OS-level process/port viewer with resource-history graphs, a Projects-folder browser whose per-project detail sheet carries a git status panel, git worktree list/remove, a project-scoped Claude Code session history (reusing the Claude Code tab's own gated session-log viewer, filtered to that project), and a Claude Code auto-memory viewer (`CLAUDE_CONFIG_DIR/projects/<slug>/memory/`, ungated — curated notes, not raw conversation content), code-server extension and mise tool management, a Claude Code status tab, Docker/dind management, PWA manifest shortcuts (webmanager intercepts code-server's own `/manifest.json` and merges
+in the `shortcuts` array — its own "Open manager" entry plus one per
+`WEBMANAGER_MANIFEST_SHORTCUT_<ID>="<name>|<url>[|<desc>]"` env var, again one var per entry
+so a side project's compose overlay can declare its own. A shortcut whose `url` is
+off-origin is **dropped silently** by the browser — W3C appmanifest scope rules, no console
+error, nothing in DevTools beyond the entry not being there — so an absolute URL is
+published as the same-origin path `/goto/<id>` instead, which webmanager 302s to the real
+target; the scope check reads the url as written and not where it ends up. Not an open
+redirect: destinations come only from this container's env, never a query parameter), a Dev
+Proxy tab (`<iframe>`-embeds router's own `/router/` page — see "router" above, the actual Caddy instance/backend live on the router container, not here), a VNC tab (same `<iframe>` embed of router's own tab — see "router" below), a web terminal (ephemeral PTY sessions), and a full file manager — see `webmanager/plan.md` for the up-to-date implemented/TODO split. Most of it still has no login of its own and relies entirely on the same reverse-proxy forward-auth as code-server; an opt-in shared password gate (`internal/authgate`, off by default) additionally protects the Terminal/File Manager/Logs/Sessions tabs entirely and gates write actions elsewhere (see `webmanager/.claude/archive/authgate-plan-done.md`) — note this gate no longer covers Dev Proxy or Tailscale at all; both moved to router-manager's own API and are gated by router-manager's own separate `internal/authgate` instance instead (`ROUTER_MANAGER_AUTH_PASSWORD_HASH` — see "router" above).
 
 ## Documentation
 

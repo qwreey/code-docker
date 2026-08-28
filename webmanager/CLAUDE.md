@@ -259,8 +259,36 @@ manager" jump-list entry pointing at `/manager/`) leaving every other field
 exactly as fetched, and responds 502 on any failure so nginx's
 `error_page 502 503 504 = @manifest_fallback` — the same idiom
 `/_code_not_ready.html` already uses — falls back to code-server's own
-manifest directly; code-server-autoinstall's vendored manifest route itself
-is never touched by `manifestpatch` — but `code-server-autoinstall/start.sh`'s
+manifest directly. That `shortcuts` array is data-driven as of 2026-08-29:
+alongside its own "Open manager" entry it carries one per
+`WEBMANAGER_MANIFEST_SHORTCUT_<ID>="<name>|<url>[|<description>]"` env var
+(`internal/manifestpatch/shortcuts.go`). One env var per entry rather than
+one delimited list, because these are normally declared by an attached side
+project's own compose overlay (`environment:` merged onto the `code-docker`
+service) — two projects attached at once must not have to merge into a
+single shared value; the same coupling inversion as router's own
+`ROUTER_VHOST_*` and netinit's move to per-network Docker labels. The ID
+comes from the env var's own name (lowercased, `_`→`-`), so it is unique by
+construction and needs no separate field. **A shortcut whose `url` is
+off-origin is dropped by the browser silently** — W3C appmanifest's
+"process the shortcuts member" fails that one item when it falls outside
+`scope`, with no console error and nothing in DevTools' manifest view
+beyond the entry not being there — which is fatal for the actual use case
+here, a side project deliberately given its own hostname. So an absolute
+URL is published as the same-origin path `/goto/<id>` (`handleGoto`,
+`main.go`, nginx `location /goto/` with **no** URI part on `proxy_pass` so
+the prefix survives the hop) which 302s to the real target; the scope check
+reads the url as written and never follows it. Not an open redirect —
+destinations come only from this container's own environment and there is
+no query parameter to name one, with a `http`/`https`-only scheme check so
+a `javascript:` value can't become a redirect into script, and
+protocol-relative `//host/...` is classified off-origin rather than being
+let through as if it were a local path. Malformed entries are skipped with
+a log line rather than silently, and the array is deliberately **not**
+capped at the four entries browsers actually draw: that cap is the
+reader's presentation detail, and enforcing it here would be webmanager
+deciding a configured shortcut doesn't exist. code-server-autoinstall's
+vendored manifest route itself is never touched by `manifestpatch` — but `code-server-autoinstall/start.sh`'s
 own `apply_pwa_metadata_patch()` does patch it directly (a `sed` against the
 *installed* code-server, gitignored inside that submodule, not anything
 checked in), the same way it already handles `PWA_NAME`/`PWA_SHORT_NAME`/

@@ -54,6 +54,33 @@ code.yaeji.moe {
 }
 ```
 
+### 사이드 프로젝트에 자기 도메인을 준 경우
+
+router의 vhost(`ROUTER_VHOST_*`, [router/docs/vhost.md](../router/docs/vhost.md))로 붙인 앱은
+**자기 서버 블록이 따로** 필요합니다. code-server와 같은 origin이 아니므로 위 블록의 예외
+경로가 적용되지 않고, 그 앱의 매니페스트/아이콘 경로도 그 앱마다 다릅니다.
+
+```Caddy
+note.yaeji.moe {
+  # Trilium의 PWA 경로는 이 둘뿐입니다 - 서비스워커가 없습니다.
+  @not_pwa_public {
+    not path /manifest.webmanifest /icon.png
+  }
+  forward_auth @not_pwa_public http://authentik:9000 {
+    uri /outpost.goauthentik.io/auth/caddy
+    trusted_proxies private_ranges
+  }
+  reverse_proxy /outpost.goauthentik.io/* http://authentik:9000
+
+  reverse_proxy http://routerip:80   # rewrite 불필요 - router의 nginx가 Host로 갈라줍니다
+}
+```
+
+앱마다 열어야 할 경로가 다르므로 그 앱의 문서를 확인하세요(Trilium은
+[tips/trilium.md](tips/trilium.md)). 공통 규칙은 하나입니다: **매니페스트와 매니페스트가
+참조하는 아이콘만** 열고, `start_url`과 실제 내용은 열지 않습니다 — 설치할 때 원격 빌드
+서버가 가져가는 건 그 둘뿐이고, 실행할 때는 사용자 브라우저가 자기 쿠키로 엽니다.
+
 ## nginx를 리버스 프록시로 쓰는 경우
 
 컨테이너 안 nginx와는 별개로, 바깥 리버스 프록시로 nginx를 쓰는 경우에도 같은

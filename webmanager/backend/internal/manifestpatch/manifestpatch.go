@@ -1,5 +1,7 @@
 // Package manifestpatch fetches code-server's real PWA manifest.json and
-// merges in a "shortcuts" entry that opens webmanager, without touching the
+// merges in the "shortcuts" entries — webmanager's own, plus whatever a side
+// project declared through WEBMANAGER_MANIFEST_SHORTCUT_* (see
+// shortcuts.go) — without touching the
 // vendored code-server-autoinstall route that actually serves it — see
 // webmanager/.claude/qa-request/manifest-shortcuts-plan-done.md for the full
 // design/rationale. Every field other than "shortcuts" passes through
@@ -53,7 +55,23 @@ func Fetch(upstreamURL string) ([]byte, error) {
 		return nil, fmt.Errorf("manifestpatch: parse upstream manifest from %s: %w", upstreamURL, err)
 	}
 
-	manifest["shortcuts"] = []any{managerShortcut}
+	shortcuts := []any{managerShortcut}
+	for _, sc := range Extra() {
+		entry := map[string]any{
+			"name": sc.Name,
+			"url":  sc.ManifestURL(),
+		}
+		if sc.Description != "" {
+			entry["description"] = sc.Description
+		}
+		shortcuts = append(shortcuts, entry)
+	}
+	// Not capped here even though browsers only draw the first few (Chrome
+	// and Edge settle on four): the cap is a presentation detail of whatever
+	// is reading the manifest, and dropping a configured entry on our side
+	// would be this package deciding the user's fifth shortcut does not
+	// exist. Documented in docs/webmanager-config.md instead.
+	manifest["shortcuts"] = shortcuts
 
 	patched, err := json.Marshal(manifest)
 	if err != nil {
