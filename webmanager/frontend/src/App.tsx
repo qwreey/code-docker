@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { CollapseChevron } from './components/common/CollapseChevron'
+import { ProjectInfoDialog } from './components/Projects/ProjectInfoDialog'
 import { SidebarContainer } from './components/Layout/SidebarContainer'
 import { SECTIONS } from './components/Layout/sections'
 import type { SectionId } from './components/Layout/sections'
@@ -119,13 +121,24 @@ function App() {
   const [pendingTerminalOpen, setPendingTerminalOpen] = useState<{
     cwd?: string
     label?: string
+    command?: string
     session?: string
   } | null>(null)
   const [pendingFilesPath, setPendingFilesPath] = useState<string | null>(null)
   const [pendingProjectPath, setPendingProjectPath] = useState<string | null>(null)
+  // Not a cross-tab payload like the three above — this one opens a dialog
+  // in place (see ProjectInfoDialog), which is the whole point: checking
+  // which project the current shell sits in shouldn't navigate you out of
+  // the terminal you were watching.
+  const [projectInfoPath, setProjectInfoPath] = useState<string | null>(null)
 
-  function openInTerminal(cwd: string, label?: string) {
-    setPendingTerminalOpen({ cwd, label })
+  // command, when given, is typed into the new session's shell as if the
+  // user had entered it (see termsession.CreateOptions.InitialCommand) —
+  // that's how the session log's "resume this conversation" action opens a
+  // terminal already running `claude --resume <id>`.
+  function openInTerminal(cwd: string, label?: string, command?: string) {
+    setProjectInfoPath(null)
+    setPendingTerminalOpen({ cwd, label, command })
     withViewTransition(() => setActive('terminal'))
   }
 
@@ -133,6 +146,7 @@ function App() {
   // used by the Projects detail sheet's "이 프로젝트에서 열린 세션" panel to
   // jump back to a session rather than spawning a duplicate.
   function openTerminalSession(name: string) {
+    setProjectInfoPath(null)
     setPendingTerminalOpen({ session: name })
     withViewTransition(() => setActive('terminal'))
   }
@@ -142,9 +156,16 @@ function App() {
     withViewTransition(() => setActive('files'))
   }
 
+  // Full Projects tab, with the managing actions ProjectInfoDialog leaves
+  // out (rescan, reclaimable-folder deletion, project deletion).
   function openProject(path: string) {
+    setProjectInfoPath(null)
     setPendingProjectPath(path)
     withViewTransition(() => setActive('projects'))
+  }
+
+  function openProjectInfo(path: string) {
+    setProjectInfoPath(path)
   }
 
   useEffect(() => {
@@ -189,20 +210,27 @@ function App() {
           banner in its own flex row above .app-content (see App.css's
           .app-main) means it's never in a position the negative margin can
           reach, for every tab, not just Terminal. */}
+      {/* Collapsed-sidebar affordance. This used to be a full-width top bar
+          inside .app-main, which bought back the sidebar's 220px of width by
+          permanently spending ~48px of height — a bad trade on a desktop
+          screen, which is wider than it is tall. A narrow full-height strip
+          at the left edge costs no vertical space at all. Desktop-only; the
+          mobile drawer has its own .mobile-topbar hamburger (see App.css). */}
+      {sidebarCollapsed && (
+        <button
+          type="button"
+          className="sidebar-rail"
+          aria-label="사이드바 펼치기"
+          aria-expanded={false}
+          title="사이드바 펼치기"
+          onClick={toggleSidebarCollapsed}
+        >
+          <span className="sidebar-rail-handle">
+            <CollapseChevron open={false} />
+          </span>
+        </button>
+      )}
       <div className="app-main">
-        {sidebarCollapsed && (
-          <div className="desktop-topbar">
-            <button
-              type="button"
-              className="hamburger-btn"
-              aria-label="사이드바 펼치기"
-              onClick={toggleSidebarCollapsed}
-            >
-              <span aria-hidden="true">☰</span>
-            </button>
-            <span className="mobile-topbar-title">webmanager</span>
-          </div>
-        )}
         <EnvVersionBanner />
         <RouterAuthSetupBanner />
         <main className="app-content">
@@ -234,7 +262,7 @@ function App() {
           )}
           {active === 'mise' && <Mise />}
           {active === 'dind' && <Dind />}
-          {active === 'claude' && <ClaudeCode />}
+          {active === 'claude' && <ClaudeCode onOpenTerminal={openInTerminal} />}
           {active === 'extensions' && <Extensions />}
           {active === 'terminal' && (
             <RequiresUnlock>
@@ -242,7 +270,7 @@ function App() {
                 initialOpen={pendingTerminalOpen}
                 onInitialOpenConsumed={() => setPendingTerminalOpen(null)}
                 onOpenFileManager={openInFileManager}
-                onOpenProject={openProject}
+                onOpenProject={openProjectInfo}
               />
             </RequiresUnlock>
           )}
@@ -265,6 +293,13 @@ function App() {
           )}
         </main>
       </div>
+      <ProjectInfoDialog
+        path={projectInfoPath}
+        onClose={() => setProjectInfoPath(null)}
+        onOpenInProjectsTab={openProject}
+        onOpenTerminal={openInTerminal}
+        onOpenTerminalSession={openTerminalSession}
+      />
       <UnlockModalHost />
     </div>
   )

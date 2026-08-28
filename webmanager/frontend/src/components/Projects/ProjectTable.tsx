@@ -45,7 +45,7 @@ export function ProjectTable({
   onProjectUpdated: (project: ProjectInfo) => void
   onProjectDeleted: (path: string) => void
   onError: (message: string) => void
-  onOpenTerminal?: (cwd: string) => void
+  onOpenTerminal?: (cwd: string, label?: string, command?: string) => void
   onOpenFileManager?: (path: string) => void
   onOpenTerminalSession?: (name: string) => void
   initialProjectPath?: string | null
@@ -113,7 +113,8 @@ export function ProjectTable({
   }
 
   // Consumes an "open this project's detail sheet" request handed down from
-  // the Terminal tab (App.tsx's openProject) - if the path doesn't match a
+  // elsewhere (App.tsx's openProject — reached from ProjectInfoDialog's
+  // "Projects 탭에서 열기") - if the path doesn't match a
   // known project (e.g. an unscanned nested folder), this is a silent no-op
   // rather than an error, same tolerance as the reverse jump's path-prefix
   // matching in ProjectTerminalSessions.
@@ -376,6 +377,12 @@ export function ProjectTable({
               </button>
             </section>
 
+            {/* Open terminal sessions sit directly under 개요, ahead of the
+                heavier read-only panels below: there are only ever a handful
+                of them, and jumping back into one is a much more likely
+                reason to open this sheet than reading a git status. */}
+            <ProjectTerminalSessions path={detailsProject.path} onOpenSession={onOpenTerminalSession} />
+
             <section className="projects-detail-section">
               <div className="projects-detail-header">재생성 가능한 폴더</div>
               {detailsProject.reclaimable.length === 0 ? (
@@ -440,9 +447,8 @@ export function ProjectTable({
 
             <GitStatusPanel path={detailsProject.path} />
             <WorktreesPanel path={detailsProject.path} />
-            <ProjectSessionHistory path={detailsProject.path} />
+            <ProjectSessionHistory path={detailsProject.path} onOpenTerminal={onOpenTerminal} />
             <ProjectMemoryPanel path={detailsProject.path} />
-            <ProjectTerminalSessions path={detailsProject.path} onOpenSession={onOpenTerminalSession} />
           </div>
         </Sheet>
       )}

@@ -39,17 +39,6 @@
   text-align: left;
 }
 
-.mise-chevron {
-  display: inline-flex;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  transition: transform 0.12s ease;
-}
-
-.mise-chevron-open {
-  transform: rotate(90deg);
-}
-
 .mise-group-title {
   font-size: 0.85rem;
   font-weight: 600;

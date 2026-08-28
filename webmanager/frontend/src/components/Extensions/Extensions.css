@@ -30,17 +30,6 @@
   text-align: left;
 }
 
-.extensions-chevron {
-  display: inline-flex;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  transition: transform 0.12s ease;
-}
-
-.extensions-chevron-open {
-  transform: rotate(90deg);
-}
-
 .extensions-group-title {
   font-size: 0.85rem;
   font-weight: 600;

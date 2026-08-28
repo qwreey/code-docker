@@ -22,18 +22,6 @@
   text-align: left;
 }
 
-.session-log-chevron {
-  display: inline-flex;
-  flex: none;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  transition: transform 0.12s ease;
-}
-
-.session-log-chevron-open {
-  transform: rotate(90deg);
-}
-
 .session-log-project-name {
   flex: 1;
   min-width: 0;
@@ -196,4 +184,22 @@
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
+}
+
+/* The session card plus its "resume in a terminal" action. The card stays a
+   button of its own (it opens the transcript), so the action has to be a
+   sibling rather than nested inside it. */
+.session-log-session-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+
+.session-log-session-row > .session-log-session-card {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-log-resume-btn {
+  flex: none;
 }

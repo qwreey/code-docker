@@ -553,7 +553,7 @@ function InstalledView({
   )
 }
 
-export function ClaudeCode() {
+export function ClaudeCode({ onOpenTerminal }: { onOpenTerminal?: (cwd: string, label?: string, command?: string) => void }) {
   const [status, setStatus] = useState<ClaudeStatus | null>(null)
   const [plugins, setPlugins] = useState<ClaudePlugin[]>([])
   const [prefs, setPrefs] = useState<ClaudePrefs | null>(null)
@@ -727,7 +727,7 @@ export function ClaudeCode() {
                 <p className="section-description">
                   이 인스턴스에서 진행된 Claude Code 대화 기록입니다. 비밀번호로 보호됩니다.
                 </p>
-                <SessionLog />
+                <SessionLog onOpenTerminal={onOpenTerminal} />
               </div>
             )}
 

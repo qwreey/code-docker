@@ -1,0 +1,21 @@
+.collapse-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--text-muted);
+  transition:
+    transform 0.15s ease,
+    color 0.15s ease;
+}
+
+.collapse-chevron-open {
+  transform: rotate(90deg);
+}
+
+/* Follows the header it sits in rather than staying muted, so the whole
+   row reads as one control on hover. */
+button:hover > .collapse-chevron,
+button:focus-visible > .collapse-chevron {
+  color: var(--text-heading);
+}

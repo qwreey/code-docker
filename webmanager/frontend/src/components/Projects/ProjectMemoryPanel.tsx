@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
 import type { ClaudeMemory } from '../../api/types'
 import { withViewTransition } from '../../utils/viewTransition'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { CollapseChevron } from '../common/CollapseChevron'
 import { Skeleton } from '../common/Skeleton'
 import '../common/common.css'
 import './ProjectMemoryPanel.css'
@@ -61,7 +61,7 @@ export default function ProjectMemoryPanel({ path }: { path: string }) {
         onClick={toggleOpen}
         aria-expanded={open}
       >
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <CollapseChevron open={open} />
         <span className="claude-memory-panel-title">Claude Code 메모리</span>
       </button>
 

@@ -161,9 +161,11 @@ export function Terminal({
   onOpenFileManager,
   onOpenProject,
 }: {
-  initialOpen?: { cwd?: string; label?: string; session?: string } | null
+  initialOpen?: { cwd?: string; label?: string; command?: string; session?: string } | null
   onInitialOpenConsumed?: () => void
   onOpenFileManager?: (path: string) => void
+  // Opens the project's info dialog over the terminal (App.tsx's
+  // openProjectInfo) rather than navigating to the Projects tab.
   onOpenProject?: (path: string) => void
 } = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -1165,9 +1167,9 @@ export function Terminal({
               type="button"
               className="btn btn-secondary btn-small"
               onClick={() => onOpenProject(activeProjectPath)}
-              title="현재 디렉토리가 속한 프로젝트로 이동"
+              title="현재 디렉토리가 속한 프로젝트 정보 보기"
             >
-              <FolderKanban size={14} /> <span className="btn-label">프로젝트로 이동</span>
+              <FolderKanban size={14} /> <span className="btn-label">프로젝트 정보</span>
             </button>
           )}
           <button

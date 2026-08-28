@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import type { ClaudeStatus } from '../../api/types'
 import { SessionLog } from '../ClaudeCode/SessionLog/SessionLog'
+import { CollapseChevron } from '../common/CollapseChevron'
 import { Skeleton } from '../common/Skeleton'
 import './Projects.css'
 
@@ -24,7 +25,13 @@ import './Projects.css'
 // GET /api/claude/status is a plain ungated read (see main.go), so the
 // "claude 바이너리를 찾을 수 없습니다" check below runs before - and
 // independent of - SessionLog's own password gate.
-export default function ProjectSessionHistory({ path }: { path: string }) {
+export default function ProjectSessionHistory({
+  path,
+  onOpenTerminal,
+}: {
+  path: string
+  onOpenTerminal?: (cwd: string, label?: string, command?: string) => void
+}) {
   const [installed, setInstalled] = useState<boolean | null>(null)
   const [open, setOpen] = useState(true)
 
@@ -51,7 +58,7 @@ export default function ProjectSessionHistory({ path }: { path: string }) {
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
       >
-        <span className={`projects-session-chevron${open ? ' projects-session-chevron-open' : ''}`}>▶</span>
+        <CollapseChevron open={open} />
         <span className="projects-detail-header">Claude Code 세션 기록</span>
       </button>
       {open &&
@@ -63,6 +70,7 @@ export default function ProjectSessionHistory({ path }: { path: string }) {
           <SessionLog
             projectFilter={path}
             emptyMessage="이 프로젝트에서 진행된 Claude Code 세션이 없습니다."
+            onOpenTerminal={onOpenTerminal}
           />
         ))}
     </section>

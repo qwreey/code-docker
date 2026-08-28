@@ -9,6 +9,7 @@ import '../common/common.css'
 import '../Extensions/Extensions.css'
 import './Fonts.css'
 import { withViewTransition } from '../../utils/viewTransition'
+import { CollapseChevron } from '../common/CollapseChevron'
 
 const SHOW_RECOMMENDATIONS_KEY = 'webmanager.fonts.showRecommendations'
 
@@ -283,7 +284,7 @@ export function Fonts() {
                   onClick={() => toggleGroup(group.family)}
                   aria-expanded={isOpen}
                 >
-                  <span className={`extensions-chevron ${isOpen ? 'extensions-chevron-open' : ''}`}>▶</span>
+                  <CollapseChevron open={isOpen} />
                   <h2 className="extensions-group-title">{group.family}</h2>
                   <CopyButton text={group.family} />
                 </button>
@@ -397,7 +398,7 @@ export function Fonts() {
                     onClick={() => toggleRecommendCategory(group.category)}
                     aria-expanded={isOpen}
                   >
-                    <span className={`extensions-chevron ${isOpen ? 'extensions-chevron-open' : ''}`}>▶</span>
+                    <CollapseChevron open={isOpen} />
                     <h3 className="extensions-group-title">{group.category || '기타'}</h3>
                   </button>
                   {isOpen && (

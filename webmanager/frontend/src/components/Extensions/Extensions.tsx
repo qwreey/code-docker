@@ -8,6 +8,7 @@ import { RestartNeededBanner } from '../common/RestartNeededBanner'
 import '../common/common.css'
 import './Extensions.css'
 import { withViewTransition } from '../../utils/viewTransition'
+import { CollapseChevron } from '../common/CollapseChevron'
 
 const SHOW_RECOMMENDATIONS_KEY = 'webmanager.extensions.showRecommendations'
 
@@ -195,7 +196,7 @@ export function Extensions() {
           onClick={() => setInstalledSectionOpen((prev) => !prev)}
           aria-expanded={installedSectionOpen}
         >
-          <span className={`extensions-chevron ${installedSectionOpen ? 'extensions-chevron-open' : ''}`}>▶</span>
+          <CollapseChevron open={installedSectionOpen} />
           <h2 className="extensions-group-title">설치된 익스텐션 ({installedList.length}개)</h2>
         </button>
         {installedSectionOpen &&
@@ -251,7 +252,7 @@ export function Extensions() {
                     onClick={() => toggleCategory(group.category)}
                     aria-expanded={isOpen}
                   >
-                    <span className={`extensions-chevron ${isOpen ? 'extensions-chevron-open' : ''}`}>▶</span>
+                    <CollapseChevron open={isOpen} />
                     <h2 className="extensions-group-title">{group.category || '기타'}</h2>
                   </button>
                   {isOpen && (

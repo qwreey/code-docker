@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { Terminal as TerminalIcon } from 'lucide-react'
 import { api, errorMessage } from '../../../api/client'
 import type { ClaudeSessionInfo, ClaudeSessionsResponse } from '../../../api/types'
 import { ErrorBanner } from '../../common/ErrorBanner'
 import { Skeleton } from '../../common/Skeleton'
 import { formatBytes } from '../../../utils/format'
 import { withViewTransition } from '../../../utils/viewTransition'
+import { CollapseChevron } from '../../common/CollapseChevron'
 
 // Client-side-only UI preference (collapse state) - see webmanager/CLAUDE.md's
 // "Client-side-only UI preferences" ground rule: per-browser localStorage,
@@ -46,10 +48,16 @@ function formatModifiedAt(iso: string): string {
 
 export function SessionList({
   onSelect,
+  onResume,
   projectFilter,
   emptyMessage = '대화 로그가 없습니다.',
 }: {
   onSelect: (session: ClaudeSessionInfo) => void
+  // Opens a terminal running `claude --resume <sessionId>` in the session's
+  // own cwd. Optional because the caller has to be able to reach the
+  // Terminal tab to honor it — SessionLog only passes it through when App
+  // handed one down (see App.tsx's openInTerminal).
+  onResume?: (session: ClaudeSessionInfo) => void
   // Absolute project path — when set, scopes the fetch to GET
   // /claude/sessions?project=<path> instead of every session on this
   // instance (see internal/claudecode.FilterSessionsByProject). Used by
@@ -121,24 +129,32 @@ export function SessionList({
               onClick={() => toggleCollapsed(project)}
               aria-expanded={isOpen}
             >
-              <span className={`session-log-chevron${isOpen ? ' session-log-chevron-open' : ''}`}>▶</span>
+              <CollapseChevron open={isOpen} />
               <span className="session-log-project-name">{project}</span>
               <span className="session-log-project-count">{projectSessions.length}</span>
             </button>
             {isOpen && (
               <div className="session-log-project-body">
                 {visibleSessions.map((s) => (
-                  <button
-                    type="button"
-                    key={`${s.project}/${s.sessionId}`}
-                    className="session-log-session-card"
-                    onClick={() => onSelect(s)}
-                  >
-                    <div className="session-log-session-preview">{s.preview || '(내용 없음)'}</div>
-                    <div className="session-log-session-meta">
-                      {formatModifiedAt(s.modifiedAt)} · {formatBytes(s.sizeBytes)}
-                    </div>
-                  </button>
+                  <div key={`${s.project}/${s.sessionId}`} className="session-log-session-row">
+                    <button type="button" className="session-log-session-card" onClick={() => onSelect(s)}>
+                      <div className="session-log-session-preview">{s.preview || '(내용 없음)'}</div>
+                      <div className="session-log-session-meta">
+                        {formatModifiedAt(s.modifiedAt)} · {formatBytes(s.sizeBytes)}
+                      </div>
+                    </button>
+                    {onResume && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-icon session-log-resume-btn"
+                        title={`터미널에서 이어하기 (claude --resume ${s.sessionId})`}
+                        aria-label="이 세션을 터미널에서 이어하기"
+                        onClick={() => onResume(s)}
+                      >
+                        <TerminalIcon size={14} />
+                      </button>
+                    )}
+                  </div>
                 ))}
                 {remaining > 0 && (
                   <button

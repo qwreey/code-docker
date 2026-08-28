@@ -19,7 +19,7 @@ export function Projects({
   initialProjectPath,
   onInitialProjectPathConsumed,
 }: {
-  onOpenTerminal?: (cwd: string) => void
+  onOpenTerminal?: (cwd: string, label?: string, command?: string) => void
   onOpenFileManager?: (path: string) => void
   onOpenTerminalSession?: (name: string) => void
   initialProjectPath?: string | null

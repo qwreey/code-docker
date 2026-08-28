@@ -53,6 +53,8 @@ export function TerminalHome({
   onOpenProfile: (profile: TerminalProfile) => void
   onNewSession: () => void
   projectRoots?: string[]
+  // Opens the project's info dialog in place (App.tsx's openProjectInfo),
+  // not a jump to the Projects tab.
   onOpenProject?: (path: string) => void
 }) {
   const [draft, setDraft] = useState<ProfileDraft | null>(null)
@@ -143,8 +145,8 @@ export function TerminalHome({
                       type="button"
                       className="terminal-home-icon-btn"
                       onClick={() => onOpenProject(projectPath)}
-                      title="이 세션이 속한 프로젝트로 이동"
-                      aria-label={`${s.name} 세션의 프로젝트로 이동`}
+                      title="이 세션이 속한 프로젝트 정보 보기"
+                      aria-label={`${s.name} 세션의 프로젝트 정보 보기`}
                     >
                       <FolderKanban size={14} />
                     </button>

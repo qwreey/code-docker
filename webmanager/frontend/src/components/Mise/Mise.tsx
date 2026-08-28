@@ -20,6 +20,7 @@ import { JobPanel } from './JobPanel'
 import { ToolSearchDialog } from './ToolSearchDialog'
 import './Mise.css'
 import { withViewTransition } from '../../utils/viewTransition'
+import { CollapseChevron } from '../common/CollapseChevron'
 
 const JOB_POLL_INTERVAL_MS = 800
 const SHOW_RECOMMENDATIONS_KEY = 'webmanager.mise.showRecommendations'
@@ -306,7 +307,7 @@ export function Mise() {
                     onClick={() => toggleCategory(group.category)}
                     aria-expanded={isOpen}
                   >
-                    <span className={`mise-chevron ${isOpen ? 'mise-chevron-open' : ''}`}>▶</span>
+                    <CollapseChevron open={isOpen} />
                     <h3 className="mise-group-title">{group.category}</h3>
                   </button>
                   {isOpen && (

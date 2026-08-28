@@ -40,22 +40,51 @@
   display: none;
 }
 
-/* Desktop counterpart to .mobile-topbar - shown only while the sidebar is
-   collapsed (see Sidebar.tsx's "«" button / Layout.css's .sidebar-collapsed).
-   Hidden below 721px since the mobile drawer's own .mobile-topbar already
-   covers that case and having both would duplicate the menu bar. */
-.desktop-topbar {
+/* The re-expand affordance while the sidebar is collapsed (see Sidebar.tsx's
+   "«" button / Layout.css's .sidebar-collapsed). A narrow full-height strip
+   at the left edge rather than a top bar: collapsing trades away 220px of
+   width, and paying for that in height is the wrong axis on a desktop
+   screen. Hidden below 721px, where the mobile drawer's own .mobile-topbar
+   hamburger already owns opening the sidebar. */
+.sidebar-rail {
   display: none;
 }
 
 @media (min-width: 721px) {
-  .desktop-topbar {
+  .sidebar-rail {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.65rem 1rem;
-    border-bottom: 1px solid var(--border);
+    justify-content: center;
+    flex: none;
+    width: 16px;
+    padding: 0;
+    border: none;
+    border-right: 1px solid var(--border);
     background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    /* Widening on hover is the whole "this will open" signal - there's no
+       room for a label, so the strip has to telegraph the click itself. */
+    transition:
+      width 0.15s ease,
+      background 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .sidebar-rail:hover,
+  .sidebar-rail:focus-visible {
+    width: 20px;
+    background: var(--surface-hover);
+    color: var(--text-heading);
+  }
+
+  .sidebar-rail-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Nudges the chevron off the exact center so it reads as attached to
+       the edge it opens from, rather than floating in the strip. */
+    margin-left: -1px;
   }
 }
 

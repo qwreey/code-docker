@@ -11,8 +11,8 @@
 }
 
 /* Desktop-only "hide the sidebar entirely" mode - see App.tsx's
-   .desktop-topbar for the matching "메뉴 열기" affordance that appears
-   while this is active. Left as a no-op below 721px since the mobile
+   .sidebar-rail for the narrow strip that stays behind as the re-expand
+   affordance while this is active. Left as a no-op below 721px since the mobile
    drawer (.sidebar-open, above) already fully owns visibility there.
 
    Deliberately margin-left (slides the whole, still-220px-wide box off the
