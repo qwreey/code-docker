@@ -24,7 +24,7 @@ OOTB_NAME="Roblox Studio"
 OOTB_DESCRIPTION="Wine 기반 Roblox Studio (GPU passthrough + headless Wayland + wayvnc)"
 OOTB_COMPOSE_INCLUDE="roblox-studio-code-docker.yml"
 OOTB_ROUTER_ALLOWED_TARGET_HOSTS="vnc-only"
-OOTB_ENV_PROMPT_1="MCP_TOKEN:code-docker의 Claude Code가 Studio를 조작하는 MCP 브리지:generate"
+OOTB_GENERATE_SECRETS="MCP_TOKEN"
 ```
 
 위 예시는 실제 [roblox-studio-docker의 `ootb-manifest.env`](https://github.com/qwreey/roblox-studio-docker/blob/HEAD/ootb-manifest.env)를
@@ -39,18 +39,22 @@ OOTB_ENV_PROMPT_1="MCP_TOKEN:code-docker의 Claude Code가 Studio를 조작하�
 | `OOTB_COMPOSE_INCLUDE` | 필수 | 이 프로젝트 레포 루트 기준 상대경로 - `ootb.sh`가 `extra-include.yml`의 `include:` 목록에 `builds/<repo-이름>/<이 값>`을 추가함 |
 | `OOTB_EXTRA_INTERNAL_NETWORKS` | 선택, **DEPRECATED** | 공백구분 네트워크 이름 목록 - `.env`의 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS`에 병합됨 (이 프로젝트가 `code-docker-internal`이 아닌 자기만의 `internal: true` 네트워크에 router를 끌어들이는 경우에만 쓰였음 - roblox-studio-docker의 VNC 격리가 그 예시). **이제는 사이드 프로젝트 자신의 compose 오버레이 파일이 그 네트워크에 `netinit.provider`/`netinit.exempt-forward: "true"` 라벨을 직접 다는 쪽을 씁니다** (자세한 라벨 스키마는 [roblox-studio.md](roblox-studio.md)와 `.claude/archive/netinit-docker-plan-done.md` 참고) - 그러면 code-docker 쪽 `.env`를 이 필드로 건드릴 필요 자체가 없어집니다. 이 필드는 아직 라벨로 옮기지 않은 매니페스트를 위한 호환 경로로 한동안 남아있을 뿐이고, `netinit-docker`가 `NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS`를 읽으면 경고 로그를 남깁니다. 새 사이드 프로젝트는 라벨 쪽을 쓰세요. (레거시 병합 동작: 사이드 프로젝트 쪽 compose가 그 네트워크 이름을 `${PREFIX:-}`로 접두사 붙여 정의했다면, 여기서도 값 안에 `${PREFIX}`를 그대로 써서 맞추세요(예: `"${PREFIX}roblox-studio-vnc"`) - `ootb-extra.sh`가 매니페스트를 source하기 전에 code-docker 쪽 `.env`의 현재 `PREFIX` 값을 환경에 내보내므로, 일반 쉘 변수 치환으로 자동으로 풀립니다.) |
 | `OOTB_ROUTER_ALLOWED_TARGET_HOSTS` | 선택 | 공백(또는 콤마)구분 호스트네임 목록 - `.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`에 병합됨(콤마 구분으로 정규화 + 중복 제거). router의 Dev Proxy / App Routes / VNC 탭이 대상으로 삼을 수 있는 호스트는 기본적으로 `code-docker`/`dind` 둘뿐이라(Caddy admin API 등을 겨냥한 self-SSRF 방지), 사이드 프로젝트가 **자기 컨테이너를 프록시 대상으로 노출하려면** 그 컨테이너의 네트워크 별칭을 여기 적어야 합니다 - 안 적으면 컨테이너는 정상적으로 뜨는데 대상 등록만 `target host ...is not in the allowed target host list`로 거부됩니다. **`OOTB_ENV_PROMPT_*`로 물어보지 않고 매니페스트가 값을 직접 선언하는 필드인 이유**: 어떤 호스트네임이 필요한지는 사용자가 알 수 없고 붙는 프로젝트만 알기 때문입니다. 위 `OOTB_EXTRA_INTERNAL_NETWORKS`와 성격이 같은 declarative 필드지만 **그쪽과 달리 Docker 라벨로 대체되지 않습니다** - router-manager는 자기가 보안 경계 컨테이너라서 `docker.sock`을 의도적으로 갖지 않고, 따라서 라벨을 읽을 수단 자체가 없습니다. 또한 보안 경계의 allowlist는 런타임에 바뀌지 않는 정적 인프라 설정으로 두는 편이 옳습니다(같은 이유로 `ROUTER_MANAGER_HOSTS`/`ALLOWED_HOSTS`도 웹 UI에서 못 바꿉니다). |
+| `OOTB_GENERATE_SECRETS` | 선택 | 공백구분 키 이름 목록 - 그 키가 `$OOTB_ENV_TARGET`에 **아직 없으면** 무작위 값(`openssl rand -hex 32`, 없으면 `/dev/urandom` 폴백)을 만들어 넣고 생성된 값을 화면에 출력합니다. 이미 있으면(빈 값으로 꺼둔 것 포함) 건드리지 않습니다. **사용자에게 묻지 않는 declarative 필드인 이유**: 무작위여도 되는 값이라 물어봐야 답이 달라지지 않습니다 - 사람이 이미 갖고 있는 값(외부 API 키 등)이라면 `OOTB_ENV_PROMPT_*`의 `secret` 쪽입니다. roblox-studio-docker의 `MCP_TOKEN`이 이 경우입니다(통합 배포에서 그 포트는 host에 게시되지 않고, 진짜 capability 게이트는 Studio 안에서 사람이 켜야 하는 Assistant 토글입니다). |
 | `OOTB_ENV_TARGET` | 선택, 기본 `.env` | 아래 `OOTB_ENV_PROMPT_*`로 물어본 값을 어느 env 파일에 쓸지 |
-| `OOTB_ENV_PROMPT_1`, `OOTB_ENV_PROMPT_2`, ... | 선택 | `이름:설명:secret\|plain\|generate` 형식, 1부터 번호를 이어서 몇 개든 추가. 없으면 다음 번호에서 중단됩니다. **공백구분 단일 리스트가 아니라 번호 붙은 개별 변수인 이유**: 설명 텍스트에 공백(특히 한글 설명)이 들어가면 셸 word-splitting으로 깨지기 때문입니다 - 각 항목이 독립된 변수라 안전합니다. **설명 텍스트에 `:`은 못 씁니다**(구분자). 종류별 동작은 아래 참고. |
+| `OOTB_ENV_PROMPT_1`, `OOTB_ENV_PROMPT_2`, ... | 선택 | `이름:설명:secret\|plain` 형식, 1부터 번호를 이어서 몇 개든 추가. 없으면 다음 번호에서 중단됩니다. **공백구분 단일 리스트가 아니라 번호 붙은 개별 변수인 이유**: 설명 텍스트에 공백(특히 한글 설명)이 들어가면 셸 word-splitting으로 깨지기 때문입니다 - 각 항목이 독립된 변수라 안전합니다. **설명 텍스트에 `:`은 못 씁니다**(구분자). 종류별 동작은 아래 참고. |
 
-### `OOTB_ENV_PROMPT_*`의 세 가지 종류
+### `OOTB_ENV_PROMPT_*`의 두 가지 종류
 
 | 종류 | 동작 |
 |---|---|
 | `plain` | 그냥 입력받아 그대로 씁니다. |
 | `secret` | 화면에 안 보이게 입력받습니다(`read -s`). 사용자가 **이미 가지고 있는** 값(외부 서비스 API 키 등)에만 쓰세요. |
-| `generate` | 값을 묻지 않고 **활성화할지 y/N만** 묻고, 예라면 `openssl rand -hex 32`(없으면 `/dev/urandom` 폴백)로 생성해서 씁니다. 사람이 지어낼 이유가 없는 내부용 토큰 - 컨테이너끼리만 쓰는 통로의 인증값 같은 것 - 에 씁니다. roblox-studio-docker의 `MCP_TOKEN`이 이 경우입니다. |
 
-세 종류 모두 **이미 그 키가 대상 env 파일에 있으면(값이 비어있어도) 다시 묻지
+**사람이 정할 내용이 없는 값은 여기 넣지 마세요** - 무작위여도 상관없는 내부용
+토큰이라면 위 표의 `OOTB_GENERATE_SECRETS`가 맞는 자리입니다. 물어봐야 답이 달라질 게
+없는 질문은 보안을 늘리지 않고 "깔면 그냥 된다"만 깨뜨립니다.
+
+둘 다 **이미 그 키가 대상 env 파일에 있으면(값이 비어있어도) 다시 묻지
 않습니다**. 사용자가 거절하거나 빈 값을 입력한 것도 `KEY=` 형태로 기록해서 남기기
 때문에, 같은 질문을 `migrate.sh`를 돌릴 때마다 다시 받는 일이 없습니다. 마음이 바뀌어
 나중에 켜고 싶다면(혹은 이미 설정된 값을 바꾸고 싶다면) 그 env 파일의 해당 줄을 직접
@@ -64,12 +68,13 @@ OOTB_ENV_PROMPT_1="MCP_TOKEN:code-docker의 Claude Code가 Studio를 조작하�
 2. `extra-include.yml`이 없거나 비어있으면 새로 만들고, `- path: builds/<이름>/$OOTB_COMPOSE_INCLUDE` 라인을 추가
 3. `OOTB_EXTRA_INTERNAL_NETWORKS`가 있으면 기존 `.env`의 값과 합쳐서 다시 씀 (덮어쓰지 않고 병합) - 위 표에 적었듯 DEPRECATED 경로이므로, 새 사이드 프로젝트는 대신 자기 오버레이의 네트워크에 라벨을 직접 답니다
 4. `OOTB_ROUTER_ALLOWED_TARGET_HOSTS`가 있으면 기존 `.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`와 합쳐서 다시 씀 (병합 + 중복 제거)
-5. `OOTB_ENV_PROMPT_*`를 순서대로 물어봐서 `$OOTB_ENV_TARGET`에 씀
-6. 하나 이상 연동됐으면 마지막에 `.env`의 `EXTRA_INCLUDE=extra-include.yml`을 설정
+5. `OOTB_GENERATE_SECRETS`에 적힌 키 중 아직 없는 것을 무작위로 생성해서 `$OOTB_ENV_TARGET`에 씀 (생성한 값은 화면에 출력)
+6. `OOTB_ENV_PROMPT_*`를 순서대로 물어봐서 `$OOTB_ENV_TARGET`에 씀
+7. 하나 이상 연동됐으면 마지막에 `.env`의 `EXTRA_INCLUDE=extra-include.yml`을 설정
 
 이미 연동된 프로젝트는 [`migrate.sh`](../index.md#업데이트하기)가 3단계에서 git
-pull한 뒤 **3~5번을 다시 반영**합니다 - declarative 필드(3~4)는 값이 바뀌었으면 다시
-병합하고, `OOTB_ENV_PROMPT_*`(5)는 **아직 대상 env 파일에 그 키가 아예 없을 때만**
+pull한 뒤 **3~6번을 다시 반영**합니다 - declarative 필드(3~5)는 값이 바뀌었거나 아직
+없으면 다시 병합/생성하고, `OOTB_ENV_PROMPT_*`(6)는 **아직 대상 env 파일에 그 키가 아예 없을 때만**
 물어봅니다(이미 답한 값은 절대 덮어쓰지 않음). 이 재적용이 없으면 매니페스트에 새
 declarative 필드가 생길 때마다 "새로 까는 사람한테만 먹고 기존 배포엔 안 먹는"
 상태가 됩니다(실제로

@@ -19,10 +19,10 @@ roblox-studio-docker는 [`ootb-manifest.env`](ootb-manifest.md)를 들고 있으
 따로 건드릴 필요가 없습니다(아래 "VNC 전용 네트워크 격리" 참고). router가 VNC를 프록시
 대상으로 삼을 수 있게 하는 allowlist 등록(`.env.router`의
 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`에 `vnc-only` 추가)도 매니페스트의
-`OOTB_ROUTER_ALLOWED_TARGET_HOSTS` 필드를 통해 자동으로 됩니다. 연동 중에 [Studio MCP
-브리지](#studio-mcp-붙이기-claude-code가-studio를-직접-조작하게-하기)를 켤지도 한 번
-물어봅니다(값은 자동 생성 - 이미 연동해둔 배포는 `migrate.sh`가 같은 질문을 합니다).
-아래 "수동으로 연동하기"는 `ootb.sh`를 안 쓰거나 이미 설치된 인스턴스에 나중에 붙일 때만 필요합니다.
+`OOTB_ROUTER_ALLOWED_TARGET_HOSTS` 필드를 통해 자동으로 됩니다. [Studio MCP
+브리지](#studio-mcp-붙이기-claude-code가-studio를-직접-조작하게-하기)가 쓰는
+`MCP_TOKEN`도 묻지 않고 자동으로 생성해 `.env`에 넣고 값을 출력해줍니다(이미 연동해둔
+배포는 `migrate.sh`가 3단계에서 같이 채워줍니다). 아래 "수동으로 연동하기"는 `ootb.sh`를 안 쓰거나 이미 설치된 인스턴스에 나중에 붙일 때만 필요합니다.
 
 ## 수동으로 연동하기
 
@@ -171,22 +171,36 @@ host에 게시되지 않습니다(`studio`가 `internal: true` 네트워크에�
 쓰지 않는 이유는, MCP를 쓰는 주체가 사람이 아니라 `code-docker-internal` 위의 에이전트
 컨테이너 자신이기 때문입니다 - router를 거칠 필요가 없는 통신입니다.
 
-### 1. `MCP_TOKEN` 설정
+### 1. `MCP_TOKEN` — ootb가 알아서 넣습니다
 
-MCP 브리지는 `MCP_TOKEN`이 비어있으면 idle 상태로 뜹니다 - 이 값이 곧 기능 on/off
-스위치입니다(기본 꺼짐은 의도적입니다 - 아래 보안 항목 참고). `ootb.sh`로 연동했다면
-연동 중 "활성화할까요?"를 물어보고 값은 자동 생성해서 code-docker 쪽 `.env`에
-넣어줍니다. 이미 연동해둔 배포라면 `migrate.sh`가 3단계에서 같은 질문을 합니다(아직
-`.env`에 `MCP_TOKEN` 줄이 없는 경우에만 - [매니페스트 문서](ootb-manifest.md) 참고).
+MCP 브리지는 `MCP_TOKEN`이 비어있으면 idle 상태로 뜹니다. `ootb.sh`로 연동했다면 이
+값은 **묻지 않고 자동 생성**돼서 code-docker 쪽 `.env`에 들어가고, 생성된 값이 화면에
+출력됩니다(매니페스트의 `OOTB_GENERATE_SECRETS` -
+[ootb-manifest.md](ootb-manifest.md)). 이미 연동해둔 배포는 `migrate.sh`가 3단계에서
+같은 일을 합니다 - 값이 이미 있으면 건드리지 않습니다.
 
-직접 넣어도 됩니다. code-docker 쪽 `.env`에 쓰면 됩니다 - `include`로 들어온 사이드
+> **`migrate.sh`로 값이 생겨도 컨테이너에는 자동으로 안 들어갑니다.** env는 컨테이너
+> 생성 시점에 박히므로 `studio`가 재생성돼야 반영됩니다 - `migrate.sh` 마지막의
+> `docker compose up -d`가 (resolved config가 바뀌었으므로) 그 재생성을 해주지만, 그
+> 단계를 건너뛰었다면 `docker compose up -d studio`를 직접 실행하세요. 반영됐는지는
+> `docker compose exec studio printenv MCP_TOKEN`으로 확인합니다 - 값이 비어있으면
+> 브리지 로그에 `MCP_TOKEN not set — idling`만 남습니다.
+
+**묻지 않는 이유**는 아래 "이 토큰이 실제로 막는 것"에 적었습니다 - 요약하면 물어봐야
+답이 달라질 게 없어서입니다. 브리지를 켜두는 것 자체는 아무 권한도 주지 않습니다(진짜
+스위치는 2번의 Studio 쪽 토글입니다).
+
+손으로 넣어도 됩니다. code-docker 쪽 `.env`에 쓰면 됩니다 - `include`로 들어온 사이드
 프로젝트의 compose 파일도 최상위 프로젝트의 `.env`를 먼저 보고, 사이드 프로젝트 자신의
 `.env`는 폴백으로만 쓰입니다(Compose 5.5 기준 실측):
 
 ```sh
-echo "MCP_TOKEN=$(openssl rand -hex 32)" >> .env
+printf '\nMCP_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env
 docker compose up -d studio   # restart가 아니라 recreate - env는 create 시점에 박힙니다
 ```
+
+반대로 **끄고 싶으면** `.env`의 `MCP_TOKEN` 줄을 빈 값으로 두세요 - 브리지가 idle로
+뜨고, `ootb`/`migrate`는 이미 있는 키를 덮어쓰지 않으므로 그 상태가 유지됩니다.
 
 ### 2. Studio 안에서 한 번만 해야 하는 수동 단계 (VNC 필요, CLI 대체 수단 없음)
 
@@ -213,8 +227,7 @@ claude mcp list   # roblox-studio: ... (HTTP) - ✔ Connected 확인
 ### 이 토큰이 실제로 막는 것
 
 `code-docker-internal` 위에서만 닿는 포트에 굳이 토큰이 필요한지는 따져볼 만합니다.
-정리하면 통합 배포에서 이 토큰의 실질적인 역할은 **인증 경계보다 기능 스위치와
-심층방어 쪽**입니다:
+정리하면 통합 배포에서 이 토큰은 **인증 경계라기보다 심층방어 한 겹**입니다:
 
 - **code-docker 자신에게는 사실상 무의미합니다.** 토큰이 `.env`와 `~/.claude.json`에
   있으므로, code-docker 안에서 뭔가 잘못되면(공급망 공격 등) 토큰도 같이 털립니다.
@@ -223,13 +236,19 @@ claude mcp list   # roblox-studio: ... (HTTP) - ✔ Connected 확인
   내부 daemon의 NAT를 통해 `code-docker-internal` 대역에 IP로는 닿을 수 있는 구조이고,
   토큰은 볼 수 없습니다. 신뢰하지 않는 이미지를 `docker run` 하는 게 이 환경의 일상적인
   용법이라는 걸 생각하면 이쪽은 실질적인 방어입니다. (구조상 그렇다는 것이고 이 경로를
-  따로 실측하지는 않았습니다 - 어느 쪽이든 토큰을 없앨 이유는 되지 않습니다.)
+  따로 실측하지는 않았습니다 - 이것 하나로 토큰을 없앨 이유도, 사용자를 귀찮게 할
+  이유도 되지 않습니다.)
 - **단독 실행(roblox-studio-docker의 `docker-compose.yml`만 쓰는 경우)에서는 진짜
   인증 경계입니다** - 그때는 `MCP_PORT`가 host에 실제로 게시됩니다.
-- 무엇보다 **기본값이 "꺼짐"이라는 것 자체가 요점입니다.** 이 MCP 툴들은 읽기 전용이
-  아니라 실제 로그인된 Roblox 계정의 Studio 안에서 임의 Luau를 실행합니다. 토큰을
-  없애면 "항상 켜짐"이 되므로, 스위치는 그대로 두고 대신 **값을 사용자가 지어내지
-  않게** 했습니다(매니페스트의 `generate` 종류 - [ootb-manifest.md](ootb-manifest.md)).
+
+**그래서 사용자에게 묻지 않습니다.** 예전에는 ootb가 "MCP 브리지를 활성화할까요?"를
+y/N로 묻고 기본값을 "아니오"로 뒀는데, 그 질문에는 답할 내용이 없습니다 - 브리지를
+켜두는 것 자체로는 아무 권한도 생기지 않기 때문입니다. **진짜 capability 게이트는 위 2번,
+Studio 안 Assistant의 "Enable Studio as MCP server" 토글**입니다. VNC로 사람이 직접
+켜야 하고 CLI 대체 수단이 없으며, 그게 꺼져 있으면 브리지는 실행할 `StudioMCP.exe`
+자체가 없습니다. 그 앞에 y/N을 하나 더 세우는 건 보안을 늘리지 않고 "깔면 그냥 된다"만
+깨뜨립니다. 그래서 지금은 토큰을 **묻지 않고 생성한 뒤 그 값을 화면에 보여주고**,
+끄고 싶은 사람은 `.env`의 그 줄을 비우면 됩니다.
 
 code-docker 바깥(예: 노트북의 Claude Code)에서 붙이고 싶어지면 host publish를
 되살리지 말고 router의 [forwards](../../router/docs/router.md#forwards--publish)나 App

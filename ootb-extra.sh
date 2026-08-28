@@ -17,7 +17,8 @@
 #   OOTB_EXTRA_INTERNAL_NETWORKS="네트워크1 네트워크2"        # 선택
 #   OOTB_ROUTER_ALLOWED_TARGET_HOSTS="호스트1 호스트2"        # 선택
 #   OOTB_ENV_TARGET=".env"                                  # 선택, 기본 .env
-#   OOTB_ENV_PROMPT_1="이름:설명 텍스트:secret|plain|generate" # 선택, 1부터 번호를 이어서
+#   OOTB_GENERATE_SECRETS="키1 키2"                          # 선택, 없으면 무작위 생성
+#   OOTB_ENV_PROMPT_1="이름:설명 텍스트:secret|plain"          # 선택, 1부터 번호를 이어서
 #   OOTB_ENV_PROMPT_2="이름2:설명 텍스트2:plain"               # 몇 개든 추가 (설명에 공백 가능 -
 #                                                            # 공백구분 리스트가 아니라 번호가
 #                                                            # 붙은 개별 변수라서 안전함)

@@ -103,7 +103,7 @@ load_manifest() {
   _lm_manifest="$_lm_dir/ootb-manifest.env"
 
   unset OOTB_NAME OOTB_DESCRIPTION OOTB_COMPOSE_INCLUDE OOTB_EXTRA_INTERNAL_NETWORKS
-  unset OOTB_ROUTER_ALLOWED_TARGET_HOSTS OOTB_ENV_TARGET
+  unset OOTB_ROUTER_ALLOWED_TARGET_HOSTS OOTB_ENV_TARGET OOTB_GENERATE_SECRETS
   for _lm_v in $(compgen -v OOTB_ENV_PROMPT_ 2>/dev/null); do unset "$_lm_v"; done
 
   [ -f "$_lm_manifest" ] || return 1
@@ -183,6 +183,37 @@ apply_manifest_declarative() {
     fi
   fi
 
+  # 이 프로젝트가 동작하려면 있어야 하지만 **사람이 정할 내용이 없는** 비밀값들
+  # (컨테이너끼리만 쓰는 통로의 토큰 등). 아직 없으면 여기서 무작위로 만들어
+  # 넣습니다 - 이미 값이 있으면(빈 값으로 꺼둔 것도 포함) 손대지 않습니다.
+  #
+  # 왜 OOTB_ENV_PROMPT_*가 아니라 declarative인가: 사용자에게 물어봐야 답이
+  # 달라지는 게 없기 때문입니다. roblox-studio-docker의 MCP_TOKEN이 그 예로,
+  # 통합 배포에서는 그 포트가 host에 게시되지 않아 code-docker-internal 위에서만
+  # 닿고, 진짜 capability 게이트는 Studio 안에서 사람이 직접 켜야 하는 Assistant의
+  # "Enable Studio as MCP server" 토글입니다(그게 꺼져 있으면 브리지는 실행할
+  # StudioMCP.exe 자체가 없습니다). 그 앞에 y/N을 하나 더 세우면 보안이 늘지 않고
+  # ootb의 "깔면 그냥 된다"만 깨집니다 - 실제로 그렇게 깨져 있었습니다.
+  #
+  # 끄고 싶으면 그 키를 빈 값으로 두면 됩니다(이 함수는 이미 있는 키를 절대
+  # 덮어쓰지 않으므로 그 상태가 유지됩니다).
+  if [ -n "${OOTB_GENERATE_SECRETS:-}" ]; then
+    _amd_target="$TARGET_DIR/${OOTB_ENV_TARGET:-.env}"
+    touch "$_amd_target"
+    for _amd_key in $OOTB_GENERATE_SECRETS; do
+      has_env_var "$_amd_target" "$_amd_key" && continue
+      _amd_secret="$(gen_secret)"
+      set_env_var "$_amd_target" "$_amd_key" "\"$_amd_secret\""
+      # 값을 화면에 보여준다 - 어차피 사용자 자신의 env 파일에 평문으로 들어가는
+      # 값이고, 이걸 안 보여주면 "어디서 났는지 모르는 비밀값이 생겼다"가 되어
+      # 오히려 불투명하다. 생성 사실만 알리고 값은 숨기는 절충은 둘 다 잃는다.
+      echo "${_amd_indent}- ${_amd_key} 생성됨: ${_amd_secret}"
+      echo "${_amd_indent}  (${OOTB_ENV_TARGET:-.env} 에 저장. 이미 떠 있는 컨테이너에는 재생성해야 반영됩니다 - docker compose up -d)"
+      echo "${_amd_indent}  (이 기능을 끄려면 그 줄을 비우세요)"
+      _amd_changed=1
+    done
+  fi
+
   [ "$_amd_changed" = "1" ]
 }
 
@@ -240,22 +271,6 @@ apply_manifest_prompts() {
     has_env_var "$_amp_target" "$_amp_name" && continue
 
     case "$_amp_kind" in
-      generate)
-        # 사람이 만들어 붙일 이유가 없는 값(컨테이너끼리만 쓰는 토큰 등)은
-        # 붙여넣기를 요구하지 말고 y/N만 묻고 여기서 생성한다. 그래서 문구도
-        # secret/plain의 "이 변수에 값을 넣으세요" 모양이 아니라 "이 기능을
-        # 켤까요" 모양이어야 한다 - 설명(_amp_desc)은 기능 이름이고, 변수는
-        # 그걸 켜는 수단일 뿐이라 앞줄에 따로 보여준다(한글 조사 문제를 피하려고
-        # 설명 뒤에 바로 서술을 잇지 않는 것이기도 하다).
-        echo "${_amp_indent}[${_amp_name}] ${_amp_desc}"
-        if confirm "${_amp_indent}→ 활성화할까요? (${_amp_name} 값은 자동 생성해서 ${OOTB_ENV_TARGET:-.env} 에 저장합니다)" n; then
-          set_env_var "$_amp_target" "$_amp_name" "\"$(gen_secret)\""
-          echo "${_amp_indent}  활성화했습니다 - ${_amp_name} 값을 새로 생성해 ${OOTB_ENV_TARGET:-.env} 에 저장했습니다."
-        else
-          set_env_var "$_amp_target" "$_amp_name" ""
-          echo "${_amp_indent}  비활성으로 기록했습니다 - 나중에 켜려면 ${OOTB_ENV_TARGET:-.env} 의 ${_amp_name} 줄을 채우세요."
-        fi
-        ;;
       secret)
         printf '%s%s (%s, 비밀값, 비우면 미설정): ' "$_amp_indent" "$_amp_name" "$_amp_desc"
         read -r -s _amp_val
