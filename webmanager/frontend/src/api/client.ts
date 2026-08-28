@@ -35,6 +35,22 @@ export function requestUnlock(): Promise<void> {
 // of re-triggering the prompter (which could otherwise recurse).
 const UNLOCK_PATH = '/auth/unlock'
 
+// How long a dismissed prompt suppresses the *next* read-triggered one.
+// Several tabs poll a gated endpoint on a short timer (the Terminal tab
+// every 3s), so without this, cancelling the modal just meant it reopened
+// on the very next tick — an unclosable prompt rather than a declined one.
+// Writes are never suppressed: those are deliberate user actions, and
+// silently failing one would be worse than asking again.
+const PROMPT_COOLDOWN_MS = 60_000
+
+let promptDeclinedAt = 0
+
+function promptSuppressed(init?: RequestInit): boolean {
+  const method = (init?.method ?? 'GET').toUpperCase()
+  if (method !== 'GET') return false
+  return Date.now() - promptDeclinedAt < PROMPT_COOLDOWN_MS
+}
+
 // Each useAuthStatus() consumer (SidebarFooter, RequiresUnlock, ...) keeps
 // its own independent status copy, refreshed only when its own caller
 // triggers it - so a successful unlock in one place (e.g. a 401 popping the
@@ -65,6 +81,10 @@ async function request<T>(path: string, init?: RequestInit, retried = false): Pr
   const res = await fetch(apiUrl(path), init)
 
   if (path === UNLOCK_PATH && res.ok) {
+    // Any successful unlock — this modal, the inline RequiresUnlock form,
+    // the sidebar's proactive button — clears a previous decline, so the
+    // 401 interceptor is immediately live again.
+    promptDeclinedAt = 0
     notifyAuthStatusChange()
   }
 
@@ -84,13 +104,17 @@ async function request<T>(path: string, init?: RequestInit, retried = false): Pr
   }
 
   if (!res.ok) {
-    if (res.status === 401 && !retried && unlockPrompter && path !== UNLOCK_PATH) {
+    if (res.status === 401 && !retried && unlockPrompter && path !== UNLOCK_PATH && !promptSuppressed(init)) {
       let unlocked = false
       try {
         await unlockPrompter()
         unlocked = true
+        promptDeclinedAt = 0
       } catch {
-        // User cancelled the prompt — fall through to the original error below.
+        // User cancelled the prompt — hold off on read-triggered prompts
+        // for a while (see PROMPT_COOLDOWN_MS) and fall through to the
+        // original error below.
+        promptDeclinedAt = Date.now()
       }
       if (unlocked) {
         // Re-issue the exact same request once, with retried=true so a

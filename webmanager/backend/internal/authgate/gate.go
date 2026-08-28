@@ -40,8 +40,23 @@ const CookieName = "webmanager_unlock"
 
 // sessionTTL governs the webmanager write-gate (RequirePassword) — kept
 // short deliberately so a "still unlocked" window doesn't linger past a
-// realistic single sitting.
+// realistic single sitting. It is an *idle* timeout: RequirePassword slides
+// it forward on every validated request (see refreshCookie).
 const sessionTTL = 10 * time.Minute
+
+// maxSessionLifetime caps that sliding refresh. Without a cap, a tab that
+// polls a gated endpoint on a timer (the Terminal tab polls
+// /api/terminal/sessions every few seconds) would keep its unlock alive
+// indefinitely just by being left open, which would make sessionTTL
+// meaningless in exactly the case it matters most. Measured from the
+// unlock the user actually typed a password for, never extended.
+const maxSessionLifetime = 12 * time.Hour
+
+// refreshThreshold is how much of sessionTTL must have elapsed before
+// RequirePassword bothers re-issuing the cookie. Purely to keep a fast
+// poll loop from carrying a Set-Cookie header on every single response —
+// any value below sessionTTL leaves the sliding behavior itself identical.
+const refreshThreshold = sessionTTL / 2
 
 // Gate is a stateful password gate: a configured argon2id hash (or none —
 // see New) plus an HMAC secret used to sign/verify self-describing unlock
@@ -126,12 +141,22 @@ func (g *Gate) Configured() bool {
 	return g != nil && g.hash != ""
 }
 
-// issueToken mints a token of the form "<b64(issued-at)>.<b64(hmac)>" — the
-// payload is the plain decimal unix timestamp, signed so it can't be
-// tampered with. There's no stored session state; verification is entirely
-// self-contained (see tokenAge).
+// issueToken mints a fresh token for a just-typed password. See mintToken
+// for the wire format.
 func (g *Gate) issueToken() string {
-	payload := strconv.FormatInt(time.Now().Unix(), 10)
+	now := time.Now()
+	return g.mintToken(now, now)
+}
+
+// mintToken builds a token of the form "<b64(payload)>.<b64(hmac)>", where
+// payload is "<origin-unix>:<refreshed-unix>" — origin is when the user
+// actually typed the password (fixed for the life of the session, bounded
+// by maxSessionLifetime) and refreshed is when the token was last slid
+// forward (bounded by sessionTTL). Both are signed, so neither can be
+// tampered with. There's no stored session state; verification is entirely
+// self-contained (see tokenTimes).
+func (g *Gate) mintToken(origin, refreshed time.Time) string {
+	payload := strconv.FormatInt(origin.Unix(), 10) + ":" + strconv.FormatInt(refreshed.Unix(), 10)
 	sig := g.sign([]byte(payload))
 	return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + base64.RawURLEncoding.EncodeToString(sig)
 }
@@ -142,65 +167,88 @@ func (g *Gate) sign(payload []byte) []byte {
 	return mac.Sum(nil)
 }
 
-// tokenAge extracts and verifies the unlock cookie on r, returning how long
-// ago it was issued. ok is false if there's no cookie, it's malformed, the
-// signature doesn't match, or it claims to be issued in the future (clock
-// skew or tampering — rejected rather than treated as "very fresh").
-func (g *Gate) tokenAge(r *http.Request) (time.Duration, bool) {
+// tokenTimes extracts and verifies the unlock cookie on r, returning when
+// the session originally started and when it was last refreshed. ok is
+// false if there's no cookie, it's malformed, the signature doesn't match,
+// or the timestamps are inconsistent — claiming to be issued in the future
+// (clock skew or tampering) or refreshed before they were issued — all
+// rejected rather than treated as "very fresh".
+//
+// A payload with no ":" is a token minted before sliding expiry existed (a
+// single timestamp); it's accepted with origin == refreshed so cookies
+// issued by an older build keep working across an upgrade instead of
+// forcing everyone to re-enter the password once.
+func (g *Gate) tokenTimes(r *http.Request) (origin, refreshed time.Time, ok bool) {
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		return 0, false
+		return time.Time{}, time.Time{}, false
 	}
 	parts := strings.SplitN(cookie.Value, ".", 2)
 	if len(parts) != 2 {
-		return 0, false
+		return time.Time{}, time.Time{}, false
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
-		return 0, false
+		return time.Time{}, time.Time{}, false
 	}
 	givenSig, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return 0, false
+		return time.Time{}, time.Time{}, false
 	}
 	if !hmac.Equal(givenSig, g.sign(payload)) {
-		return 0, false
+		return time.Time{}, time.Time{}, false
 	}
-	issuedUnix, err := strconv.ParseInt(string(payload), 10, 64)
+	originStr, refreshedStr, found := strings.Cut(string(payload), ":")
+	if !found {
+		refreshedStr = originStr
+	}
+	originUnix, err := strconv.ParseInt(originStr, 10, 64)
 	if err != nil {
-		return 0, false
+		return time.Time{}, time.Time{}, false
 	}
-	age := time.Since(time.Unix(issuedUnix, 0))
-	if age < 0 {
-		return 0, false
+	refreshedUnix, err := strconv.ParseInt(refreshedStr, 10, 64)
+	if err != nil {
+		return time.Time{}, time.Time{}, false
 	}
-	return age, true
+	origin, refreshed = time.Unix(originUnix, 0), time.Unix(refreshedUnix, 0)
+	now := time.Now()
+	if origin.After(now) || refreshed.After(now) || refreshed.Before(origin) {
+		return time.Time{}, time.Time{}, false
+	}
+	return origin, refreshed, true
 }
 
 // Unlocked reports whether the request carries a currently-valid unlock
-// token under the webmanager write-gate TTL. Safe to call even when the
-// gate isn't configured (always false in that case, since no cookie would
-// ever have been issued).
+// token — valid meaning it was refreshed within sessionTTL *and* the
+// session as a whole is still inside maxSessionLifetime. Safe to call even
+// when the gate isn't configured (always false in that case, since no
+// cookie would ever have been issued).
 func (g *Gate) Unlocked(r *http.Request) bool {
-	if g == nil {
-		return false
-	}
-	age, ok := g.tokenAge(r)
-	return ok && age <= sessionTTL
+	_, ok := g.UnlockedUntil(r)
+	return ok
 }
 
 // UnlockedUntil is like Unlocked but also returns the unlock's expiry time
 // — used by the auth status endpoint so the sidebar can show how long the
-// current unlock still has left, not just a locked/unlocked bool.
+// current unlock still has left, not just a locked/unlocked bool. That's
+// the idle deadline, except near the end of a long session where
+// maxSessionLifetime is the one that lands first.
 func (g *Gate) UnlockedUntil(r *http.Request) (time.Time, bool) {
 	if g == nil {
 		return time.Time{}, false
 	}
-	age, ok := g.tokenAge(r)
-	if !ok || age > sessionTTL {
+	origin, refreshed, ok := g.tokenTimes(r)
+	if !ok {
 		return time.Time{}, false
 	}
-	return time.Now().Add(sessionTTL - age), true
+	deadline := refreshed.Add(sessionTTL)
+	if hard := origin.Add(maxSessionLifetime); hard.Before(deadline) {
+		deadline = hard
+	}
+	if !time.Now().Before(deadline) {
+		return time.Time{}, false
+	}
+	return deadline, true
 }
 
 // TryUnlock verifies plaintext against the configured hash. key identifies
@@ -261,8 +309,30 @@ func (g *Gate) RequirePassword(next http.Handler) http.Handler {
 			writeUnauthorized(w)
 			return
 		}
+		g.refreshCookie(w, r)
 		next.ServeHTTP(w, r)
 	})
+}
+
+// refreshCookie slides an already-validated session's idle deadline
+// forward. Without it the TTL was absolute: someone actively working in
+// the UI got locked out mid-session exactly as fast as someone who had
+// walked away, and on a tab polling a gated endpoint the resulting 401
+// arrived every few seconds, re-opening the password modal each time. The
+// origin timestamp is carried through unchanged so maxSessionLifetime
+// still bounds the whole session. Only called from RequirePassword, which
+// has already validated the token, and only before next.ServeHTTP — the
+// response headers are gone once the handler starts writing.
+func (g *Gate) refreshCookie(w http.ResponseWriter, r *http.Request) {
+	origin, refreshed, ok := g.tokenTimes(r)
+	if !ok {
+		return
+	}
+	now := time.Now()
+	if now.Sub(refreshed) < refreshThreshold {
+		return
+	}
+	g.SetCookie(w, g.mintToken(origin, now))
 }
 
 func writeUnauthorized(w http.ResponseWriter) {
