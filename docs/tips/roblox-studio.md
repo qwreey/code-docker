@@ -111,7 +111,9 @@ docker compose exec code-docker printenv MCP_TOKEN    # 붙는 쪽 컨테이너�
 
 두 번째가 값을 뱉는 건 `roblox-studio-code-docker.yml`이 `code-docker` 서비스에도 `MCP_TOKEN`을 병합해주기 때문입니다 - code-docker 자신의 compose에는 이 변수가 없습니다(이 사이드 프로젝트를 모르니 당연하고, 값을 넘기는 건 오버레이의 일입니다).
 
-**끄려면** `.env`의 `MCP_TOKEN` 줄을 빈 값으로 두세요. 브리지가 idle로 뜨고, `ootb`/`migrate`는 이미 있는 키를 덮어쓰지 않으므로 그 상태가 유지됩니다.
+**끄려면** `.env`의 `MCP_TOKEN` 줄을 빈 값으로 두세요. 브리지가 idle로 뜨고, `ootb`/`migrate`는 이미 있는 키를 덮어쓰지 않으므로 그 상태가 유지됩니다(그때마다 "빈 값이라 꺼진 것으로 봅니다" 한 줄을 남깁니다 - 껐다는 걸 잊고 고장으로 오해하지 않도록).
+
+**반대로 꺼져 있는 걸 다시 켜려면** 값을 직접 채우거나, `MCP_TOKEN=` 줄을 통째로 지우고 `migrate.sh`를 돌리면 새로 생성됩니다.
 
 **손으로 넣으려면** code-docker 쪽 `.env`에 씁니다 - `include`로 들어온 사이드 프로젝트의 compose 파일도 최상위 프로젝트의 `.env`를 먼저 보고, 사이드 프로젝트 자신의 `.env`는 폴백으로만 쓰입니다(Compose 5.5 기준 실측):
 

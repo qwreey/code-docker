@@ -201,7 +201,17 @@ apply_manifest_declarative() {
     _amd_target="$TARGET_DIR/${OOTB_ENV_TARGET:-.env}"
     touch "$_amd_target"
     for _amd_key in $OOTB_GENERATE_SECRETS; do
-      has_env_var "$_amd_target" "$_amd_key" && continue
+      if has_env_var "$_amd_target" "$_amd_key"; then
+        # 값이 들어있으면 할 말이 없다(조용히 넘어간다). 하지만 **빈 값**은 다르다 -
+        # 그건 "꺼져 있다"는 뜻이고, 그 상태는 화면에 아무 흔적도 남기지 않으면서
+        # 기능만 동작하지 않아 "고장났는데 이유를 모르겠다"로 보인다. 실제로 그랬다:
+        # 이 필드가 프롬프트였던 짧은 기간에 "활성화할까요?"에 아니오로 답하면 빈 값이
+        # 기록됐는데, 묻는 단계가 사라진 뒤에도 그 기록만 남아 배포 하나가 영구히
+        # 꺼진 채였고 migrate를 돌려도 아무 말이 없었다.
+        [ -z "$(get_env_var "$_amd_target" "$_amd_key")" ] &&
+          echo "${_amd_indent}- ${_amd_key} 가 빈 값이라 꺼진 것으로 봅니다 (켜려면 ${OOTB_ENV_TARGET:-.env} 의 그 줄을 지우고 다시 실행하세요)"
+        continue
+      fi
       _amd_secret="$(gen_secret)"
       set_env_var "$_amd_target" "$_amd_key" "\"$_amd_secret\""
       # 값을 화면에 보여준다 - 어차피 사용자 자신의 env 파일에 평문으로 들어가는
