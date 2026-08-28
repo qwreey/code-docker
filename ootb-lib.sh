@@ -185,3 +185,83 @@ apply_manifest_declarative() {
 
   [ "$_amd_changed" = "1" ]
 }
+
+has_env_var() {
+  # has_env_var <file> <key> - 주석 처리되지 않은 `key=` 라인이 있으면 0.
+  # get_env_var와 달리 **값이 비어있어도 "있다"로 칩니다** - 아래
+  # apply_manifest_prompts가 "물어봤는데 사용자가 껐다"와 "아직 안 물어봤다"를
+  # 구분하는 데 씁니다(빈 값 = 그 기능 끔, 이 코드베이스 전반의 관례).
+  grep -qE "^$2=" "$1" 2>/dev/null
+}
+
+gen_secret() {
+  # 32바이트 랜덤을 hex 64자로. openssl이 없는 최소 환경을 위한 폴백 포함.
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+  else
+    LC_ALL=C tr -dc 'a-f0-9' < /dev/urandom | head -c 64
+    echo
+  fi
+}
+
+apply_manifest_prompts() {
+  # apply_manifest_prompts [들여쓰기] - load_manifest로 읽어둔 매니페스트의
+  # OOTB_ENV_PROMPT_*를 순서대로 물어 $OOTB_ENV_TARGET(기본 .env)에 씁니다.
+  # apply_manifest_declarative의 짝 - 그쪽이 "프로젝트가 값을 직접 선언하는"
+  # 필드라면 이쪽은 "사람이 답해야 하는" 필드고, 둘 다 ootb-extra.sh(최초 연동)와
+  # migrate-continue.sh(이미 연동된 배포)에서 같이 호출됩니다.
+  #
+  # **이미 그 키가 env 파일에 있으면(빈 값이어도) 묻지 않고 건너뜁니다.** 이게
+  # 이 함수를 migrate 쪽에서도 부를 수 있게 하는 전부입니다 - 최초 연동 때만
+  # 물어보던 예전 구조에서는, 이미 붙여둔 배포에 새 프롬프트가 생겨도(혹은 그때
+  # 그냥 Enter로 넘겼어도) 나중에 그 값을 설정할 경로가 사실상 없었습니다
+  # (같은 git URL을 ootb-extra.sh에 다시 입력하는 비공식 우회밖에 없었음).
+  # declarative 필드가 정확히 같은 이유로 재적용되게 바뀐 것과 같은 격차입니다
+  # - docs/tips/ootb-manifest.md 참고.
+  #
+  # 사용자가 빈 값/거절로 답한 것도 그 키를 빈 값으로 기록해서 남깁니다 - 안
+  # 그러면 매번 migrate를 돌릴 때마다 같은 질문을 다시 받게 됩니다. 나중에
+  # 마음이 바뀌면 env 파일의 그 줄을 직접 채우면 됩니다(이미 설정된 값을 바꾸는
+  # 방법도 동일합니다 - 이 함수는 기존 값을 절대 덮어쓰지 않습니다).
+  _amp_indent="${1:-    }"
+  _amp_target="$TARGET_DIR/${OOTB_ENV_TARGET:-.env}"
+  touch "$_amp_target"
+  _amp_i=1
+  while :; do
+    _amp_var="OOTB_ENV_PROMPT_$_amp_i"
+    _amp_item="${!_amp_var:-}"
+    [ -z "$_amp_item" ] && break
+    _amp_i=$((_amp_i + 1))
+
+    _amp_name="$(echo "$_amp_item" | cut -d: -f1)"
+    _amp_desc="$(echo "$_amp_item" | cut -d: -f2)"
+    _amp_kind="$(echo "$_amp_item" | cut -d: -f3)"
+
+    has_env_var "$_amp_target" "$_amp_name" && continue
+
+    case "$_amp_kind" in
+      generate)
+        # 사람이 만들어 붙일 이유가 없는 값(컨테이너끼리만 쓰는 토큰 등)은
+        # 붙여넣기를 요구하지 말고 y/N만 묻고 여기서 생성한다.
+        if confirm "${_amp_indent}${_amp_name}: ${_amp_desc} - 활성화할까요? (값은 자동 생성)" n; then
+          set_env_var "$_amp_target" "$_amp_name" "\"$(gen_secret)\""
+          echo "${_amp_indent}- ${_amp_name} 을(를) 새로 생성해 ${OOTB_ENV_TARGET:-.env} 에 저장했습니다."
+        else
+          set_env_var "$_amp_target" "$_amp_name" ""
+          echo "${_amp_indent}- ${_amp_name} 은(는) 비활성 상태로 기록했습니다(나중에 켜려면 ${OOTB_ENV_TARGET:-.env} 의 그 줄을 채우세요)."
+        fi
+        ;;
+      secret)
+        printf '%s%s (%s, 비밀값, 비우면 미설정): ' "$_amp_indent" "$_amp_name" "$_amp_desc"
+        read -r -s _amp_val
+        echo
+        set_env_var "$_amp_target" "$_amp_name" "${_amp_val:+\"$_amp_val\"}"
+        ;;
+      *)
+        printf '%s%s (%s, 비우면 미설정): ' "$_amp_indent" "$_amp_name" "$_amp_desc"
+        read -r _amp_val
+        set_env_var "$_amp_target" "$_amp_name" "${_amp_val:+\"$_amp_val\"}"
+        ;;
+    esac
+  done
+}

@@ -17,10 +17,16 @@
 #   OOTB_EXTRA_INTERNAL_NETWORKS="네트워크1 네트워크2"        # 선택
 #   OOTB_ROUTER_ALLOWED_TARGET_HOSTS="호스트1 호스트2"        # 선택
 #   OOTB_ENV_TARGET=".env"                                  # 선택, 기본 .env
-#   OOTB_ENV_PROMPT_1="이름:설명 텍스트:secret|plain"          # 선택, 1부터 번호를 이어서
+#   OOTB_ENV_PROMPT_1="이름:설명 텍스트:secret|plain|generate" # 선택, 1부터 번호를 이어서
 #   OOTB_ENV_PROMPT_2="이름2:설명 텍스트2:plain"               # 몇 개든 추가 (설명에 공백 가능 -
 #                                                            # 공백구분 리스트가 아니라 번호가
 #                                                            # 붙은 개별 변수라서 안전함)
+#
+# OOTB_ENV_PROMPT_* 를 실제로 물어보는 건 ootb-lib.sh의 apply_manifest_prompts고,
+# migrate-continue.sh도 (이미 연동된 배포에 아직 값이 없는 키에 한해) 같은 함수를
+# 부릅니다 - 그래서 "새로 까는 사람한테만 물어보고 기존 배포엔 영영 안 물어보는"
+# 격차가 없습니다. declarative 필드가 apply_manifest_declarative 하나로 모여있는
+# 것과 같은 이유입니다.
 #
 # 인자로 TARGET_DIR을 주면(ootb.sh/migrate.sh가 이렇게 호출) 위치를 다시 안
 # 묻고 바로 그 디렉터리를 씁니다 - 인자가 없으면 대화형으로 확인합니다.
@@ -88,26 +94,7 @@ while :; do
 
   apply_manifest_declarative
 
-  env_target="${OOTB_ENV_TARGET:-.env}"
-  i=1
-  while :; do
-    var="OOTB_ENV_PROMPT_$i"
-    item="${!var:-}"
-    [ -z "$item" ] && break
-    pname="$(echo "$item" | cut -d: -f1)"
-    pdesc="$(echo "$item" | cut -d: -f2)"
-    pkind="$(echo "$item" | cut -d: -f3)"
-    if [ "$pkind" = "secret" ]; then
-      printf '    %s (%s, 비밀값, 비우면 미설정): ' "$pname" "$pdesc"
-      read -r -s pval
-      echo
-    else
-      printf '    %s (%s, 비우면 미설정): ' "$pname" "$pdesc"
-      read -r pval
-    fi
-    [ -n "$pval" ] && set_env_var "$TARGET_DIR/$env_target" "$pname" "\"$pval\""
-    i=$((i + 1))
-  done
+  apply_manifest_prompts
 done
 if [ "$linked_any" = "1" ]; then
   set_env_var "$TARGET_DIR/.env" EXTRA_INCLUDE "extra-include.yml"

@@ -52,8 +52,7 @@ if [ -d "$TARGET_DIR/builds" ] && confirm "builds/ 아래 사이드 프로젝트
     fi
 
     # 방금 pull로 매니페스트가 바뀌었을 수 있으므로 declarative 필드를 다시
-    # 반영한다(사람에게 묻는 OOTB_ENV_PROMPT_*는 건드리지 않음 - 그건 최초 연동
-    # 때 한 번 물어보는 값이다). 이게 없으면 매니페스트에 새 필드가 생길 때마다
+    # 반영한다. 이게 없으면 매니페스트에 새 필드가 생길 때마다
     # "새로 까는 사람한테만 먹고 기존 배포엔 안 먹는" 상태가 되고, 실제로
     # OOTB_ROUTER_ALLOWED_TARGET_HOSTS가 그랬다 - 스택은 멀쩡히 뜨는데 router
     # 대상 등록만 조용히 거부됐다. 병합은 additive + 중복 제거라 매번 돌아도
@@ -63,6 +62,12 @@ if [ -d "$TARGET_DIR/builds" ] && confirm "builds/ 아래 사이드 프로젝트
     grep -qF "builds/$name/" "$TARGET_DIR/$extra_include_file" 2>/dev/null || continue
     load_manifest "$dir" || continue
     apply_manifest_declarative "    " && echo "    (위 값은 $name 의 ootb-manifest.env가 선언한 것입니다)"
+    # 사람에게 물어야 하는 OOTB_ENV_PROMPT_*도 같이 재적용한다 - 다만 **아직 그
+    # 키가 env 파일에 아예 없을 때만** 묻는다(apply_manifest_prompts 주석 참고).
+    # 예전에는 이게 최초 연동 때 한 번뿐이라, 이미 붙여둔 배포는 매니페스트에 새
+    # 프롬프트가 생겨도(혹은 그때 Enter로 넘겼어도) 나중에 그 값을 설정할 경로가
+    # 사실상 없었다 - roblox-studio-docker의 MCP_TOKEN이 실제로 그랬다.
+    apply_manifest_prompts "    "
   done
 fi
 echo
