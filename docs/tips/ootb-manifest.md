@@ -23,11 +23,14 @@ YAML/JSON이 아니라 이 형식을 씁니다 - `ootb.sh`는 호스트에 `yq`/
 OOTB_NAME="Roblox Studio"
 OOTB_DESCRIPTION="Wine 기반 Roblox Studio (GPU passthrough + headless Wayland + wayvnc)"
 OOTB_COMPOSE_INCLUDE="roblox-studio-code-docker.yml"
-OOTB_EXTRA_INTERNAL_NETWORKS="roblox-studio-vnc"
 OOTB_ROUTER_ALLOWED_TARGET_HOSTS="vnc-only"
-OOTB_ENV_TARGET=".env"
-OOTB_ENV_PROMPT_1="VNC_PASSWORD:VNC 접속 비밀번호(선택, 비우면 미설정):secret"
+OOTB_ENV_PROMPT_1="MCP_TOKEN:Studio MCP 브리지 접근 토큰, 비우면 브리지 비활성:secret"
 ```
+
+위 예시는 실제 [roblox-studio-docker의 `ootb-manifest.env`](https://github.com/qwreey/roblox-studio-docker/blob/HEAD/ootb-manifest.env)를
+줄인 것입니다. `OOTB_EXTRA_INTERNAL_NETWORKS`가 없는 것도, `OOTB_ENV_TARGET`이
+없는 것도(기본값 `.env`) 실제 그대로입니다 — 전자는 아래 표에 적힌 대로 라벨로
+대체돼 더 이상 필요 없고, 후자는 기본값이면 굳이 적지 않습니다.
 
 | 변수 | 필수 | 설명 |
 |---|---|---|

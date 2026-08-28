@@ -157,7 +157,7 @@ SERVFAIL을 건너뛰고 router로 넘어가는 폴백 자체를 dnsmasq 내부�
 
 ### `code-patch/` (기본 제공 브라우저 패치 모음)
 
-code-docker 자체가 기본으로 제공하는 브라우저 패치들(현재는 `tailscale-notify.js`, `cd-dialog.js`, `router-auth-notify.js`, `session-heartbeat.js`, `webmanager-launcher.js`)을 모아두는 폴더입니다. 이 폴더 안의 `<이름>.default.<확장자>` 파일은 각각 `/code/.local/share/code-docker/code/patch/<이름>.<확장자>` 로 복사됩니다 (`code-patch.*.sh` 가 매 부팅마다 확인). 같은 폴더에 `<이름>.override.<확장자>` 를 두면(다른 곳의 `*.override.*` 와 동일하게 gitignore 되어 커밋되지 않음) default 대신 그 파일이 복사됩니다. 이미 유저가 오버라이드해서 쓸 수 있는 파일들이라 폴더 이름에는 "default" 를 붙이지 않았습니다.
+code-docker 자체가 기본으로 제공하는 브라우저 패치들(현재는 `tailscale-notify.js`, `cd-dialog.js`, `router-auth-notify.js`, `session-heartbeat.js`, `webmanager-launcher.js`, 그리고 webmanager의 폰트 관리자가 만든 CSS를 code-server로 끌어오는 `fonts.css`)을 모아두는 폴더입니다. 이 폴더 안의 `<이름>.default.<확장자>` 파일은 각각 `/code/.local/share/code-docker/code/patch/<이름>.<확장자>` 로 복사됩니다 (`code-patch.*.sh` 가 매 부팅마다 확인). 같은 폴더에 `<이름>.override.<확장자>` 를 두면(다른 곳의 `*.override.*` 와 동일하게 gitignore 되어 커밋되지 않음) default 대신 그 파일이 복사됩니다. 이미 유저가 오버라이드해서 쓸 수 있는 파일들이라 폴더 이름에는 "default" 를 붙이지 않았습니다.
 
 매 부팅마다 다시 심어지지만, 대상 파일의 내용이 지난번에 심었을 때의 해시와 여전히 일치할 때만입니다 — 즉 유저가 직접 수정하지 않은 파일만 갱신됩니다(`/code/.local/share/code-docker/code/.code-patch-manifest` 로 `<이름>\t<해시>` 를 추적, 다른 [코드 서버 패치](code-server-patch.md) 파일과 동일한 재시드 규칙). 해시가 다르면(유저가 직접 고쳤거나, 아직 기록된 해시가 없는 경우) 건드리지 않고 그대로 둡니다. 이후 code-docker 버전에서 해당 `.default.` 파일이 아예 없어지면, 이전에 심어졌던 사본도 함께 삭제됩니다.
 

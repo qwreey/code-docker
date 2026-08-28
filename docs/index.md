@@ -116,6 +116,7 @@ authentik 등 SSO)가 로그인을 전담해야 합니다. PWA 설치가 안 되
 - [PWA 설치가 안 되는 이유](security-login.md#pwa-설치가-안-되는-이유-왜-일부-경로를-공개해야-하는지)
 - [Caddy 예시](security-login.md#caddy-예시)
 - [nginx를 리버스 프록시로 쓰는 경우](security-login.md#nginx를-리버스-프록시로-쓰는-경우)
+- [여러 서브도메인 한 번에 로그인 (SSO)](security-login.md#여러-서브도메인-한-번에-로그인-sso--router_manager_hosts--tinyauth_hosts) — `ROUTER_MANAGER_HOSTS`/`TINYAUTH_HOSTS`처럼 별도 서브도메인으로 노출되는 것들을 앞단 SSO 뒤에 두는 법
 
 ## 개발 도구 설치와 환경 변수 재로드
 
@@ -193,10 +194,10 @@ Proxy(내부 Caddy), tinyauth(Dev Proxy 라우트별 인증) 네 가지입니다
 API)를 code-server/webmanager와 같은 공유 origin이 아니라 별도 전용 도메인으로
 분리하는 `ROUTER_MANAGER_HOSTS` 설정도 프로덕션에서는 권장됩니다 - [router.md의
 "공유 origin과 전용
-도메인"](../router/docs/router.md#보안-공유-origin과-전용-도메인routermanagerhosts) 참고. 이
+도메인"](../router/docs/router.md#보안-공유-origin과-전용-도메인router_manager_hosts) 참고. 이
 전용 도메인까지 앞단 SSO로 같이 보호하면서 로그인을 한 번만 하고 싶다면
 [security-login.md의 "여러 서브도메인 한 번에 로그인
-(SSO)"](security-login.md#여러-서브도메인-한-번에-로그인-sso--router_manager_hosts-등)를
+(SSO)"](security-login.md#여러-서브도메인-한-번에-로그인-sso--router_manager_hosts--tinyauth_hosts)를
 참고하세요.
 
 ### 아웃바운드 네트워크 격리 (netgate)
@@ -291,12 +292,17 @@ router에 붙어 있는 GUI 컨테이너(예: Wine/labwc 위 Roblox Studio)의 �
 - [App Routes](webmanager.md#app-routes)
 - [VNC](webmanager.md#vnc)
 - [Tailscale](webmanager.md#tailscale)
+- [DNS](webmanager.md#dns)
+- [Net 관리](webmanager.md#net-관리)
+- [tinyauth](webmanager.md#tinyauth)
+- [Router 설정](webmanager.md#router-설정)
 - [Logs](webmanager.md#logs)
 - [Task Manager](webmanager.md#task-manager)
 - [Claude Code](webmanager.md#claude-code)
 - [Code Extensions](webmanager.md#code-extensions)
 - [Projects](webmanager.md#projects)
 - [mise](webmanager.md#mise)
+- [Fonts](webmanager.md#fonts)
 - [Terminal](webmanager.md#terminal)
 - [Files](webmanager.md#files)
 - [Docker/dind 관리](webmanager.md#dockerdind-관리)

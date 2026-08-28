@@ -39,7 +39,7 @@ ssh/scp 접속에도 그대로 적용). `/code/.ssh/authorized_keys` 목록 조�
 (`ROUTER_MANAGER_HOSTS`가 비어 있으면 기본값인 같은 origin의 `/router/`를, 설정돼
 있으면 그 전용 도메인을 cross-origin으로 embed — webmanager는 이제
 `@code-docker/router-frontend`를 빌드 의존성으로 갖지 않습니다. 자세한 내용은
-[router.md](../router/docs/router.md#보안-공유-origin과-전용-도메인) 참고). 이름(내부
+[router.md](../router/docs/router.md#보안-공유-origin과-전용-도메인router_manager_hosts) 참고). 이름(내부
 식별자, 파일명 + Caddyfile matcher 토큰으로만 쓰임)과 host(실제로 노출할 전체 도메인,
 예: `dev.example.com`이나 `*.staging.example.com`)로 먼저 expose를 만들고, 그 아래에
 라우트(매치 path, target `host:port`, strip prefix, 리버스프록시 path, `route`/`handle`

@@ -159,6 +159,17 @@ compose에 박혀있지 않고 router-manager UI/API로 실행 중에 추가/삭
   일치하는지 확인하세요. `NETINIT_WAIT=true`가 켜져 있다면 라우트가 없는 동안 `studio`
   자체가 재시작을 반복합니다(fail-closed) - `docker compose logs studio`에서 대기
   타임아웃 로그를 확인할 수 있습니다.
+- Studio가 `Temporary failure in name resolution`(또는 `clientsettings.roblox.com` 조회
+  실패)로 시작 자체를 못 하면 DNS 문제입니다. `internal: true` 네트워크 위의 컨테이너는
+  Docker 내장 DNS(`127.0.0.11`)가 자기가 모르는 이름에 즉시 **확정** SERVFAIL을
+  돌려주기 때문에, 외부 이름을 하나도 못 찾습니다. 그래서 `studio`는 `dns-local`
+  프로그램(strict-order dnsmasq)을 함께 띄우고, code-docker 쪽 오버레이가
+  `DNS_LOCAL_ENABLED=true`를 켜줍니다(단독 실행 시에는 기본 `false`).
+  `docker compose exec studio cat /etc/resolv.conf`가 `nameserver 127.0.0.1`이 아니라면
+  이 프로그램이 안 떴거나 꺼져 있는 것입니다 — `supervisorctl status dns-local`과
+  그 로그를 확인하세요. 이건 2026-08-27에 추가됐으므로, 그 이전에 빌드한 이미지를
+  쓰고 있다면 `docker compose build --no-cache studio`가 필요합니다(`dns-local`은
+  floating `#main` 원격 git 컨텍스트로 받아오는데 Docker가 그 fetch를 캐시합니다).
 - router의 VNC 탭/App Routes에서 대상을 추가할 때 `target host ... is not in the allowed
   target host list`가 뜨면 `.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`에
   `vnc-only`가 들어있는지 확인하세요(위 "수동으로 연동하기" 참고) - 컨테이너 자체는
