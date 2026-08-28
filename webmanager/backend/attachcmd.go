@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/coder/websocket"
 	"golang.org/x/term"
@@ -290,47 +291,147 @@ func attachAuthenticate(baseURL string) (string, error) {
 	return "", fmt.Errorf("unlock succeeded but no cookie was returned")
 }
 
-// detachMatcher recognizes one configured byte sequence (typically 1-2
-// bytes - a plain Ctrl+key, or two in a row like Docker's Ctrl+P Ctrl+Q)
-// appearing consecutively in stdin, possibly spanning more than one
-// os.Stdin.Read call. Deliberately not a general multi-pattern matcher (no
-// KMP table, no support for detecting overlapping/multiple sequences) -
-// every real detach sequence here is short enough that a plain
-// how-many-bytes-matched-so-far counter, restarting on the very byte that
-// broke the match, is simple and sufficient.
+// detachMatcher recognizes the configured detach sequence in the stdin
+// byte stream, holding back any bytes that are still a live prefix of it so
+// a partial match never leaks through to the remote PTY.
+//
+// It matches several *encodings* of the same key press, not just the raw
+// bytes, because a modern shell reconfigures the terminal's keyboard
+// reporting out from under us: fish (and other apps) enable the kitty
+// keyboard protocol or xterm's modifyOtherKeys while at their prompt, and
+// in those modes Ctrl+] arrives as "\x1b[93;5u" or "\x1b[27;5;93~" rather
+// than the plain 0x1d byte. That was a real, and thoroughly confusing,
+// failure: Ctrl+] did nothing at the shell prompt but detached perfectly
+// once a plain foreground program (`cat -v`) was running, because that
+// program's start restores the legacy encoding. See detachCandidates.
+//
+// Deliberately still not a general multi-pattern engine (no KMP table): the
+// candidate set is tiny and short, so a naive "is what I'm holding a
+// complete match / still a prefix of something" check per byte is simple
+// and fast enough.
 type detachMatcher struct {
-	seq   []byte
-	match int // how many leading bytes of seq are currently matched
+	// keys[i] holds every encoding key i might arrive as - see
+	// detachCandidates. Matching is per key, not over one flat byte string,
+	// so a two-key sequence works even when its keys arrive in different
+	// encodings and different reads.
+	keys    [][][]byte
+	matched []byte // raw bytes of the leading keys matched so far
+	keyIdx  int    // how many keys are matched
+	held    []byte // bytes of a partially matched current key
+}
+
+func newDetachMatcher(seq []byte) *detachMatcher {
+	return &detachMatcher{keys: detachCandidates(seq)}
+}
+
+// detachCandidates expands each byte of a configured sequence into every
+// encoding a terminal might send for that key press: the literal byte,
+// plus - for a C0 control byte - the kitty keyboard protocol's CSI u form
+// and xterm's modifyOtherKeys form for the same Ctrl+key. The key number in
+// both is the *unshifted* character the control byte stands for (0x1d ->
+// ']' = 93, 0x01 -> 'a' = 97); 5 is the Ctrl modifier encoding both
+// protocols share.
+func detachCandidates(seq []byte) [][][]byte {
+	keys := make([][][]byte, 0, len(seq))
+	for _, b := range seq {
+		alts := [][]byte{{b}}
+		if b >= 0x01 && b < 0x20 {
+			key := int(b) + 0x40
+			if key >= 'A' && key <= 'Z' {
+				key += 'a' - 'A'
+			}
+			alts = append(alts,
+				[]byte(fmt.Sprintf("\x1b[%d;5u", key)),
+				[]byte(fmt.Sprintf("\x1b[27;5;%d~", key)),
+			)
+		}
+		keys = append(keys, alts)
+	}
+	return keys
+}
+
+func (d *detachMatcher) matchesKey() bool {
+	for _, alt := range d.keys[d.keyIdx] {
+		if bytes.Equal(d.held, alt) {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *detachMatcher) prefixOfKey() bool {
+	for _, alt := range d.keys[d.keyIdx] {
+		if len(d.held) < len(alt) && bytes.HasPrefix(alt, d.held) {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *detachMatcher) reset() {
+	d.matched = d.matched[:0]
+	d.held = d.held[:0]
+	d.keyIdx = 0
 }
 
 // feed processes one incoming chunk. forward is what should actually reach
-// the remote PTY - a byte that's only a tentative prefix of seq is held
-// back until it's clear whether the sequence completes; if it doesn't, the
-// held-back bytes are flushed into forward once the mismatch is seen. If
-// seq completes, detached is true and anything left in chunk after that
-// point is dropped (matches Docker's own attach: nothing typed in the same
-// burst right after the escape leaks through either).
+// the remote PTY - bytes that are only a tentative prefix of the sequence
+// are held back until it's clear whether it completes; if it doesn't, they
+// are flushed into forward, and matching restarts at the very byte that
+// broke the match (so "Ctrl+P Ctrl+P Ctrl+Q" still detaches on the second
+// pair). If the sequence completes, detached is true and anything left in
+// chunk after that point is dropped - same as Docker's own attach, where
+// nothing typed in the same burst right after the escape leaks through
+// either.
+//
+// A half-typed *escape* encoding is only ever held within a single chunk:
+// terminals emit a key's whole escape sequence in one write, while a human
+// typing a two-key sequence lands in separate reads. Holding a lone ESC
+// across reads instead would make the Escape key itself feel stuck until
+// the next keystroke - unacceptable in vim and anything else that treats
+// Escape as an immediate action.
 func (d *detachMatcher) feed(chunk []byte) (forward []byte, detached bool) {
+	forward, detached = d.feedBytes(chunk)
+	if detached {
+		return forward, true
+	}
+	if len(d.held) > 0 && d.held[0] == 0x1b {
+		forward = append(forward, d.held...)
+		d.held = d.held[:0]
+	}
+	return forward, false
+}
+
+func (d *detachMatcher) feedBytes(chunk []byte) (forward []byte, detached bool) {
 	for _, b := range chunk {
-		if b == d.seq[d.match] {
-			d.match++
-			if d.match == len(d.seq) {
+		d.held = append(d.held, b)
+		if d.matchesKey() {
+			d.matched = append(d.matched, d.held...)
+			d.held = d.held[:0]
+			d.keyIdx++
+			if d.keyIdx == len(d.keys) {
+				d.reset()
 				return forward, true
 			}
 			continue
 		}
-		if d.match > 0 {
-			forward = append(forward, d.seq[:d.match]...)
-			d.match = 0
-		}
-		if b == d.seq[0] {
-			d.match = 1
-			if d.match == len(d.seq) { // single-byte sequence
-				return forward, true
-			}
+		if d.prefixOfKey() {
 			continue
 		}
-		forward = append(forward, b)
+
+		// Mismatch: everything held so far was ordinary input after all.
+		// Flush its first byte, then re-run the rest through a reset
+		// matcher so a new match can start inside it. Bounded recursion -
+		// the re-fed slice is always strictly shorter than what produced
+		// it.
+		stale := append(append([]byte(nil), d.matched...), d.held...)
+		d.reset()
+		forward = append(forward, stale[0])
+		refed, det := d.feedBytes(stale[1:])
+		forward = append(forward, refed...)
+		if det {
+			return forward, true
+		}
 	}
 	return forward, false
 }
@@ -385,13 +486,30 @@ func attachRelay(ctx context.Context, conn *websocket.Conn, detachSeq []byte, na
 	// it - Ctrl+D exits the shell, which ends the session for every other
 	// client including the browser tab, and that difference was invisible.
 	var detachedByUser atomic.Bool
+	// ATTACH_DEBUG_LOG=<path> appends a hex dump of everything read from
+	// stdin. It exists because "which bytes did the terminal actually send
+	// for that key" is otherwise unanswerable from inside a raw-mode relay,
+	// and that question is exactly what a detach key that silently does
+	// nothing comes down to (see detachCandidates). Failing to open the
+	// file is ignored: a diagnostic switch must never break the attach.
+	var debugLog *os.File
+	if path := os.Getenv("ATTACH_DEBUG_LOG"); path != "" {
+		if f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
+			debugLog = f
+			defer f.Close()
+		}
+	}
+
 	go func() {
 		defer cancel()
-		matcher := &detachMatcher{seq: detachSeq}
+		matcher := newDetachMatcher(detachSeq)
 		buf := make([]byte, 4096)
 		for {
 			n, rerr := os.Stdin.Read(buf)
 			if n > 0 {
+				if debugLog != nil {
+					fmt.Fprintf(debugLog, "%s stdin % x\n", time.Now().Format(time.RFC3339Nano), buf[:n])
+				}
 				forward, detached := matcher.feed(buf[:n])
 				if len(forward) > 0 {
 					if werr := conn.Write(ctx, websocket.MessageBinary, forward); werr != nil {

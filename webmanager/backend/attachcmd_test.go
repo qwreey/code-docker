@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -8,7 +9,7 @@ import (
 )
 
 func feedAll(seq []byte, chunks ...[]byte) (forward []byte, detached bool) {
-	m := &detachMatcher{seq: seq}
+	m := newDetachMatcher(seq)
 	for _, c := range chunks {
 		var f []byte
 		f, detached = m.feed(c)
@@ -138,5 +139,76 @@ func TestSessionExists(t *testing.T) {
 	}
 	if exists, known := sessionExists("http://127.0.0.1:1", "", "quad"); exists || known {
 		t.Errorf("sessionExists against a dead server = (%v, %v), want (false, false)", exists, known)
+	}
+}
+
+// The bug this pins: fish (and anything else that turns on the kitty
+// keyboard protocol or xterm's modifyOtherKeys while at its prompt) makes
+// the terminal report Ctrl+] as an escape sequence instead of 0x1d, so the
+// detach key did nothing at a shell prompt while working fine under a plain
+// foreground program like `cat -v`.
+func TestDetachMatcherRecognizesEscapeEncodedKey(t *testing.T) {
+	for _, encoded := range []string{"\x1b[93;5u", "\x1b[27;5;93~"} {
+		forward, detached := feedAll(defaultDetachSequence, []byte(encoded))
+		if !detached {
+			t.Errorf("%q: want detached=true", encoded)
+		}
+		if len(forward) != 0 {
+			t.Errorf("%q: forward = %q, want empty", encoded, forward)
+		}
+	}
+}
+
+func TestDetachMatcherEscapeEncodedTwoKeySequence(t *testing.T) {
+	// Ctrl+P Ctrl+Q, with each key independently in either encoding.
+	forward, detached := feedAll([]byte{0x10, 0x11}, []byte("\x1b[112;5u"), []byte{0x11})
+	if !detached {
+		t.Fatalf("want detached=true")
+	}
+	if len(forward) != 0 {
+		t.Fatalf("forward = %q, want empty", forward)
+	}
+}
+
+// A lone Escape must reach the remote immediately - vim and friends treat
+// it as an action, so holding it back until the next keystroke would be
+// worse than missing a detach.
+func TestDetachMatcherFlushesLoneEscapeAtChunkEnd(t *testing.T) {
+	m := newDetachMatcher(defaultDetachSequence)
+	forward, detached := m.feed([]byte{0x1b})
+	if detached {
+		t.Fatalf("want detached=false")
+	}
+	if !bytes.Equal(forward, []byte{0x1b}) {
+		t.Fatalf("forward = %q, want a lone ESC", forward)
+	}
+}
+
+// An escape sequence that merely looks like the start of the encoded detach
+// key must still reach the remote intact once it turns out not to be one.
+func TestDetachMatcherForwardsUnrelatedEscapeSequence(t *testing.T) {
+	arrowUp := []byte("\x1b[A")
+	forward, detached := feedAll(defaultDetachSequence, arrowUp)
+	if detached {
+		t.Fatalf("want detached=false")
+	}
+	if !bytes.Equal(forward, arrowUp) {
+		t.Fatalf("forward = %q, want %q", forward, arrowUp)
+	}
+}
+
+func TestDetachCandidates(t *testing.T) {
+	keys := detachCandidates([]byte{0x01}) // Ctrl+A -> unshifted 'a' = 97
+	if len(keys) != 1 {
+		t.Fatalf("got %d keys, want 1", len(keys))
+	}
+	want := []string{"\x01", "\x1b[97;5u", "\x1b[27;5;97~"}
+	if len(keys[0]) != len(want) {
+		t.Fatalf("got %d encodings, want %d: %q", len(keys[0]), len(want), keys[0])
+	}
+	for i := range want {
+		if string(keys[0][i]) != want[i] {
+			t.Errorf("encoding %d = %q, want %q", i, keys[0][i], want[i])
+		}
 	}
 }
