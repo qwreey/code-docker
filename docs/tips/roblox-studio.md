@@ -180,11 +180,25 @@ MCP 브리지는 `MCP_TOKEN`이 비어있으면 idle 상태로 뜹니다. `ootb.
 같은 일을 합니다 - 값이 이미 있으면 건드리지 않습니다.
 
 > **`migrate.sh`로 값이 생겨도 컨테이너에는 자동으로 안 들어갑니다.** env는 컨테이너
-> 생성 시점에 박히므로 `studio`가 재생성돼야 반영됩니다 - `migrate.sh` 마지막의
-> `docker compose up -d`가 (resolved config가 바뀌었으므로) 그 재생성을 해주지만, 그
-> 단계를 건너뛰었다면 `docker compose up -d studio`를 직접 실행하세요. 반영됐는지는
+> 생성 시점에 박히므로 **`studio`와 `code-docker` 둘 다** 재생성돼야 반영됩니다(브리지를
+> 켜는 쪽과 그 토큰으로 붙는 쪽) - `migrate.sh` 마지막의 `docker compose up -d`가
+> (resolved config가 바뀌었으므로) 양쪽을 재생성해주지만, 그 단계를 건너뛰었다면
+> `docker compose up -d studio code-docker`를 직접 실행하세요. 반영됐는지는
 > `docker compose exec studio printenv MCP_TOKEN`으로 확인합니다 - 값이 비어있으면
 > 브리지 로그에 `MCP_TOKEN not set — idling`만 남습니다.
+
+**현재 값을 다시 보려면** (ootb는 *생성한 순간에만* 출력합니다 - 이미 있는 키는 조용히
+넘어갑니다):
+
+```sh
+grep MCP_TOKEN .env                                   # 호스트에서
+docker compose exec code-docker printenv MCP_TOKEN    # 붙는 쪽 컨테이너에서
+```
+
+두 번째 명령이 값을 뱉는 건 `roblox-studio-code-docker.yml`이 `code-docker` 서비스에도
+`MCP_TOKEN`을 병합해주기 때문입니다 - 그래서 아래 3번의 `claude mcp add`를 `$MCP_TOKEN`
+그대로 복붙해도 동작합니다(code-docker 자신의 compose에는 이 변수가 없습니다. 이
+사이드 프로젝트를 모르니 당연하고, 값을 넘기는 건 오버레이의 일입니다).
 
 **묻지 않는 이유**는 아래 "이 토큰이 실제로 막는 것"에 적었습니다 - 요약하면 물어봐야
 답이 달라질 게 없어서입니다. 브리지를 켜두는 것 자체는 아무 권한도 주지 않습니다(진짜
