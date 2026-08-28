@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -111,7 +113,7 @@ func (s *Server) handleTerminal(w http.ResponseWriter, r *http.Request) {
 		// can legitimately outlive whatever timeout semantics the request
 		// context might carry, since the handler blocks here for the
 		// connection's whole lifetime rather than returning immediately.
-		s.handleNamedTerminal(context.Background(), conn, name, opts)
+		s.handleNamedTerminal(context.Background(), conn, name, opts, parseAttachSize(r))
 		return
 	}
 
@@ -193,12 +195,64 @@ readLoop:
 	_ = conn.Close(websocket.StatusNormalClosure, "")
 }
 
+// attachSize is the terminal size an attaching client reports up front, via
+// ?cols=/?rows= on the WebSocket URL. Zero means the client didn't say (an
+// older frontend, or the `attach` CLI), in which case the session keeps
+// whatever size it already had.
+type attachSize struct {
+	Cols uint16
+	Rows uint16
+}
+
+func (a attachSize) known() bool { return a.Cols > 0 && a.Rows > 0 }
+
+// parseAttachSize reads ?cols=/?rows= off r. Anything missing, unparseable
+// or out of range is reported as "not told" rather than an error — a bad
+// size is never worth refusing a terminal connection over.
+func parseAttachSize(r *http.Request) attachSize {
+	q := r.URL.Query()
+	return attachSize{Cols: parseTerminalDimension(q.Get("cols")), Rows: parseTerminalDimension(q.Get("rows"))}
+}
+
+func parseTerminalDimension(raw string) uint16 {
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 || n > math.MaxUint16 {
+		return 0
+	}
+	return uint16(n)
+}
+
+// nudgeRepaint resizes the PTY one row down and straight back, to make the
+// foreground application redraw its whole screen.
+//
+// Needed because a scrollback replay is only ever an approximation: the
+// ring buffer holds raw bytes, not parsed screen state, so a full-screen
+// application's absolute cursor moves replay into a screen that isn't in
+// the state they were written for. The client's real size is already
+// applied before the snapshot (see relayTerminalSession), but TIOCSWINSZ
+// only raises SIGWINCH when the size actually *changes* — so a client
+// reattaching at the size it left gets no signal at all, which is exactly
+// the common case, and exactly when users were nudging the browser window
+// by hand to un-garble the display.
+func nudgeRepaint(sess *termsession.Session, size attachSize, logLabel string) {
+	if !size.known() || size.Rows < 2 {
+		return
+	}
+	if err := sess.Resize(size.Cols, size.Rows-1); err != nil {
+		log.Printf("terminal: session %q: repaint nudge failed: %v", logLabel, err)
+		return
+	}
+	if err := sess.Resize(size.Cols, size.Rows); err != nil {
+		log.Printf("terminal: session %q: repaint nudge restore failed: %v", logLabel, err)
+	}
+}
+
 // handleNamedTerminal is the M2 path: reattach to (or create) a
 // termsession.Session by name, replay its scrollback, then relay this
 // connection's input/output exactly like handleTerminal's M1 loop — except
 // the PTY itself is owned by the Session, not this function, so it keeps
 // running after this connection ends.
-func (s *Server) handleNamedTerminal(ctx context.Context, conn *websocket.Conn, name string, opts termsession.CreateOptions) {
+func (s *Server) handleNamedTerminal(ctx context.Context, conn *websocket.Conn, name string, opts termsession.CreateOptions, size attachSize) {
 	sess, err := s.termSessions.GetOrCreate(name, opts)
 	if err != nil {
 		log.Printf("terminal: session %q: %v", name, err)
@@ -210,7 +264,7 @@ func (s *Server) handleNamedTerminal(ctx context.Context, conn *websocket.Conn, 
 		return
 	}
 
-	relayTerminalSession(ctx, conn, sess, name)
+	relayTerminalSession(ctx, conn, sess, name, size)
 }
 
 // relayTerminalSession shuttles an already-obtained *termsession.Session's
@@ -220,9 +274,25 @@ func (s *Server) handleNamedTerminal(ctx context.Context, conn *websocket.Conn, 
 // handleClaudeInteractiveLoginTerminal (session obtained via
 // claudecode.InteractiveLoginManager, never Registry-tracked) - the relay
 // logic itself doesn't care which. logLabel is only used for log lines.
-func relayTerminalSession(ctx context.Context, conn *websocket.Conn, sess *termsession.Session, logLabel string) {
+func relayTerminalSession(ctx context.Context, conn *websocket.Conn, sess *termsession.Session, logLabel string, size attachSize) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	// Apply the attaching client's size before the scrollback snapshot
+	// below, not after. The ring buffer holds raw bytes recorded at
+	// whatever size the PTY had when they were produced, so replaying them
+	// into a differently-sized terminal renders garbage — absolute cursor
+	// moves and box drawing land in the wrong columns. Resizing first gives
+	// the foreground application a SIGWINCH to repaint from, and that
+	// repaint then lands after the replay instead of before it. The
+	// client's own "resize" control message can't do this job: it isn't
+	// read until the readLoop below, which only starts once the replay has
+	// already been written.
+	if size.known() {
+		if rerr := sess.Resize(size.Cols, size.Rows); rerr != nil {
+			log.Printf("terminal: session %q: initial resize failed: %v", logLabel, rerr)
+		}
+	}
 
 	sink := func(p []byte) error {
 		return writeWithTimeout(ctx, conn, p)
@@ -254,6 +324,7 @@ func relayTerminalSession(ctx context.Context, conn *websocket.Conn, sess *terms
 		if werr := writeScrollback(ctx, conn, scrollback); werr != nil {
 			return
 		}
+		nudgeRepaint(sess, size, logLabel)
 	}
 
 readLoop:
@@ -308,7 +379,7 @@ func (s *Server) handleClaudeInteractiveLoginTerminal(w http.ResponseWriter, r *
 		return
 	}
 
-	relayTerminalSession(context.Background(), conn, sess, "claude-interactive-login")
+	relayTerminalSession(context.Background(), conn, sess, "claude-interactive-login", parseAttachSize(r))
 }
 
 // writeScrollback replays a session's scrollback into a freshly-attached

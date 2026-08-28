@@ -353,6 +353,18 @@ export function Terminal({
     }
   }, [currentTheme])
 
+  // Fits xterm to its container, but only when that container is actually
+  // laid out. The container carries `hidden` while the Home tab is showing
+  // (which is what a fresh mount shows), and FitAddon measures via
+  // getComputedStyle: on a display:none box it reads 0x0 and clamps to its
+  // own 2x1 minimum. That bogus size then reached the PTY through
+  // sendResize, so a session could be told it was two columns wide.
+  const fitIfVisible = useCallback(() => {
+    const container = containerRef.current
+    if (!container || container.clientWidth === 0 || container.clientHeight === 0) return
+    fitAddonRef.current?.fit()
+  }, [])
+
   // Apply the selected Font Manager family live, same "initial value at
   // creation, then kept in sync by its own effect" shape as the theme
   // effect above. A font swap can change cell metrics, so re-fit afterward
@@ -360,9 +372,9 @@ export function Terminal({
   useEffect(() => {
     if (termRef.current) {
       termRef.current.options.fontFamily = resolveFontFamily(effectiveSettings.fontFamily)
-      fitAddonRef.current?.fit()
+      fitIfVisible()
     }
-  }, [effectiveSettings.fontFamily])
+  }, [effectiveSettings.fontFamily, fitIfVisible])
 
   // Tells the backend the PTY's size changed — shared by the ResizeObserver
   // below (container size changed) and the zoom effect further down (font
@@ -386,10 +398,10 @@ export function Terminal({
   useEffect(() => {
     if (termRef.current) {
       termRef.current.options.fontSize = fontSize
-      fitAddonRef.current?.fit()
+      fitIfVisible()
       sendResize()
     }
-  }, [fontSize, sendResize])
+  }, [fontSize, fitIfVisible, sendResize])
 
   // Re-focuses the terminal. Used after every mobile-toolbar key/zoom
   // button action (see TerminalControls.tsx) since tapping a button would
@@ -513,7 +525,9 @@ export function Terminal({
     fitAddonRef.current = fitAddon
     term.loadAddon(fitAddon)
     term.open(container)
-    fitAddon.fit()
+    // Not fitAddon.fit() unconditionally: on a fresh mount the Home tab is
+    // active, so this container is still `hidden` here — see fitIfVisible.
+    if (container.clientWidth > 0 && container.clientHeight > 0) fitAddon.fit()
 
     // xterm.js v6 doesn't scroll its scrollback via a plain native
     // `overflow-y: auto` div — .xterm-viewport is wrapped in a vendored
@@ -810,6 +824,10 @@ export function Terminal({
     })
 
     const resizeObserver = new ResizeObserver(() => {
+      // Also fires when the container is hidden on a switch to the Home tab
+      // (a 0x0 box is still a size change), which is exactly the case
+      // fitIfVisible exists to skip.
+      if (container.clientWidth === 0 || container.clientHeight === 0) return
       fitAddon.fit()
       sendResize()
     })
@@ -860,6 +878,17 @@ export function Terminal({
     if (pending?.cwd) params.set('cwd', pending.cwd)
     if (pending?.command) params.set('cmd', pending.command)
 
+    // The container was hidden until the render that scheduled this effect
+    // committed, so fit here (now that it has a real box) rather than
+    // trusting whatever size the terminal happens to be carrying. The size
+    // rides along on the connect URL because the backend has to apply it
+    // *before* it snapshots and replays scrollback — the "resize" control
+    // message sent from onopen below arrives too late for that, since the
+    // server doesn't read client messages until the replay is done.
+    fitIfVisible()
+    params.set('cols', String(term.cols))
+    params.set('rows', String(term.rows))
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const ws = new WebSocket(`${protocol}//${window.location.host}${apiUrl(`/terminal?${params.toString()}`)}`)
     ws.binaryType = 'arraybuffer'
@@ -867,7 +896,10 @@ export function Terminal({
 
     ws.onopen = () => {
       setState('connected')
-      fitAddon.fit()
+      // Still sent even though the size already went out as a query param
+      // above: the container can legitimately have changed size between
+      // this effect running and the handshake completing.
+      fitIfVisible()
       ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
       refreshSessions()
     }
@@ -918,7 +950,7 @@ export function Terminal({
       ws.close()
       if (wsRef.current === ws) wsRef.current = null
     }
-  }, [activeSession, refreshSessions, reconnectNonce])
+  }, [activeSession, refreshSessions, reconnectNonce, fitIfVisible])
 
   const reconnect = useCallback(() => {
     setReconnectNonce((n) => n + 1)

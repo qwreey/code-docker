@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -100,6 +101,18 @@ func attachCmd(cfg Config, args []string) int {
 	query := url.Values{"session": {name}}
 	if len(args) == 2 {
 		query.Set("cwd", args[1])
+	}
+	// Report this terminal's size on the connect URL, not just via the
+	// "resize" control message attachRelay sends once connected: the server
+	// applies the URL size before it snapshots and replays scrollback,
+	// whereas the control message isn't read until after the replay is
+	// already on the wire. Same reason the browser tab passes it (see
+	// Terminal.tsx's WS-connect effect). Best-effort — a non-tty stdin
+	// just omits it and the session keeps its current size. Uses stdin, the
+	// same fd attachRelay measures below.
+	if cols, rows, err := term.GetSize(int(os.Stdin.Fd())); err == nil && cols > 0 && rows > 0 {
+		query.Set("cols", strconv.Itoa(cols))
+		query.Set("rows", strconv.Itoa(rows))
 	}
 	wsURL := "ws://" + cfg.Addr + "/api/terminal?" + query.Encode()
 
