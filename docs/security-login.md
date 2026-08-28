@@ -63,8 +63,11 @@ router의 vhost(`ROUTER_VHOST_*`, [router/docs/vhost.md](../router/docs/vhost.md
 ```Caddy
 note.yaeji.moe {
   # Trilium의 PWA 경로는 이 둘뿐입니다 - 서비스워커가 없습니다.
+  # /_pwa-icon.png는 router가 PWA 아이콘을 갈아끼울 때 쓰는 고정 경로입니다
+  # (ROUTER_VHOST_PWA_ICON_*, router/docs/vhost.md). 안 바꿨다면 그 앱
+  # 자신의 아이콘 경로 - Trilium이면 /icon.png - 를 대신 넣으세요.
   @not_pwa_public {
-    not path /manifest.webmanifest /icon.png
+    not path /manifest.webmanifest /_pwa-icon.png
   }
   forward_auth @not_pwa_public http://authentik:9000 {
     uri /outpost.goauthentik.io/auth/caddy

@@ -10,6 +10,8 @@ submodule이 아닙니다.
 - Trilium이 **자기 도메인**에서 서비스됩니다 (`note.example.com` 같은, router의 vhost).
 - code-docker 안의 Claude Code가 **Trilium 내장 MCP**로 노트를 읽고 씁니다.
 - 설치된 code-server PWA 아이콘 **우클릭(길게 누르기) 메뉴에 "Trilium"** 항목이 생깁니다.
+- Trilium 자체를 **별도 PWA로 설치**할 수 있고, 그때 앱 이름/아이콘이 개인 Trilium과
+  구분되게 바뀝니다.
 
 설치 절차, 인증 선택, MCP 등록은 그 레포의 `README.md`가 단일 출처입니다. 이 문서는
 **code-docker 쪽에서 무슨 일이 일어나는지**만 설명합니다.
@@ -39,6 +41,17 @@ Trilium은 노트에 담긴 JavaScript를 실행하고(스크립트 노트 — �
 | `code-docker` | `WEBMANAGER_MANIFEST_SHORTCUT_TRILIUM="Trilium\|https://<호스트네임>/\|..."` — PWA 바로가기 |
 | 바로가기가 여는 주소 | 같은 값 |
 
+여기에 더해 `ROUTER_VHOST_PWA_TRILIUM`(앱 이름, ootb가 같이 물어봅니다)과 선택적인
+`ROUTER_VHOST_PWA_ICON_TRILIUM`이 Trilium 자신의 PWA 매니페스트를 갈아끼웁니다 — 개인
+Trilium과 이 인스턴스가 둘 다 "Trilium Notes"로 설치되면 구분이 안 되기 때문입니다.
+router가 원본 매니페스트를 가져와 이름/아이콘만 바꾸는 방식이라, 실패하면 원본이 그대로
+나갑니다(설치는 되고 이름만 원래대로). 자세한 내용은
+[router/docs/vhost.md](../../router/docs/vhost.md).
+
+**바로가기와 별도 설치는 서로 대체재가 아닙니다.** webmanager는 code-server를 열고 메뉴를
+누르면 나오지만 Trilium은 아니라서, 둘을 동시에 띄우려면 앱이 두 개인 게 자연스럽습니다 —
+바로가기는 "이미 code-server를 보고 있을 때 건너가는" 용도입니다.
+
 바깥 리버스 프록시에는 `ROUTER_MANAGER_HOSTS`/`TINYAUTH_HOSTS`와 **똑같이** 한 줄
 추가하면 됩니다 (path rewrite 불필요):
 
@@ -49,7 +62,8 @@ note.example.com {
 ```
 
 PWA로 설치까지 하려면 매니페스트와 아이콘만 인증 예외로 빼야 합니다 — Trilium은
-서비스워커가 없어서 경로가 `/manifest.webmanifest`, `/icon.png` 둘뿐입니다. 이유는
+서비스워커가 없어서 경로가 `/manifest.webmanifest`와 아이콘 하나뿐입니다(아이콘을
+바꿨다면 `/_pwa-icon.png`, 안 바꿨다면 Trilium 자신의 `/icon.png`). 이유는
 [security-login.md](../security-login.md)의 "PWA 설치가 안 되는 이유" 절과 같습니다.
 
 ## MCP

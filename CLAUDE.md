@@ -92,7 +92,12 @@ a path prefix, or sharing code-server's origin would hand whatever runs inside t
 same-origin reach into webmanager's terminal/file APIs. No per-route tinyauth here; that's
 Dev Proxy's job. The upstream goes through an nginx variable + `resolver` deliberately, so a
 stopped side project is a 502 on its own hostname instead of an nginx that refuses to start
-and takes the whole front door down with it — see `router/docs/vhost.md`), and VNC (router serves noVNC itself and bridges the
+and takes the whole front door down with it. `ROUTER_VHOST_PWA_<NAME>` (+ an optional
+`ROUTER_VHOST_PWA_ICON_<NAME>`) additionally rewrites that app's own PWA manifest name/icon,
+which is what makes a *second* instance of an app the user already has installed
+distinguishable on a home screen — router-manager merges into the app's real manifest rather
+than authoring a copy, and a failure falls back to the unmodified one, so the worst case is
+the original name rather than an app that won't install. See `router/docs/vhost.md`), and VNC (router serves noVNC itself and bridges the
 browser's WebSocket to a target's raw RFB port — as of 2026-08-27; the older
 "proxy the target's own web VNC front end through an App Route" transport is still
 available per target, for a front end that isn't noVNC. No process of its own either way,
