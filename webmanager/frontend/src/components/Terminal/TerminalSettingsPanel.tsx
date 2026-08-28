@@ -38,6 +38,8 @@ export function TerminalSettingsPanel({
   fontFamilies,
   mobileInputWorkaroundEnabled,
   onToggleMobileInputWorkaround,
+  altScreenTouchScrollEnabled,
+  onToggleAltScreenTouchScroll,
 }: {
   open: boolean
   onClose: () => void
@@ -50,6 +52,8 @@ export function TerminalSettingsPanel({
   fontFamilies: string[]
   mobileInputWorkaroundEnabled: boolean
   onToggleMobileInputWorkaround: (enabled: boolean) => void
+  altScreenTouchScrollEnabled: boolean
+  onToggleAltScreenTouchScroll: (enabled: boolean) => void
 }) {
   const [draftKeybindings, setDraftKeybindings] = useState<KeyBinding[]>(settings.keybindings)
   const [draftDetachSequence, setDraftDetachSequence] = useState(bytesToDisplay(settings.detachSequence))
@@ -249,7 +253,7 @@ export function TerminalSettingsPanel({
       </section>
 
       <section className="terminal-settings-section">
-        <h4>모바일 입력 (실험적)</h4>
+        <h4>모바일 입력 · 스크롤 (실험적)</h4>
         <p className="section-description">
           모바일 가상 키보드의 예측 입력(자동완성) 기능 때문에 문자가 즉시 전송되지 않고 스페이스를 누를 때까지
           버퍼링되는 문제를 우회하는 기능입니다. 실제 <code>&lt;input type="password"&gt;</code> 필드로 포커스를
@@ -264,6 +268,21 @@ export function TerminalSettingsPanel({
             onChange={(e) => onToggleMobileInputWorkaround(e.target.checked)}
           />
           모바일 입력 버퍼링 우회 사용
+        </label>
+        <p className="section-description">
+          <code>claude</code>, <code>vim</code>, <code>htop</code>처럼 화면 전체를 쓰는 앱(대체 화면 버퍼)에서는
+          터미널 자체를 스크롤할 것이 없기 때문에, 터치 스크롤을 터미널 화면 이동이 아니라 앱에 전달할 스크롤
+          입력(마우스 휠 보고 또는 위/아래 키)으로 바꿔 보냅니다. 데스크탑에서 휠을 굴렸을 때와 똑같은 동작이고,
+          일반 셸 화면에서는 지금처럼 그대로 스크롤됩니다. 앱이 휠 입력을 이상하게 처리하면 꺼서 예전 동작으로
+          되돌릴 수 있습니다.
+        </p>
+        <label className="checkbox-option">
+          <input
+            type="checkbox"
+            checked={altScreenTouchScrollEnabled}
+            onChange={(e) => onToggleAltScreenTouchScroll(e.target.checked)}
+          />
+          전체 화면 앱에서 터치 스크롤을 앱으로 전달
         </label>
       </section>
 

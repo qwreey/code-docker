@@ -110,6 +110,10 @@ type Session struct {
 	cmd  *exec.Cmd
 	ptmx *os.File
 	ring *ringBuffer
+	// modes is fed the same bytes as ring, but keeps exact sticky-mode
+	// state instead of a bounded byte window — see modes.go for why the
+	// ring alone can't answer "is this session in the alt screen".
+	modes *modeTracker
 
 	// done is closed exactly once, when Close() actually runs (guarded by
 	// the closed bool under mu, not a sync.Once, since they'd otherwise
@@ -209,6 +213,7 @@ func newSessionCmd(name, command string, args []string, extraEnv []string, scrol
 		cmd:            cmd,
 		ptmx:           ptmx,
 		ring:           newRingBuffer(scrollbackBytes),
+		modes:          newModeTracker(),
 		sinks:          make(map[uint64]writerFunc),
 		lastAttachedAt: now,
 		done:           make(chan struct{}),
@@ -240,6 +245,7 @@ func (s *Session) pump() {
 			// of this.
 			s.mu.Lock()
 			s.ring.Write(chunk)
+			s.modes.Feed(chunk)
 			sinks := make(map[uint64]writerFunc, len(s.sinks))
 			for id, sink := range s.sinks {
 				sinks[id] = sink
@@ -280,6 +286,16 @@ func (s *Session) removeSink(id uint64) {
 	s.lastAttachedAt = time.Now()
 }
 
+// Replay is what a freshly-attached client must be sent, in field order,
+// before the live stream starts: Preamble puts it into the sticky terminal
+// modes the session is currently in (see modes.go — the alternate screen
+// buffer above all, whose one-off enable sequence has long since scrolled
+// out of the ring), then Scrollback redraws what it missed.
+type Replay struct {
+	Preamble   []byte
+	Scrollback []byte
+}
+
 // Attach adds sink as one of the session's live output receivers, replays
 // the current scrollback into it first (so a newly-attaching client sees
 // what it missed), and returns a detach func the caller must call exactly
@@ -287,11 +303,11 @@ func (s *Session) removeSink(id uint64) {
 // concurrently — a browser tab and one or more `webmanager --attach`
 // clients (see attachcmd.go) all watching and typing into the same Session
 // at once — attaching never kicks any other sink.
-func (s *Session) Attach(sink writerFunc) (detach func(), scrollback []byte, err error) {
+func (s *Session) Attach(sink writerFunc) (detach func(), replay Replay, err error) {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		return nil, nil, ErrSessionGone
+		return nil, Replay{}, ErrSessionGone
 	}
 	id := s.nextSinkID
 	s.nextSinkID++
@@ -303,11 +319,11 @@ func (s *Session) Attach(sink writerFunc) (detach func(), scrollback []byte, err
 	// well-defined instead of a race: whichever of pump()'s write or this
 	// Attach call takes the lock first determines it, with no window where
 	// both (or neither) can happen. See pump()'s own comment.
-	scrollback = s.ring.Snapshot()
+	replay = Replay{Preamble: s.modes.Preamble(), Scrollback: s.ring.Snapshot()}
 	s.mu.Unlock()
 
 	detach = func() { s.removeSink(id) }
-	return detach, scrollback, nil
+	return detach, replay, nil
 }
 
 // Write sends client keystrokes to the PTY.

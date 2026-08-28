@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
+	"webmanager/internal/termsession"
 )
 
 // TestWriteScrollbackFitsDefaultClientReadLimit pins the bug that made
@@ -19,7 +21,7 @@ import (
 // aborts any message over its default 32KiB read limit. The client here
 // deliberately does NOT raise that limit - that's the whole point.
 func TestWriteScrollbackFitsDefaultClientReadLimit(t *testing.T) {
-	scrollback := bytes.Repeat([]byte("x"), 256*1024)
+	replay := termsession.Replay{Scrollback: bytes.Repeat([]byte("x"), 256*1024)}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := websocket.Accept(w, r, nil)
@@ -28,7 +30,7 @@ func TestWriteScrollbackFitsDefaultClientReadLimit(t *testing.T) {
 			return
 		}
 		defer conn.Close(websocket.StatusNormalClosure, "")
-		if err := writeScrollback(r.Context(), conn, scrollback); err != nil {
+		if err := writeScrollback(r.Context(), conn, replay); err != nil {
 			t.Errorf("writeScrollback: %v", err)
 		}
 	}))
@@ -44,7 +46,7 @@ func TestWriteScrollbackFitsDefaultClientReadLimit(t *testing.T) {
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	var got []byte
-	for len(got) < len(scrollback)+len("\x1b[2J\x1b[H") {
+	for len(got) < len(replay.Scrollback)+len("\x1b[2J\x1b[H") {
 		_, data, rerr := conn.Read(ctx)
 		if rerr != nil {
 			t.Fatalf("read after %d bytes: %v", len(got), rerr)
@@ -52,7 +54,7 @@ func TestWriteScrollbackFitsDefaultClientReadLimit(t *testing.T) {
 		got = append(got, data...)
 	}
 
-	want := append([]byte("\x1b[2J\x1b[H"), scrollback...)
+	want := append([]byte("\x1b[2J\x1b[H"), replay.Scrollback...)
 	if !bytes.Equal(got, want) {
 		t.Fatalf("replayed %d bytes, want %d (and byte-identical)", len(got), len(want))
 	}

@@ -129,6 +129,44 @@ function saveMobileInputWorkaroundEnabled(enabled: boolean) {
   }
 }
 
+// Alt-screen touch scrolling: a touch-drag over a full-screen application
+// is delivered to that application as scroll input (see the touch handler in
+// the xterm-creation effect) instead of moving xterm's own viewport. On by
+// default — the old behavior was simply broken for those apps — but this is
+// a mobile-only behavior change of the same kind as the IME workaround
+// above, and the input it produces depends on what the application does with
+// a wheel event, so an escape hatch back to plain viewport scrolling is
+// worth having. Read through a ref, so unlike the workaround above it takes
+// effect immediately rather than on the next remount.
+const ALT_SCREEN_TOUCH_SCROLL_KEY = 'webmanager.terminal.altScreenTouchScroll'
+
+function loadAltScreenTouchScrollEnabled(): boolean {
+  try {
+    return localStorage.getItem(ALT_SCREEN_TOUCH_SCROLL_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function saveAltScreenTouchScrollEnabled(enabled: boolean) {
+  try {
+    if (enabled) localStorage.removeItem(ALT_SCREEN_TOUCH_SCROLL_KEY)
+    else localStorage.setItem(ALT_SCREEN_TOUCH_SCROLL_KEY, '0')
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - the toggle just won't persist
+  }
+}
+
+// sendsScrollToApp reports whether the running application, not the
+// viewport, is what should receive a scroll. True in the alternate screen
+// buffer (a full-screen app: there is no scrollback to move through) and
+// whenever mouse tracking is on, which an application only enables because
+// it wants to handle wheel events itself — including in the normal buffer,
+// where the alt-buffer check alone would miss it.
+function sendsScrollToApp(term: XTerm): boolean {
+  return term.buffer.active.type === 'alternate' || term.modes.mouseTrackingMode !== 'none'
+}
+
 // nextSessionName picks "세션 N" for the smallest N not already taken (or,
 // when a profile supplies a label, that label itself — only falling back to
 // "label 2", "label 3", ... if it's already in use), so repeated "+" clicks
@@ -189,6 +227,11 @@ export function Terminal({
   const [armedModifier, setArmedModifier] = useState<ModifierId | null>(null)
   const [fontSize, setFontSize] = useState<number>(loadFontSize)
   const [mobileInputWorkaroundEnabled, setMobileInputWorkaroundEnabled] = useState<boolean>(loadMobileInputWorkaroundEnabled)
+  const [altScreenTouchScrollEnabled, setAltScreenTouchScrollEnabled] = useState<boolean>(loadAltScreenTouchScrollEnabled)
+  // The touch handler is installed once with the xterm instance, so it
+  // reads the toggle through a ref rather than closing over the state.
+  const altScreenScrollRef = useRef(altScreenTouchScrollEnabled)
+  altScreenScrollRef.current = altScreenTouchScrollEnabled
   const [sessions, setSessions] = useState<TerminalSessionInfo[]>([])
   // HOME_TAB_ID is a virtual tab (never a real termsession.Session), and is
   // also the initial state now: opening the Terminal tab must not silently
@@ -450,6 +493,11 @@ export function Terminal({
     setMobileInputWorkaroundEnabled(enabled)
   }, [])
 
+  const toggleAltScreenTouchScroll = useCallback((enabled: boolean) => {
+    saveAltScreenTouchScrollEnabled(enabled)
+    setAltScreenTouchScrollEnabled(enabled)
+  }, [])
+
   const sendBytes = useCallback((bytes: string) => {
     if (!bytes) return
     const mod = armedModifierRef.current
@@ -549,6 +597,11 @@ export function Terminal({
     // easily exceeds a few px) so a genuine tap-to-focus isn't misread as a
     // drag and swallowed.
     const TOUCH_SCROLL_THRESHOLD = 16
+    // A single touch-drag can't be allowed to fire an unbounded number of
+    // wheel events: each one is a keystroke (or mouse report) to the
+    // application, and a fast flick across a short screen would otherwise
+    // send a burst of dozens at once.
+    const MAX_WHEEL_STEPS_PER_MOVE = 6
     let startY = 0
     let lastY = 0
     let dragging = false
@@ -560,6 +613,41 @@ export function Terminal({
       dragging = false
       lineRemainder = 0
     }
+    // A full-screen application (claude, vim, htop, ...) runs in the
+    // alternate screen buffer, which has no scrollback at all — so
+    // term.scrollLines() there is either a silent no-op or, worse, drags
+    // the view through the normal buffer's pile of stale redraws, which is
+    // exactly what "touch-scrolling claude moves the terminal instead of
+    // scrolling the app" was. What such an app expects instead is the
+    // scroll *as input*: a mouse report if it turned mouse tracking on,
+    // arrow keys if it didn't.
+    //
+    // Rather than reimplement that decision, hand it back to xterm.js by
+    // synthesizing the wheel event a desktop mouse would have produced and
+    // dispatching it on .xterm-screen, exactly where a real one lands.
+    // xterm's own listeners then pick whichever of the three behaviors
+    // applies (mouse report / arrow keys / viewport scroll — see
+    // CoreBrowserTerminal's wheel handling), so touch and wheel can't drift
+    // apart. DOM_DELTA_LINE with ±1 per event is used because xterm sends
+    // exactly one arrow key per wheel event regardless of magnitude.
+    const wheelTarget = () => container.querySelector('.xterm-screen') ?? container
+    const dispatchWheel = (lines: number, clientX: number, clientY: number) => {
+      const direction = lines > 0 ? 1 : -1
+      const steps = Math.min(Math.abs(lines), MAX_WHEEL_STEPS_PER_MOVE)
+      const target = wheelTarget()
+      for (let i = 0; i < steps; i++) {
+        target.dispatchEvent(
+          new WheelEvent('wheel', {
+            deltaY: direction,
+            deltaMode: WheelEvent.DOM_DELTA_LINE,
+            bubbles: true,
+            cancelable: true,
+            clientX,
+            clientY,
+          }),
+        )
+      }
+    }
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 1) return
       const y = e.touches[0].clientY
@@ -570,7 +658,15 @@ export function Terminal({
       lastY = y
       const lines = Math.trunc(lineRemainder)
       if (lines !== 0) {
-        term.scrollLines(lines)
+        // The normal buffer keeps the direct 1:1 scrollLines path: it moves
+        // with the finger instead of being quantized into wheel clicks, and
+        // it bypasses the viewport's smooth-scroll animation, which reads as
+        // lag under direct manipulation.
+        if (altScreenScrollRef.current && sendsScrollToApp(term)) {
+          dispatchWheel(lines, e.touches[0].clientX, y)
+        } else {
+          term.scrollLines(lines)
+        }
         lineRemainder -= lines
       }
       e.preventDefault()
@@ -1253,6 +1349,8 @@ export function Terminal({
         fontFamilies={fontFamilies}
         mobileInputWorkaroundEnabled={mobileInputWorkaroundEnabled}
         onToggleMobileInputWorkaround={toggleMobileInputWorkaround}
+        altScreenTouchScrollEnabled={altScreenTouchScrollEnabled}
+        onToggleAltScreenTouchScroll={toggleAltScreenTouchScroll}
       />
       <ConfirmDialog
         open={closeConfirm !== null}

@@ -21,6 +21,7 @@ import (
 
 	"webmanager/internal/atomicfile"
 	"webmanager/internal/authgate"
+	"webmanager/internal/termsession"
 )
 
 // attachCmd implements `webmanager --attach <name> [cwd]` - a plain
@@ -506,6 +507,16 @@ func attachRelay(ctx context.Context, conn *websocket.Conn, detachSeq []byte, na
 		return 1
 	}
 	defer term.Restore(fd, oldState)
+	// The session's mode preamble (see termsession.Replay) puts this
+	// terminal into whatever the remote application is using - the
+	// alternate screen buffer and mouse reporting above all - and nothing
+	// takes it back out when we detach, since the remote app is still
+	// running and never emits a teardown of its own. Without this, detaching
+	// from a session running `claude`/vim drops the user back to a shell
+	// that is still in the alt screen with mouse reporting on, which reads
+	// as a hung terminal. Raw-mode restore above does not cover it: these
+	// are terminal escape state, not termios.
+	defer os.Stdout.Write(termsession.ResetModesSequence())
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

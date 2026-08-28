@@ -297,7 +297,7 @@ func relayTerminalSession(ctx context.Context, conn *websocket.Conn, sess *terms
 	sink := func(p []byte) error {
 		return writeWithTimeout(ctx, conn, p)
 	}
-	detach, scrollback, err := sess.Attach(sink)
+	detach, replay, err := sess.Attach(sink)
 	if err != nil {
 		log.Printf("terminal: session %q: attach failed: %v", logLabel, err)
 		_ = conn.Close(websocket.StatusInternalError, err.Error())
@@ -320,8 +320,8 @@ func relayTerminalSession(ctx context.Context, conn *websocket.Conn, sess *terms
 		}
 	}()
 
-	if len(scrollback) > 0 {
-		if werr := writeScrollback(ctx, conn, scrollback); werr != nil {
+	if len(replay.Preamble) > 0 || len(replay.Scrollback) > 0 {
+		if werr := writeScrollback(ctx, conn, replay); werr != nil {
 			return
 		}
 		nudgeRepaint(sess, size, logLabel)
@@ -382,9 +382,15 @@ func (s *Server) handleClaudeInteractiveLoginTerminal(w http.ResponseWriter, r *
 	relayTerminalSession(context.Background(), conn, sess, "claude-interactive-login", parseAttachSize(r))
 }
 
-// writeScrollback replays a session's scrollback into a freshly-attached
-// connection: a clear+home first, then the buffer itself in
-// scrollbackChunkBytes-sized messages.
+// writeScrollback replays a session into a freshly-attached connection: the
+// mode preamble first, then a clear+home, then the scrollback buffer itself
+// in scrollbackChunkBytes-sized messages.
+//
+// The preamble goes first because it is what re-enters the alternate screen
+// buffer (see termsession/modes.go) — everything after it has to be drawn
+// into the buffer the application actually believes it is drawing into, and
+// entering the alt buffer clears it, so doing it after the replay would wipe
+// what was just replayed.
 //
 // The clear is needed because the ring buffer is raw bytes, not parsed
 // terminal state, so relative cursor-movement escapes in it only render
@@ -398,10 +404,11 @@ func (s *Server) handleClaudeInteractiveLoginTerminal(w http.ResponseWriter, r *
 // limit - see scrollbackChunkBytes for the bug that caused. Message order
 // on a single WebSocket connection is guaranteed, so splitting is
 // indistinguishable from one big write on the receiving end.
-func writeScrollback(ctx context.Context, conn *websocket.Conn, scrollback []byte) error {
-	if err := writeWithTimeout(ctx, conn, []byte("\x1b[2J\x1b[H")); err != nil {
+func writeScrollback(ctx context.Context, conn *websocket.Conn, replay termsession.Replay) error {
+	if err := writeWithTimeout(ctx, conn, append(append([]byte(nil), replay.Preamble...), "\x1b[2J\x1b[H"...)); err != nil {
 		return err
 	}
+	scrollback := replay.Scrollback
 	for off := 0; off < len(scrollback); off += scrollbackChunkBytes {
 		end := off + scrollbackChunkBytes
 		if end > len(scrollback) {

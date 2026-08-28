@@ -41,7 +41,7 @@ func TestAttachDoesNotDuplicateOrDropOutput(t *testing.T) {
 
 	var mu sync.Mutex
 	var live bytes.Buffer
-	detach, scrollback, err := s.Attach(func(p []byte) error {
+	detach, replay, err := s.Attach(func(p []byte) error {
 		mu.Lock()
 		live.Write(p)
 		mu.Unlock()
@@ -57,7 +57,7 @@ func TestAttachDoesNotDuplicateOrDropOutput(t *testing.T) {
 	mu.Unlock()
 	detach()
 
-	combined := append(append([]byte(nil), scrollback...), liveCopy...)
+	combined := append(append([]byte(nil), replay.Scrollback...), liveCopy...)
 
 	re := regexp.MustCompile(`LINE_(\d+)`)
 	matches := re.FindAllStringSubmatch(string(combined), -1)
