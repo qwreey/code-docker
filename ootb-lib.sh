@@ -242,13 +242,18 @@ apply_manifest_prompts() {
     case "$_amp_kind" in
       generate)
         # 사람이 만들어 붙일 이유가 없는 값(컨테이너끼리만 쓰는 토큰 등)은
-        # 붙여넣기를 요구하지 말고 y/N만 묻고 여기서 생성한다.
-        if confirm "${_amp_indent}${_amp_name}: ${_amp_desc} - 활성화할까요? (값은 자동 생성)" n; then
+        # 붙여넣기를 요구하지 말고 y/N만 묻고 여기서 생성한다. 그래서 문구도
+        # secret/plain의 "이 변수에 값을 넣으세요" 모양이 아니라 "이 기능을
+        # 켤까요" 모양이어야 한다 - 설명(_amp_desc)은 기능 이름이고, 변수는
+        # 그걸 켜는 수단일 뿐이라 앞줄에 따로 보여준다(한글 조사 문제를 피하려고
+        # 설명 뒤에 바로 서술을 잇지 않는 것이기도 하다).
+        echo "${_amp_indent}[${_amp_name}] ${_amp_desc}"
+        if confirm "${_amp_indent}→ 활성화할까요? (${_amp_name} 값은 자동 생성해서 ${OOTB_ENV_TARGET:-.env} 에 저장합니다)" n; then
           set_env_var "$_amp_target" "$_amp_name" "\"$(gen_secret)\""
-          echo "${_amp_indent}- ${_amp_name} 을(를) 새로 생성해 ${OOTB_ENV_TARGET:-.env} 에 저장했습니다."
+          echo "${_amp_indent}  활성화했습니다 - ${_amp_name} 값을 새로 생성해 ${OOTB_ENV_TARGET:-.env} 에 저장했습니다."
         else
           set_env_var "$_amp_target" "$_amp_name" ""
-          echo "${_amp_indent}- ${_amp_name} 은(는) 비활성 상태로 기록했습니다(나중에 켜려면 ${OOTB_ENV_TARGET:-.env} 의 그 줄을 채우세요)."
+          echo "${_amp_indent}  비활성으로 기록했습니다 - 나중에 켜려면 ${OOTB_ENV_TARGET:-.env} 의 ${_amp_name} 줄을 채우세요."
         fi
         ;;
       secret)
