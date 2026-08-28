@@ -198,6 +198,8 @@ vscord 확장으로 Discord Rich Presence를 연동하고, ssh 소켓 포워딩�
 
 `EXTRA_INCLUDE` 훅으로 완전히 독립된 별도 프로젝트([roblox-studio-docker](https://github.com/qwreey/roblox-studio-docker))를 code-docker 옆에 붙이는 예시입니다 - submodule이 아니라, `docker-compose.yml`이 제공하는 범용 오버레이 메커니즘을 씁니다.
 
+붙이고 나면 브라우저에서 Studio 화면을 보고(router의 VNC 탭), code-docker 안의 Claude Code가 Studio를 직접 조작할 수 있습니다(Studio 내장 MCP 서버를 네트워크로 꺼내주는 브리지 - `ootb.sh`가 토큰까지 알아서 넣어줍니다).
+
 자세한 내용은 [tips/roblox-studio.md](tips/roblox-studio.md)를 확인하세요.
 
 ## router (네트워크 경계 컨테이너)
