@@ -57,11 +57,29 @@ if [ -d "$TARGET_DIR/builds" ] && confirm "builds/ 아래 사이드 프로젝트
     # OOTB_ROUTER_ALLOWED_TARGET_HOSTS가 그랬다 - 스택은 멀쩡히 뜨는데 router
     # 대상 등록만 조용히 거부됐다. 병합은 additive + 중복 제거라 매번 돌아도
     # 안전하고, 실제로 값이 바뀐 항목만 출력된다.
+    # 아래 건너뛰기 조건들은 원래 전부 조용히 continue했다 - 그래서 매니페스트가
+    # 재적용되지 않아도 화면에는 git pull 결과만 보이고, 사용자 입장에서는 "돌렸는데
+    # 아무 일도 안 일어났다"가 된다(실제로 MCP_TOKEN이 안 생기는 걸 그렇게 발견했다).
+    # 건너뛴 이유는 반드시 말한다.
     name="$(basename "$dir")"
-    [ -n "$extra_include_file" ] || continue
-    grep -qF "builds/$name/" "$TARGET_DIR/$extra_include_file" 2>/dev/null || continue
-    load_manifest "$dir" || continue
-    apply_manifest_declarative "    " && echo "    (위 값은 $name 의 ootb-manifest.env가 선언한 것입니다)"
+    if [ -z "$extra_include_file" ]; then
+      echo "    (.env에 EXTRA_INCLUDE가 없어 매니페스트 재적용을 건너뜁니다)"
+      continue
+    fi
+    if ! grep -qF "builds/$name/" "$TARGET_DIR/$extra_include_file" 2>/dev/null; then
+      echo "    ($extra_include_file 에 builds/$name/ 항목이 없어 매니페스트 재적용을 건너뜁니다"
+      echo "     - 클론만 해두고 아직 연동하지 않은 프로젝트로 봅니다)"
+      continue
+    fi
+    if ! load_manifest "$dir"; then
+      echo "    (ootb-manifest.env가 없어 매니페스트 재적용을 건너뜁니다)"
+      continue
+    fi
+    if apply_manifest_declarative "    "; then
+      echo "    (위 값은 $name 의 ootb-manifest.env가 선언한 것입니다)"
+    else
+      echo "    매니페스트 재적용: 이미 최신이라 바뀐 값 없음"
+    fi
     # 사람에게 물어야 하는 OOTB_ENV_PROMPT_*도 같이 재적용한다 - 다만 **아직 그
     # 키가 env 파일에 아예 없을 때만** 묻는다(apply_manifest_prompts 주석 참고).
     # 예전에는 이게 최초 연동 때 한 번뿐이라, 이미 붙여둔 배포는 매니페스트에 새
