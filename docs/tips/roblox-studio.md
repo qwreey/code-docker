@@ -203,7 +203,9 @@ networks:
   docker compose exec studio tail -50 /var/log/mcp-bridge/stdout.log
   ```
 
-  `MCP_TOKEN not set — idling`이면 토큰이 컨테이너까지 안 들어간 것(`.env`만 고치고 recreate를 안 한 경우가 대부분 - `docker compose up -d studio code-docker`). `StudioMCP.exe not found`가 반복되면 위 2번 Studio 안 토글을 아직 안 켠 것입니다. `npm ERR!`가 보이면 브리지가 실행 시점에 받아오는 `npx -y supergateway`가 실패한 것으로, egress가 막힌 상태에서 컨테이너를 recreate했을 때 그렇습니다(npm 캐시가 볼륨에 없어 recreate마다 다시 받습니다).
+  `Child exited: code=127`이 반복되면 그 윗줄이 원인을 말해줍니다 - `StudioMCP.exe not found`는 위 2번 Studio 안 토글을 아직 안 켠 것이고, `wine: not found`는 roblox-studio-docker 쪽 문제입니다(2026-08-29 수정됨 - 그 이미지를 `docker compose build studio`로 다시 빌드하세요). **둘 다 브리지는 계속 `RUNNING`이고 `/healthz`도 `ok`를 돌려줍니다** - 인증을 통과한 요청만 갈 곳이 없어져서, 클라이언트에서는 타임아웃으로만 보입니다.
+
+`MCP_TOKEN not set — idling`이면 토큰이 컨테이너까지 안 들어간 것(`.env`만 고치고 recreate를 안 한 경우가 대부분 - `docker compose up -d studio code-docker`). `StudioMCP.exe not found`가 반복되면 위 2번 Studio 안 토글을 아직 안 켠 것입니다. `npm ERR!`가 보이면 브리지가 실행 시점에 받아오는 `npx -y supergateway`가 실패한 것으로, egress가 막힌 상태에서 컨테이너를 recreate했을 때 그렇습니다(npm 캐시가 볼륨에 없어 recreate마다 다시 받습니다).
 
   브리지가 멀쩡한데도 안 되면 code-docker 쪽에서 경로를 확인하세요:
 
