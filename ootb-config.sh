@@ -21,21 +21,52 @@ require_cmds awk realpath
 
 resolve_target_dir "${1:-}"
 
+# RECONFIGURE=1(migrate)에서 섹션 단위로 먼저 물어보기 위한 상태. 신규 설치(ootb.sh)는
+# 어차피 전부 물어봐야 하므로 항상 1이다.
+SECTION_ACTIVE=1
+
+section() {
+  # section "제목" <파일>:<KEY> ... - 섹션을 연다.
+  #
+  # RECONFIGURE=1이면 그 섹션이 다루는 키들의 **현재 값을 먼저 표에 보여주고**, 들어갈지
+  # 한 번만 묻는다. 안 들어가면 그 섹션의 prompt_* 호출은 전부 조용히 넘어간다.
+  # 예전에는 키마다 "(현재: X) 바꿀까요?"를 물어서, 아무 것도 안 바꾸는 흔한 경우에도
+  # Enter를 열아홉 번 눌러야 했다 - 게다가 값을 보려면 그 열아홉 번을 지나가는 수밖에
+  # 없었다. 지금은 섹션당 한 번만 답하면 되고, 안 들어가도 값은 이미 다 보인다.
+  _sec_title=$1
+  shift
+  echo
+  echo "=== $_sec_title ==="
+  if [ "${RECONFIGURE:-0}" != "1" ]; then
+    SECTION_ACTIVE=1
+    return
+  fi
+  for _sec_kv in "$@"; do
+    _sec_file="${_sec_kv%%:*}"
+    _sec_key="${_sec_kv#*:}"
+    _sec_cur="$(get_env_var "$TARGET_DIR/$_sec_file" "$_sec_key")"
+    printf '  %-22s %s\n' "$_sec_key" "${_sec_cur:-(미설정)}"
+  done
+  if confirm "  이 값들을 바꿀까요?" n; then SECTION_ACTIVE=1; else SECTION_ACTIVE=0; fi
+}
+
 prompt_set() {
   # prompt_set <파일명> <key> <프롬프트 텍스트> - 값을 큰따옴표로 감싸 저장
   # (example-env류가 이미 쓰는 관례: PREFIX="", CODE_TZ="", ... 형태).
-  # RECONFIGURE=1이면 현재 값을 보여주고 바꿀지부터 물어본 뒤에만 새 값을 입력받는다.
+  # Enter를 누르면 아무 것도 쓰지 않는다(= 현재 값/주석 처리된 기본값 유지).
   #
   # <파일명>은 TARGET_DIR 기준 파일 이름(.env / .env.router)이다 - 이 스크립트는
   # 원래 .env 전용이었지만, 그러면 router 쪽 값(TAILSCALE_ENABLED,
   # ROUTER_MANAGER_HOSTS)은 물어볼 자리가 아예 없어서 ootb로 깔고도 결국
   # .env.router를 손으로 열어야 했다.
   file=$1 key=$2 prompt=$3
+  [ "$SECTION_ACTIVE" = "1" ] || return
   if [ "${RECONFIGURE:-0}" = "1" ]; then
     current="$(get_env_var "$TARGET_DIR/$file" "$key")"
-    confirm "  $prompt (현재: ${current:-미설정}) 바꿀까요?" n || return
+    printf '  %s\n    [현재: %s] 새 값 (Enter=유지): ' "$prompt" "${current:-미설정}"
+  else
+    printf '%s: ' "$prompt"
   fi
-  printf '%s: ' "$prompt"
   read -r val
   [ -n "$val" ] && set_env_var "$TARGET_DIR/$file" "$key" "\"$val\""
 }
@@ -47,11 +78,14 @@ prompt_bool() {
   # 처리된 기본값을 그대로 살려두기 위함이라, 기본값은 prompt_set 호출부들이
   # 이미 쓰는 관례대로 프롬프트 텍스트 안에 적는다("비우면 UTC" 식).
   file=$1 key=$2 prompt=$3
+  [ "$SECTION_ACTIVE" = "1" ] || return
   if [ "${RECONFIGURE:-0}" = "1" ]; then
     current="$(get_env_var "$TARGET_DIR/$file" "$key")"
-    confirm "  $prompt (현재: ${current:-미설정}) 바꿀까요?" n || return
+    printf '  %s\n    [현재: %s] ' "$prompt" "${current:-미설정}"
+  else
+    printf '%s ' "$prompt"
   fi
-  printf '%s [y/n, Enter면 기본값 유지]: ' "$prompt"
+  printf '[y/n, Enter=유지]: '
   read -r val
   case "$val" in
     [yY]*) set_env_var "$TARGET_DIR/$file" "$key" '"true"' ;;
@@ -59,25 +93,37 @@ prompt_bool() {
   esac
 }
 
-echo "=== 환경 값 설정 (Enter로 기본값 유지) ==="
+section "기본" .env:PREFIX .env:CODE_TZ .env:CODE_LANG
 prompt_set .env PREFIX "여러 인스턴스를 한 호스트에 띄울 때 붙일 접두사 (PREFIX)"
 prompt_set .env CODE_TZ "타임존 (예: Asia/Seoul, 비우면 UTC)"
+prompt_set .env CODE_LANG "로케일 (glibc LANG 형식, 예: ko_KR.UTF-8, 비우면 C.UTF-8 - build.*.sh에서 locale-gen 안 하면 C.UTF-8 외 값은 적용 안 됨)"
+
+section "리소스 제한" \
+  .env:CODE_CPU_LIMIT .env:CODE_MEM_LIMIT \
+  .env:DIND_CPU_LIMIT .env:DIND_MEM_LIMIT \
+  .env:ROUTER_CPU_LIMIT .env:ROUTER_MEM_LIMIT
 prompt_set .env CODE_CPU_LIMIT "code-docker CPU 제한 (예: 4, 비우면 무제한)"
 prompt_set .env CODE_MEM_LIMIT "code-docker 메모리 제한 (예: 4g, 비우면 무제한)"
 prompt_set .env DIND_CPU_LIMIT "code-docker-dind CPU 제한 (비우면 무제한)"
 prompt_set .env DIND_MEM_LIMIT "code-docker-dind 메모리 제한 (비우면 무제한)"
 prompt_set .env ROUTER_CPU_LIMIT "code-docker-router CPU 제한 (비우면 무제한)"
 prompt_set .env ROUTER_MEM_LIMIT "code-docker-router 메모리 제한 (비우면 무제한)"
+
+section "호스트 바인딩 / 리버스 프록시" \
+  .env:ROUTER_HTTP_BIND .env:ROUTER_HTTP_PORT .env:TRUSTED_PROXIES
 prompt_set .env ROUTER_HTTP_BIND "router가 바인딩할 호스트 IP (비우면 0.0.0.0)"
 prompt_set .env ROUTER_HTTP_PORT "router가 쓸 호스트 포트 (비우면 80 - 이미 다른 프로세스가 쓰고 있으면 바꾸세요)"
 prompt_set .env TRUSTED_PROXIES "신뢰할 리버스 프록시 IP/CIDR 목록 (콤마구분, 비우면 비활성)"
+
+section "PWA (브라우저 설치 앱 이름)" \
+  .env:PWA_NAME .env:PWA_SHORT_NAME .env:PWA_DISPLAY_MODE
 prompt_set .env PWA_NAME "PWA 앱 이름 (여러 인스턴스를 구분하고 싶을 때, 비우면 code-docker)"
 prompt_set .env PWA_SHORT_NAME "PWA 짧은 이름 (비우면 code-docker)"
 prompt_set .env PWA_DISPLAY_MODE "PWA display 모드 (standalone/fullscreen, 비우면 standalone)"
-prompt_set .env CODE_LANG "로케일 (glibc LANG 형식, 예: ko_KR.UTF-8, 비우면 C.UTF-8 - build.*.sh에서 locale-gen 안 하면 C.UTF-8 외 값은 적용 안 됨)"
-echo
 
-echo "=== router 설정 (.env.router, Enter로 기본값 유지) ==="
+section "router 기능 (.env.router)" \
+  .env.router:TAILSCALE_ENABLED .env.router:ROUTER_MANAGER_HOSTS \
+  .env.router:ROUTER_APP_ORIGIN .env.router:TINYAUTH_HOSTS
 prompt_bool .env.router TAILSCALE_ENABLED "tailscale을 쓸까요? (기본: 사용 - 안 쓸 거면 n을 넣으세요. 끄면 Tailscale 탭이 숨겨지고 데몬도 아무 것도 하지 않습니다)"
 prompt_set .env.router ROUTER_MANAGER_HOSTS "router-manager 전용 도메인 (예: router.code.example.com, 비우면 끔 - 설정하면 그 도메인에서만 router-manager를 쓸 수 있고 로그인 쿠키도 그 도메인에만 스코프됩니다. 리버스 프록시 도메인이 아직 없다면 Enter로 건너뛰고 나중에 .env.router에서 설정하세요)"
 
