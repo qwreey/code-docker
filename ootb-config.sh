@@ -86,8 +86,13 @@ prompt_set .env.router ROUTER_MANAGER_HOSTS "router-manager 전용 도메인 (�
 # "공유 호스트네임이 뭐냐"고 묻는 건 답을 알 수 없는 질문이다.
 # (get_env_var로 방금 쓴 값을 되읽는 이유: prompt_set은 Enter를 누르면 아무
 # 것도 쓰지 않아서 반환값만으로는 "이미 설정돼 있었음"과 구분이 안 된다.)
+#
+# VNC 뷰어가 router 자신의 기능이 된 뒤로(rfb 백엔드, 기본값) 이 값은 대상별로
+# novnc 백엔드를 고른 경우에만 필요하다 - rfb 대상은 router-manager가 뷰어를
+# 직접 서비스하므로 전용 도메인에서도 설정 없이 열린다. 그래서 질문은 남기되
+# "대부분 비워두면 된다"를 문구에 넣는다.
 if [ -n "$(get_env_var "$TARGET_DIR/.env.router" ROUTER_MANAGER_HOSTS)" ]; then
-  prompt_set .env.router ROUTER_APP_ORIGIN "위 전용 도메인에서도 VNC 뷰어를 열 수 있게 할 공유 호스트네임의 origin (예: https://code.example.com, 비우면 전용 도메인의 VNC 탭에서는 뷰어가 안 뜹니다 - webmanager에 내장된 VNC 탭은 이 값 없이도 동작합니다)"
+  prompt_set .env.router ROUTER_APP_ORIGIN "위 전용 도메인을 직접 열었을 때 'novnc' 백엔드로 등록한 VNC 대상까지 볼 수 있게 할, /app/을 서비스하는 공유 호스트네임의 origin (예: https://code.example.com). 기본 백엔드인 rfb 대상과 webmanager에 내장된 VNC 탭은 이 값 없이도 동작하므로 보통은 비워두면 됩니다"
 fi
 
 # tinyauth: 로그인 화면을 서비스할 호스트네임 하나만 물어본다 - TINYAUTH_APPURL은
