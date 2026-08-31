@@ -150,9 +150,16 @@ stderr_logfile_backups=3
 ```
 
 ```sh
-mkdir -p /var/log/my-daemon   # 위 logfile 경로를 쓴다면 필요합니다
+mkdir -p /var/log/my-daemon   # 위 logfile 경로를 쓴다면 첫 설치 때 필요합니다
 reload-services               # supervisorctl reread && supervisorctl update
 ```
+
+`/var/log/<프로그램명>/`은 볼륨이 아니라 이미지 쪽이라 컨테이너를 재생성하면 사라지는데,
+서비스 정의는 볼륨에 있어서 살아남습니다. supervisord는 logfile의 상위 디렉터리가 없으면
+경고가 아니라 **에러로 처리하고 아예 기동을 거부**하므로, 그대로 두면 재생성 한 번에
+컨테이너 전체가 크래시 루프에 빠집니다. 그래서 `entrypoint.sh`가 부팅할 때마다 이
+디렉터리의 `[program:...]` 이름을 읽어 로그 디렉터리를 다시 만들어 줍니다 — 위
+`mkdir`은 재생성을 기다리지 않고 바로 쓰기 위한 것일 뿐입니다.
 
 `reload-services`는 새로 생긴 프로그램을 시작하고, 내용이 바뀐 프로그램을 재시작하고, 파일이 지워진 프로그램을 정지시킵니다. 로그는 다른 프로그램과 똑같이 webmanager의 Logs 탭에 잡히고, Supervisor 탭에서 켜고 끌 수 있습니다.
 

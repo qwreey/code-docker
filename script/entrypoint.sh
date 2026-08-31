@@ -99,6 +99,24 @@ mkdir -p /code/.local
 # user-init.sh because it's supervisord's own input, not user home state,
 # and it has to exist before the exec below reads the config.
 mkdir -p /code/.local/share/code-docker/supervisord
+
+# Recreate the log directory of every on-volume unit. Those units live on the
+# /code volume but their stdout_logfile points at /var/log/<program>/, which is
+# image state - so a container recreate keeps the unit and loses its log dir.
+# supervisord validates a program's logfile parent at config-parse time and
+# treats a missing one as an error, not a warning ("The directory named as part
+# of the path ... does not exist"), so it would refuse to start at all and take
+# the whole container into a crash loop that can only be broken by deleting the
+# unit from the volume from outside. Cheap to prevent here, and it keeps those
+# programs' logs in the same place vector tails for the Logs tab rather than
+# pushing them somewhere webmanager can't see.
+for unit in /code/.local/share/code-docker/supervisord/*.conf; do
+    [ -e "$unit" ] || continue
+    sed -n 's/^\[program:\([^]]*\)\].*/\1/p' "$unit" | while read -r program; do
+        [ -n "$program" ] && mkdir -p "/var/log/$program"
+    done
+done
+
 if [ -e /etc/code-docker/supervisord.override.conf ]; then
     exec /sbin/supervisord -n -c /etc/code-docker/supervisord.override.conf --user root
 else
