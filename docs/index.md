@@ -126,6 +126,40 @@ mise 환경이 제공되므로 `mise use -g node`, `mise use -g rust`, `mise use
 
 만약 mise 설치로 인해 global 이 달라졌으며, 이를 code-server 에 적용하고 싶다면 code-server 터미널에 `restart` 를 입력하세요. 이렇게 하면 supervisord 의 code-server 서비스가 재시작하게 되며 env 를 다시 업데이트하게 됩니다. 이는 서비스 시작 시 `mise env --shell` 를 통해 구성됩니다.
 
+### 직접 만든 서비스를 supervisord에 올리기 (재빌드 없이)
+
+mise로 깐 도구를 일회성 명령이 아니라 **계속 떠 있는 서비스**로 돌리고 싶다면, `[program:...]` 파일을 아래 경로에 넣고 `reload-services`를 입력하세요.
+
+```
+/code/.local/share/code-docker/supervisord/*.conf
+```
+
+이 경로는 이미지가 아니라 `/code` 볼륨 위에 있으므로 **재빌드도, 컨테이너 재생성도 필요 없습니다**. mise 자신도 `$HOME`(= 같은 볼륨)에 설치되기 때문에 바이너리와 서비스 정의가 함께 살아남습니다.
+
+```ini
+; /code/.local/share/code-docker/supervisord/my-daemon.conf
+[program:my-daemon]
+command=/code/.local/bin/mise exec -- my-daemon --port 9999
+autorestart=true
+stdout_logfile=/var/log/%(program_name)s/stdout.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=3
+stderr_logfile=/var/log/%(program_name)s/stderr.log
+stderr_logfile_maxbytes=10MB
+stderr_logfile_backups=3
+```
+
+```sh
+mkdir -p /var/log/my-daemon   # 위 logfile 경로를 쓴다면 필요합니다
+reload-services               # supervisorctl reread && supervisorctl update
+```
+
+`reload-services`는 새로 생긴 프로그램을 시작하고, 내용이 바뀐 프로그램을 재시작하고, 파일이 지워진 프로그램을 정지시킵니다. 로그는 다른 프로그램과 똑같이 webmanager의 Logs 탭에 잡히고, Supervisor 탭에서 켜고 끌 수 있습니다.
+
+이 경로는 사이드 프로젝트가 **자기 컨테이너가 아니라 code-docker 안에서** 뭔가를 돌려야 할 때 쓰는 통로이기도 합니다 — compose 레벨의 [`EXTRA_INCLUDE`](#ootbsh로-한-번에-설치하기)가 그렇듯, code-docker 본체가 그 프로젝트의 이름을 알 필요가 없습니다.
+
+> 여기 놓인 프로그램은 이 컨테이너의 다른 모든 서비스와 마찬가지로 root로 실행됩니다. 컨테이너 안에서는 code-server도 sshd도 이미 root라 새로 생기는 권한은 없지만, **호스트에서 `HOME_VOLUME` 경로에 쓸 수 있는 사람은 다음 reload 시점에 컨테이너 root를 얻습니다** (예전에는 재빌드가 필요했던 일입니다). 볼륨 디렉터리 권한을 그에 맞게 관리하세요.
+
 ## 타임존
 
 기본값은 UTC입니다. `.env`의 `CODE_TZ` 값을 원하는 타임존 이름(예: `Asia/Seoul`)으로
@@ -355,7 +389,7 @@ webmanager 자체 비밀번호 게이트를 켜는 방법과, 이미지를 업�
 - **code-server**: `code-service.*.sh`, `code-config.*.yaml`, `code-env.*.sh`, `code-runner.*.sh`, `recommendations.*.yaml`
 - **셸**: `shell.*` (`config/shell/`, `script/get-user-shell.sh`가 default/override를 고름)
 - **webmanager**: `webmanager.*.sh`, `example-env.webmanager`(런타임 환경변수 템플릿, 저장소 루트)
-- **기타**: `supervisord.*.conf`, `supervisord/*.conf`, `supervisor-metadata.*.yaml`(webmanager의 Supervisor 탭이 읽지만 프로그램 폴더 밖에 있는 전역 메타데이터), `user-init.*.sh`, `sshd-service.*.sh`, `dns-local.*.sh`(strict-order dnsmasq로 로컬 DNS 리졸버 실행, [build-customization.md](build-customization.md) 참고), `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`, `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅, `NGINX_LOG_LEVEL`로 access_log 상세도 조절 — `/tailscale/`·`/dev-proxy/`·`/exports/`는 이제 router 자신의 nginx가 직접 종단합니다, [router.md](../router/docs/router.md) 참고), `nginx-error.*.html`(code-server가 아직 안 떴을 때 502 대신 보여주는 자동 재시도 페이지)
+- **기타**: `supervisord.*.conf`, `supervisord/*.conf`(빌드 타임에 이미지로 들어가는 사용자 서비스 — 런타임에 재빌드 없이 추가하려면 [직접 만든 서비스를 supervisord에 올리기](#직접-만든-서비스를-supervisord에-올리기-재빌드-없이) 쪽을 쓰세요), `supervisor-metadata.*.yaml`(webmanager의 Supervisor 탭이 읽지만 프로그램 폴더 밖에 있는 전역 메타데이터), `user-init.*.sh`, `sshd-service.*.sh`, `dns-local.*.sh`(strict-order dnsmasq로 로컬 DNS 리졸버 실행, [build-customization.md](build-customization.md) 참고), `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`, `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅, `NGINX_LOG_LEVEL`로 access_log 상세도 조절 — `/tailscale/`·`/dev-proxy/`·`/exports/`는 이제 router 자신의 nginx가 직접 종단합니다, [router.md](../router/docs/router.md) 참고), `nginx-error.*.html`(code-server가 아직 안 떴을 때 502 대신 보여주는 자동 재시도 페이지)
 
 router 컨테이너(`router/` 서브모듈, 별도 레포 [qwreey/router-docker](https://github.com/qwreey/router-docker)) 자체의 override 파일 목록은 [router.md](../router/docs/router.md)를
 확인하세요 — `router/config/netgate/`, `router/config/tailscale/`,

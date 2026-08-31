@@ -1,0 +1,14 @@
+#!/bin/sh
+# Pick up [program:...] files added to the on-volume unit directory
+# (/code/.local/share/code-docker/supervisord/, the third [include] glob in
+# config/supervisord.default.conf) without recreating the container.
+#
+# `reread` re-parses the config; `update` then starts what's new, restarts
+# what changed, and stops what was removed. Both are printed so you can see
+# which program group was actually picked up - unlike `restart`, this is not
+# backgrounded through setsid, because nothing in that directory can be the
+# `code` program (its unit ships in the image), so there's no risk of this
+# killing the code-server terminal it was typed into.
+set -e
+supervisorctl reread
+supervisorctl update

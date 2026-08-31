@@ -93,6 +93,12 @@ export LANG="${CODE_LANG:-}"
 
 # Run supervisord
 mkdir -p /code/.local
+# Third [include] glob of supervisord.default.conf - the on-volume unit
+# directory that lets a program be added without a rebuild (see that file's
+# own comment for the full rationale). Created here rather than in
+# user-init.sh because it's supervisord's own input, not user home state,
+# and it has to exist before the exec below reads the config.
+mkdir -p /code/.local/share/code-docker/supervisord
 if [ -e /etc/code-docker/supervisord.override.conf ]; then
     exec /sbin/supervisord -n -c /etc/code-docker/supervisord.override.conf --user root
 else
