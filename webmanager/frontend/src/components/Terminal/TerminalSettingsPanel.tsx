@@ -40,6 +40,10 @@ export function TerminalSettingsPanel({
   onToggleMobileInputWorkaround,
   altScreenTouchScrollEnabled,
   onToggleAltScreenTouchScroll,
+  autoReconnectEnabled,
+  onToggleAutoReconnect,
+  controlBarEnabled,
+  onToggleControlBarEnabled,
 }: {
   open: boolean
   onClose: () => void
@@ -54,6 +58,10 @@ export function TerminalSettingsPanel({
   onToggleMobileInputWorkaround: (enabled: boolean) => void
   altScreenTouchScrollEnabled: boolean
   onToggleAltScreenTouchScroll: (enabled: boolean) => void
+  autoReconnectEnabled: boolean
+  onToggleAutoReconnect: (enabled: boolean) => void
+  controlBarEnabled: boolean
+  onToggleControlBarEnabled: (enabled: boolean) => void
 }) {
   const [draftKeybindings, setDraftKeybindings] = useState<KeyBinding[]>(settings.keybindings)
   const [draftDetachSequence, setDraftDetachSequence] = useState(bytesToDisplay(settings.detachSequence))
@@ -162,6 +170,20 @@ export function TerminalSettingsPanel({
           모바일 컨트롤 바에 표시될 버튼입니다. Ctrl/Alt/Shift는 눌러서 다음 입력에 적용되는 sticky 모디파이어로
           동작하며 bytes 값은 사용되지 않습니다.
         </p>
+        <label className="checkbox-option">
+          <input
+            type="checkbox"
+            checked={controlBarEnabled}
+            onChange={(e) => onToggleControlBarEnabled(e.target.checked)}
+          />
+          컨트롤 바 표시
+        </label>
+        <p className="section-description">
+          물리 키보드가 이미 있는 데스크탑(마우스/트랙패드)에서는 기본으로 꺼져 있습니다 — 아래 버튼들이 대부분
+          잉여 기능이기 때문입니다. 기기별로 저장되며, 다른 두 실험적 옵션과 달리 껐다 켜면 터미널 탭을 나갔다
+          들어올 필요 없이 바로 적용됩니다. 바를 끄면 확대/축소(줌) 버튼만 탭 목록 오른쪽으로 자리를 옮겨 계속
+          쓸 수 있습니다.
+        </p>
         <div className="terminal-keybinding-list">
           {draftKeybindings.map((b) => (
             <div key={b.id} className="terminal-keybinding-row">
@@ -250,6 +272,24 @@ export function TerminalSettingsPanel({
             ))}
           </select>
         </div>
+      </section>
+
+      <section className="terminal-settings-section">
+        <h4>자동 재연결</h4>
+        <p className="section-description">
+          연결이 끊기면(모바일에서 앱을 백그라운드로 보냈다가 돌아오는 경우가 대표적) 잠시 후 자동으로 다시
+          연결을 시도합니다. 서버가 실제로 꺼져 있을 때 계속 두드리지 않도록 재시도 간격은 점점 늘어나며(최대
+          30초), 화면으로 돌아오면 대기 중이던 재시도를 기다리지 않고 바로 한 번 더 시도합니다. 껐다 켜도 바로
+          적용되며, 다른 두 실험적 옵션과 달리 터미널 탭을 나갔다 들어올 필요가 없습니다.
+        </p>
+        <label className="checkbox-option">
+          <input
+            type="checkbox"
+            checked={autoReconnectEnabled}
+            onChange={(e) => onToggleAutoReconnect(e.target.checked)}
+          />
+          연결이 끊기면 자동으로 재연결
+        </label>
       </section>
 
       <section className="terminal-settings-section">

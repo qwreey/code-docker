@@ -1,6 +1,19 @@
-import { useRef, useState } from 'react'
-import { Home, Pencil, Pin, PinOff, Plus, X } from 'lucide-react'
+import { useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
+import { Home, Pencil, Pin, PinOff, Plus, X, ZoomIn, ZoomOut } from 'lucide-react'
 import type { TerminalSessionInfo } from '../../api/types'
+
+// Same "don't let a tap steal DOM focus" guard TerminalControls.tsx uses on
+// its own buttons (including its own zoom pair) - kept as a small local
+// copy rather than importing from there since these zoom buttons render
+// only when TerminalControls itself is NOT mounted (see showZoomGroup
+// below), so there's no shared instance to reuse. Matters most on a touch
+// device that has explicitly turned the control bar off (the default is
+// pointer:fine only, but the toggle is per-device and overridable) - the
+// zoom() callback these buttons call already ends in focusTerminal(), this
+// just stops an intermediate focus flicker before that runs.
+function preventFocusSteal(event: MouseEvent) {
+  event.preventDefault()
+}
 
 // Sentinel for the Home tab — a virtual, always-present, unclosable tab
 // (never a real termsession.Session, see TerminalHome.tsx) that Terminal.tsx
@@ -84,6 +97,8 @@ export function TerminalTabs({
   onRename,
   homeLabel,
   onRenameHome,
+  showZoomGroup,
+  onZoom,
 }: {
   sessions: TerminalSessionInfo[]
   activeSession: string
@@ -94,11 +109,42 @@ export function TerminalTabs({
   onRename: (oldName: string, newName: string) => void
   homeLabel: string
   onRenameHome: (label: string) => void
+  // Terminal.tsx's controlBarEnabled toggle, inverted - the zoom pair
+  // TerminalControls.tsx normally carries moves here instead, so it's never
+  // rendered in both places at once (see this component's own render below
+  // and TerminalControls.tsx's doc comment).
+  showZoomGroup: boolean
+  onZoom: (direction: 'in' | 'out') => void
 }) {
   // Only one tab can be under rename at a time - { name: the tab being
   // renamed (HOME_TAB_ID for the Home tab itself), value: the in-progress
   // input text }.
   const [editing, setEditing] = useState<{ name: string; value: string } | null>(null)
+  // Shared by both rename inputs below (Home's and a session tab's) since
+  // only one can ever be mounted at a time - `editing` is a single value,
+  // not per-tab state. Focus is claimed explicitly here via useLayoutEffect
+  // rather than the plain `autoFocus` prop this used to carry: autoFocus
+  // only fires on the DOM node's initial mount, so it's at the mercy of
+  // exactly when React happens to create that node relative to whatever
+  // else is re-rendering around it (a tab switch's reconnect cascade, the
+  // 3s session-list poll, ...) - a suspected but unconfirmed cause of a
+  // real report that renaming a 2nd+ tab could leave the input unfocused
+  // and unresponsive to clicks. Driving focus from an effect keyed on the
+  // edit target instead makes it deterministic: it (re)claims focus/select
+  // every time `editing` starts pointing at a (possibly new) name,
+  // regardless of what else caused that render.
+  const renameInputRef = useRef<HTMLInputElement | null>(null)
+  useLayoutEffect(() => {
+    if (!editing) return
+    renameInputRef.current?.focus()
+    renameInputRef.current?.select()
+    // Deliberately keyed on editing?.name only, not the whole `editing`
+    // object - the object's `value` field changes on every keystroke
+    // (onChange), and re-running this on every keystroke would re-select
+    // the whole field after each character typed instead of just claiming
+    // focus once when a rename starts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing?.name])
   const [order, setOrderState] = useState<string[]>(loadTabOrder)
   const tabs = reconcileTabOrder(ensureActiveIncluded(sessions, activeSession), order)
   // Drag-to-reorder, same plain HTML5 drag-event pattern used by
@@ -150,7 +196,15 @@ export function TerminalTabs({
   }
 
   return (
-    <div className="terminal-tabbar" role="tablist" aria-label="터미널 세션">
+    <div className="terminal-tabbar">
+      {/* Wrapping tab list is its own flex child (flex:1) so the zoom group
+          below stays a plain sibling at the row's far right — including
+          while the tab list itself wraps to a 2nd/3rd line, since a sibling
+          only ever occupies the first line's remaining space, it never gets
+          pushed down with the tabs the way one more wrapping item inside
+          this div would. See Terminal.css's .terminal-tabbar/.terminal-tab-list/
+          .terminal-zoom-group for the layout side of this. */}
+      <div className="terminal-tab-list" role="tablist" aria-label="터미널 세션">
       {/* Home is always first and never draggable/closable — a landing tab
           (session list + launch profiles), not a real session. Its title is
           still user-renamable (backend-persisted via TerminalSettings.homeLabel,
@@ -163,10 +217,10 @@ export function TerminalTabs({
       >
         {editing?.name === HOME_TAB_ID ? (
           <input
+            ref={renameInputRef}
             type="text"
             className="terminal-tab-rename-input"
             value={editing.value}
-            autoFocus
             onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setEditing({ name: HOME_TAB_ID, value: e.target.value })}
             onBlur={commitEditing}
@@ -196,7 +250,15 @@ export function TerminalTabs({
           <button
             type="button"
             className="terminal-tab-rename"
-            onClick={() => startEditing(HOME_TAB_ID, homeLabel || '홈')}
+            onClick={(e) => {
+              // Stops this click from also reaching any ancestor click
+              // handling (none currently on .terminal-tab-home itself, but
+              // this button and the session-tab one below intentionally
+              // match each other rather than one being defensive and the
+              // other not) before it starts editing.
+              e.stopPropagation()
+              startEditing(HOME_TAB_ID, homeLabel || '홈')
+            }}
             title="이름 변경"
             aria-label="홈 탭 이름 변경"
           >
@@ -217,7 +279,15 @@ export function TerminalTabs({
             }
             role="tab"
             aria-selected={active}
-            draggable
+            // Not draggable while its own rename input is open - dragging a
+            // tab you're actively renaming makes no sense anyway, and this
+            // is defensive hardening against a real, if unconfirmed here,
+            // WebKit quirk where a click/focus on an <input> nested inside a
+            // draggable=true ancestor can be swallowed as a potential-drag
+            // gesture instead of reaching the input normally (see the
+            // rename-input useLayoutEffect above for the actual suspected
+            // root cause this bug report points at).
+            draggable={!isEditing}
             onDragStart={() => {
               dragIdRef.current = s.name
             }}
@@ -237,10 +307,10 @@ export function TerminalTabs({
           >
             {isEditing ? (
               <input
+                ref={renameInputRef}
                 type="text"
                 className="terminal-tab-rename-input"
                 value={editing.value}
-                autoFocus
                 onFocus={(e) => e.currentTarget.select()}
                 onChange={(e) => setEditing({ name: s.name, value: e.target.value })}
                 onBlur={commitEditing}
@@ -273,7 +343,16 @@ export function TerminalTabs({
               <button
                 type="button"
                 className="terminal-tab-rename"
-                onClick={() => startEditing(s.name, s.name)}
+                onClick={(e) => {
+                  // See the matching stopPropagation on the Home tab's own
+                  // rename button above - this tab's wrapping div has no
+                  // click handler of its own today, but it does have drag
+                  // handlers, and this keeps the two pencil buttons
+                  // identical rather than one being hardened and the other
+                  // not.
+                  e.stopPropagation()
+                  startEditing(s.name, s.name)
+                }}
                 title="이름 변경"
                 aria-label={`${s.name} 이름 변경`}
               >
@@ -325,6 +404,40 @@ export function TerminalTabs({
       <button type="button" className="terminal-tab-add" aria-label="새 세션" onClick={onAdd}>
         <Plus size={15} />
       </button>
+      </div>
+      {/* Only rendered while the control bar (TerminalControls.tsx) itself is
+          hidden - see Terminal.tsx's controlBarEnabled. Reuses Terminal.tsx's
+          own zoom() callback (font-size state + fit + PTY resize), never a
+          second copy of that logic - this is purely a second place to
+          trigger it from. align-self: center (set on .terminal-zoom-group in
+          Terminal.css) is what keeps it vertically centered against the tab
+          area even though .terminal-tabbar's own items are align-items:
+          flex-start (needed so the group doesn't stretch to the tab list's
+          full wrapped height). */}
+      {showZoomGroup && (
+        <div className="terminal-zoom-group" role="toolbar" aria-label="터미널 글자 크기 조절">
+          <button
+            type="button"
+            className="terminal-zoom-btn"
+            aria-label="글자 축소"
+            title="글자 축소"
+            onMouseDown={preventFocusSteal}
+            onClick={() => onZoom('out')}
+          >
+            <ZoomOut size={15} />
+          </button>
+          <button
+            type="button"
+            className="terminal-zoom-btn"
+            aria-label="글자 확대"
+            title="글자 확대"
+            onMouseDown={preventFocusSteal}
+            onClick={() => onZoom('in')}
+          >
+            <ZoomIn size={15} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

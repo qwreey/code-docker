@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { FolderKanban, FolderOpen, Settings } from 'lucide-react'
+import { Code, FolderKanban, FolderOpen, Settings } from 'lucide-react'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
@@ -157,6 +157,85 @@ function saveAltScreenTouchScrollEnabled(enabled: boolean) {
   }
 }
 
+// Auto-reconnect: on by default, unlike the two experimental toggles above
+// (this is a plain convenience with a safe failure mode - worst case it
+// behaves like the toggle was off - not an unstable input workaround). Same
+// localStorage load/save shape as those two regardless, for consistency.
+const AUTO_RECONNECT_KEY = 'webmanager.terminal.autoReconnect'
+
+function loadAutoReconnectEnabled(): boolean {
+  try {
+    return localStorage.getItem(AUTO_RECONNECT_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function saveAutoReconnectEnabled(enabled: boolean) {
+  try {
+    if (enabled) localStorage.removeItem(AUTO_RECONNECT_KEY)
+    else localStorage.setItem(AUTO_RECONNECT_KEY, '0')
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - the toggle just won't persist
+  }
+}
+
+// Control bar visibility (TerminalControls.tsx — modifier keys/arrows/zoom):
+// per-device like the toggles above, but with a device-sensitive *default*
+// instead of a single hardcoded one. The bar exists to compensate for a
+// mobile virtual keyboard missing physical Ctrl/Alt/arrows/Esc, so it's
+// wasted vertical space on a mouse/trackpad device that already has real
+// keys for all of that — defaults to hidden when `(pointer: fine)` matches
+// (desktop) and shown otherwise, falling back to shown (today's behavior)
+// wherever matchMedia isn't available to ask. Unlike the two experimental
+// toggles above, hiding the bar is a plain conditional render (see the
+// <TerminalControls> call below), so — same as autoReconnectEnabled — it
+// takes effect immediately with no remount needed: xterm's own
+// ResizeObserver (xterm-creation effect) picks up the reclaimed space and
+// re-fits on its own, nothing extra to wire up here. Because the fallback
+// is computed rather than a fixed constant, storage can't reuse the
+// "absence means the (single) default" shape those other toggles use —
+// '1'/'0' are stored explicitly once the user actually picks one, and only
+// an unset key falls through to the computed device default below.
+const CONTROL_BAR_KEY = 'webmanager.terminal.controlBarEnabled'
+
+function defaultControlBarEnabled(): boolean {
+  if (typeof window.matchMedia !== 'function') return true
+  return !window.matchMedia('(pointer: fine)').matches
+}
+
+function loadControlBarEnabled(): boolean {
+  try {
+    const stored = localStorage.getItem(CONTROL_BAR_KEY)
+    if (stored === '1') return true
+    if (stored === '0') return false
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - falls through to
+    // the device default below
+  }
+  return defaultControlBarEnabled()
+}
+
+function saveControlBarEnabled(enabled: boolean) {
+  try {
+    localStorage.setItem(CONTROL_BAR_KEY, enabled ? '1' : '0')
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - the toggle just won't persist
+  }
+}
+
+// Capped exponential backoff for scheduled auto-reconnect attempts: 1s, 2s,
+// 4s, 8s, 16s, then held at the 30s cap. 1s is fast enough that the common
+// mobile case (a brief app-background blip) recovers almost instantly; the
+// 30s cap keeps a genuinely-down backend from being hammered forever while
+// still checking often enough that the tab comes back within half a minute
+// of the server returning. Picked by judgment, not measurement - revisit if
+// a real outage shows either end is wrong. The foreground-return path below
+// bypasses this entirely and retries immediately, since that's the actual
+// mobile scenario this feature targets.
+const RECONNECT_BASE_DELAY_MS = 1000
+const RECONNECT_MAX_DELAY_MS = 30000
+
 // sendsScrollToApp reports whether the running application, not the
 // viewport, is what should receive a scroll. True in the alternate screen
 // buffer (a full-screen app: there is no scrollback to move through) and
@@ -232,6 +311,22 @@ export function Terminal({
   // reads the toggle through a ref rather than closing over the state.
   const altScreenScrollRef = useRef(altScreenTouchScrollEnabled)
   altScreenScrollRef.current = altScreenTouchScrollEnabled
+  const [autoReconnectEnabled, setAutoReconnectEnabledState] = useState<boolean>(loadAutoReconnectEnabled)
+  // Unlike mobileInputWorkaroundEnabled above (only read once, at xterm
+  // creation - toggling it requires leaving/re-entering the tab), this one
+  // has to affect a ws.onclose handler that may already be sitting inside a
+  // closure from an earlier render, waiting for the socket to drop - so it's
+  // read through a ref, same "ref mirrors state for a listener installed
+  // once" idiom as altScreenScrollRef right above, not the mobile-input
+  // pattern. Don't copy the mobile-input pattern for a setting that needs to
+  // take effect live.
+  const autoReconnectEnabledRef = useRef(autoReconnectEnabled)
+  autoReconnectEnabledRef.current = autoReconnectEnabled
+  // No ref mirror needed here, unlike autoReconnectEnabled right above -
+  // this only ever gates a plain conditional render (<TerminalControls>
+  // below and TerminalTabs' zoom group), so plain state already re-applies
+  // on every render with no listener-closure staleness to work around.
+  const [controlBarEnabled, setControlBarEnabledState] = useState<boolean>(loadControlBarEnabled)
   const [sessions, setSessions] = useState<TerminalSessionInfo[]>([])
   // HOME_TAB_ID is a virtual tab (never a real termsession.Session), and is
   // also the initial state now: opening the Terminal tab must not silently
@@ -362,10 +457,19 @@ export function Terminal({
   // snapshot, see handlers_projects.go), but this feature is a convenience,
   // not something worth surfacing an error banner for.
   const [projectRoots, setProjectRoots] = useState<string[]>([])
+  // Same response also carries codeServerUrl (WEBMANAGER_CODE_SERVER_URL),
+  // which the "code로 열기" link below needs — piggybacking on this existing
+  // request keeps that link at exact parity with the Projects tab's own
+  // one (see ProjectTable.tsx) without adding backend plumbing just to
+  // deliver one string to this component.
+  const [codeServerUrl, setCodeServerUrl] = useState('')
   useEffect(() => {
     api
       .get<ProjectsResponse>('/projects')
-      .then((res) => setProjectRoots(res.roots))
+      .then((res) => {
+        setProjectRoots(res.roots)
+        setCodeServerUrl(res.codeServerUrl)
+      })
       .catch(() => {})
   }, [])
 
@@ -448,6 +552,119 @@ export function Terminal({
     }
   }, [fontSize, fitIfVisible, sendResize])
 
+  // Always holds the latest connection state, readable from the foreground
+  // handler below without making that effect re-subscribe its listeners on
+  // every 'connecting' <-> 'connected' <-> 'disconnected' transition - same
+  // "ref mirrors state for a stable listener" idiom as activeSessionRef
+  // above.
+  const stateRef = useRef(state)
+  stateRef.current = state
+
+  // Pending auto-reconnect timer + the attempt count driving its backoff.
+  // Refs, not state, because they must survive the WS-connect effect below
+  // tearing itself down and recreating on every reconnect attempt (it's
+  // keyed on reconnectNonce) without losing the count - only a real
+  // successful connection (ws.onopen) or an explicit user-initiated
+  // reconnect should reset it back to 0.
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectAttemptRef = useRef(0)
+  // Drives the "재연결 중..." overlay below - null whenever nothing is
+  // scheduled, otherwise which attempt is pending and when it fires, so the
+  // overlay can show live feedback instead of looking identical to a plain
+  // idle-disconnected state.
+  const [pendingReconnect, setPendingReconnect] = useState<{ attempt: number; retryAt: number } | null>(null)
+
+  const clearScheduledReconnect = useCallback(() => {
+    if (reconnectTimerRef.current !== null) {
+      clearTimeout(reconnectTimerRef.current)
+      reconnectTimerRef.current = null
+    }
+    setPendingReconnect(null)
+  }, [])
+
+  // Schedules the next auto-reconnect attempt at a capped exponential delay
+  // (see RECONNECT_BASE_DELAY_MS/RECONNECT_MAX_DELAY_MS above), firing by
+  // bumping reconnectNonce - the same signal the manual 재연결 button uses,
+  // so a scheduled attempt and a manual one both flow through the one
+  // WS-connect effect below. Guards against double-scheduling (a stray
+  // second onclose for a socket that's already being replaced) and against
+  // the Home tab, which is never a real session to reconnect.
+  const scheduleReconnect = useCallback(() => {
+    if (activeSessionRef.current === HOME_TAB_ID) return
+    if (reconnectTimerRef.current !== null) return
+    const attempt = reconnectAttemptRef.current + 1
+    reconnectAttemptRef.current = attempt
+    const delay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** (attempt - 1), RECONNECT_MAX_DELAY_MS)
+    setPendingReconnect({ attempt, retryAt: Date.now() + delay })
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = null
+      setReconnectNonce((n) => n + 1)
+    }, delay)
+  }, [])
+
+  // Manual reconnect (the overlay's button) and the foreground-return fast
+  // path below both go through this: cancel whatever's pending and retry
+  // immediately, resetting the backoff back to attempt 1 - a user action (or
+  // the app coming back to the foreground) is a strong enough signal that
+  // it's worth trying right now rather than respecting a delay computed for
+  // an unattended background retry.
+  const reconnect = useCallback(() => {
+    clearScheduledReconnect()
+    reconnectAttemptRef.current = 0
+    setReconnectNonce((n) => n + 1)
+  }, [clearScheduledReconnect])
+
+  // Ticks once a second only while a reconnect is actually pending, purely
+  // to re-render the overlay's countdown below - retrySecondsLeft itself is
+  // derived fresh from pendingReconnect.retryAt on every render rather than
+  // stored as its own state, so this doesn't need to (and shouldn't) try to
+  // keep a duplicate counter in sync.
+  const [, forceReconnectCountdownTick] = useState(0)
+  useEffect(() => {
+    if (!pendingReconnect) return
+    const id = setInterval(() => forceReconnectCountdownTick((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [pendingReconnect])
+  const retrySecondsLeft = pendingReconnect ? Math.max(0, Math.ceil((pendingReconnect.retryAt - Date.now()) / 1000)) : 0
+
+  // Several clients can be attached to one session at once (phone, tablet,
+  // laptop) and the backend applies resizes last-write-wins with no
+  // ownership concept — relayTerminalSession accepts an unsolicited resize
+  // from any attached connection at any time. So the window regaining focus
+  // is the natural moment for this client to re-claim the PTY size: coming
+  // back to the laptop after using the same session on a phone would
+  // otherwise leave the terminal stuck at the phone's dimensions.
+  // Deliberately one message on the focus transition, not polling while
+  // focused — one resize is all it takes to win.
+  //
+  // This is also auto-reconnect's fast path: waiting out a scheduled
+  // backoff after a phone was simply backgrounded and foregrounded again
+  // would make even a 1-second-old disconnect feel sluggish, so returning to
+  // the foreground jumps straight to an immediate retry instead. Both
+  // 'focus' and 'visibilitychange' are listened for (one handler, not two
+  // near-duplicate ones) - on mobile, backgrounding a tab/PWA is known to
+  // not always fire a plain window 'focus' on return (browser/OS-dependent),
+  // while 'visibilitychange' is the more reliable signal for exactly that
+  // case; not independently verified live in this repo, so keep both rather
+  // than betting entirely on one.
+  useEffect(() => {
+    if (activeSession === HOME_TAB_ID) return
+    const onForeground = () => {
+      fitIfVisible()
+      sendResize()
+      if (stateRef.current === 'disconnected' && autoReconnectEnabledRef.current) reconnect()
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') onForeground()
+    }
+    window.addEventListener('focus', onForeground)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.removeEventListener('focus', onForeground)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [activeSession, fitIfVisible, sendResize, reconnect])
+
   // Re-focuses the terminal. Used after every mobile-toolbar key/zoom
   // button action (see TerminalControls.tsx) since tapping a button would
   // otherwise shift DOM focus to the button itself (`preventFocusSteal`'s
@@ -496,6 +713,16 @@ export function Terminal({
   const toggleAltScreenTouchScroll = useCallback((enabled: boolean) => {
     saveAltScreenTouchScrollEnabled(enabled)
     setAltScreenTouchScrollEnabled(enabled)
+  }, [])
+
+  const toggleAutoReconnect = useCallback((enabled: boolean) => {
+    saveAutoReconnectEnabled(enabled)
+    setAutoReconnectEnabledState(enabled)
+  }, [])
+
+  const toggleControlBarEnabled = useCallback((enabled: boolean) => {
+    saveControlBarEnabled(enabled)
+    setControlBarEnabledState(enabled)
   }, [])
 
   const sendBytes = useCallback((bytes: string) => {
@@ -994,6 +1221,11 @@ export function Terminal({
 
     ws.onopen = () => {
       setState('connected')
+      // A real connection is exactly what auto-reconnect's backoff exists
+      // to reach - reset it so the *next* drop starts back at the fast 1s
+      // retry instead of picking up wherever this one left off.
+      reconnectAttemptRef.current = 0
+      setPendingReconnect(null)
       // Still sent even though the size already went out as a query param
       // above: the container can legitimately have changed size between
       // this effect running and the handshake completing.
@@ -1030,13 +1262,33 @@ export function Terminal({
       setState('disconnected')
       refreshSessions().then((data) => {
         if (data && activeSessionRef.current === activeSession && !data.some((s) => s.name === activeSession)) {
+          // Session genuinely gone (e.g. Ctrl+D exited the shell) - nothing
+          // to reconnect to, so fall back to Home instead of scheduling a
+          // retry that would just silently resurrect it under the backend's
+          // GetOrCreate-on-attach semantics (a "closed" tab quietly coming
+          // back to life would be far more confusing than just losing it).
           setActiveSession(HOME_TAB_ID)
+          return
+        }
+        // Still the active tab (this refetch itself is async, so the user
+        // may have switched away or closed it while it was in flight) and
+        // not confirmed dead - safe to schedule an automatic retry. Runs
+        // even if the refetch itself failed (data === null, best-effort) -
+        // a network hiccup isn't proof the session is gone, and the manual
+        // 재연결 button always remains available regardless.
+        if (autoReconnectEnabledRef.current && activeSessionRef.current === activeSession) {
+          scheduleReconnect()
         }
       })
     }
     ws.onerror = () => {
       if (wsRef.current !== ws) return
       setState('disconnected')
+      // No scheduleReconnect() call here: per the WebSocket spec an error is
+      // always followed by a close event, and ws.onclose above is the one
+      // that actually schedules a retry (after confirming via refreshSessions
+      // the session isn't just plain gone) - scheduling from both would risk
+      // a double-scheduled attempt.
     }
     ws.onmessage = (event) => {
       if (event.data instanceof ArrayBuffer) {
@@ -1047,12 +1299,15 @@ export function Terminal({
     return () => {
       ws.close()
       if (wsRef.current === ws) wsRef.current = null
+      // Cancels any pending auto-reconnect timer for THIS attempt on every
+      // teardown - unmount, switching to another tab/Home mid-backoff, or
+      // this effect re-running because a scheduled retry just fired. The
+      // last case is a harmless no-op (the timer already cleared itself
+      // before bumping reconnectNonce) but the first two are exactly the
+      // "don't keep retrying a tab the user left" guard this exists for.
+      clearScheduledReconnect()
     }
-  }, [activeSession, refreshSessions, reconnectNonce, fitIfVisible])
-
-  const reconnect = useCallback(() => {
-    setReconnectNonce((n) => n + 1)
-  }, [])
+  }, [activeSession, refreshSessions, reconnectNonce, fitIfVisible, scheduleReconnect, clearScheduledReconnect])
 
   const selectSession = useCallback(
     (name: string) => {
@@ -1217,11 +1472,21 @@ export function Terminal({
     setCloseConfirm(null)
   }, [closeConfirm, closeSession])
 
-  const activeProjectPath = useMemo(() => {
+  // The session poll above already carries each session's live cwd (read
+  // server-side from /proc/<pid>/cwd), so this tracks a plain `cd` within a
+  // poll interval. Deliberately not the on-demand GET .../cwd that
+  // openFileManagerHere uses: the "code로 열기" link needs a path at render
+  // time to build a real <a href>, and only a real anchor gets middle-click
+  // / ctrl-click "open in a new tab" from the browser for free.
+  const activeCwd = useMemo(() => {
     if (activeSession === HOME_TAB_ID) return null
-    const cwd = sessions.find((s) => s.name === activeSession)?.cwd
-    return cwd ? projectPathForCwd(cwd, projectRoots) : null
-  }, [sessions, activeSession, projectRoots])
+    return sessions.find((s) => s.name === activeSession)?.cwd ?? null
+  }, [sessions, activeSession])
+
+  const activeProjectPath = useMemo(
+    () => (activeCwd ? projectPathForCwd(activeCwd, projectRoots) : null),
+    [activeCwd, projectRoots],
+  )
 
   const surfaceStyle = {
     '--kb-inset': `${keyboardInset}px`,
@@ -1258,6 +1523,23 @@ export function Terminal({
               <FolderOpen size={14} /> <span className="btn-label">파일 브라우저에서 열기</span>
             </button>
           )}
+          {/* A real <a href>, not a button with an onClick: that is what makes
+              middle-click / ctrl-click open a new tab (browser default, no
+              handler needed), and target="_top" breaks out of the iframe when
+              webmanager is embedded. Do not "clean this up" into an onClick.
+              Falls back to window.location.origin when codeServerUrl is unset,
+              same as the Projects tab does. */}
+          {activeCwd && (
+            <a
+              className="btn btn-secondary btn-small"
+              href={`${codeServerUrl || window.location.origin}/?folder=${encodeURIComponent(activeCwd)}`}
+              target="_top"
+              rel="noopener"
+              title={`현재 디렉토리를 code에서 열기 (${activeCwd}) — 가운데 클릭하면 새 탭`}
+            >
+              <Code size={14} /> <span className="btn-label">code로 열기</span>
+            </a>
+          )}
           {activeSession !== HOME_TAB_ID && onOpenProject && activeProjectPath && (
             <button
               type="button"
@@ -1288,6 +1570,8 @@ export function Terminal({
         onRename={renameSession}
         homeLabel={effectiveSettings.homeLabel}
         onRenameHome={renameHome}
+        showZoomGroup={!controlBarEnabled}
+        onZoom={zoom}
       />
       {settingsError && (
         <p className="terminal-inline-notice">터미널 설정을 불러오지 못했습니다 ({settingsError}) — 기본값을 사용합니다.</p>
@@ -1302,12 +1586,28 @@ export function Terminal({
             unmounting avoids having to recreate xterm when a session opens
             again. */}
         <div ref={containerRef} className="terminal-container" hidden={activeSession === HOME_TAB_ID} />
+        {/* Distinguishes "waiting on a scheduled auto-reconnect" from a
+            plain idle disconnect (autoReconnectEnabled off, or Home) - a
+            silent identical overlay in the former case reads as broken
+            ("why isn't it retrying?") when it actually is. The manual
+            button still works either way; while a retry is pending it also
+            jumps the queue (reconnect() resets the backoff), so it's never
+            just a duplicate of waiting. */}
         {activeSession !== HOME_TAB_ID && state === 'disconnected' && (
           <div className="terminal-disconnect-overlay">
             <div className="terminal-disconnect-card">
-              <p>연결이 해제되었습니다</p>
+              {pendingReconnect ? (
+                <>
+                  <p>재연결 중... ({pendingReconnect.attempt}번째 시도)</p>
+                  <p className="terminal-disconnect-subtext">
+                    {retrySecondsLeft > 0 ? `${retrySecondsLeft}초 후 다시 시도` : '지금 시도 중...'}
+                  </p>
+                </>
+              ) : (
+                <p>연결이 해제되었습니다{autoReconnectEnabled ? '' : ' (자동 재연결 꺼짐)'}</p>
+              )}
               <button type="button" className="btn btn-primary btn-small" onClick={reconnect}>
-                재연결
+                {pendingReconnect ? '지금 재연결' : '재연결'}
               </button>
             </div>
           </div>
@@ -1327,7 +1627,7 @@ export function Terminal({
             onOpenProject={onOpenProject}
           />
         )}
-        {activeSession !== HOME_TAB_ID && (
+        {activeSession !== HOME_TAB_ID && controlBarEnabled && (
           <TerminalControls
             keybindings={effectiveSettings.keybindings}
             armedModifier={armedModifier}
@@ -1351,6 +1651,10 @@ export function Terminal({
         onToggleMobileInputWorkaround={toggleMobileInputWorkaround}
         altScreenTouchScrollEnabled={altScreenTouchScrollEnabled}
         onToggleAltScreenTouchScroll={toggleAltScreenTouchScroll}
+        autoReconnectEnabled={autoReconnectEnabled}
+        onToggleAutoReconnect={toggleAutoReconnect}
+        controlBarEnabled={controlBarEnabled}
+        onToggleControlBarEnabled={toggleControlBarEnabled}
       />
       <ConfirmDialog
         open={closeConfirm !== null}

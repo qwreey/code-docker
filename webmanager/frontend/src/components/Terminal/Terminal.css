@@ -61,15 +61,76 @@
 /* Session tab bar (M2 named sessions), right below the topbar per the repo
    owner's request. Real, functional tabs backed by internal/termsession —
    see TerminalTabs.tsx's doc comment for the "always show the active tab
-   even before it's confirmed by the backend" behavior. */
+   even before it's confirmed by the backend" behavior.
+
+   Two-child row: .terminal-tab-list (the actual tabs, still the one that
+   wraps — see below) and, only while the control bar is hidden, the
+   .terminal-zoom-group sibling pinned at the far right. align-items:
+   flex-start (not center) is deliberate: the tab list can grow to 2-3 lines
+   tall as it wraps, and this row's own cross-axis alignment would otherwise
+   stretch/center-shift against that growing height — .terminal-zoom-group
+   opts back into vertical centering itself via align-self. */
 .terminal-tabbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.3rem;
+  flex: none;
+  margin-top: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* The tabs themselves - flex:1 so it claims the row, wrapping internally
+   exactly like .terminal-tabbar used to on its own (same flex-wrap: wrap),
+   with .terminal-zoom-group as a plain sibling rather than one more
+   wrapping item so it never trails onto whichever line the last tab lands
+   on. min-width: 0 lets it actually shrink below its content's natural
+   width instead of pushing the zoom group out of the row. */
+.terminal-tab-list {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  flex: none;
+  flex: 1;
+  min-width: 0;
   flex-wrap: wrap;
-  margin-top: 0.5rem;
-  border-bottom: 1px solid var(--border);
+}
+
+/* Zoom group moved here from TerminalControls.tsx's control bar when that
+   bar is hidden (Terminal.tsx's controlBarEnabled) - see TerminalTabs.tsx.
+   align-self: center keeps the two buttons vertically centered against the
+   tab row regardless of how tall .terminal-tab-list's own wrapping grows
+   (an explicit user requirement, not just "looks fine" - .terminal-tabbar's
+   own align-items is flex-start for that same reason, see above). */
+.terminal-zoom-group {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex: none;
+  align-self: center;
+}
+
+/* Sized/styled to match .terminal-tab-add right above it (the other
+   icon-only button living in this row) rather than TerminalControls.tsx's
+   .terminal-key-action - that one is tinted from the active xterm theme's
+   own --term-fg/--term-bg because it sits directly on the terminal's own
+   surface; this button sits in the ordinary app-themed tab row instead, so
+   it follows the app's own --text-muted/--color-gray-bg tokens like every
+   other tab-row control. */
+.terminal-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.terminal-zoom-btn:hover {
+  color: var(--text);
+  background: var(--color-gray-bg);
 }
 
 .terminal-tab {
@@ -256,6 +317,19 @@
 .terminal-disconnect-card p {
   margin: 0;
   font-weight: 600;
+}
+
+/* Countdown/attempt-count line under the "재연결 중..." headline while an
+   auto-reconnect is scheduled - deliberately lighter than the headline
+   above so it reads as supporting detail, not a second equally-important
+   message. Selector is scoped under .terminal-disconnect-card (not just
+   .terminal-disconnect-subtext alone) so it outweighs the card's own
+   ".terminal-disconnect-card p { font-weight: 600 }" rule above by
+   specificity instead of needing !important. */
+.terminal-disconnect-card .terminal-disconnect-subtext {
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
 
 .terminal-container {
