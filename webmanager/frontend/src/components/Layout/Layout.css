@@ -316,12 +316,19 @@
     bottom: 0;
     z-index: 50;
     transform: translateX(-100%);
-    transition: transform 0.2s ease;
-    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.25);
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
   }
 
+  /* box-shadow lives here, not on the base .sidebar rule - closed state
+     translates the sidebar fully off-screen but the shadow still bleeds a
+     few px into the viewport past x=0, leaving a shadow strip with no
+     sidebar behind it. Keeping it open-only means it only paints while the
+     drawer is actually on screen. */
   .sidebar-open {
     transform: translateX(0);
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.25);
   }
 
   .sidebar-backdrop {

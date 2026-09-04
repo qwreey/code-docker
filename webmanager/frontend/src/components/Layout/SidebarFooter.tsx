@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect } from 'react'
 import { Lock, LockOpen, Monitor, Moon, Sun } from 'lucide-react'
 import { useTheme } from '../../useTheme'
 import type { ThemeChoice } from '../../theme'
@@ -14,15 +14,13 @@ function nextTheme(current: ThemeChoice): ThemeChoice {
   return THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length]
 }
 
-// "몇 분 남음" 문구를 주기적으로 다시 계산하기 위한 리렌더 트리거 — 초 단위로
-// 실시간 카운트다운할 필요는 없어서(10분짜리 TTL에 분 단위 표시면 충분) 30초
-// 주기로만 재렌더.
-function useTicker(intervalMs: number) {
-  const [, setTick] = useState(0)
+// 주어진 콜백을 주기적으로 호출 - 초 단위로 실시간 카운트다운할 필요는
+// 없어서(10분짜리 TTL에 분 단위 표시면 충분) 30초 주기로만 실행.
+function useInterval(callback: () => void, intervalMs: number) {
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), intervalMs)
+    const id = setInterval(callback, intervalMs)
     return () => clearInterval(id)
-  }, [intervalMs])
+  }, [callback, intervalMs])
 }
 
 function formatRemaining(untilIso: string | null | undefined): string {
@@ -40,7 +38,20 @@ function formatRemaining(untilIso: string | null | undefined): string {
 export function SidebarFooter() {
   const { theme, setTheme } = useTheme()
   const { status, refresh } = useAuthStatus()
-  useTicker(30_000)
+
+  // GET /api/auth/status is registered without RequirePassword (see
+  // backend/main.go), and cookie-refresh only happens inside that
+  // middleware - so polling it here never slides the idle-timeout window,
+  // it just lets formatRemaining() recompute against a fresh unlockedUntil
+  // instead of the stale snapshot from unlock time (which otherwise counts
+  // down past zero and sticks on "곧 만료" forever even though the real
+  // session keeps sliding forward from other gated requests). Only poll
+  // while the gate is actually shown - nothing to refresh otherwise.
+  const pollEnabled = status?.required === true
+  const pollStatus = useCallback(() => {
+    if (pollEnabled) refresh()
+  }, [pollEnabled, refresh])
+  useInterval(pollStatus, 30_000)
 
   async function handleUnlockClick() {
     try {
