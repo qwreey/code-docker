@@ -46,6 +46,14 @@
   margin-bottom: 0.9rem;
 }
 
+/* Anchor rendered as a toolbar button can't use the native `disabled`
+   attribute, so mirror .btn:disabled's look via aria-disabled instead
+   (see the "code-server에서 열기" link in FileManager.tsx). */
+.file-manager-toolbar a.btn-disabled-link {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .file-manager-upload-label {
   cursor: pointer;
 }

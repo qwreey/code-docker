@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Terminal as TerminalIcon } from 'lucide-react'
+import { ExternalLink, Terminal as TerminalIcon } from 'lucide-react'
 import { api, apiUrl, errorMessage } from '../../api/client'
 import type { FileEntry, FileOpResult, FileUploadResult } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
@@ -76,6 +76,17 @@ export function FileManager({
 
   const currentPath = pathStack[pathStack.length - 1].path
   const currentDirPath = currentPath ?? resolvedRootPath
+
+  // Same-origin fallback: nginx serves code-server (/) and webmanager (/manager)
+  // from the same origin/port, so the page webmanager is loaded from is also
+  // code-server's origin in the common case (see ProjectTable.tsx, which does
+  // the same thing for the Projects tab). FileManager isn't handed
+  // WEBMANAGER_CODE_SERVER_URL from the backend at all - it's only plumbed
+  // through the Projects scan API response - so this always falls back to
+  // window.location.origin rather than adding a new prop/API for it.
+  function codeServerHref(path: string): string {
+    return `${window.location.origin}/?folder=${encodeURIComponent(path)}`
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -277,6 +288,24 @@ export function FileManager({
             <TerminalIcon size={14} /> 터미널에서 열기
           </button>
         )}
+        {/* Must be a real <a href>, not a JS window.open handler: that's what lets
+            middle-click/ctrl-click open a new tab natively, and target="_top" is
+            what breaks out of the surrounding iframe when webmanager is embedded
+            (e.g. from code-server's own launcher). Don't "clean this up" into an
+            onClick. */}
+        <a
+          href={currentDirPath !== null ? codeServerHref(currentDirPath) : undefined}
+          target="_top"
+          rel="noopener"
+          className={`btn btn-secondary btn-small${currentDirPath === null ? ' btn-disabled-link' : ''}`}
+          aria-disabled={currentDirPath === null}
+          title="현재 디렉토리를 code-server에서 열기"
+          onClick={(e) => {
+            if (currentDirPath === null) e.preventDefault()
+          }}
+        >
+          <ExternalLink size={14} /> code-server에서 열기
+        </a>
         <button
           type="button"
           className="btn btn-secondary btn-small"
