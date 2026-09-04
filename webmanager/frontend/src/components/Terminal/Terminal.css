@@ -332,16 +332,47 @@
   color: var(--text-muted);
 }
 
+/* No padding here on purpose - it belongs on .xterm below. FitAddon reads
+   `getComputedStyle(this.terminal.element.parentElement).height` and treats
+   it as the available *content* height, but index.css sets
+   `box-sizing: border-box` app-wide, and Chrome then returns the BORDER box
+   from that property - so any padding on this element is silently counted as
+   usable terminal space and the row count comes out too high by exactly that
+   padding. The screen then renders taller than .xterm actually is and
+   `overflow: hidden` slices the bottom of the last row.
+
+   Measured on the real deployment, 2026-09-04, back when this rule had
+   `padding: 0.4rem 0.5rem 0`:
+
+     getComputedStyle(container).height  384.233  <- what FitAddon reads
+     container padding                   6px / 0px
+     .xterm height                       378.233  <- 384.233 - 6, the truth
+     .xterm padding                      0 / 0     <- nothing for FitAddon to subtract
+     rows / cell height                  24 / 16
+     .xterm-screen height                384      <- 24 * 16
+     overflow                            5.767px  = 0.36 of a row, clipped
+
+   So the amount clipped was exactly this element's vertical padding, which is
+   also why it varied per device: the padding is rem-based while the cell
+   height follows the font and DPR, so the ratio differs everywhere.
+   FitAddon *does* subtract `.xterm`'s own padding (its `elementPaddingVer`),
+   which is why the padding moved there - that is the supported place to put
+   terminal insets. Do not move it back. */
 .terminal-container {
   flex: 1;
   min-height: 0;
   min-width: 0;
-  padding: 0.4rem 0.5rem 0;
   overflow: hidden;
 }
 
+/* The terminal's visual inset lives here, not on .terminal-container - see
+   that rule's comment. FitAddon subtracts this padding from the space it
+   proposes rows/cols for, so it costs real terminal rows instead of silently
+   overflowing them. `height: 100%` stays correct because box-sizing is
+   border-box app-wide (index.css), so the padding is inside that 100%. */
 .terminal-container .xterm {
   height: 100%;
+  padding: 0.4rem 0.5rem;
 }
 
 .terminal-container .xterm-viewport {
