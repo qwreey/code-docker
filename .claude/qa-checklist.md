@@ -358,3 +358,50 @@ Task Manager는 flex 표, Supervisor 탭은 그 아래 펼쳐지는 일반 auto-
 - [ ] (관찰, 이번 건과 무관) Supervisor 표의 커맨드 셀은 `white-space`가 `normal`로
       계산돼 두 줄로 접힙니다. `.process-cmdline`이 `nowrap`을 지정하는데도 그렇습니다 —
       어딘가 더 구체적인 규칙이 이기는 듯. 급하지 않아 추적하지 않았습니다.
+
+
+---
+
+## 인계 메모 (2026-09-04, compact 직전)
+
+세션 대화에만 있고 파일에 없던 것들. compact/clear 후에도 남도록 여기 적는다.
+
+### 테스트 스택의 현재 상태 (gitignore라 레포에 흔적이 없음)
+
+- `.env.webmanager`가 **이 세션에서 새로 생성**됐다. `example-env.webmanager`를
+  통째로 복사한 것이라 `WEBMANAGER_ENV_VERSION=17`이 들어 있고, 그 덕에 예전에
+  로그에 뜨던 `.env.webmanager version is ""` 경고가 사라졌다.
+- 비밀번호 게이트는 한 번 켰다가(`test`) **다시 껐다**. 지금
+  `WEBMANAGER_AUTH_PASSWORD_HASH`는 주석 상태이고 `/api/auth/status`는
+  `required: false`. 비밀번호 관련 QA는 프로덕션에서 하기로 함.
+- QA 중 만든 터미널 세션과 컨트롤 바 설정은 원래대로 정리해뒀다.
+
+### 아직 답 안 한 사용자 질문
+
+- **"홈 탭은 이름을 변경할 이유가 없었는데 왜 있는지?"** — 조사 결과 근거가
+  **기록에 없다**. `764ab0c`(터미널 탭 재정렬/핀/닫기 확인 등을 한꺼번에 넣은 커밋)에
+  "Home tab title is now editable and backend-persisted (extends TerminalSettings,
+  same pattern as keybindings/theme)" 한 줄로 들어갔고, 왜 필요했는지는 어디에도 없다.
+  빼고 싶으면 `TerminalTabs.tsx`의 홈 탭 rename 분기와
+  `internal/terminalsettings`의 `homeLabel`을 걷어내면 된다. **사용자 결정 대기.**
+
+### 미해결로 남긴 결정
+
+- 커밋 `173d176`의 메시지에 탭 이름변경 원인 설명이 **틀린 채로** 남아 있다
+  (홈 탭 `draggable` 비대칭 → 실제로는 활성/비활성 탭 차이). 정정은
+  `.claude/backlog/qa-batch-2026-09-03.md`에 있다. 아직 푸시 전이라 history
+  재작성은 가능하지만 하지 않았다 — **할지 말지 사용자 결정 대기.**
+- 전체 QA는 사용자가 나중에 batch로 한 번에 하기로 했다. 개별 항목을 그때그때
+  물어보지 말 것.
+
+### 착수 가능한 다음 작업 (막힌 것/안 막힌 것)
+
+- **`.claude/backlog/git-trailer-rewrite-plan.md`** — 막힌 것 없음. 자기완결적이고
+  설계도 끝나 있다. 다음 작업으로 가장 적합.
+- `.claude/backlog/webdav-file-share-plan.md` — 막힌 것 없지만 분량이 크다.
+- `.claude/backlog/repo-restructure-plan.md` — **막혀 있다.** upstream 5개 repo에
+  릴리스 태그를 붙이는 게 선행 조건이고 그건 사용자만 할 수 있다.
+- `webmanager/.claude/research/mobile-ime-hangul-plan.md` — **막혀 있다.** 안드로이드
+  실기기 계측이 선행. 데스크탑 브라우저로는 재현이 안 된다.
+- `webmanager/.claude/research/terminal-control-bar-plan.md` — 거의 끝났다(문서
+  맨 위 상태 갱신 참고). 남은 건 탭바 가로 스크롤 전환 안뿐이고 사용자 결정 필요.
