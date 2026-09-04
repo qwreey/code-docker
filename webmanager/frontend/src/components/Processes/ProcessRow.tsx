@@ -1,6 +1,8 @@
+import type { ReactNode } from 'react'
 import type { ProcessInfo } from '../../api/types'
 import { buildHighlightSegments, type FuzzyMatchResult } from '../../utils/fuzzyMatch'
 import { formatBytes, formatPercent } from '../../utils/format'
+import { COLUMN_ORDER, PROCESS_COLUMNS, columnClassName, type ColumnId } from './columns'
 import { KillButtons } from './KillButtons'
 
 // HighlightedText renders `text` plainly, or with fuzzy-matched characters
@@ -53,37 +55,59 @@ export function ProcessRowCells({
   onKilled,
   onError,
 }: ProcessRowCellsProps) {
+  // One cell's worth of content per column, keyed by the same ColumnId the
+  // header (ProcessTable.tsx) renders from. Typed as `Record<ColumnId,
+  // ReactNode>` rather than a loose object literal so this is the other
+  // half of columns.ts's anti-drift guarantee: TypeScript won't compile this
+  // function if a column present in COLUMN_ORDER has no entry here (or vice
+  // versa), so a column can no longer be added to the header and forgotten
+  // in the body, or the reverse.
+  const cells: Record<ColumnId, ReactNode> = {
+    pid: proc.pid,
+    name: (
+      <span className="process-name-cell" style={indent ? { paddingLeft: `${indent * 1.25}rem` } : undefined}>
+        {expandable && (
+          <button
+            type="button"
+            className="process-tree-toggle"
+            onClick={onToggleExpand}
+            aria-label={expanded ? '자식 프로세스 접기' : '자식 프로세스 펼치기'}
+          >
+            {expanded ? '▾' : '▸'}
+          </button>
+        )}
+        <HighlightedText text={proc.name} match={nameMatch} />
+      </span>
+    ),
+    username: proc.username || '-',
+    status: <span className="badge badge-gray">{proc.status}</span>,
+    cpuPercent: formatPercent(proc.cpuPercent),
+    memPercent: formatPercent(proc.memPercent),
+    rssBytes: formatBytes(proc.rssBytes),
+    cmd: <HighlightedText text={proc.cmdline || '-'} match={cmdMatch} />,
+    actions: <KillButtons pid={proc.pid} label={proc.name} onKilled={onKilled} onError={onError} />,
+  }
+
+  // Per-row cell tooltips (the actual process name/cmdline value, truncated
+  // by CSS ellipsis) - distinct from a column's static header tooltip
+  // (`PROCESS_COLUMNS[id].title`, e.g. MEM's cgroup explanation), so this
+  // stays separate from columns.ts rather than living there.
+  const cellTitles: Partial<Record<ColumnId, string | undefined>> = {
+    name: proc.name,
+    cmd: proc.cmdline,
+  }
+
   return (
     <>
-      <td className="pf-col-pid">{proc.pid}</td>
-      <td className="pf-col-name" title={proc.name}>
-        <span className="process-name-cell" style={indent ? { paddingLeft: `${indent * 1.25}rem` } : undefined}>
-          {expandable && (
-            <button
-              type="button"
-              className="process-tree-toggle"
-              onClick={onToggleExpand}
-              aria-label={expanded ? '자식 프로세스 접기' : '자식 프로세스 펼치기'}
-            >
-              {expanded ? '▾' : '▸'}
-            </button>
-          )}
-          <HighlightedText text={proc.name} match={nameMatch} />
-        </span>
-      </td>
-      <td className="pf-col-user">{proc.username || '-'}</td>
-      <td className="pf-col-status">
-        <span className="badge badge-gray">{proc.status}</span>
-      </td>
-      <td className="pf-col-cpu">{formatPercent(proc.cpuPercent)}</td>
-      <td className="pf-col-mem">{formatPercent(proc.memPercent)}</td>
-      <td className="pf-col-rss">{formatBytes(proc.rssBytes)}</td>
-      <td className="pf-col-cmd process-cmdline" title={proc.cmdline}>
-        <HighlightedText text={proc.cmdline || '-'} match={cmdMatch} />
-      </td>
-      <td className="pf-col-actions table-actions-col">
-        <KillButtons pid={proc.pid} label={proc.name} onKilled={onKilled} onError={onError} />
-      </td>
+      {COLUMN_ORDER.map((id) => {
+        const col = PROCESS_COLUMNS[id]
+        const className = columnClassName(col, col.bodyOnlyClassName)
+        return (
+          <td key={id} className={className} title={cellTitles[id]}>
+            {cells[id]}
+          </td>
+        )
+      })}
     </>
   )
 }

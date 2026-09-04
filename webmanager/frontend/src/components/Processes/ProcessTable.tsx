@@ -6,29 +6,14 @@ import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
 import { ProcessRowCells } from './ProcessRow'
 import { ProcessTree } from './ProcessTree'
+import { COLUMN_ORDER, PROCESS_COLUMNS, columnClassName, type SortKey } from './columns'
 import './Processes.css'
 import { withViewTransition } from '../../utils/viewTransition'
 
 const POLL_INTERVAL_MS = 4000
 
-type SortKey = 'pid' | 'name' | 'username' | 'status' | 'cpuPercent' | 'memPercent' | 'rssBytes'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'tree'
-
-const COLUMNS: { key: SortKey; label: string; className: string; title?: string }[] = [
-  { key: 'pid', label: 'PID', className: 'pf-col-pid' },
-  { key: 'name', label: '이름', className: 'pf-col-name' },
-  { key: 'username', label: '사용자', className: 'pf-col-user' },
-  { key: 'status', label: '상태', className: 'pf-col-status' },
-  { key: 'cpuPercent', label: 'CPU', className: 'pf-col-cpu' },
-  {
-    key: 'memPercent',
-    label: 'MEM',
-    className: 'pf-col-mem',
-    title: '컨테이너 메모리 제한(cgroup)이 설정된 경우 그 제한 대비 비율, 없으면 호스트 전체 메모리 대비 비율',
-  },
-  { key: 'rssBytes', label: 'RSS', className: 'pf-col-rss' },
-]
 
 const DESC_DEFAULT_KEYS: SortKey[] = ['cpuPercent', 'memPercent', 'rssBytes']
 
@@ -228,26 +213,37 @@ export function ProcessTable() {
             <table className="process-info-table process-flex-table">
               <thead>
                 <tr>
-                  {COLUMNS.map((col) =>
-                    viewMode === 'list' ? (
-                      <th key={col.key} className={col.className} title={col.title}>
-                        <button type="button" className="sortable-header" onClick={() => toggleSort(col.key)}>
-                          {col.label}
-                          {sortKey === col.key && (
-                            <span className="sort-indicator">{sortDir === 'asc' ? '▲' : '▼'}</span>
-                          )}
-                        </button>
-                      </th>
-                    ) : (
-                      <th key={col.key} className={col.className} title={col.title}>
+                  {COLUMN_ORDER.map((id) => {
+                    // Rendering every column - including cmd/actions, which
+                    // used to be hardcoded separately below this map - from
+                    // the same PROCESS_COLUMNS/COLUMN_ORDER the body reads
+                    // (see ProcessRow.tsx) is the actual fix: both sides now
+                    // get their className from one place instead of two
+                    // hand-duplicated copies that could (and did) drift.
+                    const col = PROCESS_COLUMNS[id]
+                    const className = columnClassName(col)
+                    // Only list view's sortable columns (those with a
+                    // sortKey) get the clickable sort-indicator button; cmd
+                    // and actions have no sortKey so they always fall
+                    // through to the plain label, in both view modes -
+                    // matches the original's separate hardcoded <th>s.
+                    if (viewMode === 'list' && col.sortKey) {
+                      const key = col.sortKey
+                      return (
+                        <th key={id} className={className} title={col.title} aria-label={col.ariaLabel}>
+                          <button type="button" className="sortable-header" onClick={() => toggleSort(key)}>
+                            {col.label}
+                            {sortKey === key && <span className="sort-indicator">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                          </button>
+                        </th>
+                      )
+                    }
+                    return (
+                      <th key={id} className={className} title={col.title} aria-label={col.ariaLabel}>
                         {col.label}
                       </th>
-                    ),
-                  )}
-                  <th className="pf-col-cmd">커맨드</th>
-                  <th className="pf-col-actions" aria-label="동작">
-                    &nbsp;
-                  </th>
+                    )
+                  })}
                 </tr>
               </thead>
               {viewMode === 'list' ? (

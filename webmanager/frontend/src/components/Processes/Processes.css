@@ -91,10 +91,24 @@
    from the exact same explicit rule instead of relying on <table>'s normal
    auto column-width algorithm. */
 
+/* Row height: `align-items: center` alone only centers a row's *shorter*
+   cells against its *tallest* cell - it does nothing to make rows the same
+   height as each other. Body rows always carry the actions column's two
+   `.btn.btn-small` kill buttons (~2.6rem including the <td>'s own padding,
+   taller than any plain-text cell), so in practice every body row already
+   lands at the same height without an explicit rule - except the header
+   row, which has no buttons and would otherwise be visibly shorter than the
+   body rows below it. `min-height` here is a floor, not a fixed height, so
+   a genuinely taller row (a future wider badge, wrapped content) still
+   grows the row instead of clipping it - see the `.pf-col-name`/
+   `.pf-col-user` white-space fix below for the *other* half of the y-axis
+   drift bug this was written to fix (was: rows drifting out of alignment
+   because a long process name/username silently wrapped onto two lines). */
 .process-flex-table thead tr,
 .process-flex-table tbody tr {
   display: flex;
   align-items: center;
+  min-height: 2.7rem;
 }
 
 .process-flex-table tbody {
@@ -118,17 +132,27 @@
   flex: 0 0 3.5rem;
 }
 
+/* `text-overflow: ellipsis` only takes effect on a non-wrapping box - without
+   `white-space: nowrap` it was a no-op on both of these, so a long process
+   name or username silently wrapped onto a second line instead of eliding.
+   That's the actual mechanism behind the reported y-axis row drift: whichever
+   row happened to contain a long enough name/username grew taller than its
+   neighbors, throwing off the whole list's vertical rhythm. `.pf-col-cmd`'s
+   own `.process-cmdline` class (see below) already had `white-space: nowrap`
+   and never exhibited this. */
 .process-flex-table .pf-col-name {
   flex: 1 1 11rem;
   min-width: 8rem;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .process-flex-table .pf-col-user {
   flex: 0 0 6rem;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .process-flex-table .pf-col-status {
