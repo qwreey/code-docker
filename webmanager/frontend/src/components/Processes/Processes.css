@@ -123,9 +123,27 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* A column's used width has to come from its `.pf-col-*` flex-basis and
+   nothing else. The flex default `min-width: auto` floors an item at its
+   min-content size, so a cell whose content is wider than its basis grows
+   past it - and when that happens in the header row only, the header desyncs
+   from the body.
+
+   Measured live 2026-09-04, sorting by CPU: `th.pf-col-cpu` used 68.5px
+   against its 60px basis, because it holds `CPU` plus the `▼` sort
+   indicator. Those 8.5px came out of the growable columns, so every column
+   right of 이름 sat left of its own body cells. It moved around as you
+   sorted, since the indicator only renders on the active column.
+
+   `overflow: hidden` is what actually fixes it: it makes the cell a scroll
+   container, which resolves `min-width: auto` to zero. `min-width: 0` is
+   spelled out alongside it so the intent survives someone removing the
+   overflow. */
 .process-flex-table th,
 .process-flex-table td {
   box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .process-flex-table .pf-col-pid {
@@ -159,18 +177,32 @@
   flex: 0 0 6rem;
 }
 
+/* 5rem, not the 4rem these used to be: `CPU`/`MEM` plus the sort indicator
+   need ~68.5px and 4rem is 60px. Under the guard above the overflow would
+   now be clipped instead of pushing the other columns around - correct, but
+   a clipped header label is still a worse outcome than a slightly wider
+   column. */
 .process-flex-table .pf-col-cpu,
 .process-flex-table .pf-col-mem {
-  flex: 0 0 4rem;
+  flex: 0 0 5rem;
 }
 
 .process-flex-table .pf-col-rss {
   flex: 0 0 5.5rem;
 }
 
+/* max-width lives here, on the class both the header <th> and the body <td>
+   carry, and NOT on `.process-cmdline` below, which only the body cell gets.
+   Measured live 2026-09-04: capped at 360px in the body but free to grow to
+   471.3px in the header, and the 111px difference was handed to `.pf-col-name`
+   in the body row only (430.5px against the header's 310.7px) - which pushed
+   every column between them out of line. `.process-cmdline` keeps the
+   ellipsis/nowrap styling, which really is about the cmdline value; the
+   column's width is not. */
 .process-flex-table .pf-col-cmd {
   flex: 2 1 12rem;
   min-width: 0;
+  max-width: 24rem;
 }
 
 .process-flex-table .pf-col-actions {
@@ -195,7 +227,6 @@
 }
 
 .process-cmdline {
-  max-width: 24rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
