@@ -1,0 +1,17 @@
+// code-server(VS Code)의 사용자 설정 초기값. 이 파일은 컨테이너의
+// user-data/User/settings.json이 **아예 없을 때만** 시드된다 - 이미 있으면
+// 절대 건드리지 않는다(그 파일은 사용자와 VS Code가 계속 쓰는 파일이라
+// 덮어쓰면 설정이 날아간다). 자세한 건 code-settings.default.sh의 주석 참고.
+//
+// 여기에 키를 추가할 땐 "정말 기본값으로 강제해야 하는가"를 먼저 따질 것 -
+// code-docker는 사용자의 편집기 설정을 강제하지 않는 쪽이 기본 방침이고,
+// 아래 키는 보안 기본값이라서 예외로 들어가 있다.
+{
+  // code-server 자체의 --disable-proxy(CS_DISABLE_PROXY, code-server-
+  // autoinstall의 start.sh가 기본 1로 켠다)는 /proxy/ · /absproxy/ ·
+  // *.<proxy-domain> 라우트를 막지만, VS Code 워크벤치가 포트를 자동 감지해서
+  // 포워딩하는 동작 자체는 막지 못한다 - PORTS 탭과 알림은 계속 뜨고, 열어보면
+  // 그때 막힐 뿐이다. upstream의 docs/FAQ.md도 이 둘을 같이 쓰라고 안내한다.
+  // (docs/build-customization.md의 CS_DISABLE_PROXY 절 참고)
+  "remote.autoForwardPorts": false
+}

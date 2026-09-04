@@ -64,7 +64,23 @@ code-server 설정 파일입니다. **매 시작마다 `/code/.local/share/code-
 
 **`disable-proxy`도 여기 넣지 마세요 — 같은 이유입니다.** code-server의 포트 프록시 경로(`/proxy/<port>/`, `/absproxy/<port>/`, `*.<proxy-domain>`)는 기본으로 **꺼져 있습니다** — 이 기본값은 code-docker가 아니라 `code-server-autoinstall`의 `start.sh`가 정합니다(code-server 자신의 환경변수 `CS_DISABLE_PROXY`를 값이 없을 때 `1`로 채워줍니다). 이 경로들은 컨테이너 안에서 열려 있는 *아무* 포트로나 프록시해 주는데 그걸 막아주는 건 code-server 자신의 인증뿐이고 여기서는 `auth: none`이라(→ [로그인/보안](security-login.md)), 켜 두면 code-server에 닿을 수 있는 쪽은 컨테이너 내부 포트 전부에 닿을 수 있게 됩니다 — VS Code의 PORTS 탭이 dev 서버가 뜨자마자 자동으로 잡아 주는 포트까지 포함해서요. 밖으로 내보낼 포트는 [Dev Proxy](../router/docs/dev-proxy.md)나 [App Routes](../router/docs/app-routes.md)로 명시적으로 여세요. 되돌리려면 `.env`에 `CS_DISABLE_PROXY="0"`을 넣으면 됩니다(code-server는 `1`/`true`만 참으로 읽습니다) — config.yaml에 `disable-proxy: false`를 적는 방식은 동작하지 않습니다(code-server는 이 파일에 boolean 키가 *존재하기만 하면* 값과 무관하게 true로 읽습니다).
 
+**다만 이 옵션이 막는 건 프록시 *경로*뿐입니다.** VS Code 워크벤치가 포트를 자동으로 감지해서 포워딩하는 동작 자체는 그대로라, PORTS 탭과 알림은 계속 뜹니다 — 눌러서 열어보면 그때 막힐 뿐이죠. code-server upstream의 `docs/FAQ.md`도 이 옵션과 `remote.autoForwardPorts`를 같이 쓰라고 안내합니다. 그래서 code-docker는 아래 `settings.*.json`으로 `remote.autoForwardPorts: false`를 기본값으로 심어둡니다.
+
 여기의 각 요소는 /code/.local/share/code-docker/code/code-server/bin/code-server --help 를 통해 확인해볼 수 있습니다. 각각의 인자 `--some=value` 는 `some: value` 로 작성할 수 있습니다.
+
+### `settings.*.json` (code-server 사용자 설정 초기값)
+
+code-server(VS Code)의 **사용자** 설정 초기값입니다. `/code/.local/share/code-docker/code/user-data/User/settings.json`에 시드됩니다.
+
+**`code-config.*.yaml`과 달리 매번 덮어쓰지 않습니다 — 그 파일이 아예 없을 때만 만들어 줍니다.** `settings.json`은 code-docker의 파일이 아니라 사용자와 VS Code의 파일이고(설정 UI에서 뭔가 바꿀 때마다 VS Code가 다시 씁니다), 주석과 후행 쉼표가 허용되는 JSONC라서 셸 스크립트가 키 하나를 안전하게 병합할 방법이 없습니다. 그래서 덮어쓰기 대신 "없으면 만들기"만 합니다.
+
+대신 **이미 돌고 있는 배포본에는 새로 추가된 기본값이 반영되지 않습니다.** 그걸 조용히 넘기지 않도록, 파일이 이미 있으면 어떤 키가 적용되지 않았는지와 직접 설정하는 방법을 시작 로그(`docker compose logs`)에 남깁니다.
+
+현재 들어있는 키는 하나입니다:
+
+- `remote.autoForwardPorts: false` — 위 `code-config.*.yaml` 절의 `CS_DISABLE_PROXY` 설명 참고. 그쪽이 프록시 *경로*를 막는다면 이건 PORTS 탭의 자동 감지/포워딩 자체를 끕니다. 둘은 짝입니다.
+
+여기에 키를 추가하는 건 가벼운 결정이 아닙니다 — code-docker는 사용자의 편집기 설정을 강제하지 않는 쪽이 기본 방침이고, 위 키는 보안 기본값이라 예외로 들어가 있습니다. 배포 대상 전체에 편집기 설정을 강제하고 싶다면 `settings.override.json`을 만들어 재빌드하세요.
 
 ### `recommendations.*.yaml` (추천 목록)
 

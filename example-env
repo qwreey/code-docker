@@ -242,6 +242,15 @@
 # Note this can only be changed here, not in code-config.*.yaml: code-server
 # reads any boolean key present in that file as true, so `disable-proxy:
 # false` there would still disable it.
+#
+# This gates the proxy ROUTES only. VS Code's workbench still auto-detects
+# and forwards ports, so the PORTS tab and its notifications keep showing up
+# - they just can't be reached. That half is the `remote.autoForwardPorts`
+# workbench setting, which code-docker seeds as false via
+# config/code/settings.default.json (docs/build-customization.md). If this
+# container was first started before that default existed, its settings.json
+# already exists and won't be touched - the startup log says so and names
+# the key.
 #CS_DISABLE_PROXY="1"
 
 # Comma-separated allowlist of Host header values the in-container nginx

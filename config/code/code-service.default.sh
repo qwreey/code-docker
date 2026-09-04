@@ -25,6 +25,17 @@ else
     /etc/code-docker/code/code-patch.default.sh
 fi
 
+# Seed code-server's user settings.json if it doesn't exist yet. Must run
+# before code-server starts (it creates the file lazily on first write), and
+# after install.sh so the user-data dir's parent is there. Unlike code-patch
+# above this is create-only, never a refresh - see that script's own comment
+# for why settings.json can't use the hash-manifest scheme.
+if [ -e /etc/code-docker/code/code-settings.override.sh ]; then
+    /etc/code-docker/code/code-settings.override.sh
+else
+    /etc/code-docker/code/code-settings.default.sh
+fi
+
 # source code env
 if [ -e /etc/code-docker/code/code-env.override.sh ]; then
     source /etc/code-docker/code/code-env.override.sh
