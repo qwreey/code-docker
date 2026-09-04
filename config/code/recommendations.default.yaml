@@ -23,6 +23,10 @@ extensions:
     label: Prettier
     description: 코드 포매터.
     category: 코드 품질
+  - id: LeonardSSH.vscord
+    label: VSCord
+    description: 작업 중인 파일/프로젝트를 디스코드 상태로 표시 (docs/tips/discord-presence.md).
+    category: 편의 기능
 
 mise:
   - category: 언어 런타임/툴체인
