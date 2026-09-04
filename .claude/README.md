@@ -44,6 +44,12 @@
     문서 안에 트리거 조건과 함께 백로그로 남아 있음(실사용 중 성능 문제를
     겪으면 그때)
 
+- **`qa-checklist.md`** — 에이전트가 구현/배포까지 끝냈지만 사람이 직접 눌러봐야
+  아는 항목들의 **누적 체크리스트**. 한 번에 몰아서 확인하려고 배치로 쌓는 곳 —
+  확인이 끝나면 지우고 결과를 해당 plan 문서에 반영한다. (기능 단위로 "QA만 남은"
+  문서는 webmanager 쪽 `webmanager/.claude/qa-request/`에 따로 있음. 이 파일은
+  그것과 달리 여러 기능에 걸친 짧은 확인 항목들을 모으는 용도)
+
 - **`backlog/`** — 아직 착수하지 않은 브레인스토밍/아이디어(webmanager에 국한되지
   않는 것). `archive/`와 달리 "완료된 것"이 아니라 "언젠가 할 수도 있는 것" — 실제로
   작업을 시작할 때 참고
@@ -56,6 +62,19 @@
   - `readme-revamp-plan.md` — README.md 재단장(뱃지, 소개 문단 다듬기)
     아이디어 — 문서 콘텐츠 자체를 `docs/`로 옮기는 작업(2026-08-05)은 이미
     끝났고, 이건 그 다음 단계
+  - `repo-restructure-plan.md` — submodule 4개(router/code-dind/envmigrate/
+    code-server-autoinstall)를 원격 참조로 바꾸고 개발용 `dev/` 폴더를 두는 계획.
+    "Compose가 원격 include를 지원한다", "ARG를 ADD의 source로 쓸 수 있다" 두 전제를
+    실측으로 확인해둔 문서 (2026-09-03)
+  - `webdav-file-share-plan.md` — 다른 기기에서 파일 업/다운로드용 WebDAV 공유.
+    대문이 Caddy가 아니라 nginx라는 점, WebDAV 클라이언트가 forward-auth를 못 탄다는
+    핵심 제약이 정리돼 있음 (2026-09-03)
+  - `git-trailer-rewrite-plan.md` — 에이전트 커밋의 `Co-Authored-By` trailer를
+    qwreey-bot으로 치환. git 래퍼가 아니라 전역 `prepare-commit-msg` 훅으로 가는
+    이유가 정리돼 있음 (2026-09-03)
+  - `qa-batch-2026-09-03.md` — 사용자 QA 제보 11건의 원인 분석 + 수정 방향.
+    `CS_DISABLE_PROXY`가 사라졌다는 전제가 틀렸다는 정정과, 그럼에도 실재하는
+    구멍(`remote.autoForwardPorts`)이 여기 있음
 
 - **webmanager 전용 계획/설계**: `webmanager/.claude/` — 완료된 기능은
   `*-plan-done.md`, 아직 안 한 건 `*-plan.md`. 인덱스는 그 폴더의 `README.md`.

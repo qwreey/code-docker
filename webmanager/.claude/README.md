@@ -86,7 +86,9 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 |---|---|---|
 | `research/guide-plan.md` | code-docker 도움말/가이드를 webmanager에 임베드 — 아이디어 단계, 구현 안 함 | 미정(사용자 검토 대기) |
 | `research/version-panel-plan.md` | code-server/mise 버전 관리 패널 — 아이디어 단계, "컨테이너 재빌드 필요"를 뭘로 판단할지부터 불명확 | 최하 |
+| `research/mobile-ime-hangul-plan.md` | 모바일(안드로이드) 한글 입력이 자모로 쪼개지는 회귀 — 원인 위치(모바일 입력 워크어라운드 필드에 조합이 안 붙음)와 회귀 경위(`60f556f`)까지는 확정, 고치는 방향은 계측 후 결정. 시도한 수정은 되돌림 | 높음(실사용 회귀) |
 | `research/filemanager-rework-plan.md` | 파일 매니저 리워크(드래그앤드롭 이동, 그리드/리스트/테이블 뷰, 멀티탭) — Termix류 벤치마킹, 아이디어 단계, 착수 전 스코프를 사용자와 논의 필수. v1에서 미뤄둔 잔여 항목(업로드 진행률/chmod/zip 다운로드 등)도 여기 기록됨(리워크와는 별개) | 최하 |
+| `research/terminal-control-bar-plan.md` | 모바일 컨트롤 바 3종 — 바 높이가 xterm 크기 계산에 반영되는지(코드상 flex+ResizeObserver로 이미 실시간 반영됨을 확인, 실제 잘림은 여백 착시/xterm 반올림 중 실기기 확인 필요), 데스크탑용 기기별 숨김 토글(`autoReconnectEnabled` 패턴 이식), 숨겼을 때 줌 버튼을 탭 행으로 이동 — 탭 바가 스크롤이 아니라 줄바꿈이라는 것도 확인(sticky 적용 전 방향 결정 필요) | 사용자 확인 후 착수 |
 
 ## 프로젝트 전체 컨텍스트 (`base/`, plan/done 개념 없음)
 
