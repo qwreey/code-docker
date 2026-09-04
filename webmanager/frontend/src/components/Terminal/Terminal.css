@@ -164,7 +164,20 @@
   outline-offset: -2px;
 }
 
+/* inline-flex, not the browser default block/inline: the Home tab's label is
+   an <svg> followed by a text node, and as inline content the icon sits on the
+   text baseline rather than on the text's optical centre. Measured live
+   2026-09-04: the icon's centre was 1px above the label's, and since there is
+   no whitespace between the two nodes in JSX there was also no gap at all
+   between them (icon right edge 253.5, text left edge 253.5). align-items
+   centres them against each other and `gap` supplies the spacing that markup
+   whitespace would otherwise have to. Harmless on the text-only session-tab
+   labels that share this class - a lone text node is a single anonymous flex
+   item, so neither property has anything to act on. */
 .terminal-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   border: none;
   background: none;
   padding: 0;
