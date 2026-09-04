@@ -7,6 +7,8 @@ import { ConfirmDialog } from '../common/ConfirmDialog'
 import { GitStatusPanel } from '../common/Git/GitStatusPanel'
 import { WorktreesPanel } from '../common/Git/WorktreesPanel'
 import { Sheet } from '../common/Sheet'
+import { useAuthStatus } from '../common/useAuthStatus'
+import { ensureUnlocked } from '../common/useUnlockGate'
 import { DeleteReclaimableDialog } from './DeleteReclaimableDialog'
 import ProjectMemoryPanel from './ProjectMemoryPanel'
 import ProjectSessionHistory from './ProjectSessionHistory'
@@ -53,6 +55,7 @@ export function ProjectTable({
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('lastModified')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const { status: authStatus } = useAuthStatus()
   const [detailsPath, setDetailsPath] = useState<string | null>(null)
   const [rescanning, setRescanning] = useState<Set<string>>(new Set())
   const [miseTools, setMiseTools] = useState<Map<string, MiseToolEntry[]>>(new Map())
@@ -104,7 +107,12 @@ export function ProjectTable({
     }
   }
 
-  function openDetails(project: ProjectInfo) {
+  // Gated once here, at the open action itself, so the panels the detail
+  // sheet renders (ProjectTerminalSessions, SessionLog inside
+  // ProjectSessionHistory) see an already-unlocked cookie instead of each
+  // popping its own prompt - see useUnlockGate.ts.
+  async function openDetails(project: ProjectInfo) {
+    if (!(await ensureUnlocked(authStatus))) return
     setDetailsPath(project.path)
     if (isStale(project.scannedAt)) {
       rescanProject(project.path)

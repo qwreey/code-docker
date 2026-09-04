@@ -23,6 +23,8 @@ import { UnlockModalHost } from './components/common/UnlockModal'
 import { EnvVersionBanner } from './components/common/EnvVersionBanner'
 import { RouterAuthSetupBanner } from './components/common/RouterAuthSetupBanner'
 import { Skeleton } from './components/common/Skeleton'
+import { useAuthStatus } from './components/common/useAuthStatus'
+import { ensureUnlocked } from './components/common/useUnlockGate'
 import { withViewTransition } from './utils/viewTransition'
 import { useEmbedEscapeClose } from './utils/embedEscape'
 import './App.css'
@@ -99,6 +101,7 @@ function App() {
   const [active, setActiveState] = useState<SectionId>(() => initialSplit.section ?? 'supervisor')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed)
+  const { status: authStatus } = useAuthStatus()
 
   function toggleSidebarCollapsed() {
     setSidebarCollapsed((v) => {
@@ -164,7 +167,12 @@ function App() {
     withViewTransition(() => setActive('projects'))
   }
 
-  function openProjectInfo(path: string) {
+  // Gated once here, before the dialog opens, so ProjectTerminalSessions and
+  // ProjectSessionHistory (rendered inside ProjectInfoDialog) see an
+  // already-unlocked cookie instead of each popping its own prompt - same
+  // reasoning as ProjectTable.tsx's openDetails, see useUnlockGate.ts.
+  async function openProjectInfo(path: string) {
+    if (!(await ensureUnlocked(authStatus))) return
     setProjectInfoPath(path)
   }
 
