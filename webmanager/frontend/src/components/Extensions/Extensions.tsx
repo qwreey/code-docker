@@ -12,6 +12,12 @@ import { CollapseChevron } from '../common/CollapseChevron'
 
 const SHOW_RECOMMENDATIONS_KEY = 'webmanager.extensions.showRecommendations'
 
+// Matches backend/internal/extensions/extensions.go's installTimeout (60s,
+// shared by both install and uninstall) plus margin - the default client
+// timeout (15s, see api/client.ts) would abort a legitimate slow
+// install/uninstall well before the backend itself gives up.
+const EXTENSION_INSTALL_TIMEOUT_MS = 65_000
+
 // Every extension id is publisher.name, so the open-vsx page URL is always
 // constructible without a lookup — code-server only installs from open-vsx
 // (not the MS marketplace), so this is the one registry link that's always
@@ -108,7 +114,7 @@ export function Extensions() {
     if (installingIds.has(id)) return
     setInstallingIds((prev) => new Set(prev).add(id))
     try {
-      await api.post<{ ok: true }>('/code-extensions', { id })
+      await api.post<{ ok: true }>('/code-extensions', { id }, EXTENSION_INSTALL_TIMEOUT_MS)
       setInstalled((prev) => new Set(prev).add(id))
       setInstalledList((prev) => (prev.includes(id) ? prev : [...prev, id]))
       setError(null)
@@ -134,7 +140,7 @@ export function Extensions() {
     setUninstallTarget(null)
     setUninstallingIds((prev) => new Set(prev).add(id))
     try {
-      await api.del<{ ok: true }>(`/code-extensions/${encodeURIComponent(id)}`)
+      await api.del<{ ok: true }>(`/code-extensions/${encodeURIComponent(id)}`, undefined, EXTENSION_INSTALL_TIMEOUT_MS)
       setInstalled((prev) => {
         const next = new Set(prev)
         next.delete(id)

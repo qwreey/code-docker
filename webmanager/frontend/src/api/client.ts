@@ -77,8 +77,48 @@ export function apiUrl(path: string): string {
   return `${import.meta.env.BASE_URL}api${path}`
 }
 
-async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
-  const res = await fetch(apiUrl(path), init)
+// Default per-request timeout. A bare fetch() has no timeout of its own, so
+// a request left in flight across e.g. a laptop sleep/resume can otherwise
+// hang forever instead of ever rejecting — see ClaudeCode.tsx's load(),
+// whose loadingRef guard depends on the request eventually settling one way
+// or the other. 15s comfortably covers the slowest "quick" backend call in
+// this codebase (mise's own readTimeout, 15s exactly — see
+// backend/internal/mise/mise.go) plus the Claude auth check's 5s
+// (backend/internal/claudecode/claudecode.go's authTimeout) with margin for
+// normal network latency, while still failing a genuinely stuck request in
+// a bounded time instead of never. A handful of endpoints have their own
+// backend-side timeout well past this default (font/extension install, both
+// 60s server-side) — those call sites pass their own longer timeoutMs
+// below rather than raising this shared default for everyone else. Pass 0
+// to disable the timeout entirely for a call with no natural upper bound.
+const DEFAULT_TIMEOUT_MS = 15_000
+
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  retried = false,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<T> {
+  const controller = new AbortController()
+  const timeoutId = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : undefined
+
+  let res: Response
+  try {
+    res = await fetch(apiUrl(path), { ...init, signal: controller.signal })
+  } catch (err) {
+    // AbortError from our own timeout (not a caller-supplied signal — none
+    // of this codebase's call sites pass one) is surfaced as a distinct,
+    // recognizable ApiError rather than a generic "Failed to fetch" so a
+    // caller can show "시간 초과" instead of a confusing network-error
+    // message. status 0 is otherwise unused by real responses, so it's a
+    // safe sentinel for "no HTTP response was ever received".
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError(0, '요청 시간이 초과되었습니다')
+    }
+    throw err
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId)
+  }
 
   if (path === UNLOCK_PATH && res.ok) {
     // Any successful unlock — this modal, the inline RequiresUnlock form,
@@ -119,8 +159,9 @@ async function request<T>(path: string, init?: RequestInit, retried = false): Pr
       if (unlocked) {
         // Re-issue the exact same request once, with retried=true so a
         // second 401 (or any other error) just falls through to its own
-        // normal throw instead of prompting again.
-        return request<T>(path, init, true)
+        // normal throw instead of prompting again. timeoutMs is threaded
+        // through so a caller's override survives the retry too.
+        return request<T>(path, init, true, timeoutMs)
       }
     }
 
@@ -142,15 +183,19 @@ function withJsonBody(body?: unknown): RequestInit {
   }
 }
 
+// timeoutMs, on every verb below, overrides DEFAULT_TIMEOUT_MS for call
+// sites that legitimately need longer (or, with 0, no timeout at all) — see
+// that constant's doc comment.
 export const api = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: 'POST', ...withJsonBody(body) }),
-  put: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: 'PUT', ...withJsonBody(body) }),
-  patch: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: 'PATCH', ...withJsonBody(body) }),
-  del: <T>(path: string, body?: unknown) => request<T>(path, { method: 'DELETE', ...withJsonBody(body) }),
+  get: <T>(path: string, timeoutMs?: number) => request<T>(path, undefined, false, timeoutMs),
+  post: <T>(path: string, body?: unknown, timeoutMs?: number) =>
+    request<T>(path, { method: 'POST', ...withJsonBody(body) }, false, timeoutMs),
+  put: <T>(path: string, body?: unknown, timeoutMs?: number) =>
+    request<T>(path, { method: 'PUT', ...withJsonBody(body) }, false, timeoutMs),
+  patch: <T>(path: string, body?: unknown, timeoutMs?: number) =>
+    request<T>(path, { method: 'PATCH', ...withJsonBody(body) }, false, timeoutMs),
+  del: <T>(path: string, body?: unknown, timeoutMs?: number) =>
+    request<T>(path, { method: 'DELETE', ...withJsonBody(body) }, false, timeoutMs),
 }
 
 export function errorMessage(err: unknown): string {

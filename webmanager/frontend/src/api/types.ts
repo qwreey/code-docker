@@ -222,6 +222,12 @@ export interface ClaudeMiseVersionInfo {
 export interface ClaudeStatus {
   installed: boolean
   auth?: ClaudeAuthStatus | null
+  // Set only when `auth` came back null because the status check itself
+  // failed (CLI missing/broken, timed out, unparseable output) - never set
+  // for a genuine "not logged in" (auth is non-null with loggedIn: false in
+  // that case). Lets the frontend show "확인 실패, 다시 시도" instead of
+  // silently implying "로그아웃됨" for what's actually an unrelated failure.
+  authError?: string
   stats?: ClaudeStats | null
 }
 

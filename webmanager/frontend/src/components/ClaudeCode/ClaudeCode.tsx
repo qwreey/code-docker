@@ -456,6 +456,18 @@ function InstalledView({
             <div className="claude-card-sub">{auth.subscriptionType} 구독</div>
             <LogoutButton onLoggedOut={onLoggedOut} />
           </>
+        ) : status.authError ? (
+          // Distinct from the two "not logged in" branches below - this is
+          // "the check itself failed" (see claudeStatusResponse.AuthError's
+          // doc comment on the backend), not a confirmed logged-out state.
+          // Showing a login CTA here would incorrectly imply the account is
+          // known to be logged out; a plain retry is the honest option.
+          <div className="claude-login-panel">
+            <ErrorBanner message={`로그인 상태를 확인하지 못했습니다: ${status.authError}`} />
+            <button type="button" className="btn btn-secondary btn-small" onClick={onLoggedIn}>
+              다시 확인
+            </button>
+          </div>
         ) : onboardingCompleted ? (
           <div className="claude-login-panel">
             <LoginPanel onLoggedIn={onLoggedIn} />
@@ -559,6 +571,12 @@ export function ClaudeCode({ onOpenTerminal }: { onOpenTerminal?: (cwd: string, 
   const [prefs, setPrefs] = useState<ClaudePrefs | null>(null)
   const [miseVersion, setMiseVersion] = useState<ClaudeMiseVersionInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Separate from `error` above (which stays for unrelated action failures,
+  // e.g. handleToggleHideVersionCheck below) - load() failing needs to gate
+  // the whole status/stats view (see the render below), not just pop a
+  // dismissable banner over what would otherwise be silently-stale content
+  // from before a laptop sleep/resume or dropped connection.
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [subTab, setSubTab] = useState<ClaudeSubTab>('status')
@@ -570,6 +588,17 @@ export function ClaudeCode({ onOpenTerminal }: { onOpenTerminal?: (cwd: string, 
   // possibly-slow `mise latest` network round-trip (see
   // handleClaudeMiseVersion's doc comment on the backend), so it must never
   // block the page's main content from showing up.
+  //
+  // The try/finally wraps the entire body with no early return in between,
+  // so loadingRef.current is always released - even on failure - and this
+  // was already true before the fetch-hang fix below. What used to leave
+  // loadingRef stuck forever (making every later "새로고침" click a silent
+  // no-op, recoverable only by a full page reload) was api/client.ts's
+  // request() having no timeout at all: a request left in flight across a
+  // laptop sleep/resume could hang indefinitely, so this function's promise
+  // chain never settled and neither branch of this try/finally ever ran.
+  // Now that request() always eventually rejects (see DEFAULT_TIMEOUT_MS),
+  // this finally block reliably runs and the guard reliably clears.
   const load = useCallback(async () => {
     if (loadingRef.current) return
     loadingRef.current = true
@@ -583,9 +612,12 @@ export function ClaudeCode({ onOpenTerminal }: { onOpenTerminal?: (cwd: string, 
       setStatus(statusData)
       setPlugins(pluginsData.plugins)
       setPrefs(prefsData)
-      setError(null)
+      setLoadError(null)
     } catch (e) {
-      setError(errorMessage(e))
+      // Deliberately doesn't touch `status` - see loadError's own comment
+      // above for why a failed reload must not keep showing whatever was
+      // fetched last time as if it were still current.
+      setLoadError(errorMessage(e))
     } finally {
       withViewTransition(() => setLoading(false))
       loadingRef.current = false
@@ -667,7 +699,14 @@ export function ClaudeCode({ onOpenTerminal }: { onOpenTerminal?: (cwd: string, 
       <p className="section-description">Claude Code CLI의 로그인 상태와 사용 통계를 보여줍니다.</p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <RestartNeededBanner refreshToken={restartCheckToken} />
-      {loading && !status ? (
+      {loadError ? (
+        <div className="card">
+          <ErrorBanner message={`Claude Code 상태를 불러오지 못했습니다: ${loadError}`} />
+          <button type="button" className="btn btn-secondary btn-small" onClick={handleRefresh} disabled={loading}>
+            {loading ? '불러오는 중...' : '다시 시도'}
+          </button>
+        </div>
+      ) : loading && !status ? (
         <Skeleton />
       ) : (
         status &&

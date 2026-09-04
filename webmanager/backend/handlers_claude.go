@@ -17,9 +17,19 @@ import (
 // sub-fetch degraded — matching claude-plan.md's M1 API contract, which the
 // frontend is being built against concurrently. When Installed is false,
 // both stay nil/null too, which the contract also allows.
+//
+// AuthError is additive (added after the original M1 contract above, kept
+// `omitempty` so a healthy response's JSON shape is unchanged) — it's set
+// only when Auth is nil *because the status check itself failed*, never for
+// a genuine "not logged in" (that's Auth non-nil with LoggedIn: false). Lets
+// the frontend distinguish "please log in again" from "couldn't check right
+// now, retry" instead of collapsing both into the same nil auth the way
+// this endpoint used to. See claudecode.GetAuthStatus's doc comment for how
+// confident that distinction actually is.
 type claudeStatusResponse struct {
 	Installed bool              `json:"installed"`
 	Auth      *claudecode.Auth  `json:"auth"`
+	AuthError string            `json:"authError,omitempty"`
 	Stats     *claudecode.Stats `json:"stats"`
 }
 
@@ -42,7 +52,9 @@ type claudeMiseVersionInfo struct {
 // "claude not installed", "not logged in", or "no stats cache yet" are all
 // normal states, not errors. Only a genuinely unexpected failure outside all
 // of that would justify a non-200, which isn't expected to happen here in
-// practice.
+// practice. Auth degrading to null now also carries AuthError alongside it
+// when that null came from a failed check rather than a genuine "not
+// logged in" — see claudeStatusResponse's own doc comment.
 func (s *Server) handleClaudeStatus(w http.ResponseWriter, r *http.Request) {
 	binPath, ok := claudecode.FindBinary(s.cfg.ClaudeBinPath)
 	if !ok {
@@ -54,6 +66,8 @@ func (s *Server) handleClaudeStatus(w http.ResponseWriter, r *http.Request) {
 
 	if auth, err := claudecode.GetAuthStatus(r.Context(), binPath); err == nil {
 		resp.Auth = &auth
+	} else {
+		resp.AuthError = err.Error()
 	}
 
 	if stats, err := claudecode.LoadStats(s.cfg.ClaudeConfigDir); err == nil {

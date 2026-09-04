@@ -13,6 +13,11 @@ import { CollapseChevron } from '../common/CollapseChevron'
 
 const SHOW_RECOMMENDATIONS_KEY = 'webmanager.fonts.showRecommendations'
 
+// Matches backend/handlers_fonts.go's fontDownloadTimeout (60s) plus
+// margin - the default client timeout (15s, see api/client.ts) would abort
+// a legitimate slow font download well before the backend itself gives up.
+const FONT_INSTALL_TIMEOUT_MS = 65_000
+
 function loadShowRecommendations(): boolean {
   try {
     const stored = localStorage.getItem(SHOW_RECOMMENDATIONS_KEY)
@@ -206,7 +211,7 @@ export function Fonts() {
     if (installingIds.has(id)) return
     setInstallingIds((prev) => new Set(prev).add(id))
     try {
-      const font = await api.post<FontEntry>('/fonts/install', { id })
+      const font = await api.post<FontEntry>('/fonts/install', { id }, FONT_INSTALL_TIMEOUT_MS)
       setFonts((prev) => [...prev, font])
       setError(null)
     } catch (e) {
