@@ -116,11 +116,44 @@
   flex-direction: column;
 }
 
-/* `order` reshuffles visual position, so the DOM-last row is no longer
-   reliably the visually-last one - show the border on every body row
-   instead of only suppressing it on `:last-child`. */
-.process-flex-table tbody tr:last-child td {
+/* The row separator belongs to the row here, not to each cell.
+   `.process-info-table` puts `border-bottom` on every th/td, which is right
+   for a real table where cells stretch to the row height - but this row is
+   `display: flex; align-items: center`, so cells are only as tall as their
+   own content and sit centred. Each cell then drew its own border at its own
+   height and the separator came out as a staircase.
+
+   Measured live 2026-09-04 on one body row: most cells ended at y=387.38,
+   `td.pf-col-status` at 388.94 (its badge is taller than plain text) and
+   `td.pf-col-actions` at 391.34 (kill buttons taller still) - a 3.96px
+   spread, visible as the rule stepping down twice on its way across the row.
+   That was the remaining "rows don't line up" report; the text baselines
+   themselves were already within 0.37px.
+
+   One border on the <tr> spans the whole row at one height, whatever the
+   cells inside do. This also subsumes the rule that used to be here: it drew
+   the border on `tbody tr:last-child td` because `order` means the DOM-last
+   row isn't the visually-last one, so suppressing the last border was wrong.
+   Every row simply has one now. */
+.process-flex-table th,
+.process-flex-table td {
+  border-bottom: none;
+}
+
+.process-flex-table thead tr,
+.process-flex-table tbody tr {
   border-bottom: 1px solid var(--border);
+}
+
+/* The kill buttons are taller than a line of text, and with the default cell
+   padding they pushed the whole row to 44.55px while the header row stayed at
+   its 2.7rem minimum - two different band heights down the table. Trimming
+   just this cell's vertical padding keeps the buttons inside the row's
+   min-height instead of dictating it, so header and body rows now share one
+   height. */
+.process-flex-table .pf-col-actions {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
 }
 
 /* A column's used width has to come from its `.pf-col-*` flex-basis and
