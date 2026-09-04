@@ -458,3 +458,51 @@ Task Manager는 flex 표, Supervisor 탭은 그 아래 펼쳐지는 일반 auto-
 - [ ] 실제 에이전트 커밋에서 치환 동작 (컨테이너 안 code-server 터미널 기준)
 - [ ] `core.hooksPath`를 일부러 다른 값으로 바꿨을 때 경고 배너가 뜨는지
 - [ ] husky 같은 저장소 훅이 있는 프로젝트에서 그 훅이 계속 도는지 (실사용 확인)
+
+---
+
+## 인계 메모 (2026-09-04, WebDAV File share 세션)
+
+### 한 일
+
+`.claude/backlog/webdav-file-share-plan.md`를 구현하고
+`.claude/archive/webdav-file-share-plan-done.md`로 옮겼다. **원안이 틀렸거나
+부족했던 5가지와 구현 중 잡은 버그 3개가 그 문서 끝에 실측 근거와 함께 정리돼
+있으니, 이 기능에 문제가 생기면 거기부터 볼 것** ("이 기능이 이상할 때" 섹션에
+증상별 체크리스트가 있다).
+
+새 것: `webmanager/backend/internal/webdavshare/`, `handlers_webdav.go`,
+프론트 `components/FileShare/`, nginx 전용 리스너(`NGINX_WEBDAV_PORT`, 기본 82),
+`docs/tips/webdav.md`.
+
+### 테스트 스택 상태
+
+- 이미지 재빌드 + 재시작 완료. **공유는 꺼져 있고 `webdav.json`도 지웠다** —
+  즉 이 기능은 코드로만 존재하고 런타임 상태는 없다.
+- 비밀번호 게이트는 여전히 꺼져 있다.
+- `.env.webmanager`가 버전 17이고 이미지는 18이라 **기동 로그와 웹 UI에
+  마이그레이션 배너가 뜬다.** 정상 동작이다(WEBMANAGER_WEBDAV_* 키를 추가하며
+  버전을 올렸다). 사용자 파일이라 임의로 마이그레이션하지 않았다.
+- 브라우저 QA로 옮겼던 사용자 탭은 `/manager/files`로 되돌려 놨다.
+
+### 이번 세션에서 내가 틀렸던 것
+
+- **`mux.Handle("/webdav/")`가 기동 시 패닉했다.** `go build`/`vet`/`test` 전부
+  통과했는데 `ServeMux`의 패턴 충돌 검사는 등록 시점(런타임)에만 돈다.
+  `/api` 밖 새 경로를 추가할 땐 반드시 컨테이너를 띄워 확인할 것.
+- **`proxy_set_header Host $host`로 MOVE가 502.** `$host`가 포트를 떼는데
+  WebDAV의 `Destination`은 포트를 포함한 절대 URL이다. `$http_host`가 정답.
+  표준 포트 뒤에서는 안 나타나므로 전용 포트로 실측해야 잡힌다.
+- **요청 바디를 `bool`로 받아서 필드 생략이 조용히 공유를 꺼버렸다.** 포인터로
+  바꿔 "생략 = 그대로". 부분 업데이트를 받는 PUT은 처음부터 포인터로 짤 것.
+
+### 다음 QA batch에 넣을 항목 (WebDAV)
+
+- [ ] 실제 기기(안드로이드 파일 관리자 / 윈도우 탐색기 / Finder)에서 마운트 —
+      컨테이너 안 curl로는 전부 통과했지만 실제 클라이언트는 처음이다.
+- [ ] `ROUTER_VHOST_WEBDAV`로 전용 호스트네임을 붙여 바깥 프록시까지 관통 확인
+      (forward-auth 제외가 실제로 필요한지도 이때 체감된다)
+- [ ] 큰 파일(수 GB) 업로드를 바깥 프록시까지 태워서 — 안쪽 nginx는 무제한이지만
+      바깥 Caddy/nginx 설정이 캡을 걸 수 있다
+- [ ] `WEBMANAGER_WEBDAV_ROOT`로 하위 폴더만 공유했을 때 그 밖이 안 보이는지
+- [ ] env로 항목을 고정했을 때 탭이 잠기고 이유를 표시하는지

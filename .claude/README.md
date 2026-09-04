@@ -25,6 +25,12 @@
     `prepare-commit-msg`만으로는 rebase reword를 못 잡는다 / 전역 `core.hooksPath`가
     저장소의 훅을 *전부* 죽인다 / 기본값은 꺼짐이어야 한다)가 실측 근거와 함께
     문서 끝에 정리돼 있음
+  - `webdav-file-share-plan-done.md` — 다른 기기에서 파일 업/다운로드용 WebDAV
+    공유 — 구현 완료(2026-09-04). 원안이 틀렸거나 부족했던 5가지(fail-closed를
+    라우트 미등록이 아니라 요청별 판단으로 / env는 초기값이 아니라 항목별 고정 /
+    argon2id 캐시가 없으면 클라이언트가 요청마다 64 MiB를 태워서 못 씀 /
+    `ROUTER_VHOST_*`는 경로 없는 upstream이라 전용 nginx 리스너가 필요했음 /
+    심볼릭 링크는 `webdav.Dir`가 안 막음)와, 증상별 디버깅 가이드가 문서 끝에 있음
   - `home-structure-plan.md` — `$HOME`(`/code`)에 흩어져 있던 `.tailscale`,
     `.vector`, `.webmanager`, `.server` 등을 `$HOME/.local/share/code-docker/`
     단일 umbrella로 정리 + `user-init` 실행 위치/`set -e` 이전 +
@@ -76,9 +82,6 @@
     code-server-autoinstall)를 원격 참조로 바꾸고 개발용 `dev/` 폴더를 두는 계획.
     "Compose가 원격 include를 지원한다", "ARG를 ADD의 source로 쓸 수 있다" 두 전제를
     실측으로 확인해둔 문서 (2026-09-03)
-  - `webdav-file-share-plan.md` — 다른 기기에서 파일 업/다운로드용 WebDAV 공유.
-    대문이 Caddy가 아니라 nginx라는 점, WebDAV 클라이언트가 forward-auth를 못 탄다는
-    핵심 제약이 정리돼 있음 (2026-09-03)
   - `qa-batch-2026-09-03.md` — 사용자 QA 제보 11건의 원인 분석 + 수정 방향.
     `CS_DISABLE_PROXY`가 사라졌다는 전제가 틀렸다는 정정과, 그럼에도 실재하는
     구멍(`remote.autoForwardPorts`)이 여기 있음
