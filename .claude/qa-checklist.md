@@ -332,3 +332,29 @@ td.pf-col-actions bottom y = 391.34  (종료 버튼이 더 높음)
 - 이전 체크리스트의 "최상위 빈 폴더" 항목은 표현이 나빴습니다. 실제로는
   `currentDirPath === null`(루트가 아직 안 잡힌 순간)이라 정상 사용 중엔 도달하기
   어렵습니다 — 확인 대상에서 뺍니다.
+
+
+---
+
+## 회귀 1건 (2026-09-04, 사용자 제보 → 즉시 수정)
+
+**Supervisor 탭에서 프로그램을 펼치면 종료/강제 종료 버튼이 글자 단위로 접혀 거의
+세로쓰기가 됨.** `8685c4b`가 만든 회귀였고 같은 세션에서 고쳤습니다.
+
+같은 컬럼 정의(`columns.ts`)가 **두 개의 다른 표**에 렌더된다는 걸 놓쳤습니다 —
+Task Manager는 flex 표, Supervisor 탭은 그 아래 펼쳐지는 일반 auto-layout 표입니다.
+`.process-cmdline`의 `max-width: 24rem`이 일반 표에서는 커맨드 열을 잡아주던 유일한
+장치였는데, 그걸 `.process-flex-table .pf-col-cmd`로 옮기면서 일반 표에서 사라졌습니다.
+결과: 커맨드 셀 684.25px, 액션 열 94.25px, 버튼 31×79.69px.
+
+수정: cap을 두 표에 다 있는 `.process-info-table .pf-col-cmd`로 옮기고,
+`.process-kill-antions .btn`에 `flex: none` + `white-space: nowrap`을 걸어 라벨이
+줄어들다 단어 중간에서 접히는 일이 다시는 없게 했습니다.
+확인: 버튼 42×27.05 / 67×27.05, 액션 열 141.25px.
+
+**교훈**: `.pf-col-*` / `.process-cmdline` 계열 규칙을 건드릴 땐 `Processes/`뿐 아니라
+`Supervisor/ProcessTable.tsx`도 같이 봐야 합니다. 둘 다 `ProcessRowCells`를 씁니다.
+
+- [ ] (관찰, 이번 건과 무관) Supervisor 표의 커맨드 셀은 `white-space`가 `normal`로
+      계산돼 두 줄로 접힙니다. `.process-cmdline`이 `nowrap`을 지정하는데도 그렇습니다 —
+      어딘가 더 구체적인 규칙이 이기는 듯. 급하지 않아 추적하지 않았습니다.
