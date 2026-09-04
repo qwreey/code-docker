@@ -152,3 +152,57 @@ reword / `--no-verify` / cherry-pick / revert / 멱등성 / 이미 훅이 있는
 기본 꺼짐 상태 → 켠 상태 → 저장소 훅 체이닝, 그리고 webmanager API로
 쓴 설정을 훅이 읽는 것(git이 키 이름을 소문자로 저장하는데 `--get`이
 대소문자 무시라 문제없음)까지 확인.
+
+## 이 기능이 이상할 때 (후행 에이전트용)
+
+구현: 커밋 `2416f82`. 파일은 `config/git/hooks/`(훅 4개),
+`webmanager/backend/internal/gitconfig/aitrailer.go` + `handlers_git_aitrailer.go`,
+`webmanager/frontend/src/components/GitConfig/AiTrailer.tsx`, 그리고 Dockerfile의
+심볼릭 링크 `RUN`과 `config/user-init/user-init.default.sh`의 `core.hooksPath` 설정.
+
+### 먼저 확인할 3가지
+
+```sh
+docker compose exec code-docker git config --global --get core.hooksPath
+#  -> /etc/code-docker/git/hooks 여야 함. 아니면 훅이 아예 안 돈다.
+#     user-init이 기존 값을 덮어쓰지 않으므로 이럴 수 있고, 부팅 로그에 이유가 찍힌다.
+
+docker compose exec code-docker git config --global --get-regexp '^codedocker\.aitrailer'
+#  -> git이 키를 소문자로 저장한다(keepmodel/stripsession). 정상이다.
+#     --get은 대소문자 무시라 훅/Go 양쪽 모두 그대로 읽힌다.
+
+docker compose exec code-docker ls -la /etc/code-docker/git/hooks | head
+#  -> 훅 이름 23개가 전부 hook-dispatch 심볼릭 링크여야 한다.
+```
+
+### 훅이 도는지 직접 보기
+
+`ai-trailer.sh`는 조용히 종료하는 경로가 많다(비활성 / 이름·이메일 둘 다 없음 /
+`$1`이 없거나 파일이 아님). 어디서 빠져나가는지 보려면 임시로 `set -x`를 넣지 말고
+스크립트 맨 위에 한 줄 추가하는 편이 빠르다:
+
+```sh
+echo "ai-trailer: $* cfg=$(git config --get codedocker.aitrailer.enabled)" >> /tmp/ai-trailer.log
+```
+
+### 안 잡히는 케이스 (버그가 아니라 설계상 범위 밖)
+
+- **컨테이너 밖에서 만든 커밋.** 훅은 이 이미지 안에만 있다. 호스트에서 커밋하면
+  raw trailer가 그대로 남는다.
+- **이미 만들어진 커밋의 히스토리.** 훅은 새 커밋에만 돈다. 과거 커밋을 고치려면
+  `git rebase -i`로 reword 하거나 `git filter-repo`를 써야 하고, 후자는 훅을 안 탄다.
+- **`--no-verify` + 에디터에서 직접 타이핑한 trailer.** `--no-verify`가 `commit-msg`를
+  건너뛰고, `prepare-commit-msg`는 에디터보다 먼저 돈다. 둘 다 못 잡는 유일한 교집합인데
+  실사용에서 나올 조합이 아니라 대응 안 했다.
+- **git CLI를 안 쓰는 클라이언트.** libgit2/JGit 기반(일부 GUI)은 훅을 아예 안 탄다.
+  VS Code 내장 git은 git CLI를 쓰므로 정상 동작한다.
+
+### 고칠 때 조심할 것
+
+- `ai-trailer.sh`의 awk는 **scissors 줄 아래를 건드리지 않는다**(`commit -v`의 diff).
+  이 가드를 지우면 diff 안의 trailer처럼 보이는 줄까지 치환될 수 있다.
+- 멱등성이 `commit-msg`/`prepare-commit-msg` 이중 실행의 전제다. 출력 trailer의
+  이메일이 `@anthropic.com`이 되는 변경(예: 이메일 폴백을 harness 주소로)을 넣으면
+  무한 치환/중복이 생긴다.
+- `hook-dispatch`에서 저장소 훅 경로를 `git rev-parse --git-path hooks/<name>`으로
+  바꾸면 **무한 재귀**한다. `--absolute-git-dir`을 유지할 것.

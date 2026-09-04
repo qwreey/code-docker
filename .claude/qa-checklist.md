@@ -406,3 +406,55 @@ Task Manager는 flex 표, Supervisor 탭은 그 아래 펼쳐지는 일반 auto-
   실기기 계측이 선행. 데스크탑 브라우저로는 재현이 안 된다.
 - `webmanager/.claude/research/terminal-control-bar-plan.md` — 거의 끝났다(문서
   맨 위 상태 갱신 참고). 남은 건 탭바 가로 스크롤 전환 안뿐이고 사용자 결정 필요.
+
+---
+
+## 인계 메모 (2026-09-04, git trailer 세션)
+
+### 이번 세션에 한 일
+
+- `.claude/backlog/git-trailer-rewrite-plan.md` 구현 → 커밋 `2416f82`,
+  계획은 `.claude/archive/git-trailer-rewrite-plan-done.md`로 이동.
+  원안에서 바뀐 3가지 + **디버깅 가이드**가 그 문서 끝에 있다. 이 기능이
+  이상하게 동작한다는 제보가 오면 거기부터 볼 것.
+- 이미지를 **실제로 빌드하고 재시작**해서(`.allow-test` 있음) 컨테이너 안에서
+  e2e 확인까지 마쳤다. 지금 돌고 있는 테스트 스택은 이 커밋이 반영된 상태다.
+
+### 테스트 스택 현재 상태
+
+- `codedocker.aitrailer.*`는 **전부 꺼진 상태로 되돌려 놨다**. 확인:
+  `docker compose exec code-docker git config --global --get-regexp '^codedocker\.aitrailer'`
+  → `enabled false`, `keepmodel true`, `stripsession true`.
+  즉 이 레포에서 만드는 커밋의 trailer는 **치환되지 않는다**(당연히 호스트에서
+  커밋하므로 훅이 애초에 안 탄다 — 훅은 컨테이너 안에만 있다).
+- `core.hooksPath`는 `/etc/code-docker/git/hooks`로 설정됨(부팅 로그에 찍힘).
+- 비밀번호 게이트는 여전히 **꺼져 있다**(이전 세션에서 끈 그대로).
+- 브라우저 QA로 사용자 탭을 `/manager/files` → Git Config로 옮겼다가
+  **원래 자리로 되돌려 놨다.**
+
+### 이번 세션에서 내가 틀렸던 것 (같은 함정 반복 방지)
+
+- **원안대로 `prepare-commit-msg` 하나만 먼저 구현했다.** 테스트에서
+  rebase reword가 안 잡히는 걸 보고서야 "이 훅은 에디터보다 먼저 돈다"는 걸
+  알았다. 계획 문서만 믿지 말고 훅 타이밍은 실측할 것.
+- **cherry-pick/revert 테스트를 두 번 잘못 짰다.** 한 번은 `-q`가 없는 플래그라
+  usage만 출력됐고(그런데 그 뒤 `git log`가 성공해서 통과처럼 보였다), 한 번은
+  더러운 워킹트리 때문에 checkout이 실패했는데 뒤 명령이 계속 돌아 **엉뚱한
+  커밋을 보고 "통과"라고 읽을 뻔했다.** 셸 테스트는 중간 실패를 삼키지 않게
+  짜고, 결과가 예상과 맞아도 어느 커밋을 본 건지 확인할 것.
+- **`commit -v` scissors 테스트도 처음엔 무의미했다.** 에디터가 훅보다 뒤에 도는데
+  에디터에서 trailer를 넣어놓고 "훅이 못 잡았다"고 읽었다. 실제로는 diff 줄이
+  `+`/공백으로 시작해서 애초에 정규식에 안 걸린다 — scissors 가드는 심층 방어다.
+- **Bash 도구의 cwd가 호출 간에 유지된다.** `cd webmanager/backend` 뒤에
+  상대경로로 파일을 쓰려다 "no such file or directory"가 났다("Shell cwd was reset"
+  메시지가 뜨는데도 유지되는 경우가 있다). **파일 쓰기는 절대경로로 할 것.**
+
+### 다음 QA batch에 넣을 항목 (git trailer)
+
+사용자가 나중에 한 번에 확인하기로 한 것들. 개별로 묻지 말 것.
+
+- [ ] Git Config 탭 → "AI 커밋 trailer" 섹션 렌더링/미리보기 (브라우저에서
+      확인은 했으나 사용자 눈으로 재확인)
+- [ ] 실제 에이전트 커밋에서 치환 동작 (컨테이너 안 code-server 터미널 기준)
+- [ ] `core.hooksPath`를 일부러 다른 값으로 바꿨을 때 경고 배너가 뜨는지
+- [ ] husky 같은 저장소 훅이 있는 프로젝트에서 그 훅이 계속 도는지 (실사용 확인)
