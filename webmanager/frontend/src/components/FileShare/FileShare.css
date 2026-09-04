@@ -1,0 +1,58 @@
+/* Same shape as GitConfig.css's own .checkbox-option - kept as a local
+   copy rather than moved into common.css, matching what
+   TerminalSettingsPanel.css already does with it. */
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-bottom: 0.9rem;
+}
+
+.fileshare-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.fileshare-facts > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+/* The address and the root path are both long and both get copy-pasted, so
+   they must be allowed to wrap instead of pushing the card sideways. */
+.fileshare-facts code {
+  overflow-wrap: anywhere;
+}
+
+.fileshare-fact-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-width: 6rem;
+}
+
+.fileshare-new-password {
+  margin-bottom: 1rem;
+}
+
+.fileshare-new-password .copyable-block {
+  margin: 0.35rem 0 0.5rem;
+}
+
+.fileshare-password-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.fileshare-locked-note {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: -0.4rem 0 0.9rem;
+}

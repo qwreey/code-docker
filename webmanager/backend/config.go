@@ -66,6 +66,30 @@ type Config struct {
 	FilesRoot           string
 	FilesMaxUploadBytes string
 
+	// WebDAV* back the File share tab (internal/webdavshare) — a WebDAV
+	// view of the same tree the file manager serves, for mounting from a
+	// phone or a desktop file browser.
+	//
+	// The credential is deliberately separate from AuthPasswordHash above:
+	// WebDAV clients speak Basic auth and can't follow an SSO redirect, so
+	// this route has to be excluded from the outer forward-auth to work at
+	// all, which makes its own password the only thing guarding it.
+	//
+	// Any of the three env values below, when non-empty, pins that field —
+	// the File share tab reports it as locked instead of pretending an edit
+	// took. Left unset (the default), all three come from
+	// WebDAVSettingsPath, which the tab writes.
+	//
+	// WebDAVRoot defaults to FilesRoot rather than being independent: the
+	// two features expose the same tree through different protocols, so
+	// narrowing one and not the other would be surprising. Set it
+	// explicitly to share a subdirectory only.
+	WebDAVEnabled      string
+	WebDAVUsername     string
+	WebDAVPasswordHash string
+	WebDAVRoot         string
+	WebDAVSettingsPath string
+
 	// TerminalSettingsPath is where the web terminal's user-customizable
 	// keybindings/color themes are persisted (see internal/terminalsettings).
 	TerminalSettingsPath string
@@ -164,6 +188,10 @@ func getenv(key, def string) string {
 }
 
 func loadConfig() Config {
+	// filesRoot is read once so WEBMANAGER_WEBDAV_ROOT can default to it
+	// (see the WebDAV* field comments above) instead of repeating /code.
+	filesRoot := getenv("WEBMANAGER_FILES_ROOT", "/code")
+
 	return Config{
 		Addr:                 getenv("WEBMANAGER_ADDR", "private:81"),
 		SupervisorSock:       getenv("SUPERVISOR_SOCK", "/run/supervisor.sock"),
@@ -208,8 +236,14 @@ func loadConfig() Config {
 
 		AuthPasswordHash: getenv("WEBMANAGER_AUTH_PASSWORD_HASH", ""),
 
-		FilesRoot:           getenv("WEBMANAGER_FILES_ROOT", "/code"),
+		FilesRoot:           filesRoot,
 		FilesMaxUploadBytes: getenv("WEBMANAGER_FILES_MAX_UPLOAD_BYTES", "2147483648"),
+
+		WebDAVEnabled:      getenv("WEBMANAGER_WEBDAV_ENABLED", ""),
+		WebDAVUsername:     getenv("WEBMANAGER_WEBDAV_USER", ""),
+		WebDAVPasswordHash: getenv("WEBMANAGER_WEBDAV_PASSWORD_HASH", ""),
+		WebDAVRoot:         getenv("WEBMANAGER_WEBDAV_ROOT", filesRoot),
+		WebDAVSettingsPath: getenv("WEBMANAGER_WEBDAV_SETTINGS_PATH", "/code/.local/share/code-docker/webmanager/webdav.json"),
 
 		TerminalSettingsPath: getenv("WEBMANAGER_TERMINAL_SETTINGS_PATH", "/code/.local/share/code-docker/webmanager/terminal-settings.json"),
 		TerminalProfilesPath: getenv("WEBMANAGER_TERMINAL_PROFILES_PATH", "/code/.local/share/code-docker/webmanager/terminal-profiles.json"),

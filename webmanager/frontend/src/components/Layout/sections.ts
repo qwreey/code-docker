@@ -20,6 +20,7 @@ export type SectionId =
   | 'claude'
   | 'extensions'
   | 'files'
+  | 'file-share'
   | 'sessions'
 
 export interface SectionMeta {
@@ -50,5 +51,6 @@ export const SECTIONS: SectionMeta[] = [
   { id: 'claude', label: 'Claude Code', implemented: true },
   { id: 'extensions', label: 'Code Extensions', implemented: true },
   { id: 'files', label: 'Files', implemented: true },
+  { id: 'file-share', label: 'File share', implemented: true },
   { id: 'sessions', label: 'Sessions', implemented: true },
 ]

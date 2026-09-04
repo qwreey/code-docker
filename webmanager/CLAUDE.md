@@ -198,7 +198,16 @@ password gate (`internal/authgate` — see `.claude/archive/authgate-plan-done.m
 the full list of what it gates; principle is reads-stay-open/writes-gated,
 with Terminal/File Manager/Logs/Sessions/Supervisor-log-view/Claude-session-log
 gated entirely), a file
-manager, a shared lazy-loaded CodeMirror 6 editor component, a responsive
+manager, a File share tab (`internal/webdavshare` — the same tree over
+WebDAV so a phone/desktop file browser can mount it; off by default and
+fail-closed, with its own Basic auth password deliberately separate from
+`internal/authgate`'s because WebDAV clients can't follow an SSO redirect
+and the route therefore has to sit outside the outer forward-auth. Note it
+is dispatched by `server.go`'s `webdavRouter` *ahead* of the mux, not
+registered in it — `net/http.ServeMux` rejects a method-less `/webdav/`
+next to the `GET /` static handler at registration time, and WebDAV can't
+be pinned to a method set. See `.claude/archive/webdav-file-share-plan-done.md`
+in the repo root), a shared lazy-loaded CodeMirror 6 editor component, a responsive
 layout with a mobile hamburger/drawer sidebar (now also independently
 scrollable so short viewports can reach every item), a centralized
 `index.css` color-token system (light + dark values for every base UI token

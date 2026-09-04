@@ -223,6 +223,17 @@ attach '세션 1'          # 이름에 공백이 있으면 따옴표 필수
 
 detach 키는 webmanager Terminal 탭의 설정 패널에서 바꿀 수 있습니다(`\x1d` 같은 표기). 기본값이 도커 관례인 `Ctrl+P Ctrl+Q`가 아닌 이유는 code-server 통합 터미널에서 `Ctrl+P`가 Quick Open에 먹혀 PTY까지 내려가지 않기 때문입니다. 어떤 키를 눌러도 detach가 안 되는 경우, `ATTACH_DEBUG_LOG=/tmp/attach.log attach <이름>` 으로 실행하면 터미널이 실제로 보낸 바이트가 그 파일에 hex로 기록됩니다.
 
+## 다른 기기에서 파일 올리고 내리기 (WebDAV)
+
+webmanager의 **File share** 탭에서 켜면, 윈도우 탐색기·macOS Finder·안드로이드 파일
+관리자에서 code-docker의 폴더를 네트워크 드라이브처럼 마운트할 수 있습니다. 기본은
+꺼짐이고 비밀번호가 없으면 아무것도 서빙하지 않습니다.
+
+⚠️ WebDAV 클라이언트는 SSO 리다이렉트를 못 타므로, 이 경로는 바깥 리버스 프록시의
+forward-auth에서 반드시 제외해야 하고 그러면 전용 비밀번호가 유일한 방어선이 됩니다.
+
+자세한 내용은 [tips/webdav.md](tips/webdav.md)를 확인하세요.
+
 ## Discord presence
 
 vscord 확장으로 Discord Rich Presence를 연동하고, ssh 소켓 포워딩으로 로컬 디스코드 클라이언트와 연결하는 방법입니다.

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"webmanager/internal/authgate"
 	"webmanager/internal/cgroup"
@@ -14,6 +15,7 @@ import (
 	"webmanager/internal/sessionheartbeat"
 	"webmanager/internal/supervisor"
 	"webmanager/internal/termsession"
+	"webmanager/internal/webdavshare"
 )
 
 type Server struct {
@@ -45,6 +47,10 @@ type Server struct {
 	termSessions        *termsession.Registry
 	sessionHeartbeats   *sessionheartbeat.Store
 	gate                *authgate.Gate
+	// webdav is both the File share tab's settings store and the handler
+	// serving /webdav/ itself — it holds the live config, so a change made
+	// in the tab takes effect on the next request with no restart.
+	webdav *webdavshare.Service
 
 	// envTemplateVersion is cfg.EnvTemplatePath's WEBMANAGER_ENV_VERSION at
 	// startup ("" if the template was unreadable) — see
@@ -79,6 +85,34 @@ const maxRequestBodyBytes = 1 << 20
 // its own, much larger cap (WEBMANAGER_FILES_MAX_UPLOAD_BYTES) directly via
 // http.MaxBytesReader in handleFilesUpload before reading the body, so it's
 // still bounded — just not at this middleware's small default.
+// webdavRouter dispatches the WebDAV share ahead of everything else,
+// including limitRequestBody — a PUT there is a file upload of arbitrary
+// size, streamed straight to disk rather than held in memory, and a WebDAV
+// client has no way to be told about a byte cap other than a failed
+// transfer.
+//
+// It is a wrapper rather than two more mux patterns because net/http's
+// ServeMux refuses the combination outright: a method-less "/webdav/"
+// alongside the "GET /" static handler is rejected at registration as
+// ambiguous ("GET / matches fewer methods than /webdav/, but has a more
+// general path pattern"), and it panics at startup rather than at build
+// time. Registering per method instead would mean enumerating
+// PROPFIND/PROPPATCH/MKCOL/MOVE/COPY/LOCK/UNLOCK/OPTIONS and keeping that
+// list in sync with x/net/webdav's own.
+//
+// The bare prefix is matched too, not just the subtree: a client pointed at
+// ".../webdav" issues a PROPFIND on exactly that path, and a redirect isn't
+// reliably followed for non-GET methods.
+func webdavRouter(share http.Handler, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == webdavshare.URLPrefix || strings.HasPrefix(r.URL.Path, webdavshare.URLPrefix+"/") {
+			share.ServeHTTP(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func limitRequestBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/files/upload" {

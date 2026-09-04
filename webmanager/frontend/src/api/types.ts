@@ -113,6 +113,24 @@ export interface GitAITrailerConfig {
   hookActive: boolean
 }
 
+/** GET/PUT /api/webdav — the File share (WebDAV) tab's whole state. */
+export interface WebDavStatus {
+  enabled: boolean
+  username: string
+  hasPassword: boolean
+  /** enabled AND a password set — the only thing that decides if it serves. */
+  active: boolean
+  /** Why it isn't active, in the UI's own words. Empty when it is. */
+  reason: string
+  root: string
+  /** URL prefix the share is mounted at, e.g. "/webdav/". */
+  prefix: string
+  /** These fields are pinned by an env var and can't be changed from here. */
+  enabledLocked: boolean
+  usernameLocked: boolean
+  passwordLocked: boolean
+}
+
 export interface SshSigningKey {
   publicKeyPath: string
   publicKey: string

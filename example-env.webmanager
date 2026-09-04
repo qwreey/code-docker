@@ -28,7 +28,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=17
+WEBMANAGER_ENV_VERSION=18
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -57,6 +57,34 @@ WEBMANAGER_ENV_VERSION=17
 #WEBMANAGER_FILES_ROOT=/code
 #. 업로드 최대 크기(바이트).
 #WEBMANAGER_FILES_MAX_UPLOAD_BYTES=2147483648
+
+#. --- File share (WebDAV) ---
+#. 다른 기기(파일 탐색기/Finder/Solid Explorer/rclone)에서 위 File Manager와
+#. 같은 트리를 네이티브로 마운트하기 위한 WebDAV 공유입니다. 기본 꺼짐이고,
+#. 비밀번호가 없으면 켜도 아무것도 서빙하지 않습니다(fail-closed).
+#.
+#. 보통은 이 파일을 건드릴 필요가 없습니다 - webmanager의 "File share" 탭에서
+#. 켜고 비밀번호를 만드는 쪽이 기본 경로입니다. 아래 값들은 그 설정을 호스트
+#. 쪽에서 "고정"하고 싶을 때만 쓰세요: 비어 있지 않은 값을 넣으면 그 항목은
+#. 탭에서 잠기고(컨테이너 안에서 바꿀 수 없음), 탭이 그 이유를 표시합니다.
+#.
+#. ⚠️ WebDAV 클라이언트는 SSO 리다이렉트를 못 탑니다. 그래서 이 경로는 바깥
+#. 리버스 프록시의 forward-auth에서 반드시 제외해야 하고, 제외하는 순간 여기
+#. 비밀번호가 그 경로를 지키는 유일한 수단이 됩니다. 자세한 건
+#. docs/tips/webdav.md를 먼저 읽으세요.
+#.
+#. 켜기/끄기 강제. 비워두면 탭에서 켠 값이 쓰입니다.
+#WEBMANAGER_WEBDAV_ENABLED=
+#. Basic auth 사용자명 (기본 "webdav").
+#WEBMANAGER_WEBDAV_USER=
+#. argon2id 해시. 위 WEBMANAGER_AUTH_PASSWORD_HASH와 같은 방법으로 만들고,
+#. 같은 이유로 반드시 작은따옴표로 감싸세요.
+#WEBMANAGER_WEBDAV_PASSWORD_HASH=
+#. 공유할 최상위 경로. 기본값은 WEBMANAGER_FILES_ROOT와 동일합니다 - 드롭박스
+#. 용도로만 쓸 거라면 하위 폴더 하나로 좁히는 편이 안전합니다.
+#WEBMANAGER_WEBDAV_ROOT=
+#. 탭에서 저장한 설정(사용 여부/사용자명/비밀번호 해시)이 들어가는 파일.
+#WEBMANAGER_WEBDAV_SETTINGS_PATH=/code/.local/share/code-docker/webmanager/webdav.json
 
 #. --- Claude Code 탭 ---
 #. `claude` 바이너리 경로 오버라이드 (mise로 설치한 경우 shim이 webmanager의

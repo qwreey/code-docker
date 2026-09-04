@@ -266,6 +266,20 @@ Projects 탭 상세 시트와 같은 패널들(열린 세션/Git/워크트리/�
 프로젝트 폴더에 국한되지 않고 브라우징 — 업로드/다운로드/삭제/이동/복사/이름변경/폴더
 생성/멀티선택, 텍스트 파일은 바로 편집(CodeMirror), 권한/생성·수정 시각 정보 패널
 
+### File share (WebDAV)
+
+Files 탭과 같은 폴더를 WebDAV로 내보내, 다른 기기의 파일 탐색기에서 네트워크
+드라이브처럼 마운트할 수 있게 합니다. 켜기/사용자명/비밀번호 생성이 전부 이 탭에
+있고, 기본은 꺼짐이며 비밀번호가 없으면 켜도 아무것도 서빙하지 않습니다.
+
+비밀번호는 webmanager 게이트와 **분리**돼 있습니다 — WebDAV 클라이언트는 SSO
+리다이렉트를 못 타서 이 경로를 바깥 forward-auth에서 빼야만 하고, 그러면 이
+비밀번호가 유일한 방어선이 되기 때문입니다. 이 탭은 조회까지 통째로 게이트
+대상입니다(사용자명이 그 비밀번호의 나머지 절반이므로).
+
+노출 방법(전용 호스트네임 권장)과 기기별 마운트 방법은
+[tips/webdav.md](tips/webdav.md) 참고.
+
 ### Docker/dind 관리
 
 [Docker in Docker](tips/dind.md) 안의 컨테이너/이미지 목록과 로그 조회(비게이트),
@@ -290,8 +304,8 @@ git-lfs 는 `config/build/build.default.sh`에 포함되어 기본으로 설치�
 
 webmanager는 자체 비밀번호 게이트를 지원합니다(선택 사항, 기본은 꺼짐) — 원칙은
 **조회(읽기)는 그대로 열어두고, 변경(쓰기)만 게이트**이며, Terminal/파일 탭/Logs/
-Sessions/Supervisor의 프로그램별 로그 조회, Claude Code 탭 안의 대화 세션 로그
-서브탭(Projects 탭 상세 시트에서 프로젝트로 필터링해 재사용하는 곳 포함)은 조회까지
+Sessions/File share/Supervisor의 프로그램별 로그 조회, Claude Code 탭 안의 대화 세션
+로그 서브탭(Projects 탭 상세 시트에서 프로젝트로 필터링해 재사용하는 곳 포함)은 조회까지
 통째로 게이트됩니다. 켜는 방법
 (해시 생성, `WEBMANAGER_AUTH_PASSWORD_HASH` 설정)과 전체 동작 방식은
 [webmanager-config.md#비밀번호-게이트](webmanager-config.md#비밀번호-게이트)를

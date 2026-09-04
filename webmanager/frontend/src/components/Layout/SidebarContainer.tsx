@@ -5,6 +5,7 @@ import {
   Container,
   FileText,
   Folder,
+  FolderSync,
   GitBranch,
   Globe,
   HardDrive,
@@ -60,6 +61,7 @@ const SECTION_ICON: Record<SectionId, LucideIcon> = {
   claude: Bot,
   extensions: Puzzle,
   files: HardDrive,
+  'file-share': FolderSync,
   sessions: Users,
 }
 

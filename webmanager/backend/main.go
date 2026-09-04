@@ -23,6 +23,7 @@ import (
 	"webmanager/internal/sessionheartbeat"
 	"webmanager/internal/supervisor"
 	"webmanager/internal/termsession"
+	"webmanager/internal/webdavshare"
 )
 
 // envMigrateOpts parameterizes the shared github.com/qwreey/envmigrate package
@@ -91,6 +92,17 @@ func main() {
 	}
 	gate := authgate.New(authPasswordHash)
 
+	// Same /etc/environment cross-check as above, for the same reason: an
+	// operator who pins the WebDAV credential host-side is relying on it
+	// not being changeable from inside the container. Fail open here means
+	// falling back to the settings file (which the File share tab owns),
+	// not disabling the share.
+	webdavPasswordHash := cfg.WebDAVPasswordHash
+	if webdavPasswordHash != "" && authgate.EtcEnvironmentDefines("WEBMANAGER_WEBDAV_PASSWORD_HASH") {
+		log.Printf("main: REFUSING to honor WEBMANAGER_WEBDAV_PASSWORD_HASH because it's also set in /etc/environment — this could mean it was tampered with from inside the container")
+		webdavPasswordHash = ""
+	}
+
 	historyIntervalSeconds, err := strconv.Atoi(cfg.SystemHistoryIntervalSeconds)
 	if err != nil {
 		log.Printf("main: invalid system history interval %q, using 5: %v", cfg.SystemHistoryIntervalSeconds, err)
@@ -148,7 +160,14 @@ func main() {
 		termSessions:        termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
 		sessionHeartbeats:   sessionheartbeat.NewStore(),
 		gate:                gate,
-		envTemplateVersion:  envTemplateVersion,
+		webdav: webdavshare.New(webdavshare.Options{
+			SettingsPath:    cfg.WebDAVSettingsPath,
+			Root:            cfg.WebDAVRoot,
+			EnvEnabled:      cfg.WebDAVEnabled,
+			EnvUsername:     cfg.WebDAVUsername,
+			EnvPasswordHash: webdavPasswordHash,
+		}),
+		envTemplateVersion: envTemplateVersion,
 	}
 
 	mux := http.NewServeMux()
@@ -423,6 +442,12 @@ func main() {
 	mux.Handle("POST /api/files/copy", gate.RequirePassword(http.HandlerFunc(s.handleFilesCopy)))
 	mux.Handle("POST /api/files/delete", gate.RequirePassword(http.HandlerFunc(s.handleFilesDelete)))
 
+	// File share (WebDAV) settings. The GET is gated too, unlike most
+	// settings reads here — see handlers_webdav.go's file doc comment.
+	mux.Handle("GET /api/webdav", gate.RequirePassword(http.HandlerFunc(s.handleGetWebDAV)))
+	mux.Handle("PUT /api/webdav", gate.RequirePassword(http.HandlerFunc(s.handlePutWebDAV)))
+	mux.Handle("PUT /api/webdav/password", gate.RequirePassword(http.HandlerFunc(s.handlePutWebDAVPassword)))
+
 	// Not under /api — this replaces code-server's own manifest.json in
 	// place (see config/nginx/nginx.default.conf's `location = /manifest.json`).
 	// Ungated like the other pure-read routes above: it's a passthrough of
@@ -437,9 +462,16 @@ func main() {
 
 	mux.Handle("GET /", staticHandler(cfg.StaticDir))
 
+	// SECURITY: the WebDAV share itself sits outside the mux entirely (see
+	// webdavRouter), and deliberately outside gate.RequirePassword too — it
+	// carries its own Basic auth (internal/webdavshare) precisely because
+	// it has to work for clients that can neither hold a cookie nor follow
+	// an SSO redirect, which is also why it must be excluded from the outer
+	// forward-auth to be usable at all. Fail-closed: with no password
+	// configured it answers 404 and never touches the filesystem.
 	httpServer := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: limitRequestBody(mux),
+		Handler: webdavRouter(s.webdav, limitRequestBody(mux)),
 	}
 
 	// Shared cancel-on-shutdown context for every long-lived background

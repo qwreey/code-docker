@@ -77,6 +77,20 @@ export NGINX_TRUSTED_PROXIES_DIRECTIVES="$directives"
 export NGINX_CODE_SERVER_UPSTREAM="${CODE_SERVER_BIND_ADDR:-private:8080}"
 export NGINX_WEBMANAGER_UPSTREAM="${WEBMANAGER_ADDR:-private:81}"
 
+# NGINX_WEBDAV_PORT (docker-compose.yml, default 82) - the WebDAV-only
+# listener nginx.*.conf's second server{} block binds, so a router vhost can
+# give the file share its own hostname without publishing code-server on it
+# too (see that block's own comment and docs/tips/webdav.md). A non-numeric
+# value would make nginx refuse to start at all, taking code-server down
+# with it, so it falls back to the default loudly rather than being passed
+# through.
+webdav_port="${NGINX_WEBDAV_PORT:-82}"
+if ! [[ "$webdav_port" =~ ^[0-9]+$ ]] || [ "$webdav_port" -lt 1 ] || [ "$webdav_port" -gt 65535 ]; then
+    echo "nginx-service: NGINX_WEBDAV_PORT='$webdav_port' is not a valid port - using 82" >&2
+    webdav_port=82
+fi
+export NGINX_WEBDAV_PORT="$webdav_port"
+
 # Dev Proxy (/exports/) and router-manager's admin API used to be proxied
 # through from here too (caddy-adapter/router-manager upstreams) - router
 # now terminates host:80 directly and handles both itself, see
@@ -89,6 +103,6 @@ export NGINX_WEBMANAGER_UPSTREAM="${WEBMANAGER_ADDR:-private:81}"
 # these variable names so nginx's own $status/$loggable/$host/etc. in the
 # template pass through untouched instead of being blanked out.
 generated_config=/run/nginx.generated.conf
-envsubst '${NGINX_ACCESS_LOG_IF} ${NGINX_ALLOWED_HOSTS_MAP} ${NGINX_LOOPBACK_BLOCK_MAP} ${NGINX_TRUSTED_PROXIES_DIRECTIVES} ${NGINX_CODE_SERVER_UPSTREAM} ${NGINX_WEBMANAGER_UPSTREAM}' < "$nginx_config" > "$generated_config"
+envsubst '${NGINX_ACCESS_LOG_IF} ${NGINX_ALLOWED_HOSTS_MAP} ${NGINX_LOOPBACK_BLOCK_MAP} ${NGINX_TRUSTED_PROXIES_DIRECTIVES} ${NGINX_CODE_SERVER_UPSTREAM} ${NGINX_WEBMANAGER_UPSTREAM} ${NGINX_WEBDAV_PORT}' < "$nginx_config" > "$generated_config"
 
 exec nginx -g "daemon off;" -c "$generated_config"
