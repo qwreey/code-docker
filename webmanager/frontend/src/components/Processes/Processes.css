@@ -235,6 +235,22 @@
 .process-flex-table .pf-col-cmd {
   flex: 2 1 12rem;
   min-width: 0;
+}
+
+/* Scoped to .process-info-table, not .process-flex-table, because the same
+   columns render in two different tables: this table (flex rows, Task
+   Manager) and the plain auto-layout one the Supervisor tab expands under a
+   program. Capping the cmdline column is what stops it from eating the row
+   in either.
+
+   It briefly lived on `.process-flex-table .pf-col-cmd` and broke the
+   Supervisor one: with nothing capping it there, the auto table layout gave
+   the cmdline 684px and squeezed the actions column to 94px, so the 종료 /
+   강제 종료 buttons shrank to 31px wide and wrapped one character per line.
+   `.process-info-table` is on both tables, so one rule covers both - and
+   covers header and body identically, which is the property the flex table
+   needs (see the header/body alignment comment above). */
+.process-info-table .pf-col-cmd {
   max-width: 24rem;
 }
 
@@ -262,6 +278,16 @@
 .process-cmdline {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The buttons keep their own width whatever the column does. The Supervisor
+   tab's copy of this table is auto-layout, so a long cmdline can still make
+   this column narrow on a small screen - without this the buttons shrink and
+   their labels wrap mid-word (measured once at 31px wide and 79.69px tall,
+   effectively vertical text). */
+.process-kill-actions .btn {
+  flex: none;
   white-space: nowrap;
 }
 
