@@ -196,6 +196,9 @@ func main() {
 	mux.HandleFunc("GET /api/git/ssh-default-key", s.handleGetSSHDefaultKey)
 	mux.Handle("POST /api/git/ssh-default-key", gate.RequirePassword(http.HandlerFunc(s.handleGenerateSSHDefaultKey)))
 
+	mux.HandleFunc("GET /api/git/ai-trailer", s.handleGetGitAITrailer)
+	mux.Handle("PUT /api/git/ai-trailer", gate.RequirePassword(http.HandlerFunc(s.handlePutGitAITrailer)))
+
 	mux.HandleFunc("GET /api/git/signing", s.handleGetGitSigning)
 	mux.Handle("PUT /api/git/signing", gate.RequirePassword(http.HandlerFunc(s.handlePutGitSigning)))
 	mux.Handle("POST /api/git/signing/ssh-key", gate.RequirePassword(http.HandlerFunc(s.handleGenerateSSHSigningKey)))

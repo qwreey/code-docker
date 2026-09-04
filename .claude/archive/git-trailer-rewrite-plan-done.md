@@ -1,6 +1,7 @@
 # 에이전트 커밋 trailer 치환 계획
 
-작성 2026-09-03. 아직 착수 전.
+작성 2026-09-03. **구현 완료 2026-09-04** — 실제 컨테이너에서 e2e 검증까지 끝남.
+아래는 원안이고, 구현하며 바뀐 부분은 맨 끝 "구현하며 바뀐 것"에 적어둠.
 
 ## 요구
 
@@ -96,3 +97,58 @@ codedocker.aitrailer.stripSession = true|false
 
 훅으로 못 잡는 유일한 케이스는 `git commit --no-verify`다. 에이전트가 그걸 쓸 이유는
 거의 없으므로 래퍼는 만들지 않는다. 필요해지면 그때 추가.
+
+## 구현하며 바뀐 것 (2026-09-04)
+
+원안대로 안 간 지점이 셋. 전부 실측으로 드러난 것들이라 근거를 남겨둠.
+
+### 1. `prepare-commit-msg` 하나로는 부족했다 → `commit-msg`도 같이 건다
+
+원안은 "훅은 모든 커밋 경로에서 메시지 파일 하나로 호출된다"였는데, **호출 시점**을
+빼먹었다. `prepare-commit-msg`는 **에디터가 열리기 전에** 돈다. 그래서 `git rebase -i`의
+reword처럼 에디터에서 직접 타이핑/붙여넣기 한 trailer는 못 잡는다 — 시퀀서가 *이전*
+메시지에 대해 훅을 돌리고, 그 뒤에 에디터가 파일을 통째로 갈아치우기 때문(git 2.55에서
+`prepare-commit-msg fired: ... src=commit` 로그로 확인).
+
+반대로 `commit-msg`는 에디터 뒤에 돌지만 `--no-verify`에 건너뛰어진다. 그래서 둘 다 건다.
+치환이 멱등이라(출력 주소가 `@anthropic.com`이 아니므로 2회차에는 아무것도 매칭 안 됨)
+두 번 도는 게 안전하다. 실제 로직은 `ai-trailer.sh` 한 파일이고 두 훅 파일은 그걸
+`exec`하는 래퍼다.
+
+### 2. 전역 `core.hooksPath`는 `prepare-commit-msg`만 죽이는 게 아니었다
+
+원안의 "체이닝 5줄이면 된다"는 과소평가였다. `core.hooksPath`는 그 저장소의
+`.git/hooks/`를 **모든 훅에 대해** 대체한다 — 디렉터리에 있는 훅만이 아니라. 즉
+`prepare-commit-msg` 하나만 두면 컨테이너 안 모든 프로젝트의 husky / pre-commit /
+lefthook / 손으로 쓴 훅이 **아무 에러 없이** 전부 죽는다.
+
+그래서 `hook-dispatch` 하나를 두고 Dockerfile이 git 훅 이름 전부(23개)를 거기로
+심볼릭 링크한다. 이 스크립트가 저장소 자신의 훅으로 체이닝한다. 순서는 **저장소 훅 먼저,
+우리 것 나중** — 우리 건 정규화 패스라 마지막에 도는 게 맞고, 커밋을 거부하는 프로젝트
+훅이 있으면 헛수고를 먼저 막아준다. 하나만 존재할 땐 `exec`해서 stdin을 읽는 훅
+(`pre-push`, `pre-receive`, `post-rewrite`)이 그대로 받게 한다.
+
+**함정**: 저장소 훅 경로를 `git rev-parse --git-path hooks/<name>`으로 구하면 안 된다.
+이건 `core.hooksPath`를 존중해서 **이 디렉터리 자신**을 돌려주고, 무한 재귀한다
+(git 2.55에서 확인). `--absolute-git-dir`을 쓴다.
+
+### 3. 기본값은 꺼짐, 그리고 `core.hooksPath`를 절대 덮어쓰지 않음
+
+`enabled` 기본값을 켜짐으로 두면, 이름/이메일 미설정 상태에서 원안의
+`user.name`/`user.email` 폴백이 co-author를 **커밋 작성자 자신으로** 치환한다 — 무의미.
+그래서 기본 꺼짐.
+
+`user-init.default.sh`는 `core.hooksPath`가 이미 설정돼 있으면 건드리지 않고 로그로
+알린다(전역 슬롯 하나뿐이라 조용히 뺏으면 사용자가 걸어둔 게 죽는다). 그 상태에선 이
+기능이 아예 안 도는데 UI에서 켜면 켜진 것처럼 보이므로, `GET /api/git/ai-trailer`가
+`hookActive`를 같이 내려주고 프론트가 경고 배너를 띄운다.
+
+## 검증 결과
+
+호스트의 임시 저장소에서 케이스별로: `-m` / `-F` / 에디터 / `--amend` / `rebase -i`
+reword / `--no-verify` / cherry-pick / revert / 멱등성 / 이미 훅이 있는 저장소(체이닝) /
+저장소 훅의 커밋 거부 / trailer 없는 커밋 / `commit -v`의 diff 안 trailer(scissors 아래)
+/ 중복 제거 / `enabled=false`. 그 다음 실제 이미지를 빌드해 컨테이너 안에서
+기본 꺼짐 상태 → 켠 상태 → 저장소 훅 체이닝, 그리고 webmanager API로
+쓴 설정을 훅이 읽는 것(git이 키 이름을 소문자로 저장하는데 `--get`이
+대소문자 무시라 문제없음)까지 확인.

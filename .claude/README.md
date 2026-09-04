@@ -19,6 +19,12 @@
     각 기능의 `webmanager/.claude/*-plan-done.md`에 흡수됨. webmanager 전용
     내용이지만, "완료돼서 더 이상 안 바뀌는" archive 성격상 다른 webmanager
     문서들과 달리 여기(레포 루트 archive)에 둠.
+  - `git-trailer-rewrite-plan-done.md` — 에이전트 커밋의 `Co-Authored-By` trailer를
+    사용자가 정한 이름/이메일로 치환하는 전역 git 훅 — 구현 완료(2026-09-04). git
+    래퍼가 아니라 훅으로 간 이유, 그리고 원안이 놓쳤던 3가지(에디터 이전에 도는
+    `prepare-commit-msg`만으로는 rebase reword를 못 잡는다 / 전역 `core.hooksPath`가
+    저장소의 훅을 *전부* 죽인다 / 기본값은 꺼짐이어야 한다)가 실측 근거와 함께
+    문서 끝에 정리돼 있음
   - `home-structure-plan.md` — `$HOME`(`/code`)에 흩어져 있던 `.tailscale`,
     `.vector`, `.webmanager`, `.server` 등을 `$HOME/.local/share/code-docker/`
     단일 umbrella로 정리 + `user-init` 실행 위치/`set -e` 이전 +
@@ -73,9 +79,6 @@
   - `webdav-file-share-plan.md` — 다른 기기에서 파일 업/다운로드용 WebDAV 공유.
     대문이 Caddy가 아니라 nginx라는 점, WebDAV 클라이언트가 forward-auth를 못 탄다는
     핵심 제약이 정리돼 있음 (2026-09-03)
-  - `git-trailer-rewrite-plan.md` — 에이전트 커밋의 `Co-Authored-By` trailer를
-    qwreey-bot으로 치환. git 래퍼가 아니라 전역 `prepare-commit-msg` 훅으로 가는
-    이유가 정리돼 있음 (2026-09-03)
   - `qa-batch-2026-09-03.md` — 사용자 QA 제보 11건의 원인 분석 + 수정 방향.
     `CS_DISABLE_PROXY`가 사라졌다는 전제가 틀렸다는 정정과, 그럼에도 실재하는
     구멍(`remote.autoForwardPorts`)이 여기 있음

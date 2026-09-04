@@ -1,5 +1,6 @@
 import { GitUserForm } from './GitUserForm'
 import { CommitSigning } from './CommitSigning'
+import { AiTrailer } from './AiTrailer'
 import { HttpsCredentials } from './HttpsCredentials'
 import { GitLFS } from './GitLFS'
 import { GlobalGitignore } from './GlobalGitignore'
@@ -19,6 +20,7 @@ export function GitConfig() {
       </div>
       <GitUserForm />
       <CommitSigning />
+      <AiTrailer />
       <HttpsCredentials />
       <GitLFS />
       <GlobalGitignore />

@@ -32,6 +32,17 @@ ssh/scp 접속에도 그대로 적용). `/code/.ssh/authorized_keys` 목록 조�
 파일 원본 편집 — 저장소별 `.gitignore`가 아니라 모든 저장소에 적용되는 패턴),
 `.gitconfig` 원본 직접 편집(저장 전 문법 검증)
 
+"AI 커밋 trailer" 섹션은 에이전트가 붙이는 `Co-Authored-By: Claude ...
+<noreply@anthropic.com>` trailer를 지정한 이름/이메일로 바꾸고, `Claude-Session:`
+줄(세션 URL)을 지웁니다. 매칭은 표시 이름이 아니라 **이메일 도메인**으로 하므로 모델
+이름이 바뀌어도 계속 동작하고, 모델 이름은 옵션에 따라 `qwreey-bot (Opus 5)`처럼 괄호로
+남길 수 있습니다. 이름/이메일을 비우면 `user.name`/`user.email`로 폴백합니다. 기본은
+꺼져 있으며, 실제 치환은 이미지가 심는 git 훅이 하고 webmanager는 설정만 씁니다
+(`git config`의 `codedocker.aitrailer.*`) — 자세한 건
+[빌드 커스터마이징](build-customization.md#prepare-commit-msgsh--commit-msgsh-ai-커밋-trailer-치환)
+참고. `core.hooksPath`가 이 이미지 훅 폴더를 가리키고 있지 않으면 훅이 돌지 않으므로
+섹션 상단에 경고가 뜹니다.
+
 ### Dev Proxy
 
 `router` 컨테이너 안 `caddy-adapter`가 관리하는 `.caddy` 항목(expose) 조회/추가/삭제 —

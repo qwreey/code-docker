@@ -1,6 +1,6 @@
 # 빌드 커스터마이징
 
-`config/` 아래는 프로그램별 폴더(`build/`, `code/`, `dns-local/`, `nginx/`, `shell/`, `sshd/`, `user-init/`, `vector/`, `webmanager/`)로 나뉘어 있습니다 — 각 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 `config/build/build.default.sh` 를 같은 폴더에 `build.override.sh` 로 복사하여 원하는대로 변경할 수 있습니다. 단, sh 파일들은 꼭 `chmod u+x` 를 적용하여 실행가능한 파일로 만들어야합니다.
+`config/` 아래는 프로그램별 폴더(`build/`, `code/`, `dns-local/`, `git/`, `nginx/`, `shell/`, `sshd/`, `user-init/`, `vector/`, `webmanager/`)로 나뉘어 있습니다 — 각 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 `config/build/build.default.sh` 를 같은 폴더에 `build.override.sh` 로 복사하여 원하는대로 변경할 수 있습니다. 단, sh 파일들은 꼭 `chmod u+x` 를 적용하여 실행가능한 파일로 만들어야합니다.
 가급적 업스트림의 변경사항에 따라 필수 바이너리가 따라가도록 하려면 override 파일에서 `/etc/code-docker/build/build.default.sh` 를 실행하는것을 추천합니다. 다만 원치 않는 경우 하지 않아도 됩니다.
 각 override 파일은 편집 후, 컨테이너 재빌드가 필요합니다. `docker compose build 컨테이너명 && docker compose up -d` 를 수행하세요
 
@@ -17,6 +17,9 @@
 - [`recommendations.*.yaml`](#recommendationsyaml-추천-목록)
 - [`code-patch.*.sh`](#code-patchsh-code-patch-심기-스크립트)
 - [`code-patch/`](#code-patch-기본-제공-브라우저-패치-모음)
+
+**`config/git/hooks/`**
+- [`prepare-commit-msg.*.sh` / `commit-msg.*.sh`](#prepare-commit-msgsh--commit-msgsh-ai-커밋-trailer-치환)
 
 **`config/shell/`**
 - [`shell.*`](#shell-기본-셸-지정)
@@ -176,6 +179,26 @@ SERVFAIL을 건너뛰고 router로 넘어가는 폴백 자체를 dnsmasq 내부�
 code-docker 자체가 기본으로 제공하는 브라우저 패치들(현재는 `tailscale-notify.js`, `cd-dialog.js`, `router-auth-notify.js`, `session-heartbeat.js`, `webmanager-launcher.js`, 그리고 webmanager의 폰트 관리자가 만든 CSS를 code-server로 끌어오는 `fonts.css`)을 모아두는 폴더입니다. 이 폴더 안의 `<이름>.default.<확장자>` 파일은 각각 `/code/.local/share/code-docker/code/patch/<이름>.<확장자>` 로 복사됩니다 (`code-patch.*.sh` 가 매 부팅마다 확인). 같은 폴더에 `<이름>.override.<확장자>` 를 두면(다른 곳의 `*.override.*` 와 동일하게 gitignore 되어 커밋되지 않음) default 대신 그 파일이 복사됩니다. 이미 유저가 오버라이드해서 쓸 수 있는 파일들이라 폴더 이름에는 "default" 를 붙이지 않았습니다.
 
 매 부팅마다 다시 심어지지만, 대상 파일의 내용이 지난번에 심었을 때의 해시와 여전히 일치할 때만입니다 — 즉 유저가 직접 수정하지 않은 파일만 갱신됩니다(`/code/.local/share/code-docker/code/.code-patch-manifest` 로 `<이름>\t<해시>` 를 추적, 다른 [코드 서버 패치](code-server-patch.md) 파일과 동일한 재시드 규칙). 해시가 다르면(유저가 직접 고쳤거나, 아직 기록된 해시가 없는 경우) 건드리지 않고 그대로 둡니다. 이후 code-docker 버전에서 해당 `.default.` 파일이 아예 없어지면, 이전에 심어졌던 사본도 함께 삭제됩니다.
+
+### `prepare-commit-msg.*.sh` / `commit-msg.*.sh` (AI 커밋 trailer 치환)
+
+에이전트가 커밋 메시지에 붙이는 `Co-Authored-By: Claude ... <noreply@anthropic.com>`
+trailer를 원하는 이름/이메일로 바꾸고, 원하면 `Claude-Session:` 줄(세션 URL이 그대로
+커밋에 남습니다)을 지우는 git 훅입니다. **기본은 꺼져 있고**, webmanager의 Git Config 탭
+→ "AI 커밋 trailer"에서 켭니다. 설정은 `git config`의 `codedocker.aitrailer.*` 키에
+저장되므로 webmanager가 떠 있지 않아도 훅은 동작합니다.
+
+두 훅 파일 모두 실제 로직은 같은 `ai-trailer.sh`를 호출합니다. 둘 다 필요한 이유는
+`prepare-commit-msg`가 **에디터가 열리기 전에** 돌아서 `git rebase -i`의 reword처럼
+에디터에서 직접 타이핑한 trailer를 못 잡고, `commit-msg`는 반대로 에디터 뒤에 돌지만
+`--no-verify`에 건너뛰어지기 때문입니다. 치환은 멱등이라 두 번 돌아도 안전합니다.
+
+`config/git/hooks/` 안에는 `hook-dispatch`도 있습니다 — 이미지가 `core.hooksPath`를
+이 폴더로 잡기 때문에, **각 저장소의 `.git/hooks/`가 통째로 무시됩니다.** 그래서 모든
+훅 이름이 `hook-dispatch`로 심볼릭 링크되어 있고, 이 스크립트가 저장소 자신의 훅으로
+체이닝해 husky/pre-commit 같은 것들이 계속 동작하게 합니다. `core.hooksPath`를 이미
+직접 설정해 둔 경우 `user-init`은 그 값을 덮어쓰지 않으며(대신 로그로 알려줍니다),
+그 상태에서는 이 기능이 동작하지 않습니다 — webmanager 쪽에도 경고가 뜹니다.
 
 ### `shell.*` (기본 셸 지정)
 

@@ -49,6 +49,24 @@ if [ "$OLD_VERSION" != "$CURR_VERSION" ]; then
     echo "$CURR_VERSION" > "$VERSION_FILE"
 fi
 
+# Point git at this image's hook directory (see config/git/hooks/). Written
+# to /code/.gitconfig, which lives on the /code volume, so it survives a
+# rebuild - but re-checked every boot because a fresh volume has no gitconfig
+# at all. The hooks themselves are inert until codedocker.aitrailer.enabled is
+# turned on (webmanager's Git Config tab writes it).
+#
+# Never clobber a value the user chose: core.hooksPath is a single global
+# slot, and silently taking it over would kill whatever they pointed it at.
+HOOKS_PATH="/etc/code-docker/git/hooks"
+CURRENT_HOOKS_PATH="$(git config --global --get core.hooksPath || true)"
+if [ -z "$CURRENT_HOOKS_PATH" ]; then
+    git config --global core.hooksPath "$HOOKS_PATH"
+    echo "user-init: set git core.hooksPath to $HOOKS_PATH"
+elif [ "$CURRENT_HOOKS_PATH" != "$HOOKS_PATH" ]; then
+    echo "user-init: git core.hooksPath is already set to '$CURRENT_HOOKS_PATH' - leaving it alone." >&2
+    echo "user-init: the AI commit-trailer hook will NOT run. To use it, chain to $HOOKS_PATH/hook-dispatch from there, or unset core.hooksPath and reboot." >&2
+fi
+
 # No xdg-user-dirs (or equivalent) runs in this container - there's no DE/
 # browser to populate Desktop/Documents/Downloads for, so those aren't worth
 # creating. Projects is different: webmanager's Projects tab defaults to

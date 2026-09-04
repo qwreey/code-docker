@@ -53,3 +53,13 @@
   align-items: flex-start;
   gap: 0.6rem;
 }
+
+.aitrailer-preview {
+  margin-bottom: 0.9rem;
+}
+
+.aitrailer-preview-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.1rem;
+}

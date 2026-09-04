@@ -396,8 +396,9 @@ Task Manager는 flex 표, Supervisor 탭은 그 아래 펼쳐지는 일반 auto-
 
 ### 착수 가능한 다음 작업 (막힌 것/안 막힌 것)
 
-- **`.claude/backlog/git-trailer-rewrite-plan.md`** — 막힌 것 없음. 자기완결적이고
-  설계도 끝나 있다. 다음 작업으로 가장 적합.
+- ~~`.claude/backlog/git-trailer-rewrite-plan.md`~~ — **2026-09-04 구현 완료**,
+  `.claude/archive/git-trailer-rewrite-plan-done.md`로 이동. 원안에서 바뀐 3가지는
+  그 문서 끝 "구현하며 바뀐 것" 참고.
 - `.claude/backlog/webdav-file-share-plan.md` — 막힌 것 없지만 분량이 크다.
 - `.claude/backlog/repo-restructure-plan.md` — **막혀 있다.** upstream 5개 repo에
   릴리스 태그를 붙이는 게 선행 조건이고 그건 사용자만 할 수 있다.

@@ -24,7 +24,7 @@ If a repo-root `.allow-test` file exists (gitignored — `touch .allow-test` to 
 
 Nearly every runtime behavior is defined by a pair of files under `config/`: `<name>.default.*` (checked into git) and an optional `<name>.override.*` (gitignored, user-provided). A `script/<name>.sh` dispatcher execs the override if present, else the default — e.g. `script/code-service.sh` → `config/code/code-service.default.sh` or `config/code/code-service.override.sh`. This same default/override selection pattern applies to `build`, `code-service`, `sshd-service`, `dns-local`, `nginx-service`, `vector-service`, `webmanager`, `supervisord.conf`, `shell`, and `user-init` — with two naming exceptions: `shell`'s dispatcher is `script/get-user-shell.sh` (not `script/shell.sh`), and `supervisord.conf`'s override-or-default choice is made inline in `entrypoint.sh` itself rather than via a separate dispatcher script. When adding a new customizable behavior, follow this pattern rather than hardcoding logic into the Dockerfile.
 
-`config/` is organized into one subfolder per program — `build/`, `code/` (code-server itself, including `code-patch/`, `settings.default.json` and `recommendations.default.yaml`), `dns-local/`, `nginx/`, `shell/`, `sshd/`, `user-init/`, `vector/`, `webmanager/` — same per-feature-folder idiom `router/config/` uses (`dns/`, `tailscale/`, `netgate/`, ...). The root Dockerfile `COPY`s the whole `config` tree in one shot (`COPY config ... /etc/code-docker/`), so this nesting carries straight through to the runtime paths dispatcher scripts reference (`config/code/code-service.default.sh` → `/etc/code-docker/code/code-service.default.sh`) with no extra Dockerfile wiring needed per folder. `supervisord.default.conf`, `supervisord.d/*.conf`, and `supervisor-metadata.default.yaml` stay directly under `config/` instead of a program folder — they're cross-cutting infra (supervisord itself, and per-program metadata webmanager reads about *every* program), not owned by any single program the way the folders above are.
+`config/` is organized into one subfolder per program — `build/`, `code/` (code-server itself, including `code-patch/`, `settings.default.json` and `recommendations.default.yaml`), `dns-local/`, `git/` (`hooks/`, see the git-hooks section below), `nginx/`, `shell/`, `sshd/`, `user-init/`, `vector/`, `webmanager/` — same per-feature-folder idiom `router/config/` uses (`dns/`, `tailscale/`, `netgate/`, ...). The root Dockerfile `COPY`s the whole `config` tree in one shot (`COPY config ... /etc/code-docker/`), so this nesting carries straight through to the runtime paths dispatcher scripts reference (`config/code/code-service.default.sh` → `/etc/code-docker/code/code-service.default.sh`) with no extra Dockerfile wiring needed per folder. `supervisord.default.conf`, `supervisord.d/*.conf`, and `supervisor-metadata.default.yaml` stay directly under `config/` instead of a program folder — they're cross-cutting infra (supervisord itself, and per-program metadata webmanager reads about *every* program), not owned by any single program the way the folders above are.
 
 `.sh` override files must be `chmod u+x`. Editing an override requires a rebuild (`docker compose build && up`), not just a container restart.
 
@@ -185,9 +185,50 @@ written this way survives step 4's `--env-migrate` (envmigrate lets a user-set v
 commented template default unless the key is `#!important`). Live-verified end-to-end on
 the real server 2026-08-27.
 
+### git hooks
+
+`config/git/hooks/` holds a global git hook set the image points `core.hooksPath` at
+(`user-init.default.sh`, which **never overwrites a `core.hooksPath` the user already
+set** — it logs that it's leaving it alone, and webmanager's own panel warns when the
+value isn't ours, since the feature then silently does nothing). The one behavior it
+implements is rewriting the `Co-Authored-By: Claude ... <noreply@anthropic.com>` trailer
+an agent harness appends into a user-chosen identity, optionally keeping the model name
+in parentheses, and dropping the `Claude-Session:` URL line — matched on the **email
+domain**, never the display name, since the name carries a model version that keeps
+changing. Default-off (`codedocker.aitrailer.enabled`), because with it on and no
+name/email configured the documented fallback to `user.name`/`user.email` would rewrite
+the co-author into the commit's own author.
+
+Two structural decisions worth not re-litigating:
+
+- **A hook, not a `git` wrapper on `PATH`.** The wrapper would have to parse argv across
+  `-m`/`-F`/editor/`--amend`/`git -C`/`git -c`/aliases/rebase re-commits; git hands every
+  one of those to the hook as a single message-file path. It also avoids a
+  `/usr/local/bin/git` → `/usr/bin/git` self-recursion risk, and `bin/` has no precedent
+  for a script shadowing a real binary of the same name.
+- **Both `prepare-commit-msg` and `commit-msg`, symlinked to the same
+  `ai-trailer.sh`.** Neither alone covers everything: `prepare-commit-msg` runs *before*
+  the editor, so it misses a trailer typed during `git rebase -i`'s reword (measured — the
+  sequencer fires it on the *old* message, then the editor replaces the file wholesale);
+  `commit-msg` runs after the editor but is skipped by `--no-verify`. Running both is safe
+  because the rewrite is idempotent — its output address isn't `@anthropic.com`, so the
+  second pass matches nothing.
+
+The reason `hook-dispatch` exists at all, and why the Dockerfile symlinks **every** git
+hook name to it rather than just the two implemented: a global `core.hooksPath` *replaces*
+each repository's own `.git/hooks/` for all hooks, not only the ones present in the
+directory — so shipping just `prepare-commit-msg` here would silently kill husky,
+pre-commit, lefthook and every hand-written hook in every project in the container.
+`hook-dispatch` runs the repository's own hook first (so a project hook that rejects a
+commit does so before we bother rewriting, and our normalization gets the last word), then
+ours, and `exec`s when only one exists so stdin-reading hooks (`pre-push`, `pre-receive`,
+`post-rewrite`) get it untouched. It resolves the repo hook via `git rev-parse
+--absolute-git-dir`, **not** `--git-path hooks/<name>` — that one honors `core.hooksPath`
+and hands back this very directory, recursing forever (verified against git 2.55).
+
 ### webmanager
 
-A browser admin panel (Go backend + Vite/React frontend, `webmanager/` — its own subtree, with its own `CLAUDE.md`/`plan.md`) running alongside code-server as another supervisord program, on port 81. Well beyond its original scope now: supervisord process management, SSH `authorized_keys`/`known_hosts`, git config (commit signing/GPG, git-lfs, raw `.gitconfig` editing, global gitignore/`core.excludesFile` management), the vector-backed logs pipeline described above, an OS-level process/port viewer with resource-history graphs, a Projects-folder browser whose per-project detail sheet carries a git status panel, git worktree list/remove, a project-scoped Claude Code session history (reusing the Claude Code tab's own gated session-log viewer, filtered to that project), and a Claude Code auto-memory viewer (`CLAUDE_CONFIG_DIR/projects/<slug>/memory/`, ungated — curated notes, not raw conversation content), code-server extension and mise tool management, a Claude Code status tab, Docker/dind management, PWA manifest shortcuts (webmanager intercepts code-server's own `/manifest.json` and merges
+A browser admin panel (Go backend + Vite/React frontend, `webmanager/` — its own subtree, with its own `CLAUDE.md`/`plan.md`) running alongside code-server as another supervisord program, on port 81. Well beyond its original scope now: supervisord process management, SSH `authorized_keys`/`known_hosts`, git config (commit signing/GPG, git-lfs, raw `.gitconfig` editing, global gitignore/`core.excludesFile` management, the AI commit-trailer rewrite's `codedocker.aitrailer.*` keys — see the git-hooks section below), the vector-backed logs pipeline described above, an OS-level process/port viewer with resource-history graphs, a Projects-folder browser whose per-project detail sheet carries a git status panel, git worktree list/remove, a project-scoped Claude Code session history (reusing the Claude Code tab's own gated session-log viewer, filtered to that project), and a Claude Code auto-memory viewer (`CLAUDE_CONFIG_DIR/projects/<slug>/memory/`, ungated — curated notes, not raw conversation content), code-server extension and mise tool management, a Claude Code status tab, Docker/dind management, PWA manifest shortcuts (webmanager intercepts code-server's own `/manifest.json` and merges
 in the `shortcuts` array — its own "Open manager" entry plus one per
 `WEBMANAGER_MANIFEST_SHORTCUT_<ID>="<name>|<url>[|<desc>]"` env var, again one var per entry
 so a side project's compose overlay can declare its own. A shortcut whose `url` is

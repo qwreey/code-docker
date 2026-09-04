@@ -103,6 +103,27 @@ COPY --chown=root:root code-server-autoinstall/*.sh \
     /etc/code-docker/code-server-autoinstall/
 COPY --chown=root:root bin /usr/local/bin/
 
+# One symlink per git hook name into config/git/hooks/, all pointing at the
+# single hook-dispatch entry point (see that script for what it does with
+# them). Generated here rather than checked into git so the list is one
+# readable line instead of ~25 symlink blobs in the tree.
+#
+# Every name, not just the hooks this image implements: a global
+# core.hooksPath REPLACES a repository's own .git/hooks/ for ALL hooks, so a
+# directory holding only prepare-commit-msg would silently disable husky,
+# pre-commit, lefthook and every hand-written hook in every project in the
+# container. hook-dispatch chains through to the repository's own hook.
+RUN cd /etc/code-docker/git/hooks && \
+    for h in applypatch-msg pre-applypatch post-applypatch pre-commit \
+             pre-merge-commit prepare-commit-msg commit-msg post-commit \
+             pre-rebase post-checkout post-merge pre-push pre-receive update \
+             proc-receive post-receive post-update reference-transaction \
+             push-to-checkout pre-auto-gc post-rewrite sendemail-validate \
+             post-index-change; do \
+        ln -sf hook-dispatch "$h"; \
+    done && \
+    chmod +x hook-dispatch ai-trailer.sh ./*.default.sh
+
 # fish completion for `attach` (see config/shell/completions/attach.fish) -
 # /etc/fish/completions is fish's own system-wide completion path, so this
 # is picked up for root or any other user with no per-user setup needed.

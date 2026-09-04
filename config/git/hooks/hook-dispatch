@@ -1,0 +1,58 @@
+#!/bin/bash
+# Single entry point for every git hook, reached through one symlink per hook
+# name (created in the root Dockerfile) from the directory this image points
+# `core.hooksPath` at.
+#
+# Why every hook name and not just the one we actually implement: a global
+# core.hooksPath REPLACES each repository's own .git/hooks/ for ALL hooks, not
+# just the ones present in the directory. Shipping only prepare-commit-msg
+# here would therefore silently kill husky, pre-commit, lefthook and every
+# hand-written .git/hooks/* in every project inside the container, with no
+# error anywhere. So each hook name gets a symlink to this script, which
+# chains through to the repository's own hook.
+#
+# Order: the repository's own hook runs FIRST, then ours. Ours is a
+# normalization pass over the commit message (see prepare-commit-msg.default.sh),
+# so it should get the last word - a project hook that appends its own
+# Co-Authored-By trailer still gets normalized. It also means a project hook
+# that rejects the commit does so before we bother rewriting anything.
+set -e
+
+HOOK_NAME="$(basename "$0")"
+HOOKS_DIR="/etc/code-docker/git/hooks"
+
+# Our own implementation for this hook, if this image ships one at all
+# (override pattern, same as everywhere else under config/).
+OWN=""
+if [ -x "$HOOKS_DIR/$HOOK_NAME.override.sh" ]; then
+    OWN="$HOOKS_DIR/$HOOK_NAME.override.sh"
+elif [ -x "$HOOKS_DIR/$HOOK_NAME.default.sh" ]; then
+    OWN="$HOOKS_DIR/$HOOK_NAME.default.sh"
+fi
+
+# The repository's own hook. Resolve it via --absolute-git-dir, NOT
+# `git rev-parse --git-path hooks/<name>`: that one honours core.hooksPath and
+# hands back this very directory, which would recurse forever (verified
+# against git 2.55). GIT_DIR is exported into the hook environment by git
+# itself for the common cases, so prefer it and keep the fork out of the hot
+# path - reference-transaction fires on every single ref update.
+REPO=""
+GIT_DIR_PATH="${GIT_DIR:-}"
+if [ -z "$GIT_DIR_PATH" ]; then
+    GIT_DIR_PATH="$(git rev-parse --absolute-git-dir 2>/dev/null || true)"
+fi
+if [ -n "$GIT_DIR_PATH" ] && [ -x "$GIT_DIR_PATH/hooks/$HOOK_NAME" ]; then
+    REPO="$GIT_DIR_PATH/hooks/$HOOK_NAME"
+fi
+
+# `exec` whenever only one of the two exists, so hooks that read stdin
+# (pre-push, pre-receive, post-rewrite, ...) get it untouched.
+if [ -n "$REPO" ] && [ -n "$OWN" ]; then
+    "$REPO" "$@"
+    exec "$OWN" "$@"
+elif [ -n "$REPO" ]; then
+    exec "$REPO" "$@"
+elif [ -n "$OWN" ]; then
+    exec "$OWN" "$@"
+fi
+exit 0

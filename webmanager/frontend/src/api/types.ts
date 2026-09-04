@@ -103,6 +103,16 @@ export interface GitSigningConfig {
   commitGpgSign: boolean
 }
 
+export interface GitAITrailerConfig {
+  enabled: boolean
+  name: string
+  email: string
+  keepModel: boolean
+  stripSession: boolean
+  /** Read-only: whether core.hooksPath actually points at this image's hooks. */
+  hookActive: boolean
+}
+
 export interface SshSigningKey {
   publicKeyPath: string
   publicKey: string
