@@ -105,49 +105,66 @@
    see TerminalTabs.tsx's doc comment for the "always show the active tab
    even before it's confirmed by the backend" behavior.
 
-   Two-child row: .terminal-tab-list (the actual tabs, still the one that
-   wraps — see below) and, only while the control bar is hidden, the
-   .terminal-zoom-group sibling pinned at the far right. align-items:
-   flex-start (not center) is deliberate: the tab list can grow to 2-3 lines
-   tall as it wraps, and this row's own cross-axis alignment would otherwise
-   stretch/center-shift against that growing height — .terminal-zoom-group
-   opts back into vertical centering itself via align-self. */
+   Two-child row: .terminal-tab-list (the actual tabs, which scroll
+   horizontally — see below) and, only while the control bar is hidden, the
+   .terminal-zoom-group sibling pinned at the far right. */
 .terminal-tabbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.3rem;
   flex: none;
   margin-top: 0.5rem;
   border-bottom: 1px solid var(--border);
 }
 
-/* The tabs themselves - flex:1 so it claims the row, wrapping internally
-   exactly like .terminal-tabbar used to on its own (same flex-wrap: wrap),
-   with .terminal-zoom-group as a plain sibling rather than one more
-   wrapping item so it never trails onto whichever line the last tab lands
-   on. min-width: 0 lets it actually shrink below its content's natural
-   width instead of pushing the zoom group out of the row. */
+/* The tabs themselves. This row used to wrap onto 2-3 lines as tabs piled
+   up, which on a phone spends the one axis there is least of — height, and
+   with a keyboard open there is almost none. It scrolls sideways instead
+   (repo owner's call, 2026-09-06: "특히 모바일에선 그게 더 나아서").
+
+   The scroll container is this element rather than .terminal-tabbar, which
+   is what keeps the zoom group visible without any position: sticky at all:
+   as a sibling *outside* the scrolled box it simply never moves, so it needs
+   no opaque background or z-index to avoid tabs sliding underneath it.
+
+   min-width: 0 lets it actually shrink below its content's natural width
+   (a flex item's default min-width: auto would otherwise refuse to, and
+   push the zoom group out of the row instead of scrolling). The scrollbar
+   is hidden because a horizontal one here costs ~15px of the height this
+   change exists to save; the strip is still scrollable by touch, wheel and
+   keyboard. */
 .terminal-tab-list {
   display: flex;
   align-items: center;
   gap: 0.3rem;
   flex: 1;
   min-width: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+
+.terminal-tab-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* Tabs must keep their natural width in a nowrap row: a flex item's default
+   shrink would squeeze every tab down to nothing as more are opened, which
+   is the failure mode horizontal scrolling exists to replace. */
+.terminal-tab-list > * {
+  flex: none;
 }
 
 /* Zoom group moved here from TerminalControls.tsx's control bar when that
    bar is hidden (Terminal.tsx's controlBarEnabled) - see TerminalTabs.tsx.
-   align-self: center keeps the two buttons vertically centered against the
-   tab row regardless of how tall .terminal-tab-list's own wrapping grows
-   (an explicit user requirement, not just "looks fine" - .terminal-tabbar's
-   own align-items is flex-start for that same reason, see above). */
+   Outside the scrolling strip above, so it stays put on its own. */
 .terminal-zoom-group {
   display: flex;
   align-items: center;
   gap: 0.15rem;
   flex: none;
-  align-self: center;
 }
 
 /* Sized/styled to match .terminal-tab-add right above it (the other

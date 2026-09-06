@@ -137,16 +137,15 @@ function saveFontSize(value: number) {
 export type TerminalInputMode = 'native' | 'password' | 'diff'
 
 const INPUT_MODE_KEY = 'webmanager.terminal.inputMode'
-// Superseded by INPUT_MODE_KEY; still read once so a user who explicitly
-// opted out of the old boolean workaround keeps xterm's own textarea
-// instead of being silently moved onto a mode they never chose.
-const LEGACY_MOBILE_INPUT_WORKAROUND_KEY = 'webmanager.terminal.mobileInputWorkaround'
 
+// The old boolean key ('webmanager.terminal.mobileInputWorkaround') is
+// deliberately NOT migrated: every value it could hold selected a mode that
+// is known broken on a real device, so carrying that choice forward would
+// only preserve a bug. Repo owner's call, 2026-09-06.
 function loadInputMode(): TerminalInputMode {
   try {
     const stored = localStorage.getItem(INPUT_MODE_KEY)
     if (stored === 'native' || stored === 'password' || stored === 'diff') return stored
-    if (localStorage.getItem(LEGACY_MOBILE_INPUT_WORKAROUND_KEY) === '0') return 'native'
   } catch {
     // localStorage unavailable (e.g. private browsing) - falls through to
     // the default below
@@ -296,6 +295,38 @@ function saveAltScreenTouchScrollEnabled(enabled: boolean) {
   try {
     if (enabled) localStorage.removeItem(ALT_SCREEN_TOUCH_SCROLL_KEY)
     else localStorage.setItem(ALT_SCREEN_TOUCH_SCROLL_KEY, '0')
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - the toggle just won't persist
+  }
+}
+
+// Momentum ("fling") scrolling: after a touch-drag is released, keep
+// scrolling at the speed the finger let go at and decay to a stop, the way
+// Termux and every native Android list behave. On by default - a 1:1 drag
+// with a hard stop is the odd one out on a phone, not the safe choice.
+// Read through a ref like altScreenTouchScrollEnabled so it applies
+// immediately rather than on the next remount.
+//
+// Deliberately scoped to viewport scrolling only, never the
+// scroll-as-input path: in the alternate screen buffer (or with mouse
+// tracking on) each scroll step is a real keystroke or mouse report to the
+// running application, so a fling would fire dozens of arrow keys into
+// claude/vim after the finger already left the screen. Momentum is a
+// display affordance; input is not something to coast through.
+const TOUCH_MOMENTUM_KEY = 'webmanager.terminal.touchMomentum'
+
+function loadTouchMomentumEnabled(): boolean {
+  try {
+    return localStorage.getItem(TOUCH_MOMENTUM_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function saveTouchMomentumEnabled(enabled: boolean) {
+  try {
+    if (enabled) localStorage.removeItem(TOUCH_MOMENTUM_KEY)
+    else localStorage.setItem(TOUCH_MOMENTUM_KEY, '0')
   } catch {
     // localStorage unavailable (e.g. private browsing) - the toggle just won't persist
   }
@@ -477,6 +508,9 @@ export function Terminal({
   // selection is invisible to the browser's native copy UI).
   const [hasSelection, setHasSelection] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [touchMomentumEnabled, setTouchMomentumEnabled] = useState<boolean>(loadTouchMomentumEnabled)
+  const touchMomentumRef = useRef(touchMomentumEnabled)
+  touchMomentumRef.current = touchMomentumEnabled
   const [altScreenTouchScrollEnabled, setAltScreenTouchScrollEnabled] = useState<boolean>(loadAltScreenTouchScrollEnabled)
   // The touch handler is installed once with the xterm instance, so it
   // reads the toggle through a ref rather than closing over the state.
@@ -524,6 +558,10 @@ export function Terminal({
   // resending stale values on an unrelated later reconnect.
   const pendingCreateOptionsRef = useRef<Map<string, { cwd?: string; command?: string }>>(new Map())
   const keyboardInset = useKeyboardInset()
+  // Mirrored for keepFocus, which runs inside event handlers created before
+  // the current render.
+  const keyboardInsetRef = useRef(keyboardInset)
+  keyboardInsetRef.current = keyboardInset
   // Bumped by the disconnect overlay's "재연결" button to force the
   // WS-connect effect below to re-run against the same activeSession
   // without changing it — that effect is only otherwise keyed on
@@ -868,6 +906,19 @@ export function Terminal({
   const keepFocus = useCallback(() => {
     const target = mobileInputRef.current ?? termRef.current?.textarea ?? null
     if (!target || document.activeElement !== target) return
+    // "Already the active element" is not enough on Android: dismissing the
+    // keyboard with the system Back button leaves the field focused, so a
+    // .focus() call from a toolbar tap opens it right back up. Measured on a
+    // real device 2026-09-06 — the guard above alone did not fix the
+    // reported "확대 축소만 하려는데도 키보드가 열려서".
+    //
+    // visualViewport's inset is the only signal that actually distinguishes
+    // an open keyboard from a closed one (see useKeyboardInset). Zero inset
+    // therefore means "do nothing": on a phone that is the closed-keyboard
+    // case this exists to skip, and on a desktop, where the inset is always
+    // zero, re-focusing an element that already has focus was a no-op
+    // anyway.
+    if (keyboardInsetRef.current <= 0) return
     target.focus()
   }, [])
 
@@ -896,6 +947,11 @@ export function Terminal({
   const changeTouchMode = useCallback((mode: TouchMode) => {
     saveTouchMode(mode)
     setTouchModeState(mode)
+  }, [])
+
+  const toggleTouchMomentum = useCallback((enabled: boolean) => {
+    saveTouchMomentumEnabled(enabled)
+    setTouchMomentumEnabled(enabled)
   }, [])
 
   const toggleAltScreenTouchScroll = useCallback((enabled: boolean) => {
@@ -1017,6 +1073,35 @@ export function Terminal({
     // application, and a fast flick across a short screen would otherwise
     // send a burst of dozens at once.
     const MAX_WHEEL_STEPS_PER_MOVE = 6
+    // Momentum tuning. Velocity is carried in px/ms because that is what the
+    // touch events give directly; converting to lines happens per frame, so
+    // a font-size change mid-fling can't desync it.
+    //
+    // FRICTION is per 16.67ms (one frame at 60Hz) and normalized by the real
+    // frame time below, so a 120Hz screen decelerates over the same wall
+    // clock rather than twice as fast. 0.94 lands a hard flick in a bit under
+    // a second, which matches how far a Termux fling carries.
+    //
+    // MIN_VELOCITY is where coasting stops: below ~0.04 px/ms (40 px/s) the
+    // movement reads as a stutter rather than motion, and continuing costs a
+    // rAF callback per frame for nothing.
+    //
+    // MAX_FRAME_MS clamps dt so a tab that was backgrounded mid-fling
+    // resumes rather than teleporting: requestAnimationFrame stops firing
+    // while hidden, so the first frame back can otherwise carry a multi-second
+    // dt straight into the scroll distance.
+    const MOMENTUM_FRICTION = 0.94
+    const MOMENTUM_MIN_VELOCITY = 0.04
+    const MOMENTUM_MAX_FRAME_MS = 50
+    // Smoothing for the release velocity. A raw last-two-points delta is very
+    // noisy on a touchscreen (one 2ms sample with a 1px jitter reads as a
+    // violent flick), so the tracked value is an exponential moving average
+    // weighted toward recent samples.
+    const MOMENTUM_VELOCITY_SMOOTHING = 0.7
+    let velocity = 0
+    let velocitySeeded = false
+    let lastMoveAt = 0
+    let momentumFrame = 0
     let startX = 0
     let startY = 0
     let lastX = 0
@@ -1027,7 +1112,15 @@ export function Terminal({
     let pointerDragging = false
     let lineRemainder = 0
     const onTouchStart = (e: TouchEvent) => {
+      // Any touch stops a fling in progress, including a second finger or a
+      // plain tap - "tap to catch the scroll" is what every native list does,
+      // and letting a tap land on the terminal while it is still moving would
+      // position the cursor somewhere the user never aimed at.
+      cancelMomentum()
       if (e.touches.length !== 1) return
+      velocity = 0
+      velocitySeeded = false
+      lastMoveAt = 0
       startX = e.touches[0].clientX
       startY = e.touches[0].clientY
       lastX = startX
@@ -1077,23 +1170,49 @@ export function Terminal({
     // above takes, for the same reason (reimplementing xterm's mouse
     // protocol/selection logic here would immediately drift from it).
     //
-    // shiftKey is what separates the two modes. xterm treats shift as
-    // "force selection": with it set, a drag selects text even while an
-    // application has mouse tracking on; without it, an application that
-    // asked for mouse reports gets them. That single flag is the whole
-    // difference, so 'select' is not a separate implementation — it is
-    // 'mouse' with the modifier xterm already understands.
+    // shiftKey is NOT simply "select mode" — that was the first design and a
+    // real device proved it wrong (reported as "내가 터치한 곳부터 선택이
+    //시작되지 않고 이상한 곳부터 선택된다"). xterm's own mousedown handler
+    // reads:
+    //
+    //     this._enabled && e.shiftKey ? this._handleIncrementalClick(e)
+    //                                 : this._handleSingleClick(e)
+    //     _handleIncrementalClick(e) {
+    //       this._model.selectionStart && (this._model.selectionEnd = ...)
+    //     }
+    //
+    // so shift means "extend the existing selection from its old anchor",
+    // never "start a new one here". Only the shift-less path sets a fresh
+    // anchor at the pointer. Shift is therefore used for exactly one thing —
+    // getting past the early return that would otherwise hand the event to
+    // an application with mouse tracking on — and only when that is actually
+    // the situation.
     //
     // Events are dispatched on .xterm-screen with bubbles:true because
     // xterm's selection service starts from a mousedown there and then
     // listens on the document for the rest of the drag.
+    const screenRect = () => wheelTarget().getBoundingClientRect()
+    // xterm auto-scrolls while a drag sits outside the screen element
+    // (_dragScrollAmount), which on touch runs away the moment a finger
+    // crosses the bottom edge — reported as "선택하려 하면 최하단으로
+    // 스크롤된다". Keeping synthesized coordinates just inside the box means
+    // that timer never arms, and a finger dragged past the edge simply
+    // selects to the edge.
+    const clampToScreen = (clientX: number, clientY: number): [number, number] => {
+      const r = screenRect()
+      return [
+        Math.min(Math.max(clientX, r.left + 1), r.right - 1),
+        Math.min(Math.max(clientY, r.top + 1), r.bottom - 1),
+      ]
+    }
     const dispatchMouse = (type: 'mousedown' | 'mousemove' | 'mouseup', clientX: number, clientY: number, forceSelection: boolean) => {
+      const [x, y] = clampToScreen(clientX, clientY)
       wheelTarget().dispatchEvent(
         new MouseEvent(type, {
           bubbles: true,
           cancelable: true,
-          clientX,
-          clientY,
+          clientX: x,
+          clientY: y,
           button: 0,
           buttons: type === 'mouseup' ? 0 : 1,
           shiftKey: forceSelection,
@@ -1101,10 +1220,41 @@ export function Terminal({
         }),
       )
     }
+    // Whether this drag has to force its way past mouse reporting. Only true
+    // in select mode against an application that turned mouse tracking on —
+    // and it is exactly the case where xterm gives us the incremental-click
+    // path with no anchor of its own, so seedSelectionAnchor below has to
+    // provide one.
+    let forceSelectionDrag = false
+    // Gives _handleIncrementalClick something to extend from. Without this,
+    // an empty selectionStart makes it a no-op and the whole drag selects
+    // nothing (or worse, extends whatever was selected minutes ago).
+    // selectLines anchors at the start of the touched row rather than the
+    // exact column — predictable, and the best available: nothing in xterm's
+    // public API sets an arbitrary selection anchor.
+    const seedSelectionAnchor = (clientY: number) => {
+      const r = screenRect()
+      const rows = term.rows || 1
+      const rowHeight = r.height / rows
+      if (!(rowHeight > 0)) return
+      const row = Math.min(Math.max(Math.floor((clientY - r.top) / rowHeight), 0), rows - 1)
+      term.selectLines(term.buffer.active.viewportY + row, term.buffer.active.viewportY + row)
+    }
+    const beginPointerDrag = (clientX: number, clientY: number) => {
+      const selecting = touchModeRef.current === 'select'
+      forceSelectionDrag = selecting && sendsScrollToApp(term)
+      if (selecting) {
+        // A fresh drag must never inherit the previous drag's anchor.
+        term.clearSelection()
+        if (forceSelectionDrag) seedSelectionAnchor(clientY)
+      }
+      pointerDragging = true
+      dispatchMouse('mousedown', clientX, clientY, forceSelectionDrag)
+    }
     const endPointerDrag = (clientX: number, clientY: number) => {
       if (!pointerDragging) return
       pointerDragging = false
-      dispatchMouse('mouseup', clientX, clientY, touchModeRef.current === 'select')
+      dispatchMouse('mouseup', clientX, clientY, forceSelectionDrag)
     }
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 1) return
@@ -1116,12 +1266,8 @@ export function Terminal({
         // most often horizontal, and requiring vertical movement to start
         // one would make selecting a single line impossible.
         if (!pointerDragging && Math.abs(y - startY) < TOUCH_SCROLL_THRESHOLD && Math.abs(x - startX) < TOUCH_SCROLL_THRESHOLD) return
-        const forceSelection = mode === 'select'
-        if (!pointerDragging) {
-          pointerDragging = true
-          dispatchMouse('mousedown', startX, startY, forceSelection)
-        }
-        dispatchMouse('mousemove', x, y, forceSelection)
+        if (!pointerDragging) beginPointerDrag(startX, startY)
+        dispatchMouse('mousemove', x, y, forceSelectionDrag)
         lastX = x
         lastY = y
         e.preventDefault()
@@ -1130,6 +1276,14 @@ export function Terminal({
       if (!dragging && Math.abs(y - startY) < TOUCH_SCROLL_THRESHOLD) return
       dragging = true
       const rowHeight = container.clientHeight / (term.rows || 1) || 18
+      const now = performance.now()
+      const dt = lastMoveAt ? now - lastMoveAt : 0
+      if (dt > 0) {
+        const sample = (lastY - y) / dt
+        velocity = velocitySeeded ? velocity * (1 - MOMENTUM_VELOCITY_SMOOTHING) + sample * MOMENTUM_VELOCITY_SMOOTHING : sample
+        velocitySeeded = true
+      }
+      lastMoveAt = now
       lineRemainder += (lastY - y) / rowHeight
       lastY = y
       const lines = Math.trunc(lineRemainder)
@@ -1147,9 +1301,58 @@ export function Terminal({
       }
       e.preventDefault()
     }
+    const cancelMomentum = () => {
+      if (!momentumFrame) return
+      cancelAnimationFrame(momentumFrame)
+      momentumFrame = 0
+    }
+    // Coasts the viewport at the velocity the finger let go at, decaying to a
+    // stop. Only ever reached on the term.scrollLines path - see
+    // TOUCH_MOMENTUM_KEY's doc comment for why a fling must not be turned
+    // into input for the running application.
+    const startMomentum = () => {
+      cancelMomentum()
+      let v = velocity
+      let prev = performance.now()
+      const step = (now: number) => {
+        momentumFrame = 0
+        const dt = Math.min(now - prev, MOMENTUM_MAX_FRAME_MS)
+        prev = now
+        const rowHeight = container.clientHeight / (term.rows || 1) || 18
+        lineRemainder += (v * dt) / rowHeight
+        const lines = Math.trunc(lineRemainder)
+        if (lines !== 0) {
+          // Stop dead at either end of the scrollback instead of spinning out
+          // the remaining velocity against a wall: viewportY not moving is
+          // the only signal xterm gives that the scroll had nowhere to go.
+          const before = term.buffer.active.viewportY
+          term.scrollLines(lines)
+          lineRemainder -= lines
+          if (term.buffer.active.viewportY === before) return
+        }
+        v *= Math.pow(MOMENTUM_FRICTION, dt / 16.67)
+        if (Math.abs(v) < MOMENTUM_MIN_VELOCITY) return
+        momentumFrame = requestAnimationFrame(step)
+      }
+      momentumFrame = requestAnimationFrame(step)
+    }
     const onTouchEnd = (e: TouchEvent) => {
       const t = e.changedTouches[0]
       endPointerDrag(t?.clientX ?? lastX, t?.clientY ?? lastY)
+      if (e.touches.length > 0) return
+      if (
+        dragging &&
+        touchMomentumRef.current &&
+        touchModeRef.current === 'scroll' &&
+        !(altScreenScrollRef.current && sendsScrollToApp(term)) &&
+        Math.abs(velocity) >= MOMENTUM_MIN_VELOCITY &&
+        // A finger that came to rest before lifting means the user stopped
+        // deliberately; only a release that was still moving is a fling.
+        performance.now() - lastMoveAt < 100
+      ) {
+        startMomentum()
+      }
+      dragging = false
     }
     container.addEventListener('touchstart', onTouchStart, { passive: true })
     container.addEventListener('touchmove', onTouchMove, { passive: false })
@@ -1162,6 +1365,7 @@ export function Terminal({
       setHasSelection(term.hasSelection())
     })
     const touchCleanup = () => {
+      cancelMomentum()
       container.removeEventListener('touchstart', onTouchStart)
       container.removeEventListener('touchmove', onTouchMove)
       container.removeEventListener('touchend', onTouchEnd)
@@ -1309,27 +1513,33 @@ export function Terminal({
       // The whole reason this mode exists: mobile keyboards only reliably
       // refuse to run prediction/composition on a real password input.
       field.type = 'password'
+      field.name = `terminal-input-${Math.random().toString(36).slice(2)}`
+      field.setAttribute('aria-hidden', 'true')
+      field.tabIndex = -1
     } else {
-      // Same element type xterm's own hidden helper uses, which is what
-      // makes real IME composition attach here at all (a single-line
-      // <input>, password or not, gets a different Android input type and
-      // never fires compositionstart — measured 2026-09-03).
-      field.rows = 1
+      // Mirror xterm's own hidden helper textarea as closely as possible,
+      // attribute for attribute — that element is the one configuration
+      // measured to actually get IME composition on the reporting device
+      // (with the workaround off, Hangul composes there correctly), so every
+      // gratuitous difference is a suspect. Notably NOT set here, unlike the
+      // first version of this: aria-hidden, tabIndex=-1, a rows attribute,
+      // or a name. The 2026-09-06 device report had Hangul splitting into
+      // jamo in this mode too, i.e. composition was not attaching, and those
+      // four were the only things distinguishing this field from xterm's.
+      field.classList.add('xterm-helper-textarea')
+      field.setAttribute('aria-multiline', 'false')
+      field.tabIndex = 0
     }
     // "off", not "new-password" - "new-password" is literally the hint
     // Chrome's own save-password heuristic watches for ("this field is for
     // creating a new password"), which turned out to make the unwanted
     // "저장하시겠습니까?" prompt worse, not better (confirmed live,
-    // 2026-08-19). "off" plus a random name at least avoids matching common
-    // field-name autofill heuristics; Chrome's no-form save-prompt
-    // heuristic on mobile may still fire regardless of any attribute here.
+    // 2026-08-19). Chrome's no-form save-prompt heuristic on mobile may
+    // still fire regardless of any attribute here.
     field.autocomplete = 'off'
-    field.name = `terminal-input-${Math.random().toString(36).slice(2)}`
     field.setAttribute('autocorrect', 'off')
     field.setAttribute('autocapitalize', 'off')
     field.setAttribute('spellcheck', 'false')
-    field.setAttribute('aria-hidden', 'true')
-    field.tabIndex = -1
     // Same fully-invisible, off-screen placement as xterm's own hidden
     // textarea (xterm.css's .xterm-helper-textarea) — never meant to be
     // seen, only to hold real DOM/keyboard focus. Deliberately NOT
@@ -1492,6 +1702,21 @@ export function Terminal({
         field.setSelectionRange(ANCHOR.length, ANCHOR.length)
         debug?.log(`  (reset: ${reason})`)
       }
+      // Keeps the caret pinned to the end of the field after every committed
+      // change. This is not cosmetic: a real device typed "claude" and got
+      // "edual c" back, because every character was being inserted at the
+      // *same* offset — the last position ever set explicitly, right after
+      // the anchor — instead of after the previous one. A 0x0 off-screen
+      // textarea apparently has no live caret of its own for the keyboard to
+      // advance, so the last setSelectionRange wins forever. Re-pinning it
+      // after each commit makes the next insert land at the end, which is
+      // what the prefix diff assumes. Never done mid-composition: moving the
+      // selection under an active IME is how composition gets cancelled.
+      const pinCaretToEnd = () => {
+        if (composing) return
+        const end = field.value.length
+        field.setSelectionRange(end, end)
+      }
 
       const flush = () => {
         const value = field.value
@@ -1517,8 +1742,25 @@ export function Terminal({
             return
           }
         }
-        if (value === '') scheduleReanchor()
-        else if (!composing && value.length > MAX_FIELD_LENGTH) resetField('length cap')
+        if (value === '') {
+          scheduleReanchor()
+          return
+        }
+        // Repo owner's own suggestion, and it is the right granularity: an
+        // Android keyboard's predictive buffer is per *word*, so a word
+        // boundary is the moment it has demonstrably let go. Resetting there
+        // keeps the accumulated-value protection exactly where re-emission
+        // can still happen (inside the word being typed) while stopping the
+        // field from carrying a whole line's worth of stale text.
+        if (!composing && added.includes(' ')) {
+          resetField('word boundary')
+          return
+        }
+        if (!composing && value.length > MAX_FIELD_LENGTH) {
+          resetField('length cap')
+          return
+        }
+        pinCaretToEnd()
       }
       const onCompositionStart = (e: Event) => {
         composing = true
@@ -2160,6 +2402,8 @@ export function Terminal({
         onChangeInputMode={changeInputMode}
         inputDebugEnabled={inputDebugEnabled}
         onToggleInputDebug={toggleInputDebug}
+        touchMomentumEnabled={touchMomentumEnabled}
+        onToggleTouchMomentum={toggleTouchMomentum}
         altScreenTouchScrollEnabled={altScreenTouchScrollEnabled}
         onToggleAltScreenTouchScroll={toggleAltScreenTouchScroll}
         autoReconnectEnabled={autoReconnectEnabled}

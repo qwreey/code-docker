@@ -152,3 +152,120 @@ field input ic=false v=" 가나"     -> "\x7f"
 
 - 핀치 줌은 별도 문서: `webmanager/.claude/terminal-pinch-zoom-plan.md` (착수 전)
 - `research/terminal-control-bar-plan.md`의 "안 한 것"(탭바를 가로 스크롤로) 은 여전히 유효
+
+
+---
+
+# 실기기 1차 결과 (2026-09-06) — 3건 실패, 원인 확정 후 수정
+
+사용자가 갤럭시에서 직접 테스트한 결과. **이 절이 최신 상태다.**
+
+## 1. `diff` 모드가 글자 순서를 뒤집었다 — 원인 확정, 수정함
+
+증상: `claude`를 치면 `edual c`가 나왔다. 화면 변화 순서는 `c` → `l c` →
+`al c` → ... 였다.
+
+읽어보면 답이 나온다. `claude`를 뒤집으면 `edualc`다. 즉 **매 글자가 필드의 앞쪽
+같은 위치에 삽입되고 있었다.** diff는 정직하게 동작했다 — 공통 접두사가 갈리니
+백스페이스를 보내고 나머지를 다시 보냈고, 그 결과가 화면상 "앞에 끼워넣기"로 보인
+것이다.
+
+왜 항상 같은 위치인가: 필드가 `width:0; height:0`의 화면 밖 textarea라 **살아있는
+캐럿이 없고**, 마지막으로 `setSelectionRange`로 명시한 위치(앵커 바로 뒤, 즉 1)가
+계속 유지된다. 매 글자가 거기에 꽂힌다.
+
+수정: 커밋된 변경마다 캐럿을 끝으로 다시 고정한다(`pinCaretToEnd`). 조합 중에는
+절대 하지 않는다 — IME가 활성인 상태에서 selection을 건드리면 조합이 취소된다.
+
+## 2. 한글이 여전히 전부 쪼개졌다 — 조합이 이 필드에 안 붙는다
+
+`diff` 모드의 `<textarea>`에도 조합이 안 붙었다. 즉 `research/mobile-ime-hangul-plan.md`가
+"가장 유력"으로 꼽았던 `<input>` vs `<textarea>` 차이만으로는 설명이 안 된다.
+
+xterm 자신의 helper textarea에서는 조합이 정상적으로 붙는다(워크어라운드를 끄면
+확인됨). 그렇다면 남는 차이는 우리가 **추가로** 붙였던 것들뿐이다:
+
+- `aria-hidden="true"`
+- `tabIndex = -1`
+- `rows = 1`
+- 랜덤 `name`
+
+전부 제거하고 xterm의 helper textarea를 속성 단위로 그대로 흉내내도록 바꿨다
+(`class="xterm-helper-textarea"`, `aria-multiline="false"`, `tabIndex = 0`,
+autocorrect/autocapitalize/spellcheck off). `password` 모드는 원래 설계대로
+`aria-hidden`/`tabIndex=-1`/랜덤 name을 유지한다 — 그쪽은 조합을 **억제하는** 게
+목적이라 반대 방향이다.
+
+**이건 아직 가설이다.** 다음 실기기 확인에서도 자모가 쪼개지면, 입력 디버그를 켜고
+`compositionstart`가 뜨는지만 봐주면 된다 — 안 뜨면 이 방향(속성 차이)이 틀린
+것이고, 그때는 xterm의 textarea를 그대로 재사용하되 xterm의 `CompositionHelper`만
+우회하는 쪽으로 가야 한다.
+
+## 3. 스페이스에서 리셋 (사용자 제안)
+
+사용자 제안대로 단어 경계에서 필드를 리셋하도록 추가했다. 안드로이드 키보드의
+예측 버퍼는 **단어 단위**라, 스페이스가 곧 "키보드가 손을 뗀 지점"이다. 중복 방지가
+실제로 필요한 구간(지금 치고 있는 단어 안)은 그대로 보호하면서 필드가 한 줄
+전체를 들고 있지 않게 된다.
+
+## 4. 컨트롤 바가 여전히 키보드를 열었다 — 원인 확정, 수정함
+
+`document.activeElement !== target`만으로는 부족했다. **안드로이드에서 뒤로가기로
+키보드를 내려도 필드는 포커스를 유지한다.** 그래서 가드를 통과하고 `.focus()`가
+불렸다.
+
+`visualViewport` 기반 `useKeyboardInset`이 이미 있으니 그걸 쓴다 — inset이 0이면
+아무것도 하지 않는다. 폰에서는 "키보드 닫힘"이고, 데스크탑에서는 inset이 항상 0인데
+어차피 이미 포커스된 요소에 `.focus()`를 다시 부르는 건 no-op이었다.
+
+## 5. 선택 모드가 엉뚱한 곳부터 선택됐다 — 원인 확정, 수정함
+
+xterm의 mousedown 핸들러가 이렇다:
+
+```js
+this._enabled && e.shiftKey ? this._handleIncrementalClick(e) : this._handleSingleClick(e)
+_handleIncrementalClick(e) { this._model.selectionStart && (this._model.selectionEnd = ...) }
+```
+
+**`shiftKey`는 "새 선택 시작"이 아니라 "기존 앵커에서 확장"이다.** 앵커를 새로
+잡는 건 shift 없는 경로뿐이다. 원래 설계가 `select` 모드에 항상 shift를 실었으니,
+두 번째 드래그부터는 이전 선택 위치에서 확장됐다 — 증상 그대로다.
+
+수정:
+
+- shift는 **마우스 리포팅을 뚫어야 할 때만** 싣는다(`sendsScrollToApp(term)`).
+  일반 셸에서는 shift 없이 → `_handleSingleClick`이 터치한 지점에 앵커를 잡는다.
+- 드래그 시작 전에 `term.clearSelection()` — 새 드래그가 이전 앵커를 물려받지 않게.
+- 리포팅이 켜진 앱에서는 `_handleIncrementalClick`이 앵커 없이는 아무것도 안 하므로
+  `term.selectLines()`로 **터치한 행**에 앵커를 심어준다. 그 경우 선택은 정확한
+  열이 아니라 그 행의 시작에서 시작한다 — 임의 앵커를 잡는 공개 API가 없다.
+
+## 6. "선택하려 하면 최하단으로 스크롤" — 원인 확정, 수정함
+
+xterm은 드래그가 화면 요소 밖에 있으면 `_dragScrollAmount`로 자동 스크롤을 건다.
+터치는 손가락이 아래 경계를 넘는 순간 이게 폭주한다. 합성 좌표를 `.xterm-screen`
+사각형 안으로 클램프해서 그 타이머가 아예 안 걸리게 했다.
+
+## 7. 관성 스크롤 (신규 요청)
+
+놓는 순간 속도로 계속 스크롤되다 감속한다(Termux 방식). 설정에서 끄고 켤 수 있고
+(`webmanager.terminal.touchMomentum`, 기본 켬), 다시 터치하면 그 자리에서 멈추고,
+스크롤백 끝에 닿으면 남은 속도를 흘리지 않고 즉시 멈춘다.
+
+**대체 화면 버퍼/마우스 리포팅 경로에는 일부러 관성을 붙이지 않았다** — 그쪽은
+스크롤 한 칸이 앱에 들어가는 실제 키 입력이라, 손을 뗀 뒤에도 방향키가 수십 번 더
+들어가면 안 된다.
+
+브라우저로 검증하지 못했다: 자동화 탭이 `document.hidden`이라 `requestAnimationFrame`이
+아예 돌지 않고, 그 세션에서 창 크기까지 213x186으로 줄어들어 터미널 높이가 0이
+됐다. `rAF`를 `setTimeout`으로 갈아끼워 우회하는 것까지는 했지만 창 크기 문제로
+결론을 못 냈다 — **실기기 확인 필요.**
+
+## 8. 탭바 가로 스크롤 (사용자가 원한다고 답함)
+
+`.terminal-tab-list`가 줄바꿈 대신 가로 스크롤한다. 스크롤 컨테이너를
+`.terminal-tabbar`가 아니라 탭 목록 쪽에 둔 게 요점이다 — 줌 그룹이 스크롤되는
+박스 **바깥**의 형제라서 `position: sticky`도, 불투명 배경도, z-index도 필요 없다.
+스크롤바는 숨겼다(가로 스크롤바가 이 변경으로 아끼려는 높이를 도로 먹는다).
+활성 탭이 화면 밖이면 `scrollIntoView({inline:'nearest'})`로 끌어온다 — 특히
+`?session=`으로 복원했을 때 사용자가 스스로 스크롤한 적이 없는 상황이라 필요하다.

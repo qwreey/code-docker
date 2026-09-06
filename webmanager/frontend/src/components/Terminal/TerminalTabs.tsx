@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import { Home, Pencil, Pin, PinOff, Plus, X, ZoomIn, ZoomOut } from 'lucide-react'
 import type { TerminalSessionInfo } from '../../api/types'
 
@@ -134,6 +134,17 @@ export function TerminalTabs({
   // every time `editing` starts pointing at a (possibly new) name,
   // regardless of what else caused that render.
   const renameInputRef = useRef<HTMLInputElement | null>(null)
+  // The tab strip scrolls horizontally now (see Terminal.css's
+  // .terminal-tab-list), so the active tab can sit off-screen — most
+  // obviously right after a reload restores a session from ?session=, where
+  // nothing the user did put it there. Bring it into view whenever it
+  // changes; 'nearest' means an already-visible tab is left alone rather
+  // than yanked to an edge.
+  const tabListRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const active = tabListRef.current?.querySelector('.terminal-tab-active')
+    active?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [activeSession])
   useLayoutEffect(() => {
     if (!editing) return
     renameInputRef.current?.focus()
@@ -204,7 +215,7 @@ export function TerminalTabs({
           pushed down with the tabs the way one more wrapping item inside
           this div would. See Terminal.css's .terminal-tabbar/.terminal-tab-list/
           .terminal-zoom-group for the layout side of this. */}
-      <div className="terminal-tab-list" role="tablist" aria-label="터미널 세션">
+      <div className="terminal-tab-list" role="tablist" aria-label="터미널 세션" ref={tabListRef}>
       {/* Home is always first and never draggable/closable — a landing tab
           (session list + launch profiles), not a real session. Its title is
           still user-renamable (backend-persisted via TerminalSettings.homeLabel,

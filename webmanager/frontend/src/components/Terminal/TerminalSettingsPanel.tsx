@@ -41,6 +41,8 @@ export function TerminalSettingsPanel({
   onChangeInputMode,
   inputDebugEnabled,
   onToggleInputDebug,
+  touchMomentumEnabled,
+  onToggleTouchMomentum,
   altScreenTouchScrollEnabled,
   onToggleAltScreenTouchScroll,
   autoReconnectEnabled,
@@ -61,6 +63,8 @@ export function TerminalSettingsPanel({
   onChangeInputMode: (mode: TerminalInputMode) => void
   inputDebugEnabled: boolean
   onToggleInputDebug: (enabled: boolean) => void
+  touchMomentumEnabled: boolean
+  onToggleTouchMomentum: (enabled: boolean) => void
   altScreenTouchScrollEnabled: boolean
   onToggleAltScreenTouchScroll: (enabled: boolean) => void
   autoReconnectEnabled: boolean
@@ -336,6 +340,22 @@ export function TerminalSettingsPanel({
           입력이 여전히 이상하면 이걸 켜고 문제가 나는 상황을 한 번 재현한 뒤 화면을 캡처해 주세요. 어떤 이벤트가
           어떤 값으로 오는지, 실제로 어떤 바이트를 보냈는지가 그대로 찍힙니다.
         </p>
+        <p className="section-description">
+          터치로 스크롤한 뒤 손을 떼면, 놓는 순간의 속도로 계속 스크롤되다가 서서히 멈춥니다(Termux나 일반적인
+          안드로이드 목록과 같은 동작). 다시 화면을 터치하면 그 자리에서 멈춥니다. 스크롤백 끝에 닿으면 남은
+          속도를 흘리지 않고 바로 멈춥니다. 아래 "전체 화면 앱에서 터치 스크롤을 앱으로 전달"이 걸리는 경우
+          (대체 화면 버퍼이거나 앱이 마우스를 켠 경우)에는 <strong>일부러 관성이 붙지 않습니다</strong> — 그쪽은
+          스크롤 한 칸이 앱에 들어가는 실제 키 입력이라, 손을 뗀 뒤에도 방향키가 수십 번 더 들어가면 곤란하기
+          때문입니다.
+        </p>
+        <label className="checkbox-option">
+          <input
+            type="checkbox"
+            checked={touchMomentumEnabled}
+            onChange={(e) => onToggleTouchMomentum(e.target.checked)}
+          />
+          터치 스크롤에 관성 적용
+        </label>
         <p className="section-description">
           <code>claude</code>, <code>vim</code>, <code>htop</code>처럼 화면 전체를 쓰는 앱(대체 화면 버퍼)에서는
           터미널 자체를 스크롤할 것이 없기 때문에, 터치 스크롤을 터미널 화면 이동이 아니라 앱에 전달할 스크롤

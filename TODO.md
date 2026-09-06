@@ -35,3 +35,10 @@
   확실친 않음. 나중에 실기기(안드로이드 Chrome)로 붙어서 디버깅 필요 — 관련
   코드는 `webmanager/frontend/src/components/Terminal/Terminal.tsx`의 xterm
   생성 이펙트 안 `mobileInput` 관련 블록.
+- (2026-09-06, 사용자가 나중에 더 보기로 함) **authgate의 per-IP 백오프가
+  클라이언트를 구분하지 못함** — router-manager는 유닉스 소켓으로만 listen해서
+  `r.RemoteAddr`가 모든 호출자에 대해 동일하고, 그 값을 키로 쓰는 실패 백오프가
+  사실상 전역 버킷 하나로 동작한다(한 명이 5번 틀리면 전원이 막힘). 2026-09-06에
+  VNC 연결 패널 쪽만 `realClientIP()`로 고쳤고 인증 백오프는 일부러 안 건드렸음 —
+  인증 동작 변경이라 별도 판단이 필요. webmanager 쪽도 같은지는 아직 확인 안 함.
+  전체 분석: `.claude/backlog/authgate-client-ip-blind-spot.md`
