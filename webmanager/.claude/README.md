@@ -38,6 +38,7 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 |---|---|---|
 | `claude-rework-v2.md` | Claude Code 탭 남은 작업 — M4(익스텐션 설치 배너)/M5(MCP 서버 목록, `claude mcp list` 텍스트 파싱 필요). M1~M3+로그인/설치/mise 버전확인은 전부 완료돼서 `archive/claude-plan-done.md`로 분리됨 | M4는 바로 가능, M5는 실제 MCP 서버 출력 관찰부터 |
 | `extension-search-plan.md` | 익스텐션 검색/마켓플레이스 URL 붙여넣기 설치 — "더 보기" 링크와 삭제(uninstall)는 이미 구현 완료돼서 이 문서에서 빠짐(각각 `archive/extensions-plan-done.md` 참고), 비활성화(disable)는 조사 후 미구현 결정 | 급하지 않음 |
+| `terminal-pinch-zoom-plan.md` | 터미널 두 손가락(핀치) 확대/축소 — 조사 완료, 구현 전. 두 손가락 제스처 슬롯이 지금 완전히 비어 있어서 뺏어올 기존 동작이 없다는 게 핵심 결론. 실기기에서만 드러날 함정 3개(패딩 영역의 페이지 줌 / iOS의 `gesturestart` / 리사이즈 폭풍) 정리됨 | 사용자가 "조사만" 요청 |
 
 ## 사용자 QA 대기 (`qa-request/*-plan-done.md`)
 
@@ -50,6 +51,8 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 | `qa-request/sshkeys-plan-done.md` | SSH authorized_keys 관리 |
 | `qa-request/gitconfig-plan-done.md` | git user/email, 커밋 사이닝(SSH/GPG), 호스트별 SSH 키, HTTPS credential, git-lfs install, .gitconfig 원본 편집, known_hosts 관리 |
 | `qa-request/project-git-status-plan-done.md` | 프로젝트별 git 상태 패널(신규) — staged/changed/untracked/behind/ahead/diverged/stashed/conflicts 요약, 커밋 로그/diff, 리모트/브랜치/태그. 읽기 전용만(스테이징/커밋/push·pull은 다음 마일스톤). `gitconfig-plan-done.md`(전역 git 설정)와는 별개 기능이니 혼동 금지 |
+| `qa-request/terminal-mobile-input-touch-plan-done.md` | 터미널 모바일 입력 방식 3종(native/password/diff, 기본 diff) + 입력 디버그 오버레이 + 터치 모드 3종(스크롤/마우스/선택)과 선택 복사 + 컨트롤 바 버튼이 키보드를 열지 않게 하는 `keepFocus` + 터미널 탭 상단 바 한 줄로 합치기. `research/mobile-ime-hangul-plan.md`를 대체함 |
+| `qa-request/url-state-and-file-overlay-plan-done.md` | 탭 안 상태를 URL에(`?session=`/`?path=`/`?project=`) + 파일 브라우저 전체화면 오버레이 + 파일 에디터 전체화면·줄바꿈 토글 + code-server 위젯의 "새 탭으로 열기" |
 | `qa-request/dind-plan-done.md` | Docker/dind 관리 — M1(목록/로그, 읽기 전용)+M2(start/stop/remove, 비밀번호 게이트)+M3(docker inspect 상세 뷰, 비밀번호 게이트) 전부 코드/빌드 검증까지 완료 |
 | `qa-request/caddy-plan-done.md` | Dev Proxy 탭 — 내부 Caddy 인스턴스로 dev 서버를 와일드카드 서브도메인에 노출, `internal/devproxy`(Caddyfile 조각 CRUD) + `internal/authgate`의 `forward_auth` 연동. 설계 조사 문서였다가 실제로 구현 완료됨 — webmanager가 직접 구현했던 시절의 기록(이후 Dev Proxy 전체가 router로 완전히 이관되어 webmanager 쪽 코드는 삭제됨, 인증도 tinyauth로 대체됨. 지금은 `router/frontend`가 이 UI를 소유). 여기 남겨둔 "사용자 검증 대기" 상태 자체도 이 기능엔 더 이상 의미 없음 — 코드가 이미 다른 곳으로 옮겨갔기 때문 |
 
@@ -86,7 +89,6 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 |---|---|---|
 | `research/guide-plan.md` | code-docker 도움말/가이드를 webmanager에 임베드 — 아이디어 단계, 구현 안 함 | 미정(사용자 검토 대기) |
 | `research/version-panel-plan.md` | code-server/mise 버전 관리 패널 — 아이디어 단계, "컨테이너 재빌드 필요"를 뭘로 판단할지부터 불명확 | 최하 |
-| `research/mobile-ime-hangul-plan.md` | 모바일(안드로이드) 한글 입력이 자모로 쪼개지는 회귀 — 원인 위치(모바일 입력 워크어라운드 필드에 조합이 안 붙음)와 회귀 경위(`60f556f`)까지는 확정, 고치는 방향은 계측 후 결정. 시도한 수정은 되돌림 | 높음(실사용 회귀) |
 | `research/filemanager-rework-plan.md` | 파일 매니저 리워크(드래그앤드롭 이동, 그리드/리스트/테이블 뷰, 멀티탭) — Termix류 벤치마킹, 아이디어 단계, 착수 전 스코프를 사용자와 논의 필수. v1에서 미뤄둔 잔여 항목(업로드 진행률/chmod/zip 다운로드 등)도 여기 기록됨(리워크와는 별개) | 최하 |
 | `research/terminal-control-bar-plan.md` | 모바일 컨트롤 바 3종 — 바 높이가 xterm 크기 계산에 반영되는지(코드상 flex+ResizeObserver로 이미 실시간 반영됨을 확인, 실제 잘림은 여백 착시/xterm 반올림 중 실기기 확인 필요), 데스크탑용 기기별 숨김 토글(`autoReconnectEnabled` 패턴 이식), 숨겼을 때 줌 버튼을 탭 행으로 이동 — 탭 바가 스크롤이 아니라 줄바꿈이라는 것도 확인(sticky 적용 전 방향 결정 필요) | 사용자 확인 후 착수 |
 

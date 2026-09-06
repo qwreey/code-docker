@@ -85,7 +85,28 @@ untouched since it already has its own full-tab overlay, web terminal M1+M2
 customizable keybindings, 10 built-in + custom color themes, named
 persistent sessions with a real tab bar/pin-toggle backed by
 `internal/termsession`, keyboard-aware mobile layout, edge-to-edge
-theme-matched surface), a Font Manager tab (`internal/fonts` — upload/list/
+theme-matched surface; three selectable mobile input paths —
+`TerminalInputMode` `native`/`password`/**`diff`**, the last being the
+default and the only one that survives a Samsung keyboard: it lets a hidden
+`<textarea>` accumulate the line and sends only the common-prefix diff
+against what was already written to the PTY, so a keyboard re-emitting a
+phrase it already committed produces no bytes at all. Every earlier design
+truncated the field after each keystroke, which is exactly why such a
+re-emission always looked like new text. Reset only on Enter/blur/a length
+cap — never on an idle timer, since the accumulated value *is* the
+protection. Paired with an opt-in on-screen input-debug overlay, because
+three rounds of guessing at Android IME behavior have each been wrong at
+least once; see `.claude/qa-request/terminal-mobile-input-touch-plan-done.md`.
+A `touchMode` selector (`scroll`/`mouse`/`select`) replays a one-finger drag
+as synthetic mouse events on `.xterm-screen`, with `select` differing only by
+setting `shiftKey` — xterm's own force-selection modifier — which is what
+finally makes text selection (and therefore copying) possible on a touch
+device. Control-bar buttons go through `keepFocus`, which refocuses *only*
+when the field already has focus, so an open keyboard stays open and a
+closed one is never forced open. On the Terminal tab the app's own
+`.mobile-topbar` is hidden and its hamburger is adopted into
+`.terminal-topbar`, reclaiming ~3.6rem of the height a phone keyboard makes
+scarce), a Font Manager tab (`internal/fonts` — upload/list/
 edit/delete ttf/otf/woff/woff2, `GET /api/fonts/css` generates `@font-face`
 rules fresh per request, loaded by webmanager's own `index.html` via a
 static `<link>` and by code-server via a new code-patch file,
@@ -207,7 +228,18 @@ is dispatched by `server.go`'s `webdavRouter` *ahead* of the mux, not
 registered in it — `net/http.ServeMux` rejects a method-less `/webdav/`
 next to the `GET /` static handler at registration time, and WebDAV can't
 be pinned to a method set. See `.claude/archive/webdav-file-share-plan-done.md`
-in the repo root), a shared lazy-loaded CodeMirror 6 editor component, a responsive
+in the repo root), a shared lazy-loaded CodeMirror 6 editor component (with a live-reconfigured
+`EditorView.lineWrapping` compartment behind a per-device wrap toggle), a
+`FileManagerDialog` that renders the file browser as a full-screen overlay
+over whatever tab you are on — the same "don't cost the user the terminal
+they were watching" reasoning as `ProjectInfoDialog`, and the reason
+`Sheet` grew a `size="full"` variant that the file editor uses too — plus
+deep-link query state for the one piece of within-tab state each of three
+tabs has (`?session=`/`?path=`/`?project=`, `replaceState` so Back doesn't
+become "up one directory"; a URL-supplied session name is verified against
+the live list before selection, because sessions are created lazily by the
+WS handshake and selecting an unknown one would silently spawn a shell —
+see `.claude/qa-request/url-state-and-file-overlay-plan-done.md`), a responsive
 layout with a mobile hamburger/drawer sidebar (now also independently
 scrollable so short viewports can reach every item), a centralized
 `index.css` color-token system (light + dark values for every base UI token

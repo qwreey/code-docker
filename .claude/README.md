@@ -25,6 +25,10 @@
     `prepare-commit-msg`만으로는 rebase reword를 못 잡는다 / 전역 `core.hooksPath`가
     저장소의 훅을 *전부* 죽인다 / 기본값은 꺼짐이어야 한다)가 실측 근거와 함께
     문서 끝에 정리돼 있음
+  - `vnc-connected-clients-plan-done.md` — router VNC 대상에 지금 누가 붙어 있는지
+    보고 끊는 기능 — 구현 완료(2026-09-06). 원안이 놓쳤던 두 가지(`reconnect=1`
+    때문에 그냥 끊으면 즉시 재접속된다 / router-manager는 유닉스 소켓 뒤라 애초에
+    클라이언트 IP를 못 보고 있었다)가 문서 앞머리에 정리돼 있음
   - `webdav-file-share-plan-done.md` — 다른 기기에서 파일 업/다운로드용 WebDAV
     공유 — 구현 완료(2026-09-04). 원안이 틀렸거나 부족했던 5가지(fail-closed를
     라우트 미등록이 아니라 요청별 판단으로 / env는 초기값이 아니라 항목별 고정 /
