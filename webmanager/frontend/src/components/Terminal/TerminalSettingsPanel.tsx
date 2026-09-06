@@ -3,6 +3,7 @@ import { Sheet } from '../common/Sheet'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import type { KeyBinding, TerminalSettings, TerminalTheme } from '../../api/types'
+import type { TerminalInputMode } from './Terminal'
 import { BUILTIN_THEMES, THEME_COLOR_KEYS, findTheme, type ThemeColorKey } from './themes'
 import { bytesToDisplay, displayToBytes } from './escapeCodec'
 import './TerminalSettingsPanel.css'
@@ -36,8 +37,10 @@ export function TerminalSettingsPanel({
   onSave,
   onPreviewTheme,
   fontFamilies,
-  mobileInputWorkaroundEnabled,
-  onToggleMobileInputWorkaround,
+  inputMode,
+  onChangeInputMode,
+  inputDebugEnabled,
+  onToggleInputDebug,
   altScreenTouchScrollEnabled,
   onToggleAltScreenTouchScroll,
   autoReconnectEnabled,
@@ -54,8 +57,10 @@ export function TerminalSettingsPanel({
   onSave: (next: TerminalSettings) => void
   onPreviewTheme: (colors: Record<string, string>) => void
   fontFamilies: string[]
-  mobileInputWorkaroundEnabled: boolean
-  onToggleMobileInputWorkaround: (enabled: boolean) => void
+  inputMode: TerminalInputMode
+  onChangeInputMode: (mode: TerminalInputMode) => void
+  inputDebugEnabled: boolean
+  onToggleInputDebug: (enabled: boolean) => void
   altScreenTouchScrollEnabled: boolean
   onToggleAltScreenTouchScroll: (enabled: boolean) => void
   autoReconnectEnabled: boolean
@@ -295,20 +300,42 @@ export function TerminalSettingsPanel({
       <section className="terminal-settings-section">
         <h4>모바일 입력 · 스크롤 (실험적)</h4>
         <p className="section-description">
-          모바일 가상 키보드의 예측 입력(자동완성) 기능 때문에 문자가 즉시 전송되지 않고 스페이스를 누를 때까지
-          버퍼링되는 문제를 우회하는 기능입니다. 실제 <code>&lt;input type="password"&gt;</code> 필드로 포커스를
-          가로채서 예측 입력 자체를 끄는 방식이라, 기기/키보드 앱에 따라 아직 완벽하지 않을 수 있습니다(연속 입력
-          시 느려짐 등). 문제가 있으면 꺼서 기존 방식(버퍼링은 있지만 더 안정적)으로 되돌릴 수 있습니다. 데스크탑에는
-          영향이 없고, 변경 사항은 터미널 탭을 나갔다가 다시 들어와야 적용됩니다.
+          모바일 가상 키보드는 예측 입력(자동완성) 때문에 터미널과 잘 맞지 않습니다. 기기/키보드 앱마다 증상이
+          달라서, 어느 하나가 항상 옳지 않기 때문에 세 가지 방식 중에 고를 수 있게 해뒀습니다. 터치 기기에서만
+          적용되고 데스크탑에는 영향이 없으며, 바꾸면 바로 적용됩니다(탭을 나갔다 들어올 필요 없음).
+        </p>
+        <div className="form-field">
+          <label htmlFor="terminal-input-mode-select">입력 방식</label>
+          <select
+            id="terminal-input-mode-select"
+            value={inputMode}
+            onChange={(e) => onChangeInputMode(e.target.value as TerminalInputMode)}
+          >
+            <option value="diff">새 입력 필드 (권장) — 한글 조합 유지 + 중복 입력 방지</option>
+            <option value="password">비밀번호 필드 — 예측 입력 완전 차단, 한글 깨짐</option>
+            <option value="native">끔 (xterm 기본) — 예측 입력 버퍼링/중복 발생</option>
+          </select>
+        </div>
+        <p className="section-description">
+          <strong>새 입력 필드</strong>는 숨겨진 <code>&lt;textarea&gt;</code>에 입력을 그대로 쌓아두고, 이미
+          터미널로 보낸 내용과의 <em>차이만</em> 계산해서 보냅니다. 키보드가 이미 확정한 문장을 다시 흘려보내도
+          차이가 없으니 아무것도 안 보내게 되고(중복 입력 방지), 조합은 textarea에서 정상적으로 일어나므로 한글도
+          깨지지 않습니다. <strong>비밀번호 필드</strong>는 예측 입력을 확실히 끄는 대신 IME 조합 자체를 막아
+          한글이 자모로 쪼개집니다. <strong>끔</strong>은 xterm 기본 동작으로, 삼성 키보드에서
+          &quot;가나다. 가나다.&quot;처럼 중복 입력이 생길 수 있습니다.
         </p>
         <label className="checkbox-option">
           <input
             type="checkbox"
-            checked={mobileInputWorkaroundEnabled}
-            onChange={(e) => onToggleMobileInputWorkaround(e.target.checked)}
+            checked={inputDebugEnabled}
+            onChange={(e) => onToggleInputDebug(e.target.checked)}
           />
-          모바일 입력 버퍼링 우회 사용
+          입력 디버그 표시 (최근 입력 이벤트를 터미널 위에 표시)
         </label>
+        <p className="section-description">
+          입력이 여전히 이상하면 이걸 켜고 문제가 나는 상황을 한 번 재현한 뒤 화면을 캡처해 주세요. 어떤 이벤트가
+          어떤 값으로 오는지, 실제로 어떤 바이트를 보냈는지가 그대로 찍힙니다.
+        </p>
         <p className="section-description">
           <code>claude</code>, <code>vim</code>, <code>htop</code>처럼 화면 전체를 쓰는 앱(대체 화면 버퍼)에서는
           터미널 자체를 스크롤할 것이 없기 때문에, 터치 스크롤을 터미널 화면 이동이 아니라 앱에 전달할 스크롤

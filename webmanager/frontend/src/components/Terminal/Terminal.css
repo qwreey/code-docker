@@ -51,6 +51,48 @@
   margin: 0;
 }
 
+/* The app's mobile hamburger, adopted into this row (see Terminal.tsx's
+   comment on onToggleSidebar): on the Terminal tab .mobile-topbar is hidden
+   entirely so the two bars collapse into one. Above 720px the sidebar is
+   permanently visible and .mobile-topbar was already display:none, so this
+   would be a button with nothing to do. */
+.terminal-hamburger-btn {
+  display: none;
+}
+
+/* Segmented control for what a one-finger drag does (Terminal.tsx's
+   TOUCH_MODE_OPTIONS). Kept as a tight group so the three buttons read as
+   one control rather than three unrelated actions in the header row. */
+.terminal-touch-mode {
+  display: inline-flex;
+  gap: 0.15rem;
+  flex: none;
+}
+
+/* Input-event debug readout (terminal settings > 입력 디버그). Deliberately
+   plain and unobtrusive-but-legible: its only job is to be readable in a
+   screenshot taken on a phone. pointer-events:none so it can never swallow
+   a touch meant for the terminal underneath it. */
+.terminal-input-debug {
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.4rem;
+  max-width: min(100%, 34rem);
+  max-height: 45%;
+  overflow: hidden;
+  z-index: 5;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.72);
+  color: #7ce38b;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-all;
+  pointer-events: none;
+}
+
 .terminal-inline-notice {
   flex: none;
   font-size: 0.82rem;
@@ -472,11 +514,32 @@
   .terminal-section {
     margin: -1.25rem;
     width: calc(100% + 2.5rem);
-    /* 3.6rem accounts for .mobile-topbar (App.css) — derived from the
-       original height rule here (calc(100vh - 6.1rem), where 6.1rem was
-       .app-content's old 2.5rem padding + this remainder) before the
-       padding-cancelling negative margin above made that part obsolete. */
-    height: calc(100dvh - 3.6rem - var(--kb-inset, 0px));
+    /* No .mobile-topbar height to subtract any more: the Terminal tab hides
+       it (App.css's .app-shell-terminal rule) and carries its hamburger in
+       .terminal-topbar instead, so this row is the top of the viewport.
+       That reclaimed ~3.6rem is the whole point — with a phone keyboard up
+       there is very little height left to spend on chrome. */
+    height: calc(100dvh - var(--kb-inset, 0px));
+  }
+
+  .terminal-hamburger-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 2.1rem;
+    height: 2.1rem;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .terminal-hamburger-btn:hover {
+    background: var(--surface-hover);
   }
 
   /* Icon-only topbar actions - at this width the connection badge + up to
@@ -508,6 +571,6 @@
   .terminal-section {
     margin: -1rem -0.85rem;
     width: calc(100% + 1.7rem);
-    height: calc(100dvh - 3.6rem - var(--kb-inset, 0px));
+    height: calc(100dvh - var(--kb-inset, 0px));
   }
 }

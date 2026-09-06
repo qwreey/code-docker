@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { Code, FolderKanban, FolderOpen, Settings } from 'lucide-react'
+import { Code, Copy, FolderKanban, FolderOpen, Hand, Menu, MousePointer2, Settings, TextSelect } from 'lucide-react'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
+import { copyText } from '../../utils/clipboard'
 import { api, apiUrl, errorMessage, ApiError } from '../../api/client'
 import type {
   FontManifest,
@@ -101,31 +102,174 @@ function saveFontSize(value: number) {
   }
 }
 
-// Experimental mobile IME-buffering workaround (see the touch-device block
-// in the xterm-creation effect below) - enabled by default, but real-device
-// testing (2026-08-19) found it still has rough edges (typing speed under
-// fast consecutive input), so an escape hatch to fall back to xterm's own
-// default textarea is worth keeping. Per-device localStorage like fontSize
-// above, not backend-persisted - toggling only takes effect the next time
-// the Terminal tab is fully remounted (leave and reopen it), since the
-// touch-device setup runs once in the xterm-creation effect, not on every
-// render.
-const MOBILE_INPUT_WORKAROUND_KEY = 'webmanager.terminal.mobileInputWorkaround'
+// Mobile text input mode. Three genuinely different code paths, because no
+// single one has survived contact with every keyboard:
+//
+//   'native'   - xterm.js's own hidden <textarea>. Real IME composition
+//                works, but Android keyboards (Samsung's above all) keep a
+//                whole phrase in a predictive buffer and re-emit text they
+//                already committed, which lands as duplicated input
+//                ("가나다. 가나다. 가나다"). Plain Latin typing is also
+//                buffered until a word boundary commits it.
+//   'password' - the original 2026-08-19 workaround: a real
+//                <input type="password">, the only element type mobile
+//                keyboards reliably refuse to run prediction on. Kills the
+//                buffering, but a password field also suppresses real IME
+//                composition, so Hangul arrives split into jamo
+//                ("ㄱㅏㄴㅏㄷㅏ"). Kept selectable because it is the only
+//                mode confirmed to stop predictive buffering outright.
+//   'diff'     - a plain <textarea> (so composition attaches, same element
+//                type xterm itself uses) that is never truncated while
+//                typing, with everything already forwarded to the PTY
+//                tracked as a string and each change reduced to a
+//                common-prefix diff. A keyboard that re-emits text it
+//                already committed then produces *no* new bytes at all -
+//                exactly the duplication 'native' loses to - and a
+//                shortened value produces backspaces rather than a
+//                silently dropped keystroke.
+//
+// Background and the measurements behind each of those claims:
+// webmanager/.claude/qa-request/terminal-mobile-input-touch-plan-done.md.
+//
+// Per-device localStorage like fontSize above, not backend-persisted. Only
+// consulted on a touch device (pointer: coarse) - a mouse/trackpad never
+// hits any of these keyboard bugs and always uses xterm's own textarea.
+export type TerminalInputMode = 'native' | 'password' | 'diff'
 
-function loadMobileInputWorkaroundEnabled(): boolean {
+const INPUT_MODE_KEY = 'webmanager.terminal.inputMode'
+// Superseded by INPUT_MODE_KEY; still read once so a user who explicitly
+// opted out of the old boolean workaround keeps xterm's own textarea
+// instead of being silently moved onto a mode they never chose.
+const LEGACY_MOBILE_INPUT_WORKAROUND_KEY = 'webmanager.terminal.mobileInputWorkaround'
+
+function loadInputMode(): TerminalInputMode {
   try {
-    return localStorage.getItem(MOBILE_INPUT_WORKAROUND_KEY) !== '0'
+    const stored = localStorage.getItem(INPUT_MODE_KEY)
+    if (stored === 'native' || stored === 'password' || stored === 'diff') return stored
+    if (localStorage.getItem(LEGACY_MOBILE_INPUT_WORKAROUND_KEY) === '0') return 'native'
   } catch {
-    return true
+    // localStorage unavailable (e.g. private browsing) - falls through to
+    // the default below
+  }
+  return 'diff'
+}
+
+function saveInputMode(mode: TerminalInputMode) {
+  try {
+    localStorage.setItem(INPUT_MODE_KEY, mode)
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - the choice just won't persist
   }
 }
 
-function saveMobileInputWorkaroundEnabled(enabled: boolean) {
+// Input debug overlay: shows the last few input-related DOM events (type,
+// isComposing, the field's value, the bytes actually forwarded) in a corner
+// of the terminal. Off by default and deliberately not pretty - it exists
+// because every previous round of guessing at what an Android keyboard
+// does has been wrong at least once, and a screenshot of real events from
+// the actual device is worth more than a fourth guess.
+const INPUT_DEBUG_KEY = 'webmanager.terminal.inputDebug'
+
+function loadInputDebugEnabled(): boolean {
   try {
-    if (enabled) localStorage.removeItem(MOBILE_INPUT_WORKAROUND_KEY)
-    else localStorage.setItem(MOBILE_INPUT_WORKAROUND_KEY, '0')
+    return localStorage.getItem(INPUT_DEBUG_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function saveInputDebugEnabled(enabled: boolean) {
+  try {
+    if (enabled) localStorage.setItem(INPUT_DEBUG_KEY, '1')
+    else localStorage.removeItem(INPUT_DEBUG_KEY)
   } catch {
     // localStorage unavailable (e.g. private browsing) - the toggle just won't persist
+  }
+}
+
+// What a one-finger drag on the terminal does. A touch screen has to serve
+// three jobs a mouse gets separate affordances for, and no default can be
+// right for all of them:
+//
+//   'scroll' - move the viewport / send scroll to a full-screen app. The
+//              historical behavior and still the default.
+//   'mouse'  - replay the drag as real mouse events on .xterm-screen, so an
+//              application that turned mouse tracking on (tmux, vim, htop,
+//              Claude Code) receives actual clicks and drags.
+//   'select' - the same synthetic mouse events but with shiftKey set, which
+//              is xterm's own "force selection" modifier: it selects text
+//              even while an application has mouse tracking on. This is the
+//              only way to get a text selection on a touch device at all,
+//              since xterm renders into elements the browser's own
+//              long-press selection can't usefully grab.
+//
+// Read through a ref so switching modes applies immediately (the touch
+// handler is installed once with the xterm instance), same idiom as
+// altScreenTouchScrollEnabled below.
+export type TouchMode = 'scroll' | 'mouse' | 'select'
+
+const TOUCH_MODE_KEY = 'webmanager.terminal.touchMode'
+
+function loadTouchMode(): TouchMode {
+  try {
+    const stored = localStorage.getItem(TOUCH_MODE_KEY)
+    if (stored === 'scroll' || stored === 'mouse' || stored === 'select') return stored
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - falls through
+  }
+  return 'scroll'
+}
+
+function saveTouchMode(mode: TouchMode) {
+  try {
+    localStorage.setItem(TOUCH_MODE_KEY, mode)
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - the choice just won't persist
+  }
+}
+
+const TOUCH_MODE_OPTIONS: { id: TouchMode; label: string; title: string; Icon: typeof Hand }[] = [
+  { id: 'scroll', label: '스크롤', title: '드래그하면 화면이 스크롤됩니다', Icon: Hand },
+  { id: 'mouse', label: '마우스', title: '드래그를 마우스 입력으로 앱에 전달합니다 (tmux/vim/claude 등)', Icon: MousePointer2 },
+  { id: 'select', label: '선택', title: '드래그하면 텍스트가 선택됩니다 (복사용)', Icon: TextSelect },
+]
+
+// Debug overlay for the input path (INPUT_DEBUG_KEY above). Built
+// imperatively rather than as a React node on purpose: it updates on every
+// keystroke, and pushing that through component state would re-render the
+// whole terminal section for something that is only ever read off a
+// screenshot. Kept to the last few lines so it can't grow without bound.
+const INPUT_DEBUG_LINES = 12
+
+// JSON.stringify leaves control characters like DEL (0x7f) as invisible raw
+// bytes, which is useless in an overlay whose entire job is showing what was
+// sent — a backspace rendered as `""` reads as "sent nothing", the opposite
+// of the truth. Escape anything below 0x20 plus DEL explicitly.
+function debugQuote(value: string): string {
+  let out = ''
+  for (const ch of value) {
+    const code = ch.codePointAt(0) ?? 0
+    if (code < 0x20 || code === 0x7f) out += `\\x${code.toString(16).padStart(2, '0')}`
+    else if (ch === '"' || ch === '\\') out += '\\' + ch
+    else out += ch
+  }
+  return `"${out}"`
+}
+
+function createInputDebugOverlay(container: HTMLElement): { log: (line: string) => void; dispose: () => void } {
+  const el = document.createElement('div')
+  el.className = 'terminal-input-debug'
+  container.appendChild(el)
+  const lines: string[] = []
+  return {
+    log(line: string) {
+      lines.push(line)
+      if (lines.length > INPUT_DEBUG_LINES) lines.shift()
+      el.textContent = lines.join('\n')
+    },
+    dispose() {
+      el.remove()
+    },
   }
 }
 
@@ -277,6 +421,10 @@ export function Terminal({
   onInitialOpenConsumed,
   onOpenFileManager,
   onOpenProject,
+  onToggleSidebar,
+  restoreSession,
+  onRestoreSessionConsumed,
+  onActiveSessionChange,
 }: {
   initialOpen?: { cwd?: string; label?: string; command?: string; session?: string } | null
   onInitialOpenConsumed?: () => void
@@ -284,6 +432,18 @@ export function Terminal({
   // Opens the project's info dialog over the terminal (App.tsx's
   // openProjectInfo) rather than navigating to the Projects tab.
   onOpenProject?: (path: string) => void
+  // Given only while this tab is the active section: the Terminal tab hides
+  // the app's own mobile top bar (see App.tsx) to reclaim the vertical space
+  // a phone keyboard makes precious, and adopts its hamburger into its own
+  // header instead.
+  onToggleSidebar?: () => void
+  // Session name restored from the URL (?session=...). Unlike initialOpen's
+  // own session field, which always names a session another tab just looked
+  // at, this one comes from a reload or a bookmark and may well be dead —
+  // so it is verified against the live list before being selected.
+  restoreSession?: string | null
+  onRestoreSessionConsumed?: () => void
+  onActiveSessionChange?: (name: string | null) => void
 } = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<XTerm | null>(null)
@@ -291,11 +451,11 @@ export function Terminal({
   const wsRef = useRef<WebSocket | null>(null)
   const armedModifierRef = useRef<ModifierId | null>(null)
   // Only ever set on touch devices (see the mobile input workaround below).
-  // focusTerminal() needs this: xterm's own public `.focus()` always
+  // keepFocus() needs this: xterm's own public `.focus()` always
   // targets its real textarea directly, which would silently re-enable
   // predictive-text buffering (the exact bug the workaround exists to
   // avoid) the moment any toolbar button is pressed if left unchecked.
-  const mobileInputRef = useRef<HTMLInputElement | null>(null)
+  const mobileInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
 
   const [state, setState] = useState<ConnectionState>('connecting')
   const [settings, setSettings] = useState<TerminalSettings | null>(null)
@@ -305,7 +465,18 @@ export function Terminal({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [armedModifier, setArmedModifier] = useState<ModifierId | null>(null)
   const [fontSize, setFontSize] = useState<number>(loadFontSize)
-  const [mobileInputWorkaroundEnabled, setMobileInputWorkaroundEnabled] = useState<boolean>(loadMobileInputWorkaroundEnabled)
+  const [inputMode, setInputModeState] = useState<TerminalInputMode>(loadInputMode)
+  const [inputDebugEnabled, setInputDebugEnabledState] = useState<boolean>(loadInputDebugEnabled)
+  const [touchMode, setTouchModeState] = useState<TouchMode>(loadTouchMode)
+  // The touch handler is installed once with the xterm instance (same as
+  // altScreenScrollRef below), so it reads the mode through a ref.
+  const touchModeRef = useRef(touchMode)
+  touchModeRef.current = touchMode
+  // Set while a selection exists after a 'select'-mode drag, so a copy
+  // affordance can appear (a touch device has no Ctrl+C, and xterm's own
+  // selection is invisible to the browser's native copy UI).
+  const [hasSelection, setHasSelection] = useState(false)
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [altScreenTouchScrollEnabled, setAltScreenTouchScrollEnabled] = useState<boolean>(loadAltScreenTouchScrollEnabled)
   // The touch handler is installed once with the xterm instance, so it
   // reads the toggle through a ref rather than closing over the state.
@@ -665,32 +836,39 @@ export function Terminal({
     }
   }, [activeSession, fitIfVisible, sendResize, reconnect])
 
-  // Re-focuses the terminal. Used after every mobile-toolbar key/zoom
-  // button action (see TerminalControls.tsx) since tapping a button would
-  // otherwise shift DOM focus to the button itself (`preventFocusSteal`'s
-  // onMouseDown there stops most of that, this is the rest), which both
-  // drops xterm's own focus state and closes the virtual keyboard. Calling
-  // this from inside the same synchronous touch-derived event handler keeps
-  // it within the user-gesture context most mobile browsers require to
-  // reopen the keyboard programmatically.
+  // keepFocus is what every control-bar button (TerminalControls.tsx) goes
+  // through after its action, and it deliberately never *opens* the
+  // on-screen keyboard — it only keeps an already-open one from closing.
   //
-  // When the mobile-input-workaround is active, focus MUST go straight to
-  // it, not to xterm's own real textarea — `XTerm.focus()` always targets
-  // that real textarea directly, and while its own onTextareaFocus listener
-  // (below) does redirect that back here, going through xterm briefly
-  // focuses the real textarea first, which is exactly the element the
-  // workaround exists to keep real keystrokes away from. Short-circuiting
-  // straight to mobileInputRef skips that round-trip entirely — confirmed
-  // live, 2026-08-21, as more than theoretical: a version of this that
-  // called `XTerm.focus()` unconditionally let one toolbar button press
-  // silently revive the predictive-text buffering bug for the rest of that
-  // typing session.
-  const focusTerminal = useCallback(() => {
-    if (mobileInputRef.current) {
-      mobileInputRef.current.focus()
-      return
-    }
-    termRef.current?.focus()
+  // The distinction only matters on a phone: focus() on a text field is
+  // also the gesture that opens the virtual keyboard, so an unconditional
+  // refocus from a toolbar tap means pressing Ctrl, an arrow key or zoom
+  // pops the keyboard up even when the user only wanted to change the font
+  // size and never intended to type — reported as exactly that, "확대
+  // 축소만 하려는데도 키보드가 열려서". Refocusing when the field already
+  // has focus is still needed (that is what keeps the tap from dismissing
+  // an open keyboard, which is why this call exists at all), so the guard
+  // is "already the active element" rather than dropping the call
+  // entirely: keyboard open stays open, keyboard closed stays closed.
+  //
+  // When a mobile input field is active, the target MUST be that field and
+  // not xterm's own real textarea — `XTerm.focus()` always targets the real
+  // textarea directly, which is exactly the element the workaround exists
+  // to keep real keystrokes away from. Confirmed live 2026-08-21 as more
+  // than theoretical: a version that called `XTerm.focus()` unconditionally
+  // let one toolbar button press silently revive the predictive-text
+  // buffering bug for the rest of that typing session.
+  //
+  // Not conditional on being a touch device: on desktop, TerminalControls'
+  // own preventFocusSteal already stops the button from taking focus in the
+  // first place, so the only case this changes there is a tap after focus
+  // genuinely moved elsewhere — where sending the byte still works (the WS
+  // write needs no focus at all) and silently yanking focus back was never
+  // load-bearing.
+  const keepFocus = useCallback(() => {
+    const target = mobileInputRef.current ?? termRef.current?.textarea ?? null
+    if (!target || document.activeElement !== target) return
+    target.focus()
   }, [])
 
   const zoom = useCallback(
@@ -700,14 +878,24 @@ export function Terminal({
         saveFontSize(next)
         return next
       })
-      focusTerminal()
+      keepFocus()
     },
-    [focusTerminal],
+    [keepFocus],
   )
 
-  const toggleMobileInputWorkaround = useCallback((enabled: boolean) => {
-    saveMobileInputWorkaroundEnabled(enabled)
-    setMobileInputWorkaroundEnabled(enabled)
+  const changeInputMode = useCallback((mode: TerminalInputMode) => {
+    saveInputMode(mode)
+    setInputModeState(mode)
+  }, [])
+
+  const toggleInputDebug = useCallback((enabled: boolean) => {
+    saveInputDebugEnabled(enabled)
+    setInputDebugEnabledState(enabled)
+  }, [])
+
+  const changeTouchMode = useCallback((mode: TouchMode) => {
+    saveTouchMode(mode)
+    setTouchModeState(mode)
   }, [])
 
   const toggleAltScreenTouchScroll = useCallback((enabled: boolean) => {
@@ -737,8 +925,8 @@ export function Terminal({
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(new TextEncoder().encode(out))
     }
-    focusTerminal()
-  }, [focusTerminal])
+    keepFocus()
+  }, [keepFocus])
 
   const armModifier = useCallback((mod: ModifierId) => {
     setArmedModifier((prev) => {
@@ -746,8 +934,8 @@ export function Terminal({
       armedModifierRef.current = next
       return next
     })
-    focusTerminal()
-  }, [focusTerminal])
+    keepFocus()
+  }, [keepFocus])
 
   // Live-preview a theme without persisting it (used while editing a custom
   // theme's colors, and to revert preview on cancel).
@@ -829,15 +1017,23 @@ export function Terminal({
     // application, and a fast flick across a short screen would otherwise
     // send a burst of dozens at once.
     const MAX_WHEEL_STEPS_PER_MOVE = 6
+    let startX = 0
     let startY = 0
+    let lastX = 0
     let lastY = 0
     let dragging = false
+    // Set once a 'mouse'/'select'-mode drag has synthesized its mousedown,
+    // so touchmove keeps feeding the same drag and touchend can close it.
+    let pointerDragging = false
     let lineRemainder = 0
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 1) return
+      startX = e.touches[0].clientX
       startY = e.touches[0].clientY
+      lastX = startX
       lastY = startY
       dragging = false
+      pointerDragging = false
       lineRemainder = 0
     }
     // A full-screen application (claude, vim, htop, ...) runs in the
@@ -875,9 +1071,62 @@ export function Terminal({
         )
       }
     }
+    // 'mouse'/'select' touch modes: replay the drag as the mouse events a
+    // desktop would have produced, and let xterm decide what they mean —
+    // the same "hand the decision back to xterm" approach dispatchWheel
+    // above takes, for the same reason (reimplementing xterm's mouse
+    // protocol/selection logic here would immediately drift from it).
+    //
+    // shiftKey is what separates the two modes. xterm treats shift as
+    // "force selection": with it set, a drag selects text even while an
+    // application has mouse tracking on; without it, an application that
+    // asked for mouse reports gets them. That single flag is the whole
+    // difference, so 'select' is not a separate implementation — it is
+    // 'mouse' with the modifier xterm already understands.
+    //
+    // Events are dispatched on .xterm-screen with bubbles:true because
+    // xterm's selection service starts from a mousedown there and then
+    // listens on the document for the rest of the drag.
+    const dispatchMouse = (type: 'mousedown' | 'mousemove' | 'mouseup', clientX: number, clientY: number, forceSelection: boolean) => {
+      wheelTarget().dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX,
+          clientY,
+          button: 0,
+          buttons: type === 'mouseup' ? 0 : 1,
+          shiftKey: forceSelection,
+          view: window,
+        }),
+      )
+    }
+    const endPointerDrag = (clientX: number, clientY: number) => {
+      if (!pointerDragging) return
+      pointerDragging = false
+      dispatchMouse('mouseup', clientX, clientY, touchModeRef.current === 'select')
+    }
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 1) return
       const y = e.touches[0].clientY
+      const x = e.touches[0].clientX
+      const mode = touchModeRef.current
+      if (mode !== 'scroll') {
+        // Both axes count here, unlike scroll mode: a selection drag is
+        // most often horizontal, and requiring vertical movement to start
+        // one would make selecting a single line impossible.
+        if (!pointerDragging && Math.abs(y - startY) < TOUCH_SCROLL_THRESHOLD && Math.abs(x - startX) < TOUCH_SCROLL_THRESHOLD) return
+        const forceSelection = mode === 'select'
+        if (!pointerDragging) {
+          pointerDragging = true
+          dispatchMouse('mousedown', startX, startY, forceSelection)
+        }
+        dispatchMouse('mousemove', x, y, forceSelection)
+        lastX = x
+        lastY = y
+        e.preventDefault()
+        return
+      }
       if (!dragging && Math.abs(y - startY) < TOUCH_SCROLL_THRESHOLD) return
       dragging = true
       const rowHeight = container.clientHeight / (term.rows || 1) || 18
@@ -898,11 +1147,26 @@ export function Terminal({
       }
       e.preventDefault()
     }
+    const onTouchEnd = (e: TouchEvent) => {
+      const t = e.changedTouches[0]
+      endPointerDrag(t?.clientX ?? lastX, t?.clientY ?? lastY)
+    }
     container.addEventListener('touchstart', onTouchStart, { passive: true })
     container.addEventListener('touchmove', onTouchMove, { passive: false })
+    container.addEventListener('touchend', onTouchEnd, { passive: true })
+    container.addEventListener('touchcancel', onTouchEnd, { passive: true })
+    // Drives the copy affordance below: xterm's selection is its own state,
+    // invisible to window.getSelection(), so nothing else would ever know a
+    // touch drag produced one.
+    const selectionDisposable = term.onSelectionChange(() => {
+      setHasSelection(term.hasSelection())
+    })
     const touchCleanup = () => {
       container.removeEventListener('touchstart', onTouchStart)
       container.removeEventListener('touchmove', onTouchMove)
+      container.removeEventListener('touchend', onTouchEnd)
+      container.removeEventListener('touchcancel', onTouchEnd)
+      selectionDisposable.dispose()
     }
 
     // Mobile virtual keyboards (Gboard etc.) run predictive/autocorrect text
@@ -920,189 +1184,6 @@ export function Terminal({
       term.textarea.setAttribute('spellcheck', 'false')
     }
 
-    // Confirmed live (2026-08-19) that CSS-only masking (-webkit-text-
-    // security) isn't enough — the keyboard only suppresses predictive
-    // composition for a real <input type="password">, which <textarea>
-    // (xterm.js's own hidden input) structurally cannot be. So on a touch
-    // device only, mint an actual password-type <input>, redirect focus to
-    // it every time term.textarea would otherwise become focused (its own
-    // internal click-to-focus, or any focusTerminal() call below), and feed
-    // what it captures through the same sendBytes() pipeline term.onData
-    // already uses — xterm itself never receives real keystrokes on a
-    // touch device, this input does. Left a no-op on desktop (mouse/
-    // trackpad users never hit the buffering bug, and this is a real
-    // behavior swap not worth the risk there).
-    //
-    // A 2026-08-21 detour tried instead overlaying this input directly on
-    // top of the whole terminal (full size, still invisible) so a tap would
-    // land on it AS the real target with no redirect needed — that did make
-    // open/close/reopen fully native, but it also meant EVERY touch was
-    // swallowed by this input before it could ever reach xterm's own mouse
-    // handling, breaking mouse-click-driven terminal UIs entirely on touch
-    // (tmux pane selection, vim/htop mouse mode, Claude Code's own
-    // click-driven interactive prompts) — confirmed a hard requirement, not
-    // optional, so that approach was reverted back to this redirect-based
-    // one despite its own on-screen-keyboard-dismiss quirks (see
-    // focusTerminal() above for the one concrete bug that detour did
-    // legitimately catch and that's kept fixed here too).
-    const isTouchDevice =
-      loadMobileInputWorkaroundEnabled() &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(pointer: coarse)').matches
-    let mobileInputCleanup: (() => void) | undefined
-    if (isTouchDevice && term.textarea) {
-      const mobileInput = document.createElement('input')
-      mobileInput.type = 'password'
-      // "off", not "new-password" - "new-password" is literally the hint
-      // Chrome's own save-password heuristic watches for ("this field is
-      // for creating a new password"), which turned out to make the
-      // unwanted "저장하시겠습니까?" prompt worse, not better (confirmed
-      // live, 2026-08-19). "off" plus a random name at least avoids
-      // matching common field-name autofill heuristics; Chrome's no-form
-      // save-prompt heuristic on mobile may still fire regardless of any
-      // attribute here — that's a known Chrome quirk (autocomplete=off is
-      // deliberately ignored for the save-prompt decision, only affects
-      // autofill *suggestions*), not something fixable client-side.
-      mobileInput.autocomplete = 'off'
-      mobileInput.name = `terminal-input-${Math.random().toString(36).slice(2)}`
-      mobileInput.setAttribute('autocorrect', 'off')
-      mobileInput.setAttribute('autocapitalize', 'off')
-      mobileInput.setAttribute('spellcheck', 'false')
-      mobileInput.setAttribute('aria-hidden', 'true')
-      mobileInput.tabIndex = -1
-      // Same fully-invisible, off-screen placement as xterm's own hidden
-      // textarea (xterm.css's .xterm-helper-textarea) - never meant to be
-      // seen, only to hold real DOM/keyboard focus. Deliberately NOT
-      // overlaying the terminal (tried, reverted — see the doc comment
-      // above): staying off to the side and out of the hit-testing path
-      // entirely is what lets a real tap land on xterm's own screen/textarea
-      // first, so xterm's normal mouse-click handling (cursor positioning,
-      // mouse-tracking-protocol apps) keeps working; onTextareaFocus below
-      // is what redirects the resulting focus attempt here afterward.
-      Object.assign(mobileInput.style, {
-        position: 'absolute',
-        opacity: '0',
-        left: '-9999em',
-        top: '0',
-        width: '0',
-        height: '0',
-        zIndex: '-5',
-        border: '0',
-        padding: '0',
-      })
-      container.appendChild(mobileInput)
-      mobileInputRef.current = mobileInput
-
-      // Confirmed live (2026-08-19): fully clearing the field to '' after
-      // every keystroke breaks backspace — deleting from an already-empty
-      // field is a no-op with nothing for the browser to fire an input
-      // event about, so backspace silently did nothing. Keeping one
-      // sentinel character in the field at all times means there's always
-      // something for backspace to consume. baseline tracks what we've
-      // already forwarded to the PTY; every input/compositionend event is
-      // diffed against it (length-based, not full text diffing - real
-      // single-keystroke mobile input is always a plain append or a plain
-      // backspace, never a mid-string edit) rather than assuming the field
-      // was actually reset back to ANCHOR since the browser may not have
-      // gotten to that reset yet on fast consecutive typing (see
-      // scheduleReset below).
-      const ANCHOR = ' '
-      let baseline = ANCHOR
-      mobileInput.value = ANCHOR
-      mobileInput.setSelectionRange(ANCHOR.length, ANCHOR.length)
-
-      // Also confirmed live: resetting .value synchronously inside the
-      // input handler made fast consecutive typing drop characters -
-      // mutating a focused field's value while Android's own IME/webview
-      // bridge is still processing that same keystroke appears to stall or
-      // desync it. Deferring the reset to the next animation frame lets
-      // that processing fully finish first. The equality check guards
-      // against a stale reset clobbering a value that's already moved on
-      // by the time the frame runs (e.g. two keystrokes landed before this
-      // fired) - in that case the newer keystroke's own scheduled reset
-      // takes over instead.
-      let resetScheduled = false
-      const scheduleReset = () => {
-        if (resetScheduled) return
-        resetScheduled = true
-        const expected = mobileInput.value
-        requestAnimationFrame(() => {
-          resetScheduled = false
-          if (mobileInput.value !== expected) return
-          mobileInput.value = ANCHOR
-          mobileInput.setSelectionRange(ANCHOR.length, ANCHOR.length)
-          baseline = ANCHOR
-        })
-      }
-
-      // Shared by onInput (plain typing) and onCompositionEnd (IME commit)
-      // — both just need "what changed vs. baseline", the source doesn't
-      // matter once composition itself is done.
-      const processValueChange = () => {
-        const value = mobileInput.value
-        if (value.length > baseline.length) {
-          sendBytes(value.slice(baseline.length))
-        } else if (value.length < baseline.length) {
-          sendBytes('\x7f'.repeat(baseline.length - value.length))
-        }
-        baseline = value
-        scheduleReset()
-      }
-
-      let composing = false
-      const onCompositionStart = () => {
-        composing = true
-      }
-      // Real IME composition (Hangul assembly etc.) still legitimately
-      // fires compositionstart/end regardless of input type - that's
-      // OS/keyboard-level, not something a password field suppresses. Only
-      // commit on compositionend so an in-progress multi-keystroke syllable
-      // isn't sent character-by-character as it's being assembled.
-      const onCompositionEnd = () => {
-        composing = false
-        processValueChange()
-      }
-      const onInput = () => {
-        if (composing) return
-        processValueChange()
-      }
-      const onKeyDown = (e: KeyboardEvent) => {
-        // Enter never reaches the input-event handling above - a
-        // single-line <input> doesn't insert a line break the way xterm's
-        // own <textarea> did, so this is the one key still driven by
-        // keydown. Most mobile keyboards (Gboard included) do dispatch a
-        // real keydown for Enter even though they don't for ordinary
-        // character keys.
-        if (e.key === 'Enter' && !composing) {
-          e.preventDefault()
-          sendBytes('\r')
-        }
-      }
-      mobileInput.addEventListener('compositionstart', onCompositionStart)
-      mobileInput.addEventListener('compositionend', onCompositionEnd)
-      mobileInput.addEventListener('input', onInput)
-      mobileInput.addEventListener('keydown', onKeyDown)
-
-      // Whenever xterm's own textarea would become focused - its internal
-      // click-to-focus handler, or any focusTerminal() call elsewhere in
-      // this file - immediately steal focus back to this input instead.
-      // This is what keeps the keyboard in password mode across every
-      // existing focus path without having to special-case each call site.
-      // (focusTerminal() itself also short-circuits straight to
-      // mobileInputRef now, skipping this round-trip when it's the one
-      // calling — this listener is what covers every OTHER path, above all
-      // xterm's own real click-to-focus.)
-      const onTextareaFocus = () => {
-        mobileInput.focus()
-      }
-      term.textarea.addEventListener('focus', onTextareaFocus)
-
-      mobileInputCleanup = () => {
-        term.textarea?.removeEventListener('focus', onTextareaFocus)
-        mobileInput.remove()
-        mobileInputRef.current = null
-      }
-    }
 
     // A program running inside the PTY (tmux/vim with set-clipboard, etc.)
     // can ask the terminal to copy to the OS clipboard via an OSC 52 escape
@@ -1161,7 +1242,6 @@ export function Terminal({
     return () => {
       resizeObserver.disconnect()
       touchCleanup?.()
-      mobileInputCleanup?.()
       oscDisposable.dispose()
       dataDisposable.dispose()
       term.dispose()
@@ -1170,6 +1250,343 @@ export function Terminal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Mobile text-input path — see the TerminalInputMode doc comment near the
+  // top of this file for what each mode does and which keyboard bug it
+  // exists for.
+  //
+  // Deliberately its own effect rather than a branch inside the
+  // xterm-creation effect it used to live in: that one is keyed on [] and
+  // never re-runs, so changing the mode only took effect after leaving and
+  // re-entering the Terminal tab. That is a miserable loop when the whole
+  // point of having modes is trying them against a real phone, so this one
+  // is keyed on the mode and applies live. It relies on effects running in
+  // declaration order — the creation effect above has already populated
+  // termRef/containerRef by the time this first runs.
+  useEffect(() => {
+    const term = termRef.current
+    const container = containerRef.current
+    const textarea = term?.textarea
+    if (!term || !container || !textarea) return
+
+    const debug = inputDebugEnabled ? createInputDebugOverlay(container) : null
+    const logEvent = (source: string, e: Event, value?: string) => {
+      if (!debug) return
+      const composing = 'isComposing' in e ? String((e as InputEvent).isComposing) : '-'
+      const key = e instanceof KeyboardEvent ? ` key=${e.key}` : ''
+      debug.log(`${source} ${e.type} ic=${composing}${key} v=${debugQuote(value ?? '')}`)
+    }
+    const emit = (bytes: string) => {
+      debug?.log(`  -> ${debugQuote(bytes)}`)
+      sendBytes(bytes)
+    }
+
+    // The workaround fields only exist on a touch device: a mouse/trackpad
+    // never hits predictive buffering or the duplication bug, and swapping
+    // out the element real keystrokes land on is not a risk worth taking
+    // there. The debug overlay is still installed on desktop (attached to
+    // xterm's own textarea below) so the same instrumentation can be read
+    // in a desktop browser's device emulation.
+    const isTouchDevice = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+    const useField = isTouchDevice && inputMode !== 'native'
+
+    if (!useField) {
+      if (!debug) return
+      const onNativeEvent = (e: Event) => logEvent('xterm', e, textarea.value)
+      for (const type of ['compositionstart', 'compositionupdate', 'compositionend', 'input', 'keydown']) {
+        textarea.addEventListener(type, onNativeEvent)
+      }
+      return () => {
+        for (const type of ['compositionstart', 'compositionupdate', 'compositionend', 'input', 'keydown']) {
+          textarea.removeEventListener(type, onNativeEvent)
+        }
+        debug.dispose()
+      }
+    }
+
+    const field = inputMode === 'password' ? document.createElement('input') : document.createElement('textarea')
+    if (field instanceof HTMLInputElement) {
+      // The whole reason this mode exists: mobile keyboards only reliably
+      // refuse to run prediction/composition on a real password input.
+      field.type = 'password'
+    } else {
+      // Same element type xterm's own hidden helper uses, which is what
+      // makes real IME composition attach here at all (a single-line
+      // <input>, password or not, gets a different Android input type and
+      // never fires compositionstart — measured 2026-09-03).
+      field.rows = 1
+    }
+    // "off", not "new-password" - "new-password" is literally the hint
+    // Chrome's own save-password heuristic watches for ("this field is for
+    // creating a new password"), which turned out to make the unwanted
+    // "저장하시겠습니까?" prompt worse, not better (confirmed live,
+    // 2026-08-19). "off" plus a random name at least avoids matching common
+    // field-name autofill heuristics; Chrome's no-form save-prompt
+    // heuristic on mobile may still fire regardless of any attribute here.
+    field.autocomplete = 'off'
+    field.name = `terminal-input-${Math.random().toString(36).slice(2)}`
+    field.setAttribute('autocorrect', 'off')
+    field.setAttribute('autocapitalize', 'off')
+    field.setAttribute('spellcheck', 'false')
+    field.setAttribute('aria-hidden', 'true')
+    field.tabIndex = -1
+    // Same fully-invisible, off-screen placement as xterm's own hidden
+    // textarea (xterm.css's .xterm-helper-textarea) — never meant to be
+    // seen, only to hold real DOM/keyboard focus. Deliberately NOT
+    // overlaying the terminal: a 2026-08-21 detour tried that (so a tap
+    // would land on it directly with no focus redirect needed) and it
+    // swallowed every touch before xterm's own mouse handling could see it,
+    // breaking tmux pane selection, vim/htop mouse mode and Claude Code's
+    // click-driven prompts. Staying off to the side keeps taps landing on
+    // xterm first; the focus listener below is what redirects afterwards.
+    Object.assign(field.style, {
+      position: 'absolute',
+      opacity: '0',
+      left: '-9999em',
+      top: '0',
+      width: '0',
+      height: '0',
+      zIndex: '-5',
+      border: '0',
+      padding: '0',
+      resize: 'none',
+    })
+    container.appendChild(field)
+    mobileInputRef.current = field
+
+    // One sentinel character is always kept in the field: deleting from an
+    // already-empty field fires no input event at all (nothing for the
+    // browser to report), which is how backspace silently stopped working
+    // the first time this was written against a fully-cleared field.
+    const ANCHOR = ' '
+    let composing = false
+    let cleanups: (() => void)[] = []
+
+    if (inputMode === 'password') {
+      // Length-based diff against a field that is reset back to ANCHOR after
+      // every keystroke. Correct only because a password field suppresses
+      // composition entirely, so every event really is a single plain
+      // append or a single backspace — which is also exactly why Hangul
+      // breaks in this mode.
+      let baseline = ANCHOR
+      field.value = ANCHOR
+      field.setSelectionRange(ANCHOR.length, ANCHOR.length)
+
+      // Resetting .value synchronously inside the input handler made fast
+      // consecutive typing drop characters (confirmed live 2026-08-19):
+      // mutating a focused field's value while Android's IME/webview bridge
+      // is still processing that same keystroke stalls or desyncs it.
+      // Deferring to the next animation frame lets it finish. The equality
+      // check stops a stale reset from clobbering a value a newer keystroke
+      // already moved past.
+      let resetScheduled = false
+      const scheduleReset = () => {
+        if (resetScheduled) return
+        resetScheduled = true
+        const expected = field.value
+        requestAnimationFrame(() => {
+          resetScheduled = false
+          if (field.value !== expected) return
+          field.value = ANCHOR
+          field.setSelectionRange(ANCHOR.length, ANCHOR.length)
+          baseline = ANCHOR
+        })
+      }
+      const processValueChange = () => {
+        const value = field.value
+        if (value.length > baseline.length) {
+          emit(value.slice(baseline.length))
+        } else if (value.length < baseline.length) {
+          emit('\x7f'.repeat(baseline.length - value.length))
+        }
+        baseline = value
+        scheduleReset()
+      }
+      const onCompositionStart = (e: Event) => {
+        composing = true
+        logEvent('field', e, field.value)
+      }
+      const onCompositionEnd = (e: Event) => {
+        composing = false
+        logEvent('field', e, field.value)
+        processValueChange()
+      }
+      const onInput = (e: Event) => {
+        logEvent('field', e, field.value)
+        if (composing) return
+        processValueChange()
+      }
+      const onKeyDown = (ev: Event) => {
+        const e = ev as KeyboardEvent
+        logEvent('field', e, field.value)
+        // Enter never reaches the input-event handling above — a
+        // single-line <input> doesn't insert a line break the way a
+        // <textarea> does. Most mobile keyboards (Gboard included) do
+        // dispatch a real keydown for Enter even though they don't for
+        // ordinary character keys.
+        if (e.key === 'Enter' && !composing) {
+          e.preventDefault()
+          emit('\r')
+        }
+      }
+      field.addEventListener('compositionstart', onCompositionStart)
+      field.addEventListener('compositionend', onCompositionEnd)
+      field.addEventListener('input', onInput)
+      field.addEventListener('keydown', onKeyDown)
+      cleanups.push(() => {
+        field.removeEventListener('compositionstart', onCompositionStart)
+        field.removeEventListener('compositionend', onCompositionEnd)
+        field.removeEventListener('input', onInput)
+        field.removeEventListener('keydown', onKeyDown)
+      })
+    } else {
+      // 'diff' mode. The field is left to accumulate the line being typed
+      // instead of being truncated after every keystroke, and `sent` holds
+      // exactly what has already been forwarded to the PTY from it. Each
+      // change is reduced to a common-prefix diff, which is what makes this
+      // immune to the duplication bug: a keyboard that re-emits or rewrites
+      // a phrase it already committed produces a value equal to what was
+      // already sent, so the diff is empty and nothing goes out. The
+      // previous designs all truncated the field, which meant every such
+      // re-emission looked like brand new text.
+      let sent = ANCHOR
+      field.value = ANCHOR
+      field.setSelectionRange(ANCHOR.length, ANCHOR.length)
+
+      // Re-anchoring has to be deferred for the same reason the password
+      // mode's reset is (see above), and is only ever needed when the field
+      // ran empty — i.e. after a backspace, never mid-burst.
+      let reanchorScheduled = false
+      const scheduleReanchor = () => {
+        if (reanchorScheduled) return
+        reanchorScheduled = true
+        requestAnimationFrame(() => {
+          reanchorScheduled = false
+          if (composing || field.value !== '') return
+          field.value = ANCHOR
+          sent = ANCHOR
+          field.setSelectionRange(ANCHOR.length, ANCHOR.length)
+        })
+      }
+
+      // Resetting the field back to the anchor is the one thing that must
+      // be done sparingly here, and it is worth being explicit about why:
+      // the accumulated value IS the protection against duplication. Clear
+      // it while the keyboard still considers that text its own, and the
+      // keyboard's next rewrite of the phrase looks like brand new input
+      // again — which is the bug, reintroduced. So there is deliberately no
+      // idle timer: the field is only reset at moments the keyboard itself
+      // has demonstrably let go of the text.
+      //
+      // Those moments are Enter (the line is over, see onKeyDown), blur
+      // (the IME session ends with focus — this is precisely the "tap
+      // outside, tap back in and it's fine for a while" behavior reported
+      // from a Galaxy, made explicit rather than left to chance), and a
+      // hard length cap so a session that somehow never hits either can't
+      // grow without bound.
+      const MAX_FIELD_LENGTH = 512
+      const resetField = (reason: string) => {
+        if (field.value === ANCHOR) return
+        field.value = ANCHOR
+        sent = ANCHOR
+        field.setSelectionRange(ANCHOR.length, ANCHOR.length)
+        debug?.log(`  (reset: ${reason})`)
+      }
+
+      const flush = () => {
+        const value = field.value
+        if (value === sent) return
+        let common = 0
+        const max = Math.min(value.length, sent.length)
+        while (common < max && value[common] === sent[common]) common++
+        const removed = sent.length - common
+        const added = value.slice(common)
+        sent = value
+        if (removed > 0) emit('\x7f'.repeat(removed))
+        if (added) {
+          // A <textarea> can legitimately gain a real newline: not every
+          // keyboard's Enter arrives as a keydown (onKeyDown below only
+          // catches the ones that do), and some insert the break through a
+          // plain input event instead. A PTY wants CR for that, and the
+          // line is over either way, so translate and reset rather than
+          // letting a stray '\n' accumulate in the field forever.
+          const hadNewline = added.includes('\n')
+          emit(hadNewline ? added.replace(/\n/g, '\r') : added)
+          if (hadNewline) {
+            resetField('newline')
+            return
+          }
+        }
+        if (value === '') scheduleReanchor()
+        else if (!composing && value.length > MAX_FIELD_LENGTH) resetField('length cap')
+      }
+      const onCompositionStart = (e: Event) => {
+        composing = true
+        logEvent('field', e, field.value)
+      }
+      const onCompositionEnd = (e: Event) => {
+        composing = false
+        logEvent('field', e, field.value)
+        flush()
+      }
+      const onInput = (e: Event) => {
+        logEvent('field', e, field.value)
+        // Nothing is sent mid-composition: the field holds a half-assembled
+        // syllable, and forwarding it would be the jamo-by-jamo bug.
+        if (composing) return
+        flush()
+      }
+      const onKeyDown = (ev: Event) => {
+        const e = ev as KeyboardEvent
+        logEvent('field', e, field.value)
+        if (e.key === 'Enter' && !composing) {
+          // The line is over, so the field's accumulated copy of it is
+          // meaningless from here on — reset rather than carrying it into
+          // the next line's diffs.
+          e.preventDefault()
+          flush()
+          emit('\r')
+          resetField('enter')
+        }
+      }
+      const onBlur = () => {
+        composing = false
+        resetField('blur')
+      }
+      field.addEventListener('compositionstart', onCompositionStart)
+      field.addEventListener('compositionend', onCompositionEnd)
+      field.addEventListener('input', onInput)
+      field.addEventListener('keydown', onKeyDown)
+      field.addEventListener('blur', onBlur)
+      cleanups.push(() => {
+        field.removeEventListener('compositionstart', onCompositionStart)
+        field.removeEventListener('compositionend', onCompositionEnd)
+        field.removeEventListener('input', onInput)
+        field.removeEventListener('keydown', onKeyDown)
+        field.removeEventListener('blur', onBlur)
+      })
+    }
+
+    // Whenever xterm's own textarea would become focused — its internal
+    // click-to-focus handler, or any keepFocus() call — steal focus back to
+    // this field. That is what keeps every existing focus path on the
+    // workaround field without special-casing each call site. (keepFocus
+    // itself targets mobileInputRef directly; this listener covers every
+    // OTHER path, above all xterm's own real click-to-focus.)
+    const onTextareaFocus = () => {
+      field.focus()
+    }
+    textarea.addEventListener('focus', onTextareaFocus)
+
+    return () => {
+      textarea.removeEventListener('focus', onTextareaFocus)
+      for (const fn of cleanups) fn()
+      cleanups = []
+      field.remove()
+      mobileInputRef.current = null
+      debug?.dispose()
+    }
+  }, [inputMode, inputDebugEnabled, sendBytes])
 
   // WebSocket connection: reopened against the active session's name
   // whenever it changes (switching tabs), independent of the xterm
@@ -1327,6 +1744,49 @@ export function Terminal({
     },
     [sessions, activeSession],
   )
+
+  // A touch device is the only place the touch-mode selector means
+  // anything, and it also can't change while the page is open.
+  const isCoarsePointer = useMemo(
+    () => typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches,
+    [],
+  )
+
+  const copySelection = useCallback(async () => {
+    const term = termRef.current
+    if (!term || !term.hasSelection()) return
+    const ok = await copyText(term.getSelection())
+    setCopyState(ok ? 'copied' : 'failed')
+    if (ok) term.clearSelection()
+    window.setTimeout(() => setCopyState('idle'), 1500)
+  }, [])
+
+  // Reports the active session up so App.tsx can keep it in the URL - which
+  // is what makes a reload land back on the same session, and a terminal tab
+  // bookmarkable.
+  useEffect(() => {
+    onActiveSessionChange?.(activeSession === HOME_TAB_ID ? null : activeSession)
+  }, [activeSession, onActiveSessionChange])
+
+  // Restores ?session=<name> from the URL. Deliberately not routed through
+  // the initialOpen path below: selecting an unknown name there would
+  // silently *create* a new shell (sessions are created lazily by the WS
+  // handshake, there is no separate create call), so a stale bookmark would
+  // quietly spawn a process every time it was opened. Verify against the
+  // real list first and fall back to the Home tab instead.
+  useEffect(() => {
+    if (!restoreSession) return
+    let cancelled = false
+    void refreshSessions().then((list) => {
+      if (cancelled) return
+      if (list?.some((s) => s.name === restoreSession)) setActiveSession(restoreSession)
+      onRestoreSessionConsumed?.()
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Consumes an "open in terminal" request handed down from another tab
   // (Projects/Files, see App.tsx's openInTerminal) - runs once on mount only,
@@ -1505,8 +1965,57 @@ export function Terminal({
   return (
     <section className="terminal-section" style={surfaceStyle}>
       <div className="terminal-topbar">
+        {/* The app's own mobile top bar is hidden while this tab is active
+            (App.css's .app-shell-terminal rule) and its hamburger moves
+            here, so the two bars become one row. A phone keyboard already
+            eats most of the viewport; spending 3.6rem of what's left on a
+            second bar carrying nothing but a menu button isn't worth it. */}
+        {onToggleSidebar && (
+          <button
+            type="button"
+            className="terminal-hamburger-btn"
+            onClick={onToggleSidebar}
+            aria-label="메뉴 열기"
+          >
+            <Menu size={18} />
+          </button>
+        )}
         <h1>Terminal</h1>
         <div className="terminal-header-actions">
+          {isCoarsePointer && activeSession !== HOME_TAB_ID && (
+            <div className="terminal-touch-mode" role="group" aria-label="터치 동작 모드">
+              {TOUCH_MODE_OPTIONS.map(({ id, label, title, Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`btn btn-small ${touchMode === id ? 'btn-primary' : 'btn-secondary'}`}
+                  // Same reason TerminalControls' buttons do this: without
+                  // it the tap moves DOM focus off the terminal, which
+                  // dismisses the on-screen keyboard.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => changeTouchMode(id)}
+                  title={title}
+                  aria-pressed={touchMode === id}
+                >
+                  <Icon size={14} /> <span className="btn-label">{label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {hasSelection && activeSession !== HOME_TAB_ID && (
+            <button
+              type="button"
+              className="btn btn-primary btn-small"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={copySelection}
+              title="선택한 텍스트를 클립보드로 복사"
+            >
+              <Copy size={14} />{' '}
+              <span className="btn-label">
+                {copyState === 'copied' ? '복사됨' : copyState === 'failed' ? '복사 실패' : '복사'}
+              </span>
+            </button>
+          )}
           {activeSession !== HOME_TAB_ID && (
             <span className={`badge ${STATE_BADGE_CLASS[state]} terminal-status-badge`} title={STATE_LABEL[state]}>
               <span className="terminal-status-dot" aria-hidden="true" />
@@ -1647,8 +2156,10 @@ export function Terminal({
         onSave={saveSettings}
         onPreviewTheme={previewTheme}
         fontFamilies={fontFamilies}
-        mobileInputWorkaroundEnabled={mobileInputWorkaroundEnabled}
-        onToggleMobileInputWorkaround={toggleMobileInputWorkaround}
+        inputMode={inputMode}
+        onChangeInputMode={changeInputMode}
+        inputDebugEnabled={inputDebugEnabled}
+        onToggleInputDebug={toggleInputDebug}
         altScreenTouchScrollEnabled={altScreenTouchScrollEnabled}
         onToggleAltScreenTouchScroll={toggleAltScreenTouchScroll}
         autoReconnectEnabled={autoReconnectEnabled}

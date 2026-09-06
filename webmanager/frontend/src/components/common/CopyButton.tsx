@@ -1,28 +1,17 @@
 import { useState } from 'react'
+import { copyText } from '../../utils/clipboard'
 import './common.css'
 
 export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
 
   async function handleCopy() {
-    try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(text)
-      } else {
-        const textarea = document.createElement('textarea')
-        textarea.value = text
-        textarea.style.position = 'fixed'
-        textarea.style.opacity = '0'
-        document.body.appendChild(textarea)
-        textarea.select()
-        document.execCommand('copy')
-        document.body.removeChild(textarea)
-      }
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
+    if (!(await copyText(text))) {
       setCopied(false)
+      return
     }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
   }
 
   return (
