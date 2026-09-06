@@ -21,7 +21,19 @@ export function withViewTransition(update: () => void): void {
   // toggle); App.tsx's sidebar handler additionally skips this wrapper
   // outright when the *target* tab is iframe-based, since an iframe about to
   // be mounted can't be detected by this presence check.
-  if (!document.startViewTransition || document.querySelector('iframe')) {
+  // A View Transition can only start on a *visible* document. On a hidden
+  // one Chrome rejects `ready` with "Transition was aborted because of
+  // invalid state" and — the part that actually matters — defers the update
+  // callback instead of running it, so the state change inside flushSync
+  // never lands until something else happens to start another transition.
+  // The symptom is the app silently not navigating: measured 2026-09-06,
+  // the file-browser overlay's "탭으로 열기" closed its dialog but stayed on
+  // the Terminal tab, and the pending setActive only applied minutes later
+  // when an unrelated transition ran. (This is also the likely explanation
+  // for the "sidebar .click() sometimes doesn't route" flakiness recorded in
+  // .claude/browser-qa-notes.md, since an automation tab is hidden.)
+  // A hidden document has nothing to animate anyway, so take the plain path.
+  if (!document.startViewTransition || document.hidden || document.querySelector('iframe')) {
     update()
     return
   }

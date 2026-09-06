@@ -21,6 +21,14 @@
 - 사이드바 버튼 `.click()`이 라우팅을 안 태우는 경우가 있다. 안 되면
   `navigate`로 경로를 직접 친다(`/manager/processes`, `/manager/terminal`,
   `/manager/files`, `/manager/supervisor`).
+  - **원인 확인됨 (2026-09-06).** 자동화 탭은 `document.hidden === true`라서
+    `document.startViewTransition()`이 "Transition was aborted because of
+    invalid state"로 죽고, **업데이트 콜백 자체가 미뤄진다** —
+    `withViewTransition` 안의 `flushSync(update)`가 그 콜백 안에 있으니 상태
+    변경이 아예 안 나간다. 나중에 다른 트랜지션이 시작되면 그때서야 밀린
+    콜백이 실행된다(그래서 "가끔 되는" 것처럼 보였다). `viewTransition.ts`에
+    `document.hidden` 가드를 추가해서 고쳤으니 이제는 자동화 탭에서도 그냥
+    동작한다. 그 가드 이전 번들로 QA할 때는 여전히 이 함정을 밟는다.
 - Task Manager는 상단 `성능`/`프로세스` 토글과 그 아래 `프로세스`/`포트` 서브탭이
   **둘 다** 있고 라벨이 겹친다. `프로세스` 텍스트 버튼이 2개 잡히므로 둘 다 눌러야
   표가 뜬다.
