@@ -207,6 +207,13 @@ function saveInputDebugEnabled(enabled: boolean) {
 // altScreenTouchScrollEnabled below.
 export type TouchMode = 'scroll' | 'mouse' | 'select'
 
+// How much visualViewport inset counts as "the on-screen keyboard is up".
+// Not simply `> 0`: the inset is a float and a desktop browser reports small
+// sub-pixel values (0.45px measured 2026-09-06) from ordinary rounding, so a
+// zero comparison leaks. Any real keyboard covers hundreds of pixels, so
+// anything under this is noise or a browser UI bar, never a keyboard.
+const KEYBOARD_OPEN_MIN_INSET = 80
+
 const TOUCH_MODE_KEY = 'webmanager.terminal.touchMode'
 
 function loadTouchMode(): TouchMode {
@@ -236,9 +243,16 @@ const TOUCH_MODE_OPTIONS: { id: TouchMode; label: string; title: string; Icon: t
 // Debug overlay for the input path (INPUT_DEBUG_KEY above). Built
 // imperatively rather than as a React node on purpose: it updates on every
 // keystroke, and pushing that through component state would re-render the
-// whole terminal section for something that is only ever read off a
-// screenshot. Kept to the last few lines so it can't grow without bound.
-const INPUT_DEBUG_LINES = 12
+// whole terminal section on each one.
+//
+// Two different limits. Only the last few lines are *shown*, because the
+// overlay sits on top of the terminal and must not swallow it - but the
+// copy button hands over a much longer history, since the useful report is
+// the whole sequence that went wrong, not the tail of it. A phone
+// screenshot can't be pasted anywhere as text either, which is why that
+// button exists at all (repo owner, 2026-09-06: "실측한걸 보내줄 수가 없네").
+const INPUT_DEBUG_DISPLAY_LINES = 12
+const INPUT_DEBUG_HISTORY_LINES = 400
 
 // JSON.stringify leaves control characters like DEL (0x7f) as invisible raw
 // bytes, which is useless in an overlay whose entire job is showing what was
@@ -255,18 +269,102 @@ function debugQuote(value: string): string {
   return `"${out}"`
 }
 
-function createInputDebugOverlay(container: HTMLElement): { log: (line: string) => void; dispose: () => void } {
+function createInputDebugOverlay(
+  container: HTMLElement,
+  meta: () => string,
+): { log: (line: string) => void; dispose: () => void } {
   const el = document.createElement('div')
   el.className = 'terminal-input-debug'
+
+  const bar = document.createElement('div')
+  bar.className = 'terminal-input-debug-bar'
+  const title = document.createElement('span')
+  title.textContent = '입력 디버그'
+  const copy = document.createElement('button')
+  copy.type = 'button'
+  copy.className = 'terminal-input-debug-btn'
+  copy.textContent = '복사'
+  const clear = document.createElement('button')
+  clear.type = 'button'
+  clear.className = 'terminal-input-debug-btn'
+  clear.textContent = '지우기'
+  bar.append(title, copy, clear)
+
+  const body = document.createElement('div')
+  body.className = 'terminal-input-debug-log'
+
+  // Shown only when the clipboard write fails. It can, and on this
+  // deployment it is the likely case rather than the exotic one: the page is
+  // usually served over plain http, where navigator.clipboard doesn't exist
+  // at all, leaving document.execCommand('copy') — which is refused unless
+  // the browser considers the click a genuine user activation. Rather than
+  // dead-end at "복사 실패", drop the whole report into a real, selectable
+  // textarea with everything already selected, so the system's own
+  // copy affordance finishes the job. The point of this overlay is getting
+  // the measurement off the device; it must not have a path where that is
+  // impossible.
+  const fallback = document.createElement('textarea')
+  fallback.className = 'terminal-input-debug-fallback'
+  fallback.spellcheck = false
+  fallback.hidden = true
+
+  el.append(bar, body, fallback)
   container.appendChild(el)
+
   const lines: string[] = []
+  const render = () => {
+    body.textContent = lines.slice(-INPUT_DEBUG_DISPLAY_LINES).join('\n')
+  }
+
+  // Tapping either button must not move focus off the input field: that
+  // would close the keyboard and fire a blur, i.e. change the very thing
+  // being measured. Same preventDefault-on-mousedown trick TerminalControls
+  // uses for its own buttons.
+  const preventFocusSteal = (e: Event) => e.preventDefault()
+  copy.addEventListener('mousedown', preventFocusSteal)
+  clear.addEventListener('mousedown', preventFocusSteal)
+
+  let resetLabel = 0
+  const onCopy = () => {
+    const text = `${meta()}\n${lines.join('\n')}`
+    void copyText(text).then((ok) => {
+      if (ok) {
+        fallback.hidden = true
+        copy.textContent = '복사됨'
+        window.clearTimeout(resetLabel)
+        resetLabel = window.setTimeout(() => {
+          copy.textContent = '복사'
+        }, 1500)
+        return
+      }
+      fallback.value = text
+      fallback.hidden = false
+      fallback.focus()
+      fallback.select()
+      copy.textContent = '길게 눌러 복사'
+    })
+  }
+  const onClear = () => {
+    lines.length = 0
+    fallback.hidden = true
+    copy.textContent = '복사'
+    render()
+  }
+  copy.addEventListener('click', onCopy)
+  clear.addEventListener('click', onClear)
+
   return {
     log(line: string) {
       lines.push(line)
-      if (lines.length > INPUT_DEBUG_LINES) lines.shift()
-      el.textContent = lines.join('\n')
+      if (lines.length > INPUT_DEBUG_HISTORY_LINES) lines.shift()
+      render()
     },
     dispose() {
+      window.clearTimeout(resetLabel)
+      copy.removeEventListener('mousedown', preventFocusSteal)
+      clear.removeEventListener('mousedown', preventFocusSteal)
+      copy.removeEventListener('click', onCopy)
+      clear.removeEventListener('click', onClear)
       el.remove()
     },
   }
@@ -918,7 +1016,7 @@ export function Terminal({
     // case this exists to skip, and on a desktop, where the inset is always
     // zero, re-focusing an element that already has focus was a no-op
     // anyway.
-    if (keyboardInsetRef.current <= 0) return
+    if (keyboardInsetRef.current < KEYBOARD_OPEN_MIN_INSET) return
     target.focus()
   }, [])
 
@@ -1473,7 +1571,25 @@ export function Terminal({
     const textarea = term?.textarea
     if (!term || !container || !textarea) return
 
-    const debug = inputDebugEnabled ? createInputDebugOverlay(container) : null
+    // Header written into whatever the copy button hands over. Without it a
+    // pasted log is just a list of events with no way to tell which mode,
+    // which keyboard or which device produced them — and that context is
+    // exactly what has been missing every time this bug was guessed at.
+    const debugMeta = () => {
+      const active = document.activeElement
+      const field = mobileInputRef.current
+      return [
+        `# webmanager terminal input debug`,
+        `# time: ${new Date().toISOString()}`,
+        `# inputMode: ${inputMode}`,
+        `# field: ${field ? field.tagName.toLowerCase() + (field instanceof HTMLInputElement ? `[type=${field.type}]` : '') : 'none (xterm textarea)'}`,
+        `# focused: ${active === field ? 'workaround field' : active === term.textarea ? 'xterm textarea' : (active?.tagName.toLowerCase() ?? 'none')}`,
+        `# pointer: ${typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches ? 'coarse' : 'fine'}`,
+        `# keyboardInset: ${keyboardInsetRef.current}`,
+        `# ua: ${navigator.userAgent}`,
+      ].join('\n')
+    }
+    const debug = inputDebugEnabled ? createInputDebugOverlay(container, debugMeta) : null
     const logEvent = (source: string, e: Event, value?: string) => {
       if (!debug) return
       const composing = 'isComposing' in e ? String((e as InputEvent).isComposing) : '-'

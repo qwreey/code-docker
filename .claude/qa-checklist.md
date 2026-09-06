@@ -589,10 +589,11 @@ Task Manager는 flex 표, Supervisor 탭은 그 아래 펼쳐지는 일반 auto-
 - [ ] 영문: `claude`를 치면 `claude`로 나오는가 (`edual c` 아님 — 캐럿 고정 수정)
 - [ ] **한글: 조합이 되는가.** 이게 아직 가설입니다 — `aria-hidden`/`tabIndex=-1`/
       `rows=1`/`name`을 전부 없애고 xterm 자신의 textarea와 속성을 똑같이 맞췄습니다
-- [ ] **여전히 자모로 쪼개지면**: 입력 디버그를 켜고 한글 한 글자만 쳐서
-      `compositionstart`가 뜨는지만 봐주세요. 안 뜨면 이 방향이 틀린 것이고,
-      다음 수는 xterm의 textarea를 그대로 쓰되 xterm의 `CompositionHelper`만
-      우회하는 쪽입니다
+- [ ] **여전히 자모로 쪼개지면**: 입력 디버그를 켜고 "지우기" → 한글 한 글자 →
+      **"복사"** 로 로그를 그대로 보내주세요(화면 캡처 불필요). 기기/입력 방식/UA와
+      최근 400줄이 텍스트로 들어옵니다. 볼 것은 `compositionstart`가 뜨는지 하나입니다 —
+      안 뜨면 이 방향이 틀린 것이고, 다음 수는 xterm의 textarea를 그대로 쓰되
+      xterm의 `CompositionHelper`만 우회하는 쪽입니다
 - [ ] 스페이스를 누르면 그 시점에 필드가 리셋되는가 (디버그에 `(reset: word boundary)`)
 - [ ] 중복 입력이 없는가
 

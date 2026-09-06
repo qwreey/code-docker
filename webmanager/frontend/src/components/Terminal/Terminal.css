@@ -77,20 +77,80 @@
   position: absolute;
   right: 0.4rem;
   bottom: 0.4rem;
-  max-width: min(100%, 34rem);
+  max-width: min(calc(100% - 0.8rem), 34rem);
   max-height: 45%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   z-index: 5;
-  padding: 0.35rem 0.5rem;
   border-radius: var(--radius);
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(0, 0, 0, 0.78);
   color: #7ce38b;
   font-family: var(--mono);
   font-size: 0.68rem;
   line-height: 1.35;
+  /* The log itself must not swallow touches meant for the terminal
+     underneath it; only the button bar takes input (see below). */
+  pointer-events: none;
+}
+
+.terminal-input-debug-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: none;
+  padding: 0.25rem 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.75);
+  pointer-events: auto;
+}
+
+/* Pushes the buttons to the right edge of the bar. */
+.terminal-input-debug-bar > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.terminal-input-debug-btn {
+  flex: none;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.terminal-input-debug-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.terminal-input-debug-log {
+  overflow: hidden;
+  padding: 0.35rem 0.5rem;
   white-space: pre-wrap;
   word-break: break-all;
-  pointer-events: none;
+}
+
+/* Manual-copy escape hatch (see createInputDebugOverlay). Needs real input
+   handling, unlike the log above it. */
+.terminal-input-debug-fallback {
+  flex: 1;
+  min-height: 6rem;
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  resize: none;
+  pointer-events: auto;
 }
 
 .terminal-inline-notice {
