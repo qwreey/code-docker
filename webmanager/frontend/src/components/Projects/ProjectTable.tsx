@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ExternalLink, FolderOpen, RefreshCw, Terminal as TerminalIcon, Trash2 } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
 import type { MiseToolEntry, MiseToolsResponse, ProjectInfo, ReclaimableEntry } from '../../api/types'
@@ -41,6 +41,7 @@ export function ProjectTable({
   onOpenTerminalSession,
   initialProjectPath,
   onInitialProjectPathConsumed,
+  onSelectedProjectChange,
 }: {
   projects: ProjectInfo[]
   codeServerUrl: string
@@ -52,11 +53,19 @@ export function ProjectTable({
   onOpenTerminalSession?: (name: string) => void
   initialProjectPath?: string | null
   onInitialProjectPathConsumed?: () => void
+  onSelectedProjectChange?: (path: string | null) => void
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('lastModified')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const { status: authStatus } = useAuthStatus()
   const [detailsPath, setDetailsPath] = useState<string | null>(null)
+  // Kept in a ref so this effect doesn't re-fire when the parent hands down a
+  // freshly-created callback on every render.
+  const onSelectedProjectChangeRef = useRef(onSelectedProjectChange)
+  onSelectedProjectChangeRef.current = onSelectedProjectChange
+  useEffect(() => {
+    onSelectedProjectChangeRef.current?.(detailsPath)
+  }, [detailsPath])
   const [rescanning, setRescanning] = useState<Set<string>>(new Set())
   const [miseTools, setMiseTools] = useState<Map<string, MiseToolEntry[]>>(new Map())
   const [miseLoading, setMiseLoading] = useState<Set<string>>(new Set())

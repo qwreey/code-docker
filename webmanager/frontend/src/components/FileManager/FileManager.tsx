@@ -43,10 +43,20 @@ export function FileManager({
   initialPath,
   onInitialPathConsumed,
   onOpenTerminal,
+  onPathChange,
+  embedded,
 }: {
   initialPath?: string | null
   onInitialPathConsumed?: () => void
   onOpenTerminal?: (cwd: string) => void
+  // Reports the folder currently being browsed so App.tsx can keep it in the
+  // URL (?path=...), which makes a reload land back where you were and a
+  // folder bookmarkable.
+  onPathChange?: (path: string | null) => void
+  // Set when rendered inside FileManagerDialog rather than as its own tab:
+  // the dialog's own header already says what this is, so the page heading
+  // and description would just be a second title stealing vertical space.
+  embedded?: boolean
 } = {}) {
   const [pathStack, setPathStack] = useState<Crumb[]>(() =>
     initialPath ? [{ label: '홈', path: null }, { label: basenamePosix(initialPath), path: initialPath }] : [{ label: '홈', path: null }],
@@ -76,6 +86,10 @@ export function FileManager({
 
   const currentPath = pathStack[pathStack.length - 1].path
   const currentDirPath = currentPath ?? resolvedRootPath
+
+  useEffect(() => {
+    onPathChange?.(currentPath)
+  }, [currentPath, onPathChange])
 
   // Same-origin fallback: nginx serves code-server (/) and webmanager (/manager)
   // from the same origin/port, so the page webmanager is loaded from is also
@@ -253,15 +267,19 @@ export function FileManager({
 
   return (
     <section>
-      <div className="section-header">
-        <h1>Files</h1>
-        <button type="button" className="btn btn-secondary btn-small" onClick={load} disabled={loading}>
-          {loading ? '불러오는 중...' : '새로고침'}
-        </button>
-      </div>
-      <p className="section-description">
-        컨테이너 파일시스템을 code-server가 열어둔 프로젝트 폴더에 국한되지 않고 탐색합니다.
-      </p>
+      {!embedded && (
+        <>
+          <div className="section-header">
+            <h1>Files</h1>
+            <button type="button" className="btn btn-secondary btn-small" onClick={load} disabled={loading}>
+              {loading ? '불러오는 중...' : '새로고침'}
+            </button>
+          </div>
+          <p className="section-description">
+            컨테이너 파일시스템을 code-server가 열어둔 프로젝트 폴더에 국한되지 않고 탐색합니다.
+          </p>
+        </>
+      )}
 
       <nav className="file-manager-breadcrumb" aria-label="현재 위치">
         {pathStack.map((crumb, i) => (

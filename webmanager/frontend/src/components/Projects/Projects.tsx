@@ -18,12 +18,17 @@ export function Projects({
   onOpenTerminalSession,
   initialProjectPath,
   onInitialProjectPathConsumed,
+  onSelectedProjectChange,
 }: {
   onOpenTerminal?: (cwd: string, label?: string, command?: string) => void
   onOpenFileManager?: (path: string) => void
   onOpenTerminalSession?: (name: string) => void
   initialProjectPath?: string | null
   onInitialProjectPathConsumed?: () => void
+  // Reports which project's detail sheet is open so App.tsx can keep it in
+  // the URL (?project=...) - makes a reload land back on the same project,
+  // and one project's page bookmarkable.
+  onSelectedProjectChange?: (path: string | null) => void
 } = {}) {
   const [data, setData] = useState<ProjectsResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -135,6 +140,7 @@ export function Projects({
             onOpenTerminalSession={onOpenTerminalSession}
             initialProjectPath={initialProjectPath}
             onInitialProjectPathConsumed={onInitialProjectPathConsumed}
+            onSelectedProjectChange={onSelectedProjectChange}
           />
         )
       )}

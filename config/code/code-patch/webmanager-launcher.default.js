@@ -90,6 +90,7 @@
     background: #1e1e1e;
 }
 .cd-webmanager-close,
+.cd-webmanager-popout,
 .cd-webmanager-maximize {
     width: 28px;
     height: 28px;
@@ -105,6 +106,7 @@
     font-size: 16px;
 }
 .cd-webmanager-close:hover,
+.cd-webmanager-popout:hover,
 .cd-webmanager-maximize:hover {
     background: rgba(255, 255, 255, .2);
 }
@@ -153,6 +155,30 @@
         const header = document.createElement("div");
         header.className = "cd-webmanager-modal-header";
 
+        // Pulls whatever the widget is currently showing out into a real
+        // browser tab. Reads the iframe's *live* location rather than
+        // MANAGER_URL so the new tab lands on the same tab/session/folder,
+        // not back on webmanager's default page - that is the whole point
+        // (webmanager keeps its own state in the URL now: ?session=,
+        // ?path=, ?project=). Same-origin, so contentWindow.location is
+        // readable; a cross-origin deployment would throw, hence the
+        // try/catch fallback to the base URL.
+        const popout = document.createElement("button");
+        popout.type = "button";
+        popout.className = "cd-webmanager-popout";
+        popout.textContent = "↗";
+        popout.title = "새 탭으로 열기";
+        popout.addEventListener("click", () => {
+            let url = MANAGER_URL;
+            try {
+                const live = overlay?.querySelector("iframe")?.contentWindow?.location?.href;
+                if (live && live !== "about:blank") url = live;
+            } catch {
+                // Cross-origin iframe - fall back to the base URL below.
+            }
+            window.open(url, "_blank", "noopener");
+        });
+
         const maximize = document.createElement("button");
         maximize.type = "button";
         maximize.className = "cd-webmanager-maximize";
@@ -170,6 +196,7 @@
         iframe.src = MANAGER_URL;
         iframe.title = "webmanager";
 
+        header.appendChild(popout);
         header.appendChild(maximize);
         header.appendChild(close);
         modal.appendChild(header);

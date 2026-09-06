@@ -203,3 +203,25 @@
   font-size: 0.78rem;
   margin-top: 0.1rem;
 }
+
+/* The file editor is a full-screen Sheet with a flush body (no padding, no
+   scrolling of its own) so CodeMirror can own the whole area and get a real
+   height to size against - a percentage height inside a padded, auto-scrolling
+   parent resolves against nothing and collapses. */
+.file-editor-body {
+  padding: 0;
+}
+
+.file-editor-body .code-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.file-editor-body .empty-state {
+  padding: 1rem 1.25rem;
+}
+
+.file-editor-notice {
+  padding: 0.75rem 1.25rem 0;
+  flex: none;
+}

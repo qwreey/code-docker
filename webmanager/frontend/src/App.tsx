@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { CollapseChevron } from './components/common/CollapseChevron'
+import { FileManagerDialog } from './components/FileManager/FileManagerDialog'
 import { ProjectInfoDialog } from './components/Projects/ProjectInfoDialog'
 import { SidebarContainer } from './components/Layout/SidebarContainer'
 import { SECTIONS } from './components/Layout/sections'
@@ -96,8 +97,28 @@ function splitPath(pathname: string): { root: string; section: SectionId | null 
   return { root: pathname.endsWith('/') ? pathname : pathname + '/', section: null }
 }
 
+// Deep-link query state. The pathname already says which tab is open
+// (splitPath above); this carries the one piece of *within*-tab state each of
+// three tabs has that is worth surviving a reload or being bookmarked —
+// which terminal session, which folder, which project.
+//
+// replaceState, not pushState: these change as you click around inside a tab,
+// and pushing an entry per folder step would redefine the browser's Back
+// button as "go up one directory" in Files and "previously selected session"
+// in Terminal, which is not what Back means anywhere else in this app.
+// Switching tabs drops the query entirely, since setActive pushes a bare
+// `rootPath + id` — a ?session= has no meaning on the Files tab.
+function writeQuery(key: string, value: string | null) {
+  const params = new URLSearchParams(window.location.search)
+  if (value) params.set(key, value)
+  else params.delete(key)
+  const qs = params.toString()
+  window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''))
+}
+
 function App() {
   const initialSplit = useMemo(() => splitPath(window.location.pathname), [])
+  const initialQuery = useMemo(() => new URLSearchParams(window.location.search), [])
   const rootPath = initialSplit.root
   const [active, setActiveState] = useState<SectionId>(() => initialSplit.section ?? 'supervisor')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -128,8 +149,22 @@ function App() {
     command?: string
     session?: string
   } | null>(null)
-  const [pendingFilesPath, setPendingFilesPath] = useState<string | null>(null)
-  const [pendingProjectPath, setPendingProjectPath] = useState<string | null>(null)
+  const [pendingFilesPath, setPendingFilesPath] = useState<string | null>(
+    () => (initialSplit.section === 'files' ? initialQuery.get('path') : null),
+  )
+  const [pendingProjectPath, setPendingProjectPath] = useState<string | null>(
+    () => (initialSplit.section === 'projects' ? initialQuery.get('project') : null),
+  )
+  // Only meaningful for the very first render of the Terminal tab — see
+  // Terminal.tsx's restoreSession prop for why a URL-supplied session name
+  // must be verified rather than selected blind.
+  const [restoreTerminalSession, setRestoreTerminalSession] = useState<string | null>(
+    () => (initialSplit.section === 'terminal' ? initialQuery.get('session') : null),
+  )
+  // The file browser as an overlay over the current tab (see
+  // FileManagerDialog). '' means "the default root", matching FileManager's
+  // own null-path convention, since null already means "closed" here.
+  const [filesDialogPath, setFilesDialogPath] = useState<string | null>(null)
   // Not a cross-tab payload like the three above — this one opens a dialog
   // in place (see ProjectInfoDialog), which is the whole point: checking
   // which project the current shell sits in shouldn't navigate you out of
@@ -160,6 +195,25 @@ function App() {
     withViewTransition(() => setActive('files'))
   }
 
+  // The overlay variant, used from the Terminal tab: same reasoning as
+  // openProjectInfo above — looking at a file an agent just wrote shouldn't
+  // cost you the terminal you were watching.
+  function openFileManagerOverlay(path: string) {
+    setFilesDialogPath(path)
+  }
+
+  const handleActiveSessionChange = useCallback((name: string | null) => {
+    writeQuery('session', name)
+  }, [])
+
+  const handleFilesPathChange = useCallback((path: string | null) => {
+    writeQuery('path', path)
+  }, [])
+
+  const handleSelectedProjectChange = useCallback((path: string | null) => {
+    writeQuery('project', path)
+  }, [])
+
   // Full Projects tab, with the managing actions ProjectInfoDialog leaves
   // out (rescan, reclaimable-folder deletion, project deletion).
   function openProject(path: string) {
@@ -188,7 +242,11 @@ function App() {
   useEmbedEscapeClose()
 
   return (
-    <div className="app-shell">
+    /* The Terminal tab hides the app's own mobile top bar and adopts its
+       hamburger into its own header row (Terminal.tsx / Terminal.css) — with
+       a phone keyboard up there is very little height left, and a whole bar
+       carrying nothing but a menu button is the cheapest thing to give up. */
+    <div className={`app-shell${active === 'terminal' ? ' app-shell-terminal' : ''}`}>
       <div className="mobile-topbar">
         <button
           type="button"
@@ -267,6 +325,7 @@ function App() {
               onOpenTerminalSession={openTerminalSession}
               initialProjectPath={pendingProjectPath}
               onInitialProjectPathConsumed={() => setPendingProjectPath(null)}
+              onSelectedProjectChange={handleSelectedProjectChange}
             />
           )}
           {active === 'mise' && <Mise />}
@@ -278,8 +337,12 @@ function App() {
               <Terminal
                 initialOpen={pendingTerminalOpen}
                 onInitialOpenConsumed={() => setPendingTerminalOpen(null)}
-                onOpenFileManager={openInFileManager}
+                onOpenFileManager={openFileManagerOverlay}
                 onOpenProject={openProjectInfo}
+                onToggleSidebar={() => setSidebarOpen((v) => !v)}
+                restoreSession={restoreTerminalSession}
+                onRestoreSessionConsumed={() => setRestoreTerminalSession(null)}
+                onActiveSessionChange={handleActiveSessionChange}
               />
             </RequiresUnlock>
           )}
@@ -291,6 +354,7 @@ function App() {
                   initialPath={pendingFilesPath}
                   onInitialPathConsumed={() => setPendingFilesPath(null)}
                   onOpenTerminal={openInTerminal}
+                  onPathChange={handleFilesPathChange}
                 />
               </RequiresUnlock>
             </Suspense>
@@ -310,6 +374,15 @@ function App() {
           )}
         </main>
       </div>
+      <FileManagerDialog
+        path={filesDialogPath}
+        onClose={() => setFilesDialogPath(null)}
+        onOpenTerminal={openInTerminal}
+        onOpenInFilesTab={(path) => {
+          setPendingFilesPath(path)
+          withViewTransition(() => setActive('files'))
+        }}
+      />
       <ProjectInfoDialog
         path={projectInfoPath}
         onClose={() => setProjectInfoPath(null)}

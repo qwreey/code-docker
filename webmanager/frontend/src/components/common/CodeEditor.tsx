@@ -14,6 +14,8 @@ export interface CodeEditorProps {
   /** 'ini' covers INI-shaped formats (e.g. gitconfig: `[section]` + `key = value`). */
   language?: CodeEditorLanguage
   readOnly?: boolean
+  /** Soft-wrap long lines instead of scrolling horizontally. */
+  wrap?: boolean
   /** CSS height, e.g. '400px' or '60vh'. Caller decides — not hardcoded here. */
   height?: string
 }
@@ -38,13 +40,14 @@ const baseTheme = EditorView.theme({
   '.cm-scroller': { overflow: 'auto', fontFamily: 'var(--mono)' },
 })
 
-export function CodeEditor({ value, onChange, language, readOnly, height }: CodeEditorProps) {
+export function CodeEditor({ value, onChange, language, readOnly, wrap, height }: CodeEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
   const languageCompartment = useRef(new Compartment())
   const readOnlyCompartment = useRef(new Compartment())
   const themeCompartment = useRef(new Compartment())
+  const wrapCompartment = useRef(new Compartment())
   const applyingExternalValue = useRef(false)
 
   useEffect(() => {
@@ -72,6 +75,7 @@ export function CodeEditor({ value, onChange, language, readOnly, height }: Code
         languageCompartment.current.of(languageExtension(language)),
         readOnlyCompartment.current.of(EditorState.readOnly.of(!!readOnly)),
         themeCompartment.current.of(themeExtension(media.matches)),
+        wrapCompartment.current.of(wrap ? EditorView.lineWrapping : []),
       ],
     })
 
@@ -120,6 +124,14 @@ export function CodeEditor({ value, onChange, language, readOnly, height }: Code
       effects: readOnlyCompartment.current.reconfigure(EditorState.readOnly.of(!!readOnly)),
     })
   }, [readOnly])
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: wrapCompartment.current.reconfigure(wrap ? EditorView.lineWrapping : []),
+    })
+  }, [wrap])
 
   return <div ref={containerRef} className="code-editor" style={{ height: height ?? '320px' }} />
 }

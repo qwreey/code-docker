@@ -74,3 +74,43 @@
     transform: translateY(0);
   }
 }
+
+/* Full-viewport variant (Sheet's size="full"). Used where the dialog's
+   content is a screen in its own right - the file browser opened over the
+   terminal, the file editor - rather than a short form. On a phone the
+   default centered card plus an open keyboard left almost no room for the
+   content itself, which is exactly the complaint this exists to fix. */
+.sheet-backdrop-full {
+  padding: 0;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.sheet-content-full {
+  max-width: 100%;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: none;
+  border-radius: 0;
+}
+
+/* Body that manages its own scrolling/padding (Sheet's bodyClassName), for
+   a child that fills the dialog - e.g. a CodeMirror editor that needs a
+   real height to size against. */
+.sheet-body-flush {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 720px) {
+  .sheet-content-full {
+    max-height: 100dvh;
+    border-radius: 0;
+    animation: none;
+  }
+}

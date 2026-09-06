@@ -9,12 +9,22 @@ export function Sheet({
   title,
   children,
   headerActions,
+  size = 'default',
+  bodyClassName,
 }: {
   open: boolean
   onClose: () => void
   title: string
   children: ReactNode
   headerActions?: ReactNode
+  // 'full' takes the whole viewport instead of the centered 760px card.
+  // Added for content that is itself a screen rather than a form - a file
+  // browser, a code editor - where the default card plus a phone keyboard
+  // leaves a uselessly small strip of actual content.
+  size?: 'default' | 'full'
+  // Lets a full-screen consumer opt out of .sheet-body's padding/scrolling
+  // and manage its own layout instead.
+  bodyClassName?: string
 }) {
   const dialogRef = useRef<HTMLDivElement>(null)
 
@@ -34,9 +44,9 @@ export function Sheet({
   if (!open) return null
 
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
+    <div className={`sheet-backdrop${size === 'full' ? ' sheet-backdrop-full' : ''}`} onClick={onClose}>
       <div
-        className="sheet-content"
+        className={`sheet-content${size === 'full' ? ' sheet-content-full' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -53,7 +63,7 @@ export function Sheet({
             </button>
           </div>
         </div>
-        <div className="sheet-body">{children}</div>
+        <div className={`sheet-body${bodyClassName ? ` ${bodyClassName}` : ''}`}>{children}</div>
       </div>
     </div>
   )

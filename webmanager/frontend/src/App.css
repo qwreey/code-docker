@@ -130,6 +130,15 @@
     z-index: 30;
   }
 
+  /* On the Terminal tab this bar is dropped entirely and its hamburger is
+     rendered inside .terminal-topbar instead (Terminal.tsx's
+     onToggleSidebar / .terminal-hamburger-btn), merging the two rows into
+     one. Terminal.css's own height calc no longer subtracts this bar's
+     3.6rem, which is where the reclaimed space goes. */
+  .app-shell-terminal .mobile-topbar {
+    display: none;
+  }
+
   .app-content {
     padding: 1.25rem;
   }
