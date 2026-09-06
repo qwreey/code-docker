@@ -301,3 +301,82 @@ xterm은 드래그가 화면 요소 밖에 있으면 `_dragScrollAmount`로 자�
 부수 발견: 데스크탑에서도 `visualViewport` inset이 `0.45px`로 나온다(반올림 노이즈).
 `keepFocus`의 "키보드 열림" 판정을 `> 0`에서 `>= 80px`로 바꿨다 — 진짜 키보드는
 수백 px을 덮으므로 그 아래는 전부 노이즈다.
+
+
+---
+
+# 실기기 2차 결과 (2026-09-06) — 한글 원인 확정
+
+사용자가 복사 버튼으로 보내준 실측 로그. **이 절이 최신 상태다.**
+
+기기: Samsung Browser 30 / Chrome 143 / Android, `inputMode: diff`,
+`pointer: coarse`, 필드는 `textarea`, 포커스는 워크어라운드 필드.
+
+## 로그가 말해준 것
+
+```
+field keydown ic=false key=Unidentified v=" "
+field compositionstart ic=- v=" "
+field input ic=true v=" ㅇ"
+field compositionend ic=- v=" ㅇ"
+  -> "ㅇ"
+field keydown ic=false key=Unidentified v=" ㅇ"
+field compositionstart ic=- v=" ㅇ"
+field input ic=true v=" ㅇㅏ"
+field compositionend ic=- v=" ㅇㅏ"
+  -> "ㅏ"
+...
+```
+
+세 가지가 한 번에 확정됐다:
+
+1. **`compositionstart`는 뜬다.** 조합 자체는 이 필드에 붙는다 — "속성 4개(aria-hidden/
+   tabIndex/rows/name) 때문에 조합이 아예 안 붙는다"는 1차 가설은 **틀렸다.**
+2. **자모 하나마다 `compositionstart → input → compositionend` 한 사이클이 통째로
+   끝난다.** 즉 IME가 **조합 영역을 유지하지 않고 매 입력을 즉시 확정한다.**
+   그래서 `ㅇ`+`ㅏ`가 `아`로 합쳐지지 않고 필드에 `ㅇㅏ`로 쌓이고,
+   `안녕claude`가 `ㅇㅏㄴㄴㅕㅇclaude`가 된다.
+3. **diff와 캐럿 고정은 정상이다.** 매 이벤트가 정확히 한 글자씩만 보내고, 순서
+   뒤집힘도 중복도 없다. 1차에서 고친 두 건은 실제로 해결됐다.
+
+## 원인: 필드에 실제 크기가 없었다
+
+xterm의 helper textarea는 **매 렌더마다 커서 셀 위치에 실제 크기로 배치된다**:
+
+```js
+this._textarea.style.left = s+"px"; this._textarea.style.top = i+"px";
+this._textarea.style.width = Math.max(r.width, 1)+"px";
+this._textarea.style.height = Math.max(r.height, 1)+"px";
+```
+
+실측하면 `9px × 21px`이다. 반면 우리 필드는 `width:0; height:0; left:-9999em`
+이었다. **안드로이드 IME는 조합 텍스트를 그릴 자리가 없으면 조합을 포기하고 매
+입력을 즉시 커밋한다** — 로그가 정확히 그 모양이다. 그리고 이게 "xterm에서는
+조합이 되는데 우리 필드에서는 안 된다"를 설명하는 **마지막으로 남은 구조적 차이**
+였다(속성은 이미 전부 동일하게 맞춰둔 상태였다).
+
+## 수정
+
+- 필드에 진짜 박스를 준다. `.xterm-helpers`(xterm 자기 textarea의 부모) 아래로
+  옮겨서 좌표계를 동일하게 만들고, `term.onCursorMove`로 xterm textarea의
+  `left/top/width/height/lineHeight`를 그대로 따라간다 — 조합/후보 팝업이 실제로
+  글자가 들어가는 자리에 뜬다. 실측: 두 textarea가 `9×21 @ (27,146)`으로 완전히 일치.
+- **`pointer-events: none`.** 이게 터미널 영역 안에 필드를 두는 걸 안전하게 만드는
+  핵심이다. 2026-08-21에 전체 오버레이를 시도했다가 되돌린 이유가 "모든 터치를
+  가로채서 tmux/vim/claude의 마우스 조작이 깨진다"였는데, **포커스만 필요한 필드는
+  히트 테스트가 애초에 필요 없다.** 히트 테스트에서 빼버리면 그 실패 모드가
+  구조적으로 불가능해진다.
+- 디버그 로그에 `compositionupdate`와 `data`를 추가했다. 조합을 유지하는 IME는 한
+  쌍의 start/end 사이에 update가 여러 번 뜨고, 포기한 IME는 하나도 안 뜬다 —
+  이 차이가 로그에서 가장 중요한 정보인데 1차 로그엔 없어서 왕복이 한 번 더 들었다.
+
+## 아직 확인 안 된 것
+
+실기기에서 실제로 조합이 붙는지. 브라우저에서는 파이프라인만 확인했다 — 정상적인
+조합 사이클(start → update → input×N → end)을 합성해서 넣으면 조합 중엔 아무것도
+안 보내고 `compositionend`에서 `안` 하나만 보낸다.
+
+**이 수정으로도 자모가 쪼개지면**, 남은 선택지는 하나다: **자모 조합을 우리가 직접
+구현하는 것**(한글 오토마타). 로그상 IME가 자모를 순서대로 정확히 주고 있으므로
+기술적으로는 가능하지만, 백스페이스/겹받침/복합모음/받침 이동까지 다뤄야 하고
+한글 전용이라 다른 IME(일본어/중국어)는 여전히 깨진다. 착수 전 사용자 확인 필요.

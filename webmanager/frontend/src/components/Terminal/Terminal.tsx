@@ -1594,7 +1594,11 @@ export function Terminal({
       if (!debug) return
       const composing = 'isComposing' in e ? String((e as InputEvent).isComposing) : '-'
       const key = e instanceof KeyboardEvent ? ` key=${e.key}` : ''
-      debug.log(`${source} ${e.type} ic=${composing}${key} v=${debugQuote(value ?? '')}`)
+      // `data` is what actually distinguishes "the IME is composing" from
+      // "the IME committed a character and moved on" — without it the two
+      // read identically in the log, which cost a round trip once already.
+      const data = 'data' in e && (e as CompositionEvent).data != null ? ` d=${debugQuote(String((e as CompositionEvent).data))}` : ''
+      debug.log(`${source} ${e.type} ic=${composing}${key}${data} v=${debugQuote(value ?? '')}`)
     }
     const emit = (bytes: string) => {
       debug?.log(`  -> ${debugQuote(bytes)}`)
@@ -1656,29 +1660,62 @@ export function Terminal({
     field.setAttribute('autocorrect', 'off')
     field.setAttribute('autocapitalize', 'off')
     field.setAttribute('spellcheck', 'false')
-    // Same fully-invisible, off-screen placement as xterm's own hidden
-    // textarea (xterm.css's .xterm-helper-textarea) — never meant to be
-    // seen, only to hold real DOM/keyboard focus. Deliberately NOT
-    // overlaying the terminal: a 2026-08-21 detour tried that (so a tap
-    // would land on it directly with no focus redirect needed) and it
-    // swallowed every touch before xterm's own mouse handling could see it,
-    // breaking tmux pane selection, vim/htop mouse mode and Claude Code's
-    // click-driven prompts. Staying off to the side keeps taps landing on
-    // xterm first; the focus listener below is what redirects afterwards.
+    // Invisible, but NOT zero-sized and NOT parked off-screen — and that
+    // distinction turned out to be the whole ballgame for IME composition.
+    //
+    // Measured on a Galaxy (Samsung Browser 30, 2026-09-06): with the field
+    // at width:0/height:0/left:-9999em, every single jamo arrived as its own
+    // complete compositionstart → input → compositionend cycle, so "안녕"
+    // reached the terminal as "ㅇㅏㄴㄴㅕㅇ". The IME was refusing to hold a
+    // composing region at all. xterm's own helper textarea, which composes
+    // correctly on the same device, is the counter-example: it is given a
+    // real box at the cursor cell every render
+    // (`width: Math.max(r.width, 1) + 'px'`, measured at 9px). An Android
+    // IME needs somewhere to draw composing text; given nowhere, it commits
+    // each keystroke instead of composing.
+    //
+    // pointer-events: none is what makes living inside the terminal's own
+    // area safe. A 2026-08-21 detour put a full-size field on top of the
+    // terminal and had to be reverted because it swallowed every touch
+    // before xterm's mouse handling could see it — breaking tmux pane
+    // selection, vim/htop mouse mode and Claude Code's click-driven
+    // prompts. A field that only ever needs *focus* does not need
+    // hit-testing at all, so taking it out of hit-testing entirely keeps
+    // that failure impossible while still giving the IME a real box.
     Object.assign(field.style, {
       position: 'absolute',
       opacity: '0',
-      left: '-9999em',
-      top: '0',
-      width: '0',
-      height: '0',
+      left: '0px',
+      top: '0px',
+      width: '1ch',
+      height: '1.2em',
       zIndex: '-5',
       border: '0',
       padding: '0',
       resize: 'none',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      pointerEvents: 'none',
     })
-    container.appendChild(field)
+    // Parented next to xterm's own helper textarea rather than on the
+    // container, so the geometry copied below means the same thing (same
+    // containing block) instead of being off by the container's padding.
+    ;(textarea.parentElement ?? container).appendChild(field)
     mobileInputRef.current = field
+
+    // Track xterm's own helper textarea, which it keeps parked on the cursor
+    // cell — that puts this field there too, so a keyboard that draws a
+    // composing/candidate popup anchors it where the text is actually going.
+    const syncFieldBox = () => {
+      const from = textarea.style
+      if (from.width) field.style.width = from.width
+      if (from.height) field.style.height = from.height
+      if (from.left) field.style.left = from.left
+      if (from.top) field.style.top = from.top
+      if (from.lineHeight) field.style.lineHeight = from.lineHeight
+    }
+    syncFieldBox()
+    const cursorDisposable = term.onCursorMove(syncFieldBox)
 
     // One sentinel character is always kept in the field: deleting from an
     // already-empty field fires no input event at all (nothing for the
@@ -1755,12 +1792,15 @@ export function Terminal({
           emit('\r')
         }
       }
+      const onCompositionUpdate = (e: Event) => logEvent('field', e, field.value)
       field.addEventListener('compositionstart', onCompositionStart)
+      field.addEventListener('compositionupdate', onCompositionUpdate)
       field.addEventListener('compositionend', onCompositionEnd)
       field.addEventListener('input', onInput)
       field.addEventListener('keydown', onKeyDown)
       cleanups.push(() => {
         field.removeEventListener('compositionstart', onCompositionStart)
+        field.removeEventListener('compositionupdate', onCompositionUpdate)
         field.removeEventListener('compositionend', onCompositionEnd)
         field.removeEventListener('input', onInput)
         field.removeEventListener('keydown', onKeyDown)
@@ -1911,13 +1951,20 @@ export function Terminal({
         composing = false
         resetField('blur')
       }
+      // Observed only, never acted on: an IME that keeps a composing region
+      // fires several of these between one compositionstart/end pair, and an
+      // IME that has given up composing fires none. That difference is the
+      // single most useful thing in a copied debug log.
+      const onCompositionUpdate = (e: Event) => logEvent('field', e, field.value)
       field.addEventListener('compositionstart', onCompositionStart)
+      field.addEventListener('compositionupdate', onCompositionUpdate)
       field.addEventListener('compositionend', onCompositionEnd)
       field.addEventListener('input', onInput)
       field.addEventListener('keydown', onKeyDown)
       field.addEventListener('blur', onBlur)
       cleanups.push(() => {
         field.removeEventListener('compositionstart', onCompositionStart)
+        field.removeEventListener('compositionupdate', onCompositionUpdate)
         field.removeEventListener('compositionend', onCompositionEnd)
         field.removeEventListener('input', onInput)
         field.removeEventListener('keydown', onKeyDown)
@@ -1938,6 +1985,7 @@ export function Terminal({
 
     return () => {
       textarea.removeEventListener('focus', onTextareaFocus)
+      cursorDisposable.dispose()
       for (const fn of cleanups) fn()
       cleanups = []
       field.remove()
