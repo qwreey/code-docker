@@ -114,6 +114,10 @@ type Session struct {
 	// state instead of a bounded byte window — see modes.go for why the
 	// ring alone can't answer "is this session in the alt screen".
 	modes *modeTracker
+	// clip strips OSC 52 out of what goes *into* ring, so a clipboard write
+	// isn't performed again every time a client reattaches and the replay
+	// re-runs it — see oscfilter.go. Live output is unaffected.
+	clip *clipboardFilter
 
 	// done is closed exactly once, when Close() actually runs (guarded by
 	// the closed bool under mu, not a sync.Once, since they'd otherwise
@@ -214,6 +218,7 @@ func newSessionCmd(name, command string, args []string, extraEnv []string, scrol
 		ptmx:           ptmx,
 		ring:           newRingBuffer(scrollbackBytes),
 		modes:          newModeTracker(),
+		clip:           newClipboardFilter(),
 		sinks:          make(map[uint64]writerFunc),
 		lastAttachedAt: now,
 		done:           make(chan struct{}),
@@ -244,7 +249,7 @@ func (s *Session) pump() {
 			// duplicated output. See Attach's own comment for the other half
 			// of this.
 			s.mu.Lock()
-			s.ring.Write(chunk)
+			s.ring.Write(s.clip.Filter(chunk))
 			s.modes.Feed(chunk)
 			sinks := make(map[uint64]writerFunc, len(s.sinks))
 			for id, sink := range s.sinks {
