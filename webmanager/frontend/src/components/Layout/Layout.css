@@ -1,5 +1,5 @@
 .sidebar {
-  width: 220px;
+  width: var(--sidebar-width, 220px);
   flex-shrink: 0;
   min-height: 0;
   border-right: 1px solid var(--border);
@@ -7,25 +7,55 @@
   display: flex;
   flex-direction: column;
   padding: 1rem 0.75rem;
-  transition: margin-left 0.15s ease;
 }
 
 /* Desktop-only "hide the sidebar entirely" mode - see App.tsx's
    .sidebar-rail for the narrow strip that stays behind as the re-expand
    affordance while this is active. Left as a no-op below 721px since the mobile
-   drawer (.sidebar-open, above) already fully owns visibility there.
+   drawer (.sidebar-open, below) already fully owns visibility there.
 
-   Deliberately margin-left (slides the whole, still-220px-wide box off the
-   left edge), not width - animating width forces every child
-   (.sidebar-title/.sidebar-list-wrap/footer) to reflow and visibly
-   compress on every frame of the transition. Keeping the box's own width
-   fixed and only moving its position means nothing inside it ever
-   reflows; margin-left still counts toward the flex item's main-axis
-   footprint (unlike transform), so .app-main still smoothly reclaims the
-   freed space as this animates, same end state as the old width:0. */
+   The sidebar is taken *out of the flex flow entirely* on desktop
+   (position: absolute) and only ever moved by transform. Two earlier
+   versions animated something that was still part of the layout - width:0
+   first, then margin-left: -220px - and both made .app-main's width change
+   on every frame of the transition for the whole 150ms. That is fine for a
+   static page and actively bad for the Terminal tab: Terminal.tsx's
+   ResizeObserver calls fitAddon.fit() *and* sends a `resize` frame to the
+   PTY on every one of those, so a single sidebar toggle turned into ~10
+   reflows and ~10 SIGWINCHes at the shell (visible as the terminal
+   thrashing, and as re-wrapped output in anything that redraws on resize).
+   With the box positioned out of flow, .app-main's margin-left flips once,
+   in one commit (App.css), so the terminal refits exactly once; the
+   animation is pure transform on this box plus a matching compensating
+   transform on .app-main, neither of which is a layout change at all. */
 @media (min-width: 721px) {
+  .sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    /* Above .app-main so the two edges meet cleanly mid-slide even if the
+       compensating animations land a subpixel apart. */
+    z-index: 20;
+    transition: transform var(--sidebar-anim-duration, 0.16s) ease;
+  }
+
+  /* Travels exactly as far as .app-main's compensating animation does
+     (--sidebar-shift, i.e. 220 - the rail's 16), not its own full width -
+     equal distances are what keep this box's right edge and the content's
+     left edge flush for every frame in between. Sliding the full 220 was
+     measurably worse: the two edges drift apart mid-flight and open a gap
+     that peaks at the rail's width. The 16px of sidebar left on screen as
+     a result is covered by .sidebar-rail, which is stacked above this box
+     for that reason (App.css). */
   .sidebar-collapsed {
-    margin-left: -220px;
+    transform: translateX(calc(-1 * var(--sidebar-shift, 204px)));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
   }
 }
 

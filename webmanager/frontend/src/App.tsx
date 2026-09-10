@@ -123,14 +123,21 @@ function App() {
   const [active, setActiveState] = useState<SectionId>(() => initialSplit.section ?? 'supervisor')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed)
+  // Which way the sidebar last moved, or null before the first toggle of
+  // this page load. Only drives the compensating slide animation on
+  // .app-main (App.css) - the layout itself is already correct the instant
+  // sidebarCollapsed flips, which is the whole point (see App.css's
+  // "sidebar collapse" comment). Never cleared: the value alternates by
+  // construction, so the animation-name always changes and re-triggers,
+  // and a finished animation leaves no transform behind.
+  const [sidebarShift, setSidebarShift] = useState<'in' | 'out' | null>(null)
   const { status: authStatus } = useAuthStatus()
 
   function toggleSidebarCollapsed() {
-    setSidebarCollapsed((v) => {
-      const next = !v
-      saveSidebarCollapsed(next)
-      return next
-    })
+    const next = !sidebarCollapsed
+    setSidebarCollapsed(next)
+    saveSidebarCollapsed(next)
+    setSidebarShift(next ? 'out' : 'in')
   }
 
   function setActive(id: SectionId) {
@@ -246,7 +253,11 @@ function App() {
        hamburger into its own header row (Terminal.tsx / Terminal.css) — with
        a phone keyboard up there is very little height left, and a whole bar
        carrying nothing but a menu button is the cheapest thing to give up. */
-    <div className={`app-shell${active === 'terminal' ? ' app-shell-terminal' : ''}`}>
+    <div
+      className={`app-shell${active === 'terminal' ? ' app-shell-terminal' : ''}${
+        sidebarCollapsed ? ' app-shell-sidebar-collapsed' : ''
+      }`}
+    >
       <div className="mobile-topbar">
         <button
           type="button"
@@ -297,7 +308,7 @@ function App() {
           </span>
         </button>
       )}
-      <div className="app-main">
+      <div className={`app-main${sidebarShift ? ` app-main-shift-${sidebarShift}` : ''}`}>
         <EnvVersionBanner />
         <RouterAuthSetupBanner />
         <main className="app-content">

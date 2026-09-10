@@ -1,10 +1,26 @@
 .app-shell {
   display: flex;
   height: 100vh;
-  /* .sidebar-collapsed (Layout.css) slides the sidebar off the left edge
-     via a negative margin rather than shrinking its width - this keeps
-     that slide from ever creating a stray horizontal scrollbar. */
+  /* Containing block for the out-of-flow .sidebar/.sidebar-rail on desktop
+     (Layout.css / below). */
+  position: relative;
+  /* Both halves of the collapse animation (the sidebar sliding past the
+     left edge, and .app-main's compensating transform overhanging the
+     right one) push painted content outside the shell - this keeps either
+     from ever creating a stray horizontal scrollbar. */
   overflow-x: hidden;
+  /* Single source of truth for the collapse geometry: the sidebar's own
+     width, the width of the rail left behind in its place, and the
+     distance everything therefore travels. Declared here rather than in
+     :root so the sidebar box (Layout.css) and the content next to it
+     inherit the same numbers. */
+  --sidebar-width: 220px;
+  --sidebar-rail-width: 16px;
+  --sidebar-shift: calc(var(--sidebar-width) - var(--sidebar-rail-width));
+  --sidebar-anim-duration: 0.16s;
+  /* Painted behind the rail's own 16px strip for the one frame between the
+     rail unmounting and the sidebar sliding over that spot. */
+  background: var(--surface);
 }
 
 /* Column wrapper around EnvVersionBanner + .app-content — kept as a
@@ -18,6 +34,73 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* ── sidebar collapse: size once, animate with transform ─────────────────
+   The sidebar is out of flow on desktop (see Layout.css's long comment on
+   why), so the space it occupies is *this* box's margin-left, and it flips
+   between the two values below in a single commit with no transition on
+   it. That is the whole point: .app-content resizes exactly once per
+   toggle instead of once per animation frame, which is what stops the
+   Terminal tab from refitting and SIGWINCH-ing the PTY ~10 times per
+   click.
+
+   Flipping the margin instantly would, on its own, make the content jump
+   204px sideways while the sidebar was still sliding. So the toggle also
+   tags this box with one of the two keyframes below, which start it at the
+   position it *was* at and animate it back to zero - a transform, which
+   the compositor handles without any layout, so it costs no resizes. The
+   sidebar's own transform transition runs for the same duration in the
+   same commit, so the two edges travel together and stay flush.
+
+   App.tsx sets the direction class and never clears it: the class
+   alternates by construction (a toggle always reverses direction), so the
+   animation-name always changes and always re-triggers, and a finished
+   animation with the default `animation-fill-mode: none` leaves no
+   transform behind to interfere with anything. */
+@media (min-width: 721px) {
+  .app-main {
+    margin-left: var(--sidebar-width);
+  }
+
+  .app-shell-sidebar-collapsed .app-main {
+    margin-left: var(--sidebar-rail-width);
+  }
+
+  .app-main-shift-in {
+    animation: app-main-shift-in var(--sidebar-anim-duration) ease;
+  }
+
+  .app-main-shift-out {
+    animation: app-main-shift-out var(--sidebar-anim-duration) ease;
+  }
+}
+
+/* expanding: content was at the rail's left edge, ends 204px further right */
+@keyframes app-main-shift-in {
+  from {
+    transform: translateX(calc(-1 * var(--sidebar-shift)));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* collapsing: content was at the sidebar's right edge, ends 204px left */
+@keyframes app-main-shift-out {
+  from {
+    transform: translateX(var(--sidebar-shift));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-main-shift-in,
+  .app-main-shift-out {
+    animation: none;
+  }
 }
 
 .app-content {
@@ -51,12 +134,28 @@
 }
 
 @media (min-width: 721px) {
+  /* Out of flow for the same reason the sidebar itself is: the hover
+     widening below is a width change, and as a flex item that meant merely
+     moving the mouse over the strip resized .app-main - a smaller version
+     of the toggle problem, but the terminal refit and PTY resize it
+     triggered were exactly the same ones. Absolutely positioned, its 16px
+     is reserved by .app-main's margin-left instead, and the hover growth
+     just overlaps 4px of content. */
   .sidebar-rail {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    /* Above the sidebar (z-index 20), not below it: the collapsed sidebar
+       deliberately stops 16px short of fully off-screen so its slide covers
+       the same distance as .app-main's (Layout.css), and this strip is what
+       hides the sliver that leaves behind. */
+    z-index: 30;
     display: flex;
     align-items: center;
     justify-content: center;
     flex: none;
-    width: 16px;
+    width: var(--sidebar-rail-width);
     padding: 0;
     border: none;
     border-right: 1px solid var(--border);
@@ -73,7 +172,7 @@
 
   .sidebar-rail:hover,
   .sidebar-rail:focus-visible {
-    width: 20px;
+    width: calc(var(--sidebar-rail-width) + 4px);
     background: var(--surface-hover);
     color: var(--text-heading);
   }
