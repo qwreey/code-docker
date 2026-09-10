@@ -92,27 +92,29 @@ type authStatusRaw struct {
 	SubscriptionType string `json:"subscriptionType"`
 }
 
-// GetAuthStatus runs `claude auth status --json` with a bounded timeout.
-// Any failure (binary missing/broken, non-zero exit, timeout, unparseable
-// output) is returned as an error for the caller to degrade to `auth: null`
-// — never surfaced as an HTTP error, since a genuinely logged-out or
-// offline state is expected, not exceptional.
+// GetAuthStatus runs `claude auth status --json` with a bounded timeout and
+// reports the login state it prints. Only a failure to *learn* the state
+// (binary missing/broken, timeout, unparseable output) is returned as an
+// error for the caller to degrade to `auth: null` — a genuinely logged-out
+// or offline state is expected, not exceptional, and comes back as a normal
+// Auth with LoggedIn false.
 //
-// Whether this error path can ever actually fire for a plain "not logged
-// in" user, as opposed to only real check failures, is unverified: `claude
-// 2.1.220`'s own --json output (confirmed live, see below) already reports
-// state via the loggedIn field with a clean exit 0 for the logged-in case,
-// which is the shape a status subcommand built for scripting would be
-// expected to use for "not logged in" too — but that specific case hasn't
-// been observed directly (doing so would require logging out a real,
-// in-use session just to check). If it turns out the CLI instead exits
-// non-zero for a logged-out user, that case is indistinguishable here from
-// any other failure, and the caller-visible error (see handleClaudeStatus's
-// AuthError) will read as a generic "확인 실패" rather than "로그아웃됨" —
-// the deliberately safe direction, not a bug: an operator investigating an
-// unexpected logged-out-looking state should see "the check itself
-// failed, here's why" rather than a confident but potentially wrong
-// "you're logged out".
+// The exit code is deliberately NOT the signal here. Measured against claude
+// 2.1.266: logged in exits 0, logged out exits **1** — while printing a
+// perfectly well-formed `{"loggedIn": false, "authMethod": "none", ...}` on
+// stdout either way. The earlier version of this function keyed off
+// cmd.Output()'s error and so turned every logged-out user into a bare
+// "exit status 1" AuthError; the frontend's authError branch then shows a
+// retry button instead of a login CTA, which made re-login after an expired
+// session impossible from the web UI (that branch is honest about not
+// knowing — the bug was that we claimed not to know). So: parse stdout
+// first, and fall back to the exit error only when there's nothing
+// parseable there. This also keeps working if a future CLI goes back to
+// exiting 0 for logged-out.
+//
+// Timeouts skip the parse entirely — a killed process's stdout can be a
+// truncated prefix, and "the check didn't finish" is a real check failure,
+// not a login state.
 //
 // Verified quirk (claude 2.1.220): the CLI nulls out email/orgId/orgName in
 // this command's own output whenever CLAUDE_CONFIG_DIR is present in its
@@ -128,24 +130,28 @@ func GetAuthStatus(ctx context.Context, binPath string) (Auth, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, binPath, "auth", "status", "--json")
-	out, err := cmd.Output()
-	if err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return Auth{}, fmt.Errorf("claude auth status timed out after %s", authTimeout)
-		}
-		// cmd.Output() populates ExitError.Stderr (since Stderr wasn't
-		// otherwise redirected), so a non-zero exit carries the CLI's own
-		// explanation through to the caller instead of the useless bare
-		// "exit status 1" err.Error() would otherwise give.
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
-			return Auth{}, fmt.Errorf("claude auth status: %s", strings.TrimSpace(string(exitErr.Stderr)))
-		}
-		return Auth{}, err
+	// cmd.Output() fills the returned slice with whatever landed on stdout
+	// even when it also returns an error, which is exactly the logged-out
+	// case above.
+	out, runErr := cmd.Output()
+
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return Auth{}, fmt.Errorf("claude auth status timed out after %s", authTimeout)
 	}
 
 	var raw authStatusRaw
 	if err := json.Unmarshal(out, &raw); err != nil {
+		if runErr != nil {
+			// cmd.Output() populates ExitError.Stderr (since Stderr wasn't
+			// otherwise redirected), so a non-zero exit carries the CLI's own
+			// explanation through to the caller instead of the useless bare
+			// "exit status 1" runErr.Error() would otherwise give.
+			var exitErr *exec.ExitError
+			if errors.As(runErr, &exitErr) && len(exitErr.Stderr) > 0 {
+				return Auth{}, fmt.Errorf("claude auth status: %s", strings.TrimSpace(string(exitErr.Stderr)))
+			}
+			return Auth{}, runErr
+		}
 		return Auth{}, fmt.Errorf("claude auth status: unparseable output: %w", err)
 	}
 

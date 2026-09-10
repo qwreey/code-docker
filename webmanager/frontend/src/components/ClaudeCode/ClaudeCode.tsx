@@ -460,13 +460,38 @@ function InstalledView({
           // Distinct from the two "not logged in" branches below - this is
           // "the check itself failed" (see claudeStatusResponse.AuthError's
           // doc comment on the backend), not a confirmed logged-out state.
-          // Showing a login CTA here would incorrectly imply the account is
-          // known to be logged out; a plain retry is the honest option.
+          // A retry stays the primary action, since a login CTA here would
+          // incorrectly imply the account is known to be logged out.
+          //
+          // But it can't be the *only* action. This branch used to be a dead
+          // end, and a backend bug that misreported every logged-out user as
+          // a check failure (`exit status 1` - see GetAuthStatus) therefore
+          // made re-login after an expired session impossible from the web
+          // UI. That bug is fixed, but the shape of the trap isn't specific
+          // to it: any future reason this check fails would strand the user
+          // the same way. The interactive terminal login is the right escape
+          // hatch precisely because it doesn't assert a state - it shows the
+          // CLI's own output, so the user sees what's actually true.
           <div className="claude-login-panel">
             <ErrorBanner message={`로그인 상태를 확인하지 못했습니다: ${status.authError}`} />
             <button type="button" className="btn btn-secondary btn-small" onClick={onLoggedIn}>
               다시 확인
             </button>
+            <div className="claude-card-note">
+              <button
+                type="button"
+                className="claude-advanced-login-toggle"
+                onClick={() => setShowInteractiveLogin(true)}
+              >
+                터미널로 로그인
+              </button>
+            </div>
+            {showInteractiveLogin && (
+              <InteractiveLoginDialog
+                onLoggedIn={onLoggedIn}
+                onClose={() => setShowInteractiveLogin(false)}
+              />
+            )}
           </div>
         ) : onboardingCompleted ? (
           <div className="claude-login-panel">
