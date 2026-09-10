@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -105,6 +106,26 @@ func (c *Client) readLog(ctx context.Context, method, name string, offset, lengt
 	return v.asString(), nil
 }
 
+// ansiSequence matches a terminal color escape; xmlForbidden matches the
+// control bytes XML 1.0 has no representation for at all (everything below
+// 0x20 except tab/CR/LF).
+var (
+	ansiSequence = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+	xmlForbidden = regexp.MustCompile(`[\x00-\x08\x0b\x0c\x0e-\x1f]`)
+)
+
+// sanitizeXML makes a supervisord response parseable. readProcessStdoutLog
+// and friends embed a program's log bytes into the XML document verbatim,
+// escaping nothing but XML's own metacharacters - so one ANSI color escape
+// (0x1b) from a program that colors its output makes the entire document
+// illegal XML, and Go's decoder rejects the whole response rather than that
+// one character, i.e. the process-log viewer fails for exactly the programs
+// whose logs are most readable. Kept identical to router's own copy of this
+// package, where the bug was found.
+func sanitizeXML(data []byte) []byte {
+	return xmlForbidden.ReplaceAll(ansiSequence.ReplaceAll(data, nil), nil)
+}
+
 func stringParam(s string) string {
 	var buf strings.Builder
 	_ = xml.EscapeText(&buf, []byte(s))
@@ -137,7 +158,7 @@ func (c *Client) call(ctx context.Context, method string, params ...string) (rpc
 	}
 
 	var mr methodResponse
-	if err := xml.Unmarshal(data, &mr); err != nil {
+	if err := xml.Unmarshal(sanitizeXML(data), &mr); err != nil {
 		return rpcValue{}, fmt.Errorf("supervisor rpc %s: decode response: %w", method, err)
 	}
 
