@@ -55,18 +55,17 @@ type Phase = 'starting' | 'connecting' | 'running' | 'reconnecting' | 'locked' |
 // InteractiveLoginDialog embeds the real, interactive `claude` CLI (its own
 // first-run onboarding wizard - theme picker, then "Select login method")
 // in a live terminal, instead of driving `claude auth login` headlessly.
-// This exists because the headless flow (see LoginPanel) writes valid
-// credentials `claude auth status` recognizes immediately, but never marks
-// the interactive wizard's own separate "onboarding complete" state
-// (~/.claude.json's hasCompletedOnboarding) - so a bare `claude` launched
-// afterward in e.g. code-server's integrated terminal still shows the same
-// login-method screen from scratch, ignoring the credentials that already
-// exist. Going through the real wizard once is the only way to clear that.
-// See root CLAUDE.md's webmanager section for the incident this was built
-// to fix. ClaudeCode.tsx only ever opens this dialog when
-// GET /api/claude/onboarding-status already reports incomplete - once it's
-// complete once, the plain headless flow (LoginPanel) is sufficient on its
-// own for logging back in, since re-onboarding is never required again.
+// This exists because on the CLI it was built against (2.1.220) the
+// headless flow (see LoginPanel) wrote valid credentials but never marked
+// the wizard's own separate "onboarding complete" state (~/.claude.json's
+// hasCompletedOnboarding) - so a bare `claude` in e.g. code-server's
+// integrated terminal still showed the login-method screen from scratch.
+// Current CLIs (measured 2.1.252-2.1.267) set that flag from `claude auth
+// login` too, and the flag isn't one-time either: the CLI's own `/logout`
+// resets it. See webmanager/CLAUDE.md for both incidents. ClaudeCode.tsx
+// makes this dialog the primary CTA only while onboarding-status reports
+// incomplete; elsewhere it's a fallback that can open on an instance that
+// is already onboarded - see the baseline check in the status poll below.
 //
 // This dialog polls that same onboarding-status endpoint (not
 // GET /api/claude/status's auth.loggedIn) to decide when it's safe to
@@ -112,6 +111,11 @@ export function InteractiveLoginDialog({ onClose, onLoggedIn }: { onClose: () =>
   // True once onLoggedIn() has fired, so a second status-poll tick landing
   // before its own interval clears doesn't call it twice.
   const completedRef = useRef(false)
+  // hasCompletedOnboarding as first seen by the status poll. Only a
+  // false->true flip counts as completion: opened as the fallback on an
+  // already-onboarded instance, the flag is true from the first tick, and
+  // treating that as "done" closed the dialog before the user could log in.
+  const baselineCompletedRef = useRef<boolean | null>(null)
   // Guards the auto-close-on-completed effect so it only ever schedules
   // itself once, even if phase is set to 'completed' again for some reason.
   const closeScheduledRef = useRef(false)
@@ -430,7 +434,8 @@ export function InteractiveLoginDialog({ onClose, onLoggedIn }: { onClose: () =>
     const interval = window.setInterval(async () => {
       try {
         const status = await api.get<ClaudeOnboardingStatus>('/claude/onboarding-status')
-        if (status.completed && !completedRef.current) {
+        if (baselineCompletedRef.current === null) baselineCompletedRef.current = status.completed
+        if (status.completed && !baselineCompletedRef.current && !completedRef.current) {
           completedRef.current = true
           clearReconnectTimer()
           setPhase('completed')
@@ -466,6 +471,12 @@ export function InteractiveLoginDialog({ onClose, onLoggedIn }: { onClose: () =>
       }, INTERRUPT_GAP_MS)
     }
     window.setTimeout(cancelSession, CLOSE_FALLBACK_DELAY_MS)
+    // Without a detected completion the parent still shows the status it
+    // had when this opened, so a login finished here in fallback mode - or
+    // one abandoned after credentials were saved, the logged-in-but-not-
+    // onboarded state ClaudeCode.tsx warns about - would stay invisible
+    // until a manual reload. onLoggedIn is the parent's status reload.
+    if (!completedRef.current) onLoggedIn()
     onClose()
   }
 
@@ -481,12 +492,11 @@ export function InteractiveLoginDialog({ onClose, onLoggedIn }: { onClose: () =>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase])
 
-  // Safety net: ClaudeCode.tsx only opens this dialog when
-  // GET /api/claude/onboarding-status already reported incomplete, so
-  // `claude` should always show its first-run wizard here. But if that
-  // check raced with something else completing onboarding in the
-  // meantime, the CLI would skip straight to the normal chat REPL with no
-  // login screen at all (confirmed live in exactly that race) - the REPL's
+  // Safety net: `claude` only shows its first-run wizard while onboarding is
+  // incomplete. Opened as the fallback on an already-onboarded instance, or
+  // when onboarding completed elsewhere in the meantime, the CLI skips
+  // straight to the normal chat REPL with no login screen at all (the race
+  // was confirmed live) - the REPL's
   // own `/login` slash command reopens the same login-method chooser the
   // wizard shows, so this button types it in rather than trying to
   // auto-detect "which screen is this" from the PTY's own ANSI-heavy
