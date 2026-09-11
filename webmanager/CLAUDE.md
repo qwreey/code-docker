@@ -184,11 +184,17 @@ wizard instead of a scripted `claude auth login` transcript. Which path is
 primary is decided by `GET /api/claude/onboarding-status`
 (`claudecode.HasCompletedOnboarding`, a plain read of that same
 `hasCompletedOnboarding` field — cheap enough to poll every couple seconds):
-once it's already true, the interactive terminal is never actually needed
-again (re-onboarding is a one-time thing), so the plain headless flow above
-is offered as primary with the terminal as a "고급" fallback; before that
-first completion, it's the other way around, since only the real wizard can
-set that flag in the first place. The dialog itself also polls
+once it's true, the plain headless flow above is offered as primary with the
+terminal as a "고급" fallback; before that, it's the other way around. The
+flag is **not** one-time, though (2026-09-11 incident): the CLI's own
+`/logout` slash command resets it (`clearOnboarding:true`, measured in
+2.1.252–2.1.267 — `claude auth logout`, which the panel's logout button
+runs, does not), and a login that saves credentials but dies before the
+wizard's last screen leaves `loggedIn` true with the flag still false. The
+logged-in card therefore reads `onboarding-status` too and shows a repair
+notice for that state. Since at least 2.1.252 `claude auth login` sets the
+flag itself on success, so the headless flow is the repair — the "only the
+real wizard can set it" premise above held for 2.1.220 only. The dialog itself also polls
 `onboarding-status` (not `auth.loggedIn`) to decide when it's actually safe
 to auto-close — confirmed live that `loggedIn` flips true well before the
 wizard's remaining screens (a continue prompt, then a security notice) are
@@ -197,6 +203,15 @@ fix. Closing sends two Ctrl+C bytes (Ink-style CLIs need a second press to
 actually exit) then falls back to an explicit server-side `Session.Close()`
 a couple seconds later — confirmed live the double-byte alone doesn't
 always land in time, so the fallback is load-bearing, not just defensive.
+The dialog also survives its WebSocket dying — mobile Chrome kills a
+backgrounded tab's socket while the user copies the OAuth code, which is
+how the 2026-09-11 login ended one screen short. The PTY never depended on
+the socket, so it reattaches to the same session id with backoff, asking
+`GET /api/claude/login/interactive/{id}/status` first because a failed
+handshake looks identical (close 1006) for a network drop, a finished
+session's 404 and an expired gate's 401. It auto-closes only on the flag
+flipping false→true while open, not on it already being true when the
+dialog is opened as a fallback on an onboarded instance.
 A Claude Code conversation-log viewer inside the same
 tab (`.claude/archive/claude-session-log-plan-done.md`, `internal/claudecode/sessions.go`) lists
 and renders every session transcript found under

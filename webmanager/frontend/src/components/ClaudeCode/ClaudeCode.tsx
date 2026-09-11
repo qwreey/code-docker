@@ -388,23 +388,27 @@ function InstalledView({
     startUpdate()
   }, [miseVersion, startUpdate])
 
-  // Which login CTA is primary depends on whether this instance has ever
-  // finished the CLI's own onboarding wizard (~/.claude.json's
-  // hasCompletedOnboarding - see InteractiveLoginDialog's doc comment for
-  // why this isn't just auth.loggedIn): once it has, the plain headless
-  // flow (LoginPanel - `claude auth login`) is sufficient on its own for
-  // logging back in, since re-onboarding is never required again, and the
-  // heavier terminal dialog is only offered as a "고급" fallback. Only
-  // before that first completion is the interactive dialog actually
-  // necessary (it's the only thing that can drive the wizard to
-  // completion) - so it's the primary CTA in that case, with the headless
-  // flow demoted to "고급" instead. null (still loading) defaults to the
-  // interactive dialog being primary, same as the "never onboarded" case -
-  // the safer default, since skipping a wizard that's actually still
-  // needed is worse than one extra click for someone already onboarded.
+  // ~/.claude.json's hasCompletedOnboarding, which is what decides whether a
+  // bare `claude` in a terminal restarts its first-run wizard - see
+  // InteractiveLoginDialog's doc comment for why it isn't auth.loggedIn.
+  //
+  // Logged out, it picks the primary login CTA: already onboarded means the
+  // headless flow (LoginPanel) is enough; otherwise the interactive dialog
+  // leads, since on older CLIs only the real wizard could set the flag. null
+  // (still loading) defaults to the dialog - skipping a wizard that's still
+  // needed is worse than one extra click.
+  //
+  // Logged in, it catches the state the original design assumed couldn't
+  // happen: onboarding is not one-time. The CLI's own `/logout` resets the
+  // flag (clearOnboarding:true, measured in 2.1.252-2.1.267; `claude auth
+  // logout`, which LogoutButton runs, does not), and a later login that
+  // saves credentials but never reaches the wizard's last screen - e.g. the
+  // dialog's WebSocket dying while the user copies the code on a phone -
+  // leaves `auth status` saying logged in with the flag still false. Fetched
+  // on every status reload (keyed on the auth object, not just loggedIn) so
+  // a repair login clears the notice as soon as it lands.
   const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null)
   useEffect(() => {
-    if (auth?.loggedIn) return
     let cancelled = false
     api
       .get<ClaudeOnboardingStatus>('/claude/onboarding-status')
@@ -415,10 +419,11 @@ function InstalledView({
     return () => {
       cancelled = true
     }
-  }, [auth?.loggedIn])
+  }, [auth])
 
   const [showInteractiveLogin, setShowInteractiveLogin] = useState(false)
   const [showAdvancedLogin, setShowAdvancedLogin] = useState(false)
+  const [showRepairLogin, setShowRepairLogin] = useState(false)
 
   return (
     <div className="claude-installed-wrap">
@@ -455,6 +460,40 @@ function InstalledView({
             <div className="claude-card-value">{auth.email}</div>
             <div className="claude-card-sub">{auth.subscriptionType} 구독</div>
             <LogoutButton onLoggedOut={onLoggedOut} />
+            {onboardingCompleted === false && (
+              <div className="claude-login-panel">
+                <div className="warning-note">
+                  <span>
+                    로그인은 되어 있지만 CLI 온보딩이 끝나지 않은 상태라, 터미널에서 <code>claude</code>를
+                    실행하면 로그인부터 다시 묻습니다. <code>claude</code> 안에서 <code>/logout</code>을
+                    했거나 로그인 도중 창이 끊기면 이렇게 됩니다.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-small"
+                  onClick={() => setShowRepairLogin((v) => !v)}
+                >
+                  {showRepairLogin ? '복구 로그인 닫기' : '다시 로그인해서 복구'}
+                </button>
+                {showRepairLogin && <LoginPanel onLoggedIn={onLoggedIn} />}
+                <div className="claude-card-note">
+                  <button
+                    type="button"
+                    className="claude-advanced-login-toggle"
+                    onClick={() => setShowInteractiveLogin(true)}
+                  >
+                    안 되면: 터미널로 온보딩
+                  </button>
+                </div>
+                {showInteractiveLogin && (
+                  <InteractiveLoginDialog
+                    onLoggedIn={onLoggedIn}
+                    onClose={() => setShowInteractiveLogin(false)}
+                  />
+                )}
+              </div>
+            )}
           </>
         ) : status.authError ? (
           // Distinct from the two "not logged in" branches below - this is
