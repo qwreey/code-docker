@@ -293,6 +293,7 @@ func main() {
 	// trust tier either way.
 	mux.Handle("POST /api/claude/login/interactive/start", gate.RequirePassword(http.HandlerFunc(s.handleClaudeInteractiveLoginStart)))
 	mux.Handle("GET /api/claude/login/interactive/{id}", gate.RequirePassword(http.HandlerFunc(s.handleClaudeInteractiveLoginTerminal)))
+	mux.Handle("GET /api/claude/login/interactive/{id}/status", gate.RequirePassword(http.HandlerFunc(s.handleClaudeInteractiveLoginStatus)))
 	mux.Handle("POST /api/claude/login/interactive/{id}/cancel", gate.RequirePassword(http.HandlerFunc(s.handleClaudeInteractiveLoginCancel)))
 	mux.Handle("GET /api/claude/sessions", gate.RequirePassword(http.HandlerFunc(s.handleClaudeSessions)))
 	mux.Handle("GET /api/claude/sessions/{project}/{sessionId}", gate.RequirePassword(http.HandlerFunc(s.handleClaudeSessionLines)))

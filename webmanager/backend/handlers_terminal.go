@@ -361,9 +361,11 @@ readLoop:
 // POST /api/claude/login/interactive/start (see
 // internal/claudecode.InteractiveLoginManager and handlers_claude.go) - same
 // relay as a named terminal session, just sourced from that manager instead
-// of s.termSessions. A 404 (unknown/superseded/expired id) closes the
-// socket immediately with a policy-violation-shaped status so the frontend
-// can tell "start over" apart from a normal disconnect.
+// of s.termSessions. An unknown/superseded/expired id, or one whose CLI has
+// already exited, is refused with a plain 404 before the upgrade. A browser
+// can't read that status off a failed WebSocket handshake, so the frontend
+// asks GET .../status instead to tell "start over" apart from a dropped
+// connection it should reattach.
 func (s *Server) handleClaudeInteractiveLoginTerminal(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 

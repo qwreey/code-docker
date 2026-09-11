@@ -83,14 +83,26 @@ func (m *InteractiveLoginManager) Start(binPath string) (id string, sess *termse
 	return newID, s, nil
 }
 
-// Session returns the current session if id still names it (not superseded
-// by a newer Start, or already cancelled/expired) - ok is false otherwise,
-// same "session gone, start over" contract as LoginManager.Status.
+// Session returns the current session if id still names it and its PTY is
+// still running - ok is false otherwise (superseded by a newer Start,
+// cancelled, expired, or the `claude` process exited on its own), same
+// "session gone, start over" contract as LoginManager.Status.
+//
+// The exited case matters because nothing clears m.current when the CLI
+// exits by itself: without the Done check a dead session still looked
+// current, so the frontend couldn't tell "my WebSocket dropped (a phone
+// backgrounding the tab), reattach" apart from "there is nothing left to
+// reattach to" - see GET .../status in handlers_claude.go.
 func (m *InteractiveLoginManager) Session(id string) (sess *termsession.Session, ok bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.current == nil || m.id != id {
 		return nil, false
+	}
+	select {
+	case <-m.current.Done():
+		return nil, false
+	default:
 	}
 	return m.current, true
 }

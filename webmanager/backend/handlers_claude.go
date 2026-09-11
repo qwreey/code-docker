@@ -344,6 +344,25 @@ func (s *Server) handleClaudeInteractiveLoginStart(w http.ResponseWriter, r *htt
 	writeJSON(w, http.StatusOK, claudeInteractiveLoginStartResponse{SessionID: id})
 }
 
+// claudeInteractiveLoginStatusResponse is
+// GET /api/claude/login/interactive/{id}/status's body.
+type claudeInteractiveLoginStatusResponse struct {
+	Alive bool `json:"alive"`
+}
+
+// handleClaudeInteractiveLoginStatus reports whether session id can still be
+// reattached to. The dialog asks this before every reconnect because a
+// browser WebSocket gives it no way to tell why a handshake failed - a 404
+// for a finished session, a 401 from an expired password gate and a plain
+// network drop all surface as the same close code 1006. Always 200 for a
+// well-formed request (an unknown id is simply not alive), so the 401 this
+// route can return through gate.RequirePassword is unambiguous and goes
+// through the frontend's normal unlock prompt.
+func (s *Server) handleClaudeInteractiveLoginStatus(w http.ResponseWriter, r *http.Request) {
+	_, alive := s.interactiveLoginMgr.Session(r.PathValue("id"))
+	writeJSON(w, http.StatusOK, claudeInteractiveLoginStatusResponse{Alive: alive})
+}
+
 // handleClaudeInteractiveLoginCancel closes session id's PTY, if it's still
 // the current one. Always 200 - idempotent, matching
 // claudecode.InteractiveLoginManager.Cancel's own contract, since the
