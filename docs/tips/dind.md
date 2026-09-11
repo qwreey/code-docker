@@ -11,7 +11,7 @@ dind 로 생성된 컨테이너는 `code-docker-internal` 네트워크에 묶여
 
 </details>
 
-`code-docker-dind` 는 `code-docker-internal` 에만 연결되어있고, 데몬 소켓도 그 네트워크의 IP에만 바인드되어있어 컨테이너 바깥(인터넷)에서는 노출되지 않습니다. `docker pull` 등 인터넷 접근이 필요한 요청은 `code-docker-router`(egress netgate - [egress-netgate.md](../../router/docs/egress-netgate.md) 참고)를 게이트웨이로 거쳐 나갑니다.
+`code-docker-dind` 는 `code-docker-internal` 에만 연결되어있고, 데몬 소켓도 그 네트워크의 IP에만 바인드되어있어 컨테이너 바깥(인터넷)에서는 노출되지 않습니다. `docker pull` 등 인터넷 접근이 필요한 요청은 `code-docker-router`(egress netgate - [egress-netgate.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/egress-netgate.md) 참고)를 게이트웨이로 거쳐 나갑니다.
 
 <details>
 <summary>기술적으로 어떻게 막혀있는지</summary>

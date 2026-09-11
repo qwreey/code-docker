@@ -63,9 +63,9 @@ code-server 서비스 엔트리포인트입니다. code-server 의 업데이트/
 
 code-server 설정 파일입니다. **매 시작마다 `/code/.local/share/code-docker/code/config.yaml`로 무조건 덮어써집니다** — 다른 override 패턴 파일들과 마찬가지로 완전히 파생된(derived) 파일이라, `/code/.local/share/code-docker/code/config.yaml`을 직접 편집해도 다음 재시작에 사라집니다. 커스터마이징하려면 `code-config.override.yaml`을 만들고 재빌드하세요.
 
-**`bind-addr`는 여기 넣지 마세요 — 넣어도 무시됩니다.** `code-runner.default.sh`가 항상 `--bind-addr` CLI 인자를 붙여서 실행하는데, code-server는 CLI 인자를 config.yaml 값보다 우선하므로 여기(default든 override든)에 뭘 적어도 그 값이 이깁니다. 실제 바인드 주소를 바꾸고 싶으면 `docker-compose.yml`의 `CODE_SERVER_BIND_ADDR`(기본값 `private:8080`)을 바꾸세요 — nginx의 upstream 대상도 같은 값을 따라가므로(`nginx-service.default.sh`) 라우팅이 어긋날 걱정 없이 이거 하나만 바꾸면 됩니다. `private`는 `code-docker-internal` 네트워크 alias일 뿐(전용 tailscale IP가 아닙니다 — tailscale은 이제 [router 컨테이너](../router/docs/router.md)에서 실행되고, code-docker 자신은 tailscaled를 갖고 있지 않습니다), loopback 대신 이 alias에 바인드해야 할 필수적인 이유는 더 이상 없지만 기본값은 그대로 유지하고 있습니다.
+**`bind-addr`는 여기 넣지 마세요 — 넣어도 무시됩니다.** `code-runner.default.sh`가 항상 `--bind-addr` CLI 인자를 붙여서 실행하는데, code-server는 CLI 인자를 config.yaml 값보다 우선하므로 여기(default든 override든)에 뭘 적어도 그 값이 이깁니다. 실제 바인드 주소를 바꾸고 싶으면 `docker-compose.yml`의 `CODE_SERVER_BIND_ADDR`(기본값 `private:8080`)을 바꾸세요 — nginx의 upstream 대상도 같은 값을 따라가므로(`nginx-service.default.sh`) 라우팅이 어긋날 걱정 없이 이거 하나만 바꾸면 됩니다. `private`는 `code-docker-internal` 네트워크 alias일 뿐(전용 tailscale IP가 아닙니다 — tailscale은 이제 [router 컨테이너](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md)에서 실행되고, code-docker 자신은 tailscaled를 갖고 있지 않습니다), loopback 대신 이 alias에 바인드해야 할 필수적인 이유는 더 이상 없지만 기본값은 그대로 유지하고 있습니다.
 
-**`disable-proxy`도 여기 넣지 마세요 — 같은 이유입니다.** code-server의 포트 프록시 경로(`/proxy/<port>/`, `/absproxy/<port>/`, `*.<proxy-domain>`)는 기본으로 **꺼져 있습니다** — 이 기본값은 code-docker가 아니라 `code-server-autoinstall`의 `start.sh`가 정합니다(code-server 자신의 환경변수 `CS_DISABLE_PROXY`를 값이 없을 때 `1`로 채워줍니다). 이 경로들은 컨테이너 안에서 열려 있는 *아무* 포트로나 프록시해 주는데 그걸 막아주는 건 code-server 자신의 인증뿐이고 여기서는 `auth: none`이라(→ [로그인/보안](security-login.md)), 켜 두면 code-server에 닿을 수 있는 쪽은 컨테이너 내부 포트 전부에 닿을 수 있게 됩니다 — VS Code의 PORTS 탭이 dev 서버가 뜨자마자 자동으로 잡아 주는 포트까지 포함해서요. 밖으로 내보낼 포트는 [Dev Proxy](../router/docs/dev-proxy.md)나 [App Routes](../router/docs/app-routes.md)로 명시적으로 여세요. 되돌리려면 `.env`에 `CS_DISABLE_PROXY="0"`을 넣으면 됩니다(code-server는 `1`/`true`만 참으로 읽습니다) — config.yaml에 `disable-proxy: false`를 적는 방식은 동작하지 않습니다(code-server는 이 파일에 boolean 키가 *존재하기만 하면* 값과 무관하게 true로 읽습니다).
+**`disable-proxy`도 여기 넣지 마세요 — 같은 이유입니다.** code-server의 포트 프록시 경로(`/proxy/<port>/`, `/absproxy/<port>/`, `*.<proxy-domain>`)는 기본으로 **꺼져 있습니다** — 이 기본값은 code-docker가 아니라 `code-server-autoinstall`의 `start.sh`가 정합니다(code-server 자신의 환경변수 `CS_DISABLE_PROXY`를 값이 없을 때 `1`로 채워줍니다). 이 경로들은 컨테이너 안에서 열려 있는 *아무* 포트로나 프록시해 주는데 그걸 막아주는 건 code-server 자신의 인증뿐이고 여기서는 `auth: none`이라(→ [로그인/보안](security-login.md)), 켜 두면 code-server에 닿을 수 있는 쪽은 컨테이너 내부 포트 전부에 닿을 수 있게 됩니다 — VS Code의 PORTS 탭이 dev 서버가 뜨자마자 자동으로 잡아 주는 포트까지 포함해서요. 밖으로 내보낼 포트는 [Dev Proxy](https://github.com/qwreey/router-docker/blob/HEAD/docs/dev-proxy.md)나 [App Routes](https://github.com/qwreey/router-docker/blob/HEAD/docs/app-routes.md)로 명시적으로 여세요. 되돌리려면 `.env`에 `CS_DISABLE_PROXY="0"`을 넣으면 됩니다(code-server는 `1`/`true`만 참으로 읽습니다) — config.yaml에 `disable-proxy: false`를 적는 방식은 동작하지 않습니다(code-server는 이 파일에 boolean 키가 *존재하기만 하면* 값과 무관하게 true로 읽습니다).
 
 **다만 이 옵션이 막는 건 프록시 *경로*뿐입니다.** VS Code 워크벤치가 포트를 자동으로 감지해서 포워딩하는 동작 자체는 그대로라, PORTS 탭과 알림은 계속 뜹니다 — 눌러서 열어보면 그때 막힐 뿐이죠. code-server upstream의 `docs/FAQ.md`도 이 옵션과 `remote.autoForwardPorts`를 같이 쓰라고 안내합니다. 그래서 code-docker는 아래 `settings.*.json`으로 `remote.autoForwardPorts: false`를 기본값으로 심어둡니다.
 
@@ -145,7 +145,7 @@ sshd 를 설정하고 실행합니다. 기본적으로 `/etc/ssh`는 적절한 �
 tailscale 관련 override 파일(`tailscale-service.*.sh`, `tailscale-forward.*.sh`,
 `tailscale-publish.*.sh`, `tailscale-config.*.yaml`)은 이제 code-docker가 아니라
 **router** 컨테이너(`router/config/tailscale/`)에 있습니다 — 같은 override 패턴이지만
-재빌드 대상이 `code-docker-router` 서비스입니다. 자세한 내용은 [router.md](../router/docs/router.md)를
+재빌드 대상이 `code-docker-router` 서비스입니다. 자세한 내용은 [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md)를
 확인하세요.
 
 ### `dns-local.*.sh` (로컬 DNS 리졸버)
@@ -256,7 +256,7 @@ DNS 모드 선택/WireGuard 장치 생성/컨트롤 플레인 루틴 추적 같�
 수십만 줄까지 쌓일 수 있음 — tailscale 팀도 인정한 오래된 업스트림 이슈입니다,
 [tailscale/tailscale#282](https://github.com/tailscale/tailscale/issues/282)) 한때
 이 파일에 `TAILSCALE_LOG_LEVEL` 허용리스트 필터가 있었지만, tailscaled 자체가
-[router 컨테이너](../router/docs/router.md)로 옮겨가면서 code-docker의 vector는 더 이상
+[router 컨테이너](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md)로 옮겨가면서 code-docker의 vector는 더 이상
 `tailscaled` app_name을 아예 보지 않으므로 그 필터(및 `TAILSCALE_LOG_LEVEL`)는
 죽은 코드로 남겨두는 대신 제거했습니다 — router가 자체 로그 파이프라인을 갖추면
 그쪽으로 이식될 수 있습니다.
@@ -286,7 +286,7 @@ webmanager는 지금처럼 `/api/...`를 그대로 받습니다. access/error �
 router로 프록시되지 않습니다 — router가 host:80을 직접 종단하도록 바뀌면서
 (`router/config/nginx/`) 이 파일에서는 빠졌고, webmanager의 Tailscale/Dev Proxy
 탭도 이제 router 자신의 `/router/` 경로로 직접 호출합니다. 자세한 내용은
-[router.md](../router/docs/router.md) 참고. `TRUSTED_PROXIES`(외부 리버스 프록시의 IP/CIDR를 알려주면 `$remote_addr`가
+[router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고. `TRUSTED_PROXIES`(외부 리버스 프록시의 IP/CIDR를 알려주면 `$remote_addr`가
 그 프록시의 X-Forwarded-For를 신뢰해서 실제 클라이언트 IP로 채워짐, 기본 빈 값)도
 같이 있습니다.
 

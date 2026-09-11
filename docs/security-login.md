@@ -7,7 +7,7 @@ webmanager(`/manager`)는 code-docker 컨테이너 안 nginx가 한 origin으로
 종단합니다 — code-docker는 더 이상 `code-docker-external`에 붙지 않아
 외부에서 직접 닿지 않고, host에 퍼블리시된 포트도 router의 80번 하나뿐입니다
 (자세한 경위는
-[dev-proxy.md의 "바깥 리버스 프록시 연결하기"](../router/docs/dev-proxy.md#바깥-리버스-프록시-연결하기)
+[dev-proxy.md의 "바깥 리버스 프록시 연결하기"](https://github.com/qwreey/router-docker/blob/HEAD/docs/dev-proxy.md#바깥-리버스-프록시-연결하기)
 참고). 그래서 앞단 리버스 프록시는 **router 컨테이너 하나(`routerip:80`)**만
 바라보면 됩니다 — 다만 프록시 대상이 하나라는 것이지 호스트네임까지 하나는
 아닙니다. router-manager 전용 도메인(`ROUTER_MANAGER_HOSTS`)이나 tinyauth
@@ -20,9 +20,9 @@ webmanager(`/manager`)는 code-docker 컨테이너 안 nginx가 한 origin으로
 다룹니다 - 이것과 별개로, webmanager 자체 비밀번호 게이트
 ([webmanager-config.md의 비밀번호 게이트](webmanager-config.md#비밀번호-게이트),
 `WEBMANAGER_AUTH_PASSWORD_HASH`), router-manager 자체 관리 API 비밀번호
-([router.md의 router-manager 자체 인증](../router/docs/router.md#router-manager-자체-인증),
+([router.md의 router-manager 자체 인증](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#router-manager-자체-인증),
 `ROUTER_MANAGER_AUTH_PASSWORD_HASH`), Dev Proxy/App Routes 라우트별
-인증([router.md의 tinyauth](../router/docs/router.md#tinyauth), `TINYAUTH_AUTH_USERS`)이
+인증([router.md의 tinyauth](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#tinyauth), `TINYAUTH_AUTH_USERS`)이
 서로 독립된 별도의 인증 계층으로 따로 존재합니다 - 이 문서에서 다루는 앞단
 SSO를 켜둔다고 해서 저 세 가지가 자동으로 켜지거나 대체되지 않으며, 반대로
 저것들을 켜둔다고 code-server 자체가 보호되지도 않습니다.
@@ -56,7 +56,7 @@ code.yaeji.moe {
 
 ### 사이드 프로젝트에 자기 도메인을 준 경우
 
-router의 vhost(`ROUTER_VHOST_*`, [router/docs/vhost.md](../router/docs/vhost.md))로 붙인 앱은
+router의 vhost(`ROUTER_VHOST_*`, [router/docs/vhost.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/vhost.md))로 붙인 앱은
 **자기 서버 블록이 따로** 필요합니다. code-server와 같은 origin이 아니므로 위 블록의 예외
 경로가 적용되지 않고, 그 앱의 매니페스트/아이콘 경로도 그 앱마다 다릅니다.
 
@@ -123,10 +123,10 @@ server {
 code-docker 관련 서비스 중 일부는 공유 호스트네임(`code.yaeji.moe`)의 경로가
 아니라 **완전히 별도 서브도메인**으로 노출됩니다. 현재 두 가지가 있습니다:
 
-- [`ROUTER_MANAGER_HOSTS`](../router/docs/router.md#보안-공유-origin과-전용-도메인router_manager_hosts)
+- [`ROUTER_MANAGER_HOSTS`](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#보안-공유-origin과-전용-도메인router_manager_hosts)
   (예: `router.code.yaeji.moe`) — router-manager 전용 관리 도메인. 선택 사항이지만
   프로덕션에서는 권장됩니다.
-- [`TINYAUTH_HOSTS`](../router/docs/router.md#tinyauth) (예: `auth.code.yaeji.moe`) —
+- [`TINYAUTH_HOSTS`](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#tinyauth) (예: `auth.code.yaeji.moe`) —
   tinyauth 로그인 화면. Dev Proxy 라우트/App Routes 앱의 "인증 요구"를 하나라도
   쓸 거라면 **선택이 아니라 필수**입니다. tinyauth의 SPA는 base path를 지원하지
   않아 호스트네임 하나를 통째로 써야 합니다.

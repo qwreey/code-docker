@@ -46,7 +46,7 @@ Trilium은 노트에 담긴 JavaScript를 실행하고(스크립트 노트 — �
 Trilium과 이 인스턴스가 둘 다 "Trilium Notes"로 설치되면 구분이 안 되기 때문입니다.
 router가 원본 매니페스트를 가져와 이름/아이콘만 바꾸는 방식이라, 실패하면 원본이 그대로
 나갑니다(설치는 되고 이름만 원래대로). 자세한 내용은
-[router/docs/vhost.md](../../router/docs/vhost.md).
+[router/docs/vhost.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/vhost.md).
 
 **바로가기와 별도 설치는 서로 대체재가 아닙니다.** webmanager는 code-server를 열고 메뉴를
 누르면 나오지만 Trilium은 아니라서, 둘을 동시에 띄우려면 앱이 두 개인 게 자연스럽습니다 —

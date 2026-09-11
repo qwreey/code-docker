@@ -21,7 +21,7 @@ roblox-studio-docker가 들고 다니는 [`ootb-manifest.env`](ootb-manifest.md)
 
 - **`extra-include.yml`에 오버레이 등록** - `builds/roblox-studio-docker/roblox-studio-code-docker.yml`
 - **`.env`의 `EXTRA_INCLUDE=extra-include.yml`**
-- **`.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`에 `vnc-only` 추가** - router의 VNC 탭/App Routes/Dev Proxy가 대상으로 삼을 수 있는 호스트 allowlist는 기본이 `code-docker`/`dind` 둘뿐입니다([대상 호스트 allowlist](../../router/docs/vnc.md#대상-호스트-allowlist)). 이걸 빼먹으면 스택은 멀쩡히 뜨는데 대상 등록만 `target host ... is not in the allowed target host list`로 거부됩니다.
+- **`.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`에 `vnc-only` 추가** - router의 VNC 탭/App Routes/Dev Proxy가 대상으로 삼을 수 있는 호스트 allowlist는 기본이 `code-docker`/`dind` 둘뿐입니다([대상 호스트 allowlist](https://github.com/qwreey/router-docker/blob/HEAD/docs/vnc.md#대상-호스트-allowlist)). 이걸 빼먹으면 스택은 멀쩡히 뜨는데 대상 등록만 `target host ... is not in the allowed target host list`로 거부됩니다.
 - **`.env`의 `MCP_TOKEN` 생성** - 묻지 않고 만들어 넣고 값을 화면에 출력합니다. 아래 [Studio MCP](#claude-code에-studio-mcp-붙이기) 참고.
 
 DOCKER-USER 방화벽 예외는 `.env`에 쓰이지 않습니다 - roblox-studio-docker 쪽 오버레이가 자기 네트워크에 라벨로 직접 선언합니다(아래 [격리 구조](#격리-구조) 참고).
@@ -60,7 +60,7 @@ include:
 VNC 포트는 host에 게시되지 않습니다. 접속 경로는 두 가지고, 둘 다 대상 호스트는 **`studio`가 아니라 `vnc-only`** 입니다.
 
 - **router의 VNC 탭** (권장) - `rfb` 백엔드로 `vnc-only:5900`을 등록하면 브라우저에서 바로 봅니다. 대상 자신의 웹 VNC 프런트엔드를 거치는 `novnc` 백엔드(`vnc-only:6080`, App Routes 경유)도 여전히 쓸 수 있습니다.
-- **네이티브 VNC 클라이언트** - router의 [forwards](../../router/docs/router.md#forwards--publish)로 `vnc-only:5900`을 원하는 host 포트에 매핑합니다. compose에 박는 값이 아니라 router-manager UI/API로 실행 중에 추가/삭제합니다.
+- **네이티브 VNC 클라이언트** - router의 [forwards](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#forwards--publish)로 `vnc-only:5900`을 원하는 host 포트에 매핑합니다. compose에 박는 값이 아니라 router-manager UI/API로 실행 중에 추가/삭제합니다.
 
 <details>
 <summary>왜 <code>studio</code>가 아니라 <code>vnc-only</code>인지</summary>
@@ -144,7 +144,7 @@ docker compose up -d studio code-docker   # restart 아님 - env는 create 시�
 
 통합 배포에서 `MCP_PORT`는 host에 게시되지 않습니다. `studio`가 `internal: true` 네트워크에만 붙어있으면 Docker는 그 컨테이너의 host publish DNAT를 **조용히 건너뜁니다** - 예전 오버레이가 `MCP_PORT`만 남겨뒀을 때 실제로 아무것도 게시되지 않고 있었습니다(에러도 없이).
 
-VNC와 달리 `vnc-only` 별칭을 쓰지 않는 이유는, MCP를 쓰는 주체가 사람이 아니라 `code-docker-internal` 위의 에이전트 컨테이너 자신이기 때문입니다 - router를 거칠 이유가 없는 통신입니다. 반대로 code-docker **바깥**(예: 노트북의 Claude Code)에서 붙이고 싶어지면 host publish를 되살리지 말고 router의 [forwards](../../router/docs/router.md#forwards--publish)나 App Routes(+tinyauth)로 노출하는 쪽이 "국경은 router만" 원칙과 일관됩니다.
+VNC와 달리 `vnc-only` 별칭을 쓰지 않는 이유는, MCP를 쓰는 주체가 사람이 아니라 `code-docker-internal` 위의 에이전트 컨테이너 자신이기 때문입니다 - router를 거칠 이유가 없는 통신입니다. 반대로 code-docker **바깥**(예: 노트북의 Claude Code)에서 붙이고 싶어지면 host publish를 되살리지 말고 router의 [forwards](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#forwards--publish)나 App Routes(+tinyauth)로 노출하는 쪽이 "국경은 router만" 원칙과 일관됩니다.
 
 </details>
 

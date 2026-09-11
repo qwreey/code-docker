@@ -101,8 +101,8 @@ cat .env.webmanager | tee -a .env.webmanager.bak | docker compose exec -T code-d
 > 요청 기준 10분**(쓰기 작업 재확인 기준)이며, 게이트를 통과하는 요청마다 다시 밀립니다 —
 > 즉 계속 쓰는 동안엔 안 풀리고, 손을 뗀 뒤 10분이 지나야 잠깁니다. 다만 탭을 열어만 둬도
 > 무한정 열려 있지는 않도록, 비밀번호를 입력한 시점부터 **12시간**이 지나면 활동과 무관하게
-> 다시 잠깁니다. [Dev Proxy 인증](../router/docs/dev-proxy.md#인증)은 이제 별개의 도구
-> ([tinyauth](../router/docs/router.md#tinyauth), router 컨테이너)가 담당하므로 이 잠금과는 완전히
+> 다시 잠깁니다. [Dev Proxy 인증](https://github.com/qwreey/router-docker/blob/HEAD/docs/dev-proxy.md#인증)은 이제 별개의 도구
+> ([tinyauth](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#tinyauth), router 컨테이너)가 담당하므로 이 잠금과는 완전히
 > 무관합니다 — 예전엔 같은 토큰을 공유했지만, Dev Proxy가 router로 옮겨가면서 분리됐습니다.
 > **해시는 컨테이너가 이미 떠 있는 상태에서 아래 명령으로 직접
 > 생성합니다**(비밀번호를 두 번 입력받아 오타를 확인하고, 화면엔 안 보이며, 결과로
@@ -128,9 +128,9 @@ cat .env.webmanager | tee -a .env.webmanager.bak | docker compose exec -T code-d
 > gitignore 편집 포함), SSH Keys 추가·삭제, Projects 탭 상세 시트의 git worktree
 > 삭제 등이 여기 해당합니다. Dev Proxy/Tailscale은 이제 router 컨테이너의
 > 자체 API(router-manager)를 호출하므로 이 게이트 대상이 아닙니다(개별 라우트의
-> "인증 요구"는 대신 [tinyauth](../router/docs/router.md#tinyauth)가 담당) — router-manager는
+> "인증 요구"는 대신 [tinyauth](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#tinyauth)가 담당) — router-manager는
 > `ROUTER_MANAGER_AUTH_PASSWORD_HASH`로 켜는 자기 자신만의 별도 비밀번호 게이트를
-> 갖고 있습니다([router.md](../router/docs/router.md#router-manager-자체-인증) 참고). 예외로 **Terminal, 파일 탭, Logs, Sessions,
+> 갖고 있습니다([router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#router-manager-자체-인증) 참고). 예외로 **Terminal, 파일 탭, Logs, Sessions,
 > Supervisor의 프로그램별 로그 조회, Claude Code 탭의 대화 세션 로그 서브탭(Projects
 > 탭 상세 시트에서 프로젝트별로 필터링해 재사용하는 곳 포함)은
 > 조회까지 통째로 게이트**됩니다(각각 root 쉘/임의 파일 접근/로그 속 시크릿

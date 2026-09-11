@@ -270,11 +270,11 @@ Proxy(내부 Caddy), tinyauth(Dev Proxy 라우트별 인증) 네 가지입니다
 바라보면 됩니다 - 설정 예시는 [security-login.md의 "Caddy
 예시"](security-login.md#caddy-예시) 참고.
 
-자세한 내용은 [router.md](../router/docs/router.md)를 확인하세요. router-manager(설정 UI +
+자세한 내용은 [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md)를 확인하세요. router-manager(설정 UI +
 API)를 code-server/webmanager와 같은 공유 origin이 아니라 별도 전용 도메인으로
 분리하는 `ROUTER_MANAGER_HOSTS` 설정도 프로덕션에서는 권장됩니다 - [router.md의
 "공유 origin과 전용
-도메인"](../router/docs/router.md#보안-공유-origin과-전용-도메인router_manager_hosts) 참고. 이
+도메인"](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#보안-공유-origin과-전용-도메인router_manager_hosts) 참고. 이
 전용 도메인까지 앞단 SSO로 같이 보호하면서 로그인을 한 번만 하고 싶다면
 [security-login.md의 "여러 서브도메인 한 번에 로그인
 (SSO)"](security-login.md#여러-서브도메인-한-번에-로그인-sso--router_manager_hosts--tinyauth_hosts)를
@@ -284,7 +284,7 @@ API)를 code-server/webmanager와 같은 공유 origin이 아니라 별도 전�
 
 code-docker/dind가 각각 호스트에서 도는 `code-docker-netinit-docker` 에이전트(code-docker 쪽 - 컨테이너 자신은 `NET_ADMIN` 없이)와 dind 자기 자신의 루프가 계속 심어주는 라우트를 통해서만 아웃바운드로 나갈 수 있도록 강제하고, router 컨테이너가 실제 국경(사설 대역 차단, DNS 레벨 블록리스트, 인바운드 포트포워딩)을 담당하는 기능입니다 - 컨테이너 안 AI 에이전트가 임의로 인터넷/사설망에 접근하는 걸 막기 위한 것입니다. `docker compose up`만으로 바로 동작합니다.
 
-자세한 내용은 [egress-netgate.md](../router/docs/egress-netgate.md)를 확인하세요 - 기능 자체를 끄고 싶다면 [당장 인터넷이 필요하다면](../router/docs/egress-netgate.md#당장-인터넷이-필요하다면-기능-자체를-끄기) 절을 먼저 보세요.
+자세한 내용은 [egress-netgate.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/egress-netgate.md)를 확인하세요 - 기능 자체를 끄고 싶다면 [당장 인터넷이 필요하다면](https://github.com/qwreey/router-docker/blob/HEAD/docs/egress-netgate.md#당장-인터넷이-필요하다면-기능-자체를-끄기) 절을 먼저 보세요.
 
 ## 리소스 제한 (CPU/메모리)
 
@@ -304,7 +304,7 @@ cp example-env .env
   ```sh
   cp example-env.webmanager .env.webmanager
   ```
-- **router**(네트워크 경계 컨테이너, `.env.router`) - tailscale, Dev Proxy/App Routes 노출 정책, router-manager 자체 비밀번호(`ROUTER_MANAGER_AUTH_PASSWORD_HASH`), 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`, `ROUTER_APP_ORIGIN`, 아래 "router" 절 참고), tinyauth(로그인 화면 호스트네임 `TINYAUTH_HOSTS` 포함) 등. 자세한 내용은 [router.md](../router/docs/router.md) 참고. 템플릿 파일 자체는 `router/example-env.router`에 있지만, 복사한 결과물은 `router/` 안이 아니라 `.env`/`.env.webmanager`와 같은 위치(`docker-compose.yml` 옆)에 `.env.router`로 둡니다 - `builds/code-docker`에 클론해 쓰는 배포 구조에서는 `router/` 안에 두면 컨테이너에 전달되지 않습니다.
+- **router**(네트워크 경계 컨테이너, `.env.router`) - tailscale, Dev Proxy/App Routes 노출 정책, router-manager 자체 비밀번호(`ROUTER_MANAGER_AUTH_PASSWORD_HASH`), 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`, `ROUTER_APP_ORIGIN`, 아래 "router" 절 참고), tinyauth(로그인 화면 호스트네임 `TINYAUTH_HOSTS` 포함) 등. 자세한 내용은 [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고. 템플릿 파일 자체는 `router/example-env.router`에 있지만, 복사한 결과물은 `router/` 안이 아니라 `.env`/`.env.webmanager`와 같은 위치(`docker-compose.yml` 옆)에 `.env.router`로 둡니다 - `builds/code-docker`에 클론해 쓰는 배포 구조에서는 `router/` 안에 두면 컨테이너에 전달되지 않습니다.
   ```sh
   cp router/example-env.router .env.router
   ```
@@ -315,49 +315,49 @@ cp example-env .env
 
 ## tailscale 연결
 
-router 컨테이너(code-docker 자신이 아님, [router.md](../router/docs/router.md) 참고)가 고유한
+router 컨테이너(code-docker 자신이 아님, [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고)가 고유한
 tailscale IP를 가지도록 하여, ssh/adb 를 위해 별도로 포트를 열거나 `ssh -R` 로 소켓을
 전송하지 않고도 tailnet 안 어디서든 code-docker 에 접근하거나, 반대로 code-docker 에서
 다른 tailnet 기기의 포트를 가져올 수 있습니다.
 
-자세한 내용은 [router.md의 tailscale 절](../router/docs/router.md#tailscale)을 확인하세요 — 이
+자세한 내용은 [router.md의 tailscale 절](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#tailscale)을 확인하세요 — 이
 문서(`tailscale.md`)는 이제 짧은 안내 페이지입니다.
 
 ## dev 서버 노출 (Dev Proxy)
 
-컨테이너 안에서 뜬 dev 서버(`npm run dev` 등)를 와일드카드 서브도메인으로 바깥에 노출하는 기능입니다. router 컨테이너의 내부 Caddy 인스턴스가 서브도메인별로 로컬 포트로 프록시하고, [webmanager의 Dev Proxy 탭](webmanager.md)에서 항목을 관리합니다(router가 제공하는 페이지 컴포넌트를 webmanager가 그대로 가져와 보여줍니다) — 또는 `http://<host>/router/`를 직접 열어 webmanager 없이 같은 화면을 쓸 수도 있습니다([router.md](../router/docs/router.md#router-manager) 참고).
+컨테이너 안에서 뜬 dev 서버(`npm run dev` 등)를 와일드카드 서브도메인으로 바깥에 노출하는 기능입니다. router 컨테이너의 내부 Caddy 인스턴스가 서브도메인별로 로컬 포트로 프록시하고, [webmanager의 Dev Proxy 탭](webmanager.md)에서 항목을 관리합니다(router가 제공하는 페이지 컴포넌트를 webmanager가 그대로 가져와 보여줍니다) — 또는 `http://<host>/router/`를 직접 열어 webmanager 없이 같은 화면을 쓸 수도 있습니다([router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#router-manager) 참고).
 
-자세한 내용은 [dev-proxy.md](../router/docs/dev-proxy.md)를 확인하세요.
+자세한 내용은 [dev-proxy.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/dev-proxy.md)를 확인하세요.
 
-- [켜고 끄기 / 기본 설정](../router/docs/dev-proxy.md#켜고-끄기--기본-설정)
-- [expose 추가하기](../router/docs/dev-proxy.md#expose-추가하기)
-- [바깥 리버스 프록시 연결하기](../router/docs/dev-proxy.md#바깥-리버스-프록시-연결하기)
-- [인증](../router/docs/dev-proxy.md#인증) — [router의 tinyauth](../router/docs/router.md#tinyauth)에 최소 한 명의 사용자가 등록되어 있어야 하고(`/router/`의 "tinyauth" 탭에서 관리), 로그인 화면을 서비스할 `TINYAUTH_HOSTS`(`.env.router`)도 설정되어 있어야 합니다 - 둘 다 놓치기 쉬운 필수 설정입니다
+- [켜고 끄기 / 기본 설정](https://github.com/qwreey/router-docker/blob/HEAD/docs/dev-proxy.md#켜고-끄기--기본-설정)
+- [expose 추가하기](https://github.com/qwreey/router-docker/blob/HEAD/docs/dev-proxy.md#expose-추가하기)
+- [바깥 리버스 프록시 연결하기](https://github.com/qwreey/router-docker/blob/HEAD/docs/dev-proxy.md#바깥-리버스-프록시-연결하기)
+- [인증](https://github.com/qwreey/router-docker/blob/HEAD/docs/dev-proxy.md#인증) — [router의 tinyauth](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#tinyauth)에 최소 한 명의 사용자가 등록되어 있어야 하고(`/router/`의 "tinyauth" 탭에서 관리), 로그인 화면을 서비스할 `TINYAUTH_HOSTS`(`.env.router`)도 설정되어 있어야 합니다 - 둘 다 놓치기 쉬운 필수 설정입니다
 
 ## 경로 기반 앱 라우팅 (App Routes)
 
 호스트 포트를 여러 개 열지 않고 80번 하나로 여러 앱을 노출하기 위한 기능입니다 — 바깥 리버스 프록시가 요청 경로 앞에 `/app/<이름>`을 붙여(rewrite) 넘기면, router 안 Caddy(Dev Proxy와 같은 인스턴스)가 그 접두사를 벗기고 지정한 대상으로 리버스 프록시합니다(Host 헤더와는 무관, [webmanager의 App Routes 탭](webmanager.md)에서 관리). 최초 부팅 시 `code → code-docker:80` 앱이 자동 생성됩니다.
 
-자세한 내용은 [app-routes.md](../router/docs/app-routes.md)를 확인하세요.
+자세한 내용은 [app-routes.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/app-routes.md)를 확인하세요.
 
-- [켜고 끄기](../router/docs/app-routes.md#켜고-끄기) — `CADDY_ADAPTER_ENABLED`로 Dev Proxy와 함께 제어됩니다(별도 스위치 없음)
-- [기본 앱 (code)](../router/docs/app-routes.md#기본-앱-code)
-- [앱 추가하기](../router/docs/app-routes.md#앱-추가하기)
-- [바깥 리버스 프록시 연결하기](../router/docs/app-routes.md#바깥-리버스-프록시-연결하기)
-- [알려진 한계 — 절대경로 응답은 제한적으로만 다뤄집니다](../router/docs/app-routes.md#알려진-한계--절대경로-응답은-제한적으로만-다뤄집니다)
-- [인증](../router/docs/app-routes.md#인증)
+- [켜고 끄기](https://github.com/qwreey/router-docker/blob/HEAD/docs/app-routes.md#켜고-끄기) — `CADDY_ADAPTER_ENABLED`로 Dev Proxy와 함께 제어됩니다(별도 스위치 없음)
+- [기본 앱 (code)](https://github.com/qwreey/router-docker/blob/HEAD/docs/app-routes.md#기본-앱-code)
+- [앱 추가하기](https://github.com/qwreey/router-docker/blob/HEAD/docs/app-routes.md#앱-추가하기)
+- [바깥 리버스 프록시 연결하기](https://github.com/qwreey/router-docker/blob/HEAD/docs/app-routes.md#바깥-리버스-프록시-연결하기)
+- [알려진 한계 — 절대경로 응답은 제한적으로만 다뤄집니다](https://github.com/qwreey/router-docker/blob/HEAD/docs/app-routes.md#알려진-한계--절대경로-응답은-제한적으로만-다뤄집니다)
+- [인증](https://github.com/qwreey/router-docker/blob/HEAD/docs/app-routes.md#인증)
 
 ## VNC (GUI 컨테이너 화면 보기)
 
 router에 붙어 있는 GUI 컨테이너(예: Wine/labwc 위 Roblox Studio)의 화면을 브라우저에서 바로 보고 조작하는 기능입니다. 대상마다 두 가지 뷰어 백엔드 중 하나를 고릅니다 — 기본값인 `rfb`는 router-manager 자신이 noVNC 뷰어를 서비스하며 대상의 raw RFB 포트(보통 5900번)에 직접 브리지하므로 대상은 VNC만 말하면 되고 App Route도 생기지 않으며, `novnc`는 대상이 띄운 웹 VNC 프런트엔드(noVNC/websockify, 보통 6080번)를 App Route로 리버스 프록시하는 이전 방식입니다(router의 Caddy는 HTTP/WebSocket만 중계할 수 있어 raw RFB는 이 경로로 태울 수 없기 때문). 네이티브 VNC 클라이언트로 붙는 경로는 백엔드와 무관하게 Net 관리 탭의 Forwards가 담당합니다. [webmanager의 VNC 탭](webmanager.md#vnc) 또는 `http://<host>/router/`에서 관리합니다.
 
-자세한 내용은 [vnc.md](../router/docs/vnc.md)를 확인하세요.
+자세한 내용은 [vnc.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/vnc.md)를 확인하세요.
 
-- [어떻게 동작하는가](../router/docs/vnc.md#어떻게-동작하는가-읽고-시작하는-편이-좋습니다) — `rfb`(router 중계, 기본값)와 `novnc`(대상이 서비스하는 웹 VNC) 두 백엔드의 차이
-- [대상 추가하기](../router/docs/vnc.md#대상-추가하기) — sibling 프로젝트의 컨테이너를 대상으로 삼으려면 `.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`가 필요합니다
-- [뷰어 백엔드](../router/docs/vnc.md#뷰어-백엔드)
-- [보기 (뷰어)](../router/docs/vnc.md#보기-뷰어) — 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`)을 직접 열었을 때의 차이(`rfb`는 그대로 동작, `novnc`는 `ROUTER_APP_ORIGIN` 필요)
-- [알려진 제약](../router/docs/vnc.md#알려진-제약) — noVNC와 `VNC_PASSWORD`(VeNCrypt)는 백엔드와 무관하게 함께 쓸 수 없습니다
+- [어떻게 동작하는가](https://github.com/qwreey/router-docker/blob/HEAD/docs/vnc.md#어떻게-동작하는가-읽고-시작하는-편이-좋습니다) — `rfb`(router 중계, 기본값)와 `novnc`(대상이 서비스하는 웹 VNC) 두 백엔드의 차이
+- [대상 추가하기](https://github.com/qwreey/router-docker/blob/HEAD/docs/vnc.md#대상-추가하기) — sibling 프로젝트의 컨테이너를 대상으로 삼으려면 `.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`가 필요합니다
+- [뷰어 백엔드](https://github.com/qwreey/router-docker/blob/HEAD/docs/vnc.md#뷰어-백엔드)
+- [보기 (뷰어)](https://github.com/qwreey/router-docker/blob/HEAD/docs/vnc.md#보기-뷰어) — 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`)을 직접 열었을 때의 차이(`rfb`는 그대로 동작, `novnc`는 `ROUTER_APP_ORIGIN` 필요)
+- [알려진 제약](https://github.com/qwreey/router-docker/blob/HEAD/docs/vnc.md#알려진-제약) — noVNC와 `VNC_PASSWORD`(VeNCrypt)는 백엔드와 무관하게 함께 쓸 수 없습니다
 
 ## webmanager (관리자 패널)
 
@@ -408,15 +408,15 @@ webmanager 자체 비밀번호 게이트를 켜는 방법과, 이미지를 업�
 - **셸**: `shell.*` (`config/shell/`, `script/get-user-shell.sh`가 default/override를 고름)
 - **git 훅**: `config/git/hooks/`의 `prepare-commit-msg.*.sh`/`commit-msg.*.sh`(에이전트가 붙이는 `Co-Authored-By: Claude ... <noreply@anthropic.com>` trailer를 원하는 이름/이메일로 치환하고 `Claude-Session:` 줄 제거 — 기본 꺼짐, webmanager Git Config 탭에서 켬)
 - **webmanager**: `webmanager.*.sh`, `example-env.webmanager`(런타임 환경변수 템플릿, 저장소 루트)
-- **기타**: `supervisord.*.conf`, `supervisord/*.conf`(빌드 타임에 이미지로 들어가는 사용자 서비스 — 런타임에 재빌드 없이 추가하려면 [직접 만든 서비스를 supervisord에 올리기](#직접-만든-서비스를-supervisord에-올리기-재빌드-없이) 쪽을 쓰세요), `supervisor-metadata.*.yaml`(webmanager의 Supervisor 탭이 읽지만 프로그램 폴더 밖에 있는 전역 메타데이터), `user-init.*.sh`, `sshd-service.*.sh`, `dns-local.*.sh`(strict-order dnsmasq로 로컬 DNS 리졸버 실행, [build-customization.md](build-customization.md) 참고), `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`, `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅, `NGINX_LOG_LEVEL`로 access_log 상세도 조절 — `/tailscale/`·`/dev-proxy/`·`/exports/`는 이제 router 자신의 nginx가 직접 종단합니다, [router.md](../router/docs/router.md) 참고), `nginx-error.*.html`(code-server가 아직 안 떴을 때 502 대신 보여주는 자동 재시도 페이지)
+- **기타**: `supervisord.*.conf`, `supervisord/*.conf`(빌드 타임에 이미지로 들어가는 사용자 서비스 — 런타임에 재빌드 없이 추가하려면 [직접 만든 서비스를 supervisord에 올리기](#직접-만든-서비스를-supervisord에-올리기-재빌드-없이) 쪽을 쓰세요), `supervisor-metadata.*.yaml`(webmanager의 Supervisor 탭이 읽지만 프로그램 폴더 밖에 있는 전역 메타데이터), `user-init.*.sh`, `sshd-service.*.sh`, `dns-local.*.sh`(strict-order dnsmasq로 로컬 DNS 리졸버 실행, [build-customization.md](build-customization.md) 참고), `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`, `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅, `NGINX_LOG_LEVEL`로 access_log 상세도 조절 — `/tailscale/`·`/dev-proxy/`·`/exports/`는 이제 router 자신의 nginx가 직접 종단합니다, [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고), `nginx-error.*.html`(code-server가 아직 안 떴을 때 502 대신 보여주는 자동 재시도 페이지)
 
-router 컨테이너(`router/` 서브모듈, 별도 레포 [qwreey/router-docker](https://github.com/qwreey/router-docker)) 자체의 override 파일 목록은 [router.md](../router/docs/router.md)를
+router 컨테이너(`router/` 서브모듈, 별도 레포 [qwreey/router-docker](https://github.com/qwreey/router-docker)) 자체의 override 파일 목록은 [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md)를
 확인하세요 — `router/config/netgate/`, `router/config/tailscale/`,
 `router/config/caddy-adapter/`에 나뉘어 있습니다. router 전용 기능
 환경변수(tailscale/Dev Proxy/router-manager 자체 비밀번호/tinyauth)는
 `router/example-env.router`(런타임 템플릿, `.env.router`로 복사해
 사용 - `router/` 안이 아니라 `docker-compose.yml` 옆) — webmanager와 같은 `--env-migrate` 마이그레이션 도구를 공유합니다,
-자세한 내용은 [router.md#router-환경변수-마이그레이션](../router/docs/router.md#router-환경변수-마이그레이션) 참고.
+자세한 내용은 [router.md#router-환경변수-마이그레이션](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#router-환경변수-마이그레이션) 참고.
 
 # 코드 서버 패치
 
