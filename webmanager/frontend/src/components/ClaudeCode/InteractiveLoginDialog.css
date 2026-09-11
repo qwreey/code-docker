@@ -38,6 +38,18 @@
   color: var(--text-muted);
 }
 
+.interactive-login-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+/* Last screen stays visible while disconnected, dimmed so it doesn't read as live. */
+.interactive-login-terminal-stale {
+  opacity: 0.55;
+}
+
 .interactive-login-status.interactive-login-success {
   color: var(--color-green-fg);
 }

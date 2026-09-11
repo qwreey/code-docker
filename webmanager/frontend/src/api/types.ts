@@ -282,6 +282,10 @@ export interface ClaudeInteractiveLoginStartResponse {
   sessionId: string
 }
 
+export interface ClaudeInteractiveLoginStatus {
+  alive: boolean
+}
+
 export interface ClaudeOnboardingStatus {
   completed: boolean
 }
