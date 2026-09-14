@@ -700,6 +700,11 @@ export function Terminal({
   // on-screen keyboard — written by the touch handler during drags and momentum
   // (holdFocus there), read by the mobile-input effect's focus redirect.
   const suppressFocusUntilRef = useRef(0)
+  // Bytes received from the PTY since the last row-count change, while a
+  // resize is being watched (see the repaint nudge in the ResizeObserver) —
+  // tells "the application redrew and xterm didn't show it" apart from
+  // "nothing came back at all" in a copied debug log.
+  const outputProbeRef = useRef<{ bytes: number } | null>(null)
 
   const [state, setState] = useState<ConnectionState>('connecting')
   const [settings, setSettings] = useState<TerminalSettings | null>(null)
@@ -966,13 +971,25 @@ export function Terminal({
   // below (container size changed) and the zoom effect further down (font
   // size changed, which can shift cols/rows without the container itself
   // resizing, so the ResizeObserver alone would never fire for it).
-  const sendResize = useCallback(() => {
-    const term = termRef.current
+  // Sends an explicit size rather than whatever the terminal currently is —
+  // the repaint nudge in the ResizeObserver has to put the PTY one row short of
+  // the terminal for a moment. Logs sent vs dropped, because a resize silently
+  // skipped on a socket that isn't open is otherwise indistinguishable from an
+  // application that ignored its SIGWINCH.
+  const sendSize = useCallback((cols: number, rows: number, why: string) => {
     const ws = wsRef.current
-    if (term && ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'resize', cols, rows }))
+      debugLogRef.current?.(`  (pty size ${cols}x${rows} sent: ${why})`)
+    } else {
+      debugLogRef.current?.(`  (pty size ${cols}x${rows} dropped, socket ${ws ? ws.readyState : 'none'}: ${why})`)
     }
   }, [])
+
+  const sendResize = useCallback(() => {
+    const term = termRef.current
+    if (term) sendSize(term.cols, term.rows, 'resize')
+  }, [sendSize])
 
   // Apply the zoom (font size) level live — same "initial value at creation,
   // then kept in sync by its own effect" shape as theme/fontFamily above.
@@ -1885,6 +1902,21 @@ export function Terminal({
       return false
     })
 
+    // Repaint nudge for full-screen applications once a row-count change has
+    // settled: shrink the PTY one row and straight back, the same trick the
+    // backend's nudgeRepaint uses after a scrollback replay. Measured against
+    // a real PTY (2026-09-14): vim in Visual mode redraws its "-- VISUAL --"
+    // line on the new last row from a single SIGWINCH, with no input needed —
+    // yet on the device, after the keyboard opened, that line stayed missing
+    // until a drag sent vim some input. So the redraw either never arrived or
+    // landed while xterm was still reflowing the alternate buffer across the
+    // shrink. A second SIGWINCH delivered after the size has stopped moving
+    // covers both. Alternate buffer only: an application there repaints its
+    // whole screen anyway, while a shell prompt in the normal buffer (fish)
+    // repaints on every SIGWINCH and would stack duplicate prompts.
+    const REPAINT_NUDGE_DELAY_MS = 300
+    let lastObservedRows = term.rows
+    let repaintNudgeTimer = 0
     const resizeObserver = new ResizeObserver(() => {
       // Also fires when the container is hidden on a switch to the Home tab
       // (a 0x0 box is still a size change), which is exactly the case
@@ -1892,12 +1924,34 @@ export function Terminal({
       if (container.clientWidth === 0 || container.clientHeight === 0) return
       fitAddon.fit()
       sendResize()
-      debugLogRef.current?.(`  (resize ${container.clientWidth}x${container.clientHeight}px -> ${term.cols}x${term.rows})`)
+      debugLogRef.current?.(
+        `  (resize ${container.clientWidth}x${container.clientHeight}px -> ${term.cols}x${term.rows} buffer=${term.buffer.active.type} cursorY=${term.buffer.active.cursorY})`,
+      )
+      if (term.rows === lastObservedRows) return
+      lastObservedRows = term.rows
+      outputProbeRef.current = { bytes: 0 }
+      window.clearTimeout(repaintNudgeTimer)
+      repaintNudgeTimer = window.setTimeout(() => {
+        const probe = outputProbeRef.current
+        debugLogRef.current?.(`  (output since resize: ${probe?.bytes ?? 0} bytes)`)
+        if (term.buffer.active.type !== 'alternate' || term.rows < 2) {
+          outputProbeRef.current = null
+          return
+        }
+        outputProbeRef.current = { bytes: 0 }
+        sendSize(term.cols, term.rows - 1, 'repaint nudge')
+        sendSize(term.cols, term.rows, 'repaint nudge restore')
+        window.setTimeout(() => {
+          debugLogRef.current?.(`  (output after nudge: ${outputProbeRef.current?.bytes ?? 0} bytes)`)
+          outputProbeRef.current = null
+        }, 600)
+      }, REPAINT_NUDGE_DELAY_MS)
     })
     resizeObserver.observe(container)
 
     return () => {
       resizeObserver.disconnect()
+      window.clearTimeout(repaintNudgeTimer)
       touchCleanup?.()
       oscDisposable.dispose()
       dataDisposable.dispose()
@@ -2653,6 +2707,7 @@ export function Terminal({
     }
     ws.onmessage = (event) => {
       if (event.data instanceof ArrayBuffer) {
+        if (outputProbeRef.current) outputProbeRef.current.bytes += event.data.byteLength
         term.write(new Uint8Array(event.data))
       }
     }
