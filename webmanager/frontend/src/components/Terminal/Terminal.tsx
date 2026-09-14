@@ -465,6 +465,66 @@ function loadTouchMomentumEnabled(): boolean {
   }
 }
 
+// Live composition: forward what the IME is composing on every input event
+// instead of waiting for compositionend. On by default, because once the
+// field got a real box (see the mobile-input effect) Samsung's keyboard
+// started holding a composing region for a whole *word* — so the
+// commit-at-compositionend design showed nothing at all until the space bar
+// ("안녕하세요 치면 아무것도 안 보이는데, 띄어쓰기를 넣으면 입력이 넘어가",
+// 2026-09-14). The prefix diff is what makes forwarding a half-assembled
+// syllable safe: ㅇ → 아 → 안 goes out as "ㅇ", "\x7f아", "\x7f안", so the
+// terminal shows composition happening instead of an invisible buffer, and a
+// keyboard rewriting the whole word only resends what actually changed. The
+// toggle is the escape hatch back to the commit-at-end behavior for an app
+// that handles backspace badly.
+const LIVE_COMPOSITION_KEY = 'webmanager.terminal.liveComposition'
+
+function loadLiveCompositionEnabled(): boolean {
+  try {
+    return localStorage.getItem(LIVE_COMPOSITION_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function saveLiveCompositionEnabled(enabled: boolean) {
+  try {
+    if (enabled) localStorage.removeItem(LIVE_COMPOSITION_KEY)
+    else localStorage.setItem(LIVE_COMPOSITION_KEY, '0')
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - the toggle just won't persist
+  }
+}
+
+// Refocus at each word boundary: blur and immediately refocus the field
+// after a space, so the keyboard drops its association with the previous
+// word (stale suggestions, a predictive buffer that might re-emit it). The
+// repo owner's original design for this bug. Off by default, and not
+// because the idea is wrong: the prefix diff already makes a re-emitted word
+// produce no bytes, so this is no longer needed for correctness — only to
+// clear the suggestion bar. What it costs is uncertain: a programmatic
+// focus() outside a real user gesture can close the on-screen keyboard on
+// some Android builds, which would mean the keyboard flickering on every
+// space. A toggle lets that be measured on the actual device.
+const REFOCUS_ON_WORD_KEY = 'webmanager.terminal.refocusOnWord'
+
+function loadRefocusOnWordEnabled(): boolean {
+  try {
+    return localStorage.getItem(REFOCUS_ON_WORD_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function saveRefocusOnWordEnabled(enabled: boolean) {
+  try {
+    if (enabled) localStorage.setItem(REFOCUS_ON_WORD_KEY, '1')
+    else localStorage.removeItem(REFOCUS_ON_WORD_KEY)
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - the toggle just won't persist
+  }
+}
+
 function saveTouchMomentumEnabled(enabled: boolean) {
   try {
     if (enabled) localStorage.removeItem(TOUCH_MOMENTUM_KEY)
@@ -653,6 +713,16 @@ export function Terminal({
   const [touchMomentumEnabled, setTouchMomentumEnabled] = useState<boolean>(loadTouchMomentumEnabled)
   const touchMomentumRef = useRef(touchMomentumEnabled)
   touchMomentumRef.current = touchMomentumEnabled
+  // Read through refs by the mobile-input effect rather than listed in its
+  // deps: that effect creates the input field, and re-running it would tear
+  // the field down and rebuild it — dismissing the keyboard mid-sentence
+  // just because a setting was flipped.
+  const [liveCompositionEnabled, setLiveCompositionEnabled] = useState<boolean>(loadLiveCompositionEnabled)
+  const liveCompositionRef = useRef(liveCompositionEnabled)
+  liveCompositionRef.current = liveCompositionEnabled
+  const [refocusOnWordEnabled, setRefocusOnWordEnabled] = useState<boolean>(loadRefocusOnWordEnabled)
+  const refocusOnWordRef = useRef(refocusOnWordEnabled)
+  refocusOnWordRef.current = refocusOnWordEnabled
   const [altScreenTouchScrollEnabled, setAltScreenTouchScrollEnabled] = useState<boolean>(loadAltScreenTouchScrollEnabled)
   // The touch handler is installed once with the xterm instance, so it
   // reads the toggle through a ref rather than closing over the state.
@@ -1099,6 +1169,16 @@ export function Terminal({
   const toggleTouchMomentum = useCallback((enabled: boolean) => {
     saveTouchMomentumEnabled(enabled)
     setTouchMomentumEnabled(enabled)
+  }, [])
+
+  const toggleLiveComposition = useCallback((enabled: boolean) => {
+    saveLiveCompositionEnabled(enabled)
+    setLiveCompositionEnabled(enabled)
+  }, [])
+
+  const toggleRefocusOnWord = useCallback((enabled: boolean) => {
+    saveRefocusOnWordEnabled(enabled)
+    setRefocusOnWordEnabled(enabled)
   }, [])
 
   const toggleAltScreenTouchScroll = useCallback((enabled: boolean) => {
@@ -1965,6 +2045,25 @@ export function Terminal({
         const end = field.value.length
         field.setSelectionRange(end, end)
       }
+      // See REFOCUS_ON_WORD_KEY. Deferred a task rather than done inside the
+      // input handler: blurring a field while the keyboard is still delivering
+      // the keystroke that triggered this is the same kind of mid-event
+      // mutation that dropped characters in 2026-08-19's synchronous reset.
+      // `refocusing` keeps onBlur from treating our own blur as the user
+      // leaving the field.
+      let refocusTimer = 0
+      let refocusing = false
+      const scheduleRefocus = () => {
+        window.clearTimeout(refocusTimer)
+        refocusTimer = window.setTimeout(() => {
+          if (document.activeElement !== field) return
+          refocusing = true
+          field.blur()
+          field.focus()
+          refocusing = false
+          debug?.log(`  (refocus: word boundary, focused=${document.activeElement === field})`)
+        }, 0)
+      }
 
       const flush = () => {
         const value = field.value
@@ -2002,6 +2101,7 @@ export function Terminal({
         // field from carrying a whole line's worth of stale text.
         if (!composing && added.includes(' ')) {
           resetField('word boundary')
+          if (refocusOnWordRef.current) scheduleRefocus()
           return
         }
         if (!composing && value.length > MAX_FIELD_LENGTH) {
@@ -2018,12 +2118,27 @@ export function Terminal({
         composing = false
         logEvent('field', e, field.value)
         flush()
+        // With live composition, a space typed *inside* the composition
+        // was already sent by an input event while `composing` was still
+        // true — which is exactly when flush's word-boundary reset is
+        // skipped — so compositionend sees no new bytes and flush returns
+        // before reaching it. Catch that case here, now that the keyboard
+        // has actually let go of the word.
+        if (field.value !== ANCHOR && field.value.endsWith(' ')) {
+          resetField('word boundary')
+          if (refocusOnWordRef.current) scheduleRefocus()
+        }
       }
       const onInput = (e: Event) => {
         logEvent('field', e, field.value)
-        // Nothing is sent mid-composition: the field holds a half-assembled
-        // syllable, and forwarding it would be the jamo-by-jamo bug.
-        if (composing) return
+        // Mid-composition the field holds a half-assembled syllable. With
+        // live composition on it goes out anyway, and the next input's diff
+        // backspaces over it once the IME assembles it further — that is
+        // what makes composition visible in the terminal at all (see
+        // LIVE_COMPOSITION_KEY). With it off, nothing is sent until
+        // compositionend, which on a keyboard that composes a whole word at
+        // a time means nothing until the space bar.
+        if (composing && !liveCompositionRef.current) return
         flush()
       }
       const onKeyDown = (ev: Event) => {
@@ -2041,6 +2156,7 @@ export function Terminal({
       }
       const onBlur = () => {
         composing = false
+        if (refocusing) return
         resetField('blur')
       }
       // Observed only, never acted on: an IME that keeps a composing region
@@ -2055,6 +2171,7 @@ export function Terminal({
       field.addEventListener('keydown', onKeyDown)
       field.addEventListener('blur', onBlur)
       cleanups.push(() => {
+        window.clearTimeout(refocusTimer)
         field.removeEventListener('compositionstart', onCompositionStart)
         field.removeEventListener('compositionupdate', onCompositionUpdate)
         field.removeEventListener('compositionend', onCompositionEnd)
@@ -2660,6 +2777,10 @@ export function Terminal({
         onToggleInputDebug={toggleInputDebug}
         touchMomentumEnabled={touchMomentumEnabled}
         onToggleTouchMomentum={toggleTouchMomentum}
+        liveCompositionEnabled={liveCompositionEnabled}
+        onToggleLiveComposition={toggleLiveComposition}
+        refocusOnWordEnabled={refocusOnWordEnabled}
+        onToggleRefocusOnWord={toggleRefocusOnWord}
         altScreenTouchScrollEnabled={altScreenTouchScrollEnabled}
         onToggleAltScreenTouchScroll={toggleAltScreenTouchScroll}
         altScreenWheelScrollEnabled={altScreenWheelScrollEnabled}

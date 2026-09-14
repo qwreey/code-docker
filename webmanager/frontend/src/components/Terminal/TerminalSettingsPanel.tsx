@@ -43,6 +43,10 @@ export function TerminalSettingsPanel({
   onToggleInputDebug,
   touchMomentumEnabled,
   onToggleTouchMomentum,
+  liveCompositionEnabled,
+  onToggleLiveComposition,
+  refocusOnWordEnabled,
+  onToggleRefocusOnWord,
   altScreenTouchScrollEnabled,
   onToggleAltScreenTouchScroll,
   altScreenWheelScrollEnabled,
@@ -67,6 +71,10 @@ export function TerminalSettingsPanel({
   onToggleInputDebug: (enabled: boolean) => void
   touchMomentumEnabled: boolean
   onToggleTouchMomentum: (enabled: boolean) => void
+  liveCompositionEnabled: boolean
+  onToggleLiveComposition: (enabled: boolean) => void
+  refocusOnWordEnabled: boolean
+  onToggleRefocusOnWord: (enabled: boolean) => void
   altScreenTouchScrollEnabled: boolean
   onToggleAltScreenTouchScroll: (enabled: boolean) => void
   altScreenWheelScrollEnabled: boolean
@@ -331,6 +339,34 @@ export function TerminalSettingsPanel({
           깨지지 않습니다. <strong>비밀번호 필드</strong>는 예측 입력을 확실히 끄는 대신 IME 조합 자체를 막아
           한글이 자모로 쪼개집니다. <strong>끔</strong>은 xterm 기본 동작으로, 삼성 키보드에서
           &quot;가나다. 가나다.&quot;처럼 중복 입력이 생길 수 있습니다.
+        </p>
+        <label className="checkbox-option">
+          <input
+            type="checkbox"
+            checked={liveCompositionEnabled}
+            onChange={(e) => onToggleLiveComposition(e.target.checked)}
+          />
+          조합 중인 글자도 바로 터미널에 보내기 (새 입력 필드 전용)
+        </label>
+        <p className="section-description">
+          켜면 <code>ㅇ</code> → <code>아</code> → <code>안</code>처럼 조합되는 과정이 터미널에 그대로 보입니다(바뀐 글자만
+          지우고 다시 씁니다). 끄면 키보드가 조합을 끝낼 때까지 아무것도 보내지 않는데, 삼성 키보드처럼 단어 하나를 통째로
+          조합하는 키보드에서는 <strong>띄어쓰기를 누르기 전까지 아무것도 안 보이게</strong> 됩니다. 백스페이스를 이상하게
+          처리하는 앱에서 문제가 있을 때만 끄세요.
+        </p>
+        <label className="checkbox-option">
+          <input
+            type="checkbox"
+            checked={refocusOnWordEnabled}
+            onChange={(e) => onToggleRefocusOnWord(e.target.checked)}
+          />
+          띄어쓰기마다 입력 필드를 다시 포커스해 자동완성 연관 끊기 (실험적)
+        </label>
+        <p className="section-description">
+          단어가 끝날 때마다 필드를 blur→focus해서, 키보드가 이전 단어를 기억해 자동완성을 띄우거나 다시 흘려보내지
+          못하게 합니다. 중복 입력 자체는 켜지 않아도 이미 막혀 있어서, 이건 자동완성 막대를 비우는 효과가 전부입니다.
+          기기에 따라 <strong>띄어쓰기마다 키보드가 깜빡 닫혔다 열릴 수 있어</strong> 기본은 꺼져 있습니다 — 켜보고
+          키보드가 멀쩡하면 써도 됩니다(입력 디버그에 <code>(refocus: ...)</code>가 찍힙니다).
         </p>
         <label className="checkbox-option">
           <input
