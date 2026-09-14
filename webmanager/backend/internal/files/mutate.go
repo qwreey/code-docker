@@ -107,8 +107,11 @@ func Move(root string, items []string, destDir string) []ItemResult {
 			results = append(results, ItemResult{Path: item, Ok: false, Error: err.Error()})
 			continue
 		}
-		dest := filepath.Join(resolvedDest, filepath.Base(resolvedSrc))
-		if _, err := ResolvePath(root, dest); err != nil {
+		// ResolveForAccess (not the lexical ResolvePath) so an existing
+		// destination entry that is a symlink out of the root is rejected
+		// rather than written through by the EXDEV copy fallback.
+		dest, err := ResolveForAccess(root, filepath.Join(resolvedDest, filepath.Base(resolvedSrc)))
+		if err != nil {
 			results = append(results, ItemResult{Path: item, Ok: false, Error: err.Error()})
 			continue
 		}
@@ -150,8 +153,11 @@ func Copy(root string, items []string, destDir string) []ItemResult {
 			results = append(results, ItemResult{Path: item, Ok: false, Error: err.Error()})
 			continue
 		}
-		dest := filepath.Join(resolvedDest, filepath.Base(resolvedSrc))
-		if _, err := ResolvePath(root, dest); err != nil {
+		// Same as Move: resolve the destination's own final component so a
+		// symlink already sitting there can't redirect the copy out of the
+		// root.
+		dest, err := ResolveForAccess(root, filepath.Join(resolvedDest, filepath.Base(resolvedSrc)))
+		if err != nil {
 			results = append(results, ItemResult{Path: item, Ok: false, Error: err.Error()})
 			continue
 		}
@@ -207,7 +213,12 @@ func copyFile(src, dest string, mode fs.FileMode) error {
 	}
 	defer in.Close()
 
-	out, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+	// O_NOFOLLOW: recursive copy re-derives each child path itself, below
+	// the one destination this package validated, so a pre-existing symlink
+	// deep in the destination tree has had no check of its own. Refusing to
+	// write through any of them is cheaper than re-validating every child,
+	// and matches the package's "reject, never silently redirect" stance.
+	out, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC|syscall.O_NOFOLLOW, mode)
 	if err != nil {
 		return err
 	}

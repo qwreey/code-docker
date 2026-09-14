@@ -92,22 +92,9 @@ if [ "$built" = "1" ]; then
       fi
     fi
   fi
-  if confirm "router-manager 관리자 비밀번호를 지금 설정할까요?" n; then
-    printf "Password: "; read -r -s pw1; echo
-    printf "Confirm: "; read -r -s pw2; echo
-    if [ "$pw1" != "$pw2" ] || [ -z "$pw1" ]; then
-      echo "  ! 비밀번호가 비어있거나 일치하지 않아 건너뜁니다."
-    else
-      hash="$(printf '%s\n' "$pw1" | docker compose run --rm -T \
-        --entrypoint /usr/local/bin/router-manager code-docker-router --hash-password)"
-      if [ -n "$hash" ]; then
-        set_env_var "$TARGET_DIR/.env.router" ROUTER_MANAGER_AUTH_PASSWORD_HASH "'$hash'"
-        echo "  - ROUTER_MANAGER_AUTH_PASSWORD_HASH 설정 완료"
-      else
-        echo "  ! 해시 생성 실패"
-      fi
-    fi
-  fi
+  # ootb-lib.sh에 함수로 있는 이유는 그 함수의 주석 참고 - migrate-continue.sh의
+  # 빌드 직후 지점에서도 같은 질문을 해야 하기 때문입니다.
+  prompt_router_manager_password "$TARGET_DIR"
   echo
 fi
 

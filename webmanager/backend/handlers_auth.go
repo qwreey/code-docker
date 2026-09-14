@@ -50,7 +50,7 @@ func (s *Server) handleAuthUnlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.gate.SetCookie(w, token)
+	s.gate.SetCookie(w, r, token)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 

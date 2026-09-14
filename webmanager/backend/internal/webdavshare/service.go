@@ -8,8 +8,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"log"
+	"mime"
 	"net"
 	"net/http"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -389,7 +391,64 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// x/net/webdav's own ServeHTTP groups GET/HEAD/POST together
+	// (handleGetHeadPost) as the methods that hand a file's bytes to
+	// net/http.ServeContent, which picks Content-Type from the extension
+	// alone (text/html, image/svg+xml, ...) and never sets
+	// Content-Disposition itself (verified against the vendored
+	// golang.org/x/net/webdav and net/http/fs.go source: no
+	// "Content-Disposition" reference in either). A stored `evil.html`
+	// would therefore render inline on this container's own origin
+	// (code-server/webmanager) rather than download, turning an ordinary
+	// PUT into a stored-XSS delivery path. Setting the header before
+	// delegating is enough - ServeContent only *adds* headers, it never
+	// clears ones already present, and this runs before any WriteHeader
+	// call in that path. Restricted to the same three methods so
+	// PROPFIND/PUT/MKCOL/etc. responses (small status-text bodies, plain
+	// XML) are untouched. WebDAV clients (Finder, gvfs, Windows Explorer,
+	// Solid Explorer) never render a GET body as a page - they only care
+	// about the bytes - so forcing a download disposition here is free for
+	// every real WebDAV use case and only closes the browser-navigation
+	// exploit path.
+	switch r.Method {
+	case http.MethodGet, http.MethodHead, http.MethodPost:
+		w.Header().Set("Content-Disposition", contentDispositionAttachment(r.URL.Path))
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+	}
+
 	s.handler.ServeHTTP(w, r)
+}
+
+// contentDispositionAttachment builds an `attachment; filename="..."` value
+// from the request path's base name. mime.FormatMediaType handles quoting
+// and non-ASCII (RFC 2231) itself; control characters are stripped first
+// since a filename can come straight from a client-chosen PUT path and CR/LF
+// in a header value is a response-splitting risk on some proxies even though
+// Go's own header writer already rejects them.
+func contentDispositionAttachment(urlPath string) string {
+	var name string
+	if strings.HasSuffix(urlPath, "/") {
+		// A GET on a directory-ish path 405s before this ever reaches a
+		// client (webdav.Handler checks fi.IsDir()) - path.Base would
+		// otherwise return the last path segment (e.g. the "webdav" prefix
+		// itself for the share root), which isn't a filename at all.
+		name = "download"
+	} else {
+		name = path.Base(urlPath)
+	}
+	if name == "" || name == "." || name == "/" {
+		name = "download"
+	}
+	name = strings.Map(func(r rune) rune {
+		if r == '\r' || r == '\n' {
+			return -1
+		}
+		return r
+	}, name)
+	if name == "" {
+		name = "download"
+	}
+	return mime.FormatMediaType("attachment", map[string]string{"filename": name})
 }
 
 func unauthorized(w http.ResponseWriter) {

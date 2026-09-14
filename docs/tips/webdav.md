@@ -69,8 +69,12 @@ dav.example.com {
 ## 기존 호스트네임의 경로로 내보내기
 
 포트 80(code-server와 같은 origin)에도 같은 `/webdav/` 경로가 열려 있습니다.
-전용 호스트네임을 못 쓸 때만 쓰세요 — 바깥 프록시에서 그 경로 하나만 골라
-forward-auth를 빼야 하는데, 경로 예외는 빠뜨리거나 잘못 쓰기 쉽습니다.
+**전용 호스트네임을 못 쓸 때만 쓰세요** — 바깥 프록시에서 그 경로 하나만 골라
+forward-auth를 빼야 하는데, 경로 예외는 빠뜨리거나 잘못 쓰기 쉽습니다. 더 근본적인
+이유도 있습니다: 이 경로는 code-server/webmanager와 **origin을 공유**하므로,
+WebDAV 자격만 가진 사람이 올린 파일 하나가 그 origin 전체(같은 쿠키, 같은
+`fetch()` 권한)에 영향을 줄 수 있는 통로가 됩니다. 위의 전용 호스트네임(포트 82
+vhost)은 origin 자체가 분리되어 있어 이 통로가 처음부터 없습니다.
 
 ```caddyfile
 code.example.com {
@@ -154,10 +158,21 @@ rclone mount codedav: ~/mnt/code-docker  # FUSE 마운트
   code-docker 쪽 nginx는 이미 무제한(`client_max_body_size 0`)에 버퍼링을 끈
   상태로 스트리밍합니다.
 - **폴더는 보이는데 파일이 안 열린다** → 공유 폴더 밖을 가리키는 심볼릭 링크는
-  일부러 막혀 있습니다(Files 탭과 같은 규칙).
+  일부러 막혀 있습니다(Files 탭과 같은 규칙). 읽기만이 아니라 그 링크를 거쳐
+  파일/폴더를 새로 만들거나 지우는 것도 같은 규칙으로 막힙니다(경로 중간에 있는
+  링크도 포함). 링크 자체를 지우는 것은 됩니다 — 막는 것은 "링크를 통과하는"
+  동작뿐입니다.
 
 ## 알아둘 제약
 
 - 잠금(WebDAV LOCK)은 메모리에만 있습니다. webmanager가 재시작하면 잠금이 사라지므로,
   여러 기기에서 같은 파일을 동시에 편집하는 용도로는 적합하지 않습니다.
 - 읽기 전용 공유 옵션은 아직 없습니다. 붙을 수 있는 쪽은 쓰기도 할 수 있습니다.
+- GET/HEAD로 내려받는 파일은 항상 `Content-Disposition: attachment`로
+  응답합니다 — 즉 브라우저로 공유 파일의 주소를 직접 열면 무조건 다운로드만
+  됩니다. `.html`/`.svg` 같은 파일을 확장자 기반 MIME으로 브라우저가 그대로
+  렌더링해 버리면(특히 위의 "기존 호스트네임의 경로로 내보내기" 방식처럼
+  code-server/webmanager와 origin을 공유할 때) 그 파일이 같은 origin에서
+  스크립트를 실행하는 통로가 될 수 있기 때문입니다. Windows 탐색기·macOS
+  Finder·gvfs·Solid Explorer 같은 WebDAV 클라이언트는 애초에
+  `Content-Disposition`을 보지 않으므로 실사용에는 영향이 없습니다.

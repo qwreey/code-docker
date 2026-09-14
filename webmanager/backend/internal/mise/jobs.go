@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -118,6 +119,16 @@ func (s *JobStore) Start(binPath string, argSets ...[]string) string {
 // e.g. handlers_mise.go/handlers_claude.go marking the restart-needed flag
 // only when the job actually succeeded.
 func (s *JobStore) StartWithCallback(onDone func(exitCode int), binPath string, argSets ...[]string) string {
+	return s.StartWithCallbackEnv(onDone, nil, binPath, argSets...)
+}
+
+// StartWithCallbackEnv is StartWithCallback plus extra environment entries
+// ("KEY=value") for the child process, appended to webmanager's own
+// inherited environment so nothing already there is lost. Added for the
+// project-clone route, which pins GIT_ALLOW_PROTOCOL so git itself refuses
+// the command-executing remote helpers (`ext::`, `fd::`) regardless of what
+// the URL says — see handlers_projects.go's handleCloneProject.
+func (s *JobStore) StartWithCallbackEnv(onDone func(exitCode int), env []string, binPath string, argSets ...[]string) string {
 	id := newJobID()
 	j := &job{running: true, lines: []string{}, startedAt: time.Now()}
 
@@ -138,7 +149,7 @@ func (s *JobStore) StartWithCallback(onDone func(exitCode int), binPath string, 
 			if i > 0 {
 				appendLine("--- " + binPath + " " + strings.Join(args, " ") + " ---")
 			}
-			lastCode = runOne(context.Background(), binPath, args, appendLine)
+			lastCode = runOne(context.Background(), binPath, args, env, appendLine)
 		}
 
 		s.mu.Lock()
@@ -161,8 +172,11 @@ func (s *JobStore) StartWithCallback(onDone func(exitCode int), binPath string, 
 // go to stderr, not stdout as first assumed, so both streams are scanned
 // concurrently and merged into the same job log. Returns the process's
 // exit code (0 on success, -1 if the process couldn't even be started).
-func runOne(ctx context.Context, binPath string, args []string, appendLine func(string)) int {
+func runOne(ctx context.Context, binPath string, args []string, env []string, appendLine func(string)) int {
 	cmd := exec.CommandContext(ctx, binPath, args...)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

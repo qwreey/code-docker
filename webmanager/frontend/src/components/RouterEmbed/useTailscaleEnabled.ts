@@ -3,10 +3,16 @@ import { useEffect, useState } from 'react'
 const POLL_INTERVAL_MS = 5000
 
 // Plain fetch, same pattern as useRouterTrustedHosts.ts in this folder -
-// GET /api/tailscale/status is unauthenticated (reads stay open per
+// GET /api/tailscale/state is unauthenticated (reads stay open per
 // router-manager's authgate convention), and this is router-manager's own
 // backend, not webmanager's (api/client.ts's api.get always targets
-// /manager/api/...). null = still loading; SidebarContainer.tsx passes that
+// /manager/api/...). /state, not /status: both carry `enabled`, but /status
+// returns the whole tailnet peer list and moved behind router-manager's
+// password gate in the 2026-09-07 security review - polling a gated route
+// here would resolve to "enabled" forever via the catch below and never
+// hide the tab, which is exactly the symptom this hook exists to prevent
+// (router's own sidebar hook made the same switch). null = still loading;
+// SidebarContainer.tsx passes that
 // straight through to Sidebar's `loading` overlay, which hides the whole
 // tab list until this resolves either way, rather than showing the real tab
 // list first and risking it visibly changing shape a moment later. A fetch
@@ -27,7 +33,7 @@ export function useTailscaleEnabled(): boolean | null {
     let cancelled = false
 
     const check = () => {
-      fetch('/router/api/tailscale/status')
+      fetch('/router/api/tailscale/state')
         .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`status ${res.status}`))))
         .then((data: { enabled?: boolean }) => {
           if (!cancelled) setEnabled(data.enabled ?? true)

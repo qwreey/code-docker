@@ -76,6 +76,16 @@
 # docker-compose.yml의 네트워크 정의에만 쓰입니다. 도커 엔진 자체의 ipv6
 # 지원(daemon.json의 ipv6/fixed-cidr-v6 등)이 먼저 켜져 있어야 의미가
 # 있습니다 - 엔진 지원 없이 이 값만 켜면 네트워크 생성이 실패합니다.
+#
+# 이 값을 켜면 netgate(router/config/netgate/firewall.default.sh)가 IPv6이
+# 실제로 붙어있는 걸 감지해 ip6tables로 고정 차단 세트(fc00::/7 ULA,
+# fe80::/10 link-local, ::1/128 loopback) + outbound: 안의 v6 CIDR 항목만
+# 미러링합니다 - forwards:/bandwidth:는 v6으로 미러링되지 않고,
+# config.default.yaml 자체도 아직 v4 CIDR만 지원합니다. ip6tables가 없거나
+# 규칙 적용이 실패하면 `docker compose logs`에 반복되는 큰 경고 블록이
+# 뜹니다(조용히 넘어가지 않음). 자세한 커버리지는
+# router/docs/egress-netgate.md의 "IPv6" 절 참고. 가장 단순하고 안전한
+# 기본값은 여전히 이 값을 켜지 않는 것입니다.
 #ENABLE_IPV6="false"
 
 # Web app name
@@ -399,14 +409,18 @@
 # 이름을 다른 값으로 바꾸고 싶을 때만 설정하세요.
 #ROUTER_HOSTNAME="router"
 
-# router의 /exports/ internal-source deny(ROUTER_NGINX_DENY_INTERNAL_EXPORTS)가
-# 참조하는, code-docker-internal 네트워크의 CIDR입니다. 기본적으로 비워두면
-# router가 자기 라우팅 테이블에서 직접 감지합니다(nginx-service.default.sh의
-# detect_internal_subnet) - code-docker-internal은 docker-compose.yml에 subnet이
+# router의 internal-source deny(/exports/ 의 ROUTER_NGINX_DENY_INTERNAL_EXPORTS,
+# router-manager 관리 API의 ROUTER_NGINX_DENY_INTERNAL_MANAGER)가 참조하는,
+# "울타리 안쪽" 네트워크의 CIDR입니다. 기본적으로 비워두면 router가 자기 라우팅
+# 테이블에서 직접 감지합니다(nginx-service.default.sh의 detect_internal_subnets)
+# - 기본 경로가 걸린 인터페이스(code-docker-external)를 제외한 **모든** 연결
+# 네트워크가 대상이므로, EXTRA_INCLUDE로 붙은 sibling 프로젝트의 네트워크까지
+# 자동으로 포함됩니다. code-docker-internal은 docker-compose.yml에 subnet이
 # 고정되어 있지 않고 Docker가 매번 자동 할당하므로(여러 PREFIX 인스턴스를 한
-# 호스트에 띄워도 서로 CIDR이 충돌하지 않도록), 감지가 곧 실제 값입니다. 이
-# 값을 직접 설정해야 하는 경우는 router가 세 번째 네트워크에 붙는 등
-# 자동 감지 전제가 깨지는 드문 상황뿐입니다.
+# 호스트에 띄워도 서로 CIDR이 충돌하지 않도록), 감지가 곧 실제 값입니다. 직접
+# 설정해야 하는 경우는 그 전제가 깨지는 드문 상황뿐이며, 여러 개면 쉼표로
+# 구분합니다. router 시작 로그의 "internal-source deny covers:" 줄로 실제
+# 적용된 목록을 확인할 수 있습니다.
 #ROUTER_INTERNAL_SUBNET=""
 
 # code-docker-router가 호스트에 퍼블리시하는 80번 포트의 바인딩 주소/포트입니다

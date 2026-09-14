@@ -46,8 +46,14 @@ func OpenUploadDest(root, dir, filename string) (destPath string, f *os.File, er
 		return "", nil, err
 	}
 
-	dest := filepath.Join(resolvedDir, name)
-	if _, err := ResolvePath(root, dest); err != nil {
+	// ResolveForAccess, not the lexical ResolvePath: the destination may
+	// already exist *as a symlink*, and os.OpenFile below follows it — an
+	// entry named like the upload that points out of the root would
+	// otherwise turn an upload into an arbitrary root-owned write. A link
+	// that stays inside the root resolves to its target and is written
+	// through as before.
+	dest, err := ResolveForAccess(root, filepath.Join(resolvedDir, name))
+	if err != nil {
 		return "", nil, err
 	}
 

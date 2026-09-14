@@ -60,9 +60,11 @@ networks:
     # below and router/.claude/router-nginx-hardening-plan.md), but it now
     # detects it live from its own routing table at startup instead of
     # relying on a value pinned here - see nginx-service.default.sh's
-    # detect_internal_subnet. Set ROUTER_INTERNAL_SUBNET explicitly only if
-    # that detection ever needs overriding (e.g. router attached to a third
-    # network).
+    # detect_internal_subnets - which, since 2026-09-14, denies EVERY network
+    # router is attached to other than the default-route one, so a sibling
+    # project's own networks (EXTRA_INCLUDE) are covered automatically. Set
+    # ROUTER_INTERNAL_SUBNET explicitly (comma-separated) only if that
+    # detection ever needs overriding.
   code-docker-external:
     name: "${PREFIX:-}code-docker-external"
     internal: false

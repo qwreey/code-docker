@@ -235,6 +235,55 @@ has_env_var() {
   grep -qE "^$2=" "$1" 2>/dev/null
 }
 
+prompt_router_manager_password() {
+  # prompt_router_manager_password <TARGET_DIR>
+  #
+  # router-manager 관리 API 비밀번호(ROUTER_MANAGER_AUTH_PASSWORD_HASH)를
+  # 물어보고 해시를 만들어 .env.router에 씁니다. 호출 전에 반드시
+  # `cd "$TARGET_DIR"`가 되어 있고 `docker compose build`가 성공한 상태여야
+  # 합니다 - 해시 생성이 방금 빌드한 이미지의 router-manager --hash-password를
+  # 실행하는 것이기 때문입니다.
+  #
+  # ootb-config.sh가 아니라 여기 있는 이유: 대화형 값은 원칙적으로 전부
+  # ootb-config.sh 한 곳에서 묻지만(root CLAUDE.md의 "ootb.sh / migrate.sh"
+  # 절), 그 스크립트는 docker를 전혀 쓰지 않는 순수 env 편집기이고 이 값만은
+  # 빌드된 이미지가 있어야 만들 수 있습니다. 그래서 "빌드 직후"라는 지점을
+  # 가진 ootb.sh와 migrate-continue.sh 양쪽에서 이 함수 하나를 부르는 방식으로
+  # 단일 출처를 유지합니다.
+  #
+  # 이미 설정돼 있으면 조용히 넘어가지 않고 그렇다고 말합니다 - 안 물어본
+  # 이유를 말하지 않으면 "안 물어봤다"와 "이미 돼 있다"가 구분되지 않습니다.
+  _prmp_dir=$1
+  if [ -n "$(get_env_var "$_prmp_dir/.env.router" ROUTER_MANAGER_AUTH_PASSWORD_HASH)" ]; then
+    echo "  - ROUTER_MANAGER_AUTH_PASSWORD_HASH가 이미 설정돼 있어 건너뜁니다."
+    return 0
+  fi
+  echo "router-manager(netgate egress 규칙 / DNS / 인바운드 포워드 / tinyauth 사용자)의"
+  echo "관리 API는 이 비밀번호로만 잠깁니다. 설정하지 않으면 잠기지 않는 게 아니라"
+  echo "아예 쓸 수 없습니다 - 비밀번호가 없으면 관리 API가 503으로 전부 거부되고,"
+  echo "/router/ 화면은 첫 설정 폼만 뜹니다. 앱 안(/router/ → 설정 탭)에서도"
+  echo "나중에 설정할 수 있지만, 여기서 설정하면 env로 고정됩니다."
+  if ! confirm "router-manager 관리자 비밀번호를 지금 설정할까요?" y; then
+    echo "  - 건너뜀. 컨테이너를 띄운 뒤 http://<host>/router/ 에서 설정하세요"
+    echo "    (그 전까지 Net 관리/DNS/tinyauth 등의 쓰기 동작은 503으로 거부됩니다)."
+    return 0
+  fi
+  printf "Password: "; read -r -s _prmp_pw1; echo
+  printf "Confirm: "; read -r -s _prmp_pw2; echo
+  if [ "$_prmp_pw1" != "$_prmp_pw2" ] || [ -z "$_prmp_pw1" ]; then
+    echo "  ! 비밀번호가 비어있거나 일치하지 않아 건너뜁니다."
+    return 0
+  fi
+  _prmp_hash="$(printf '%s\n' "$_prmp_pw1" | docker compose run --rm -T \
+    --entrypoint /usr/local/bin/router-manager code-docker-router --hash-password)"
+  if [ -n "$_prmp_hash" ]; then
+    set_env_var "$_prmp_dir/.env.router" ROUTER_MANAGER_AUTH_PASSWORD_HASH "'$_prmp_hash'"
+    echo "  - ROUTER_MANAGER_AUTH_PASSWORD_HASH 설정 완료"
+  else
+    echo "  ! 해시 생성 실패"
+  fi
+}
+
 gen_secret() {
   # 32바이트 랜덤을 hex 64자로. openssl이 없는 최소 환경을 위한 폴백 포함.
   if command -v openssl >/dev/null 2>&1; then

@@ -46,7 +46,11 @@ type Info struct {
 // filemanager-plan.md's "링크를 열 때(stat 포함)는 EvalSymlinks 후 재검증"
 // rule.
 func Stat(root, userPath string) (Info, error) {
-	resolved, err := ResolvePath(root, userPath)
+	// resolveEntry, not ResolvePath: the Lstat below must not be reachable
+	// through an ancestor symlink that leaves the root (that would leak
+	// ownership/timestamps of arbitrary container paths). The final
+	// component is left unresolved so a symlink entry still reports as one.
+	resolved, err := resolveEntry(root, userPath)
 	if err != nil {
 		return Info{}, err
 	}

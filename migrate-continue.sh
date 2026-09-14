@@ -130,6 +130,19 @@ if [ "$built" = "1" ]; then
     fi
   done
   echo
+
+  # router-manager 비밀번호는 RECONFIGURE(5단계의 ootb-config.sh)가 다룰 수
+  # 없습니다 - 그 스크립트는 docker를 전혀 안 쓰는 순수 env 편집기인데, 이
+  # 값은 방금 빌드한 이미지로 --hash-password를 돌려야 만들어집니다. 그래서
+  # "빌드 직후"인 여기서 묻습니다. 이미 설정돼 있으면 함수가 그렇다고 말하고
+  # 넘어가므로 매번 돌려도 시끄럽지 않습니다.
+  #
+  # 기존 배포에 이 질문이 생긴 이유: 비밀번호 미설정 상태의 router-manager
+  # 관리 API는 이제 통과가 아니라 503입니다(fail-closed) - 즉 예전처럼
+  # "안 잠긴 채 동작"하는 게 아니라 아예 동작하지 않습니다.
+  echo "=== 4-1. router-manager 관리자 비밀번호 ==="
+  prompt_router_manager_password "$TARGET_DIR"
+  echo
 fi
 
 echo "=== 5. 설정 재검토 ==="

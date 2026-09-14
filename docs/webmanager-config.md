@@ -70,12 +70,18 @@ curl -s https://<code-server 주소>/manifest.json | jq .shortcuts
 있습니다:
 
 ```sh
-cat .env.webmanager | tee -a .env.webmanager.bak | docker compose exec -T code-docker \
-  /etc/code-docker/webmanager/webmanager --env-migrate > .env.webmanager
+cat .env.webmanager >> .env.webmanager.bak && docker compose exec -T code-docker \
+  /etc/code-docker/webmanager/webmanager --env-migrate < .env.webmanager > .env.webmanager.new \
+  && mv .env.webmanager.new .env.webmanager
 ```
 
-(`tee -a`로 백업 파일에 매번 이어붙이는 이유: 두 줄로 나누면 백업을 깜빡하기 쉽고, 이렇게
-합쳐두면 실행할 때마다 과거 내용이 `.env.webmanager.bak`에 계속 누적되어 남습니다.)
+(`>>`로 백업 파일에 매번 이어붙이는 이유: 별도 명령으로 나누면 백업을 깜빡하기 쉽고, 이렇게
+`&&`로 묶어두면 실행할 때마다 과거 내용이 `.env.webmanager.bak`에 계속 누적되어 남습니다.
+예전에 안내하던 `cat f | tee -a f.bak | ... > f` 한 줄 파이프라인은 **쓰지 마세요** — 셸이
+파이프라인의 모든 단계를 동시에 띄우기 때문에 마지막 `> f`가 `cat`이 읽기 전에 파일을 비울 수
+있고, 그러면 빈 입력이 백업에도 붙고 결과는 비밀번호 해시가 빠진 빈 템플릿이 됩니다. 위 형태는
+원본을 쓰기로 여는 일이 없고(`<`는 읽기 전용), 전부 성공한 뒤에야 `mv`로 교체합니다. 같은 이유로
+`--env-migrate`는 빈 입력을 받으면 템플릿을 내보내는 대신 거부합니다.)
 
 활성화(주석 해제)해둔 값과 직접 남긴 코멘트는 보존되고, 더 이상 안 쓰이는 키는
 지우지 않고 파일 맨 아래 "더 이상 쓰이지 않는 키" 섹션으로 옮겨집니다. `#.`로

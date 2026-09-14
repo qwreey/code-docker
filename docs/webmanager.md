@@ -213,7 +213,11 @@ Code 자동 메모리 뷰어(`CLAUDE_CONFIG_DIR/projects/<slug>/memory/` — 정
 `claude --resume <id>`가 이미 실행된 터미널 탭이 바로 열립니다(Claude Code 탭의 대화
 로그에서도 동일). "git clone으로 새 프로젝트"
 다이얼로그로 URL을 붙여넣어 백그라운드에서 clone하고 완료되면 자동으로 목록에
-반영되는 것도 가능합니다(비밀번호 게이트)
+반영되는 것도 가능합니다(비밀번호 게이트). URL은 `http://`, `https://`,
+`git://`, `ssh://`와 scp 형식(`user@host:path`)만 받습니다 — `ext::`/`fd::`
+같은 git remote helper는 사실상 "이 명령을 실행하라"는 뜻이고 `file://`나 로컬
+경로는 파일 매니저의 울타리 밖을 읽는 통로라, 둘 다 거부합니다(git 쪽에도
+`GIT_ALLOW_PROTOCOL`로 같은 목록을 박아둡니다)
 
 ### mise
 
@@ -327,8 +331,13 @@ Files 탭과 같은 폴더를 WebDAV로 내보내, 다른 기기의 파일 탐�
 비밀번호가 유일한 방어선이 되기 때문입니다. 이 탭은 조회까지 통째로 게이트
 대상입니다(사용자명이 그 비밀번호의 나머지 절반이므로).
 
-노출 방법(전용 호스트네임 권장)과 기기별 마운트 방법은
-[tips/webdav.md](tips/webdav.md) 참고.
+GET으로 내려받는 파일은 항상 `Content-Disposition: attachment`로 응답해, 업로드된
+`.html`/`.svg` 파일이 code-server/webmanager와 같은 origin에서 브라우저에 그대로
+렌더링되는 걸 막습니다(WebDAV 클라이언트는 이 헤더를 보지 않으므로 실사용엔
+영향 없음).
+
+노출 방법(전용 호스트네임 권장 — 경로 기반 변형은 origin을 공유합니다)과
+기기별 마운트 방법은 [tips/webdav.md](tips/webdav.md) 참고.
 
 ### Docker/dind 관리
 
@@ -382,3 +391,9 @@ Sessions/File share/Supervisor의 프로그램별 로그 조회, Claude Code 탭
 > 가장 강한 권한을 가진 기능**이라 [webmanager-config.md의 비밀번호
 > 게이트](webmanager-config.md#비밀번호-게이트)(`WEBMANAGER_AUTH_PASSWORD_HASH`,
 > 기본은 꺼짐)를 함께 설정하는 걸 강력히 권장합니다.
+
+nginx는 `/manager/`에 `X-Frame-Options: SAMEORIGIN`을 붙여, 다른 origin이 이
+로그인 없는 관리 화면을 `<iframe>`으로 감싸 클릭재킹하는 걸 막습니다 —
+code-server 자신이 같은 origin에서 `/manager/`를 iframe으로 여는 launcher
+(webmanager-launcher 코드패치)는 그대로 동작합니다. `X-Content-Type-Options:
+nosniff`는 이 nginx가 서빙/프록시하는 모든 응답에 전역으로 붙습니다.

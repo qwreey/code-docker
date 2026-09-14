@@ -129,6 +129,18 @@ type cloneProjectRequest struct {
 // git flag regardless of its content. Gated like every other project
 // mutation (handleDeleteProject etc.) — this creates a new directory and
 // makes a real network connection.
+//
+// The "--" separator only settles *argv*; a git URL is its own little
+// language on top of that, and some of it executes commands
+// (`ext::sh -c 'id'` is a documented remote helper, enabled by git's
+// default protocol.ext.allow=user) or reads the local filesystem
+// (`file://`, a bare path) through a route that isn't the file manager's
+// jail. So the URL is additionally restricted to real network transports
+// by internal/projects.ValidateCloneURL, and GIT_ALLOW_PROTOCOL pins the
+// same set inside git itself — belt and braces, because the validator is a
+// parser of someone else's grammar and git's own enforcement isn't.
+// Submodules (--recursive) inherit GIT_ALLOW_PROTOCOL, so a repo can't
+// smuggle an ext:: URL in through .gitmodules either.
 func (s *Server) handleCloneProject(w http.ResponseWriter, r *http.Request) {
 	var body cloneProjectRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -141,8 +153,8 @@ func (s *Server) handleCloneProject(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "url is required")
 		return
 	}
-	if strings.ContainsAny(body.URL, "\r\n\x00") {
-		writeError(w, http.StatusBadRequest, "invalid url")
+	if err := projects.ValidateCloneURL(body.URL); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -197,11 +209,11 @@ func (s *Server) handleCloneProject(w http.ResponseWriter, r *http.Request) {
 	}
 	args = append(args, "--", body.URL, dest)
 
-	jobID := s.projectJobs.StartWithCallback(func(exitCode int) {
+	jobID := s.projectJobs.StartWithCallbackEnv(func(exitCode int) {
 		if exitCode == 0 {
 			s.projectScanner.TriggerScan()
 		}
-	}, "git", args)
+	}, []string{"GIT_ALLOW_PROTOCOL=http:https:git:ssh"}, "git", args)
 	writeJSON(w, http.StatusOK, jobResponse{JobID: jobID})
 }
 

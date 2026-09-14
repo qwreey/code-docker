@@ -22,7 +22,7 @@ dind 로 생성된 컨테이너는 `code-docker-internal` 네트워크에 묶여
 
 dind 쪽에는 `./data/dind:/var/lib/docker` 볼륨이 마운트되어있어 컨테이너/이미지가 재기동 후에도 유지됩니다.
 
-> 보안 주의: `code-docker-dind` 는 `privileged: true` 로 구동되며, 인증/TLS 없는 평문 tcp 소켓(2375)이 열려있습니다. 인터넷/호스트로부터는 격리되어있지만(`code-docker-external` 에 붙어있지 않음), `code-docker-internal` 네트워크에 연결된 컨테이너라면 누구든 이 소켓에 요청을 보낼 수 있습니다. 아래 "요청 단위 제한 (dind-authz)" 절 덕분에 기본값에서는 이 소켓을 통해 생성되는 컨테이너 자체가 특권을 요구할 수 없게 막혀있지만, 그래도 `code-docker-internal` 에는 신뢰할 수 있는 서비스만 연결하고 code-docker 접근 권한을 신뢰할 수 없는 사용자에게 주지 않는 것이 기본 전제입니다.
+> 보안 주의: `code-docker-dind` 는 `privileged: true` 로 구동되며, 인증/TLS 없는 평문 tcp 소켓(2375)이 열려있습니다. 인터넷/호스트로부터는 격리되어있지만(`code-docker-external` 에 붙어있지 않음), `code-docker-internal` 네트워크에 연결된 컨테이너라면 누구든 이 소켓에 요청을 보낼 수 있습니다. 아래 "요청 단위 제한 (dind-authz)" 절 덕분에 기본값에서는 이 소켓을 통해 생성되는 컨테이너 자체가 특권을 요구할 수 없고 swarm/plugin 우회 경로도 막혀있지만, 그래도 `code-docker-internal` 에는 신뢰할 수 있는 서비스만 연결하고 code-docker 접근 권한을 신뢰할 수 없는 사용자에게 주지 않는 것이 기본 전제입니다.
 
 ## 요청 단위 제한 (dind-authz)
 
@@ -36,6 +36,9 @@ dind 쪽에는 `./data/dind:/var/lib/docker` 볼륨이 마운트되어있어 컨
   - `--pid=host`, `--network=host`, `--ipc=host`, `--cgroupns=host`
   - `--device`, `--device-cgroup-rule`
   - `/code/` 아래가 아닌 경로를 소스로 하는 bind mount (named volume은 영향 없음)
+  - 본문이 JSON으로 파싱되지 않는 컨테이너/볼륨 생성 요청 — 검사할 수 없는 요청은 통과시키지 않습니다
+
+  위 본문 검사와 별개로, **엔드포인트 계열 자체를 거부**하는 축이 하나 더 있습니다: `swarm`/`services`/`tasks`/`nodes`/`secrets`/`configs`(= `docker swarm`, `docker service`, `docker stack`)와 `plugins`(= `docker plugin`). swarm task의 컨테이너는 데몬 내부 swarmkit executor가 만들어서 authz 플러그인을 아예 거치지 않고, v2 플러그인은 자기 config.json에 capability/host mount/host namespace를 선언한 채로 runc 컨테이너로 실행되기 때문에, 위 목록으로는 막히지 않는 우회 경로였습니다. `docker build`/buildx(`/build`, `/session`)는 영향 없습니다.
 - `dind-authz-remap` — dind-authz에 더해 [userns-remap](#추가-경화-userns-remap-dind-authz-remap)까지 적용. 기본값이 아닙니다 (아래 절 참고).
 
 정책은 이미지에 구운 기본값(`code-dind/config/dind-authz/*.default.json`)과, `DIND_AUTHZ_VOLUME`(기본 `./data/dind-authz`)로 마운트되는 실시간 conf.d 디렉토리를 병합한 결과입니다. **이 디렉토리는 code-docker 어디에도 마운트되지 않습니다** — code-docker 자신이 자기를 제한하는 정책을 고칠 수 있으면 의미가 없기 때문에, 도커 호스트 자체에 파일시스템 접근 권한이 있는 사람만 편집할 수 있습니다. 예를 들어 특정 capability를 추가로 허용하려면:

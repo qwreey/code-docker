@@ -13,8 +13,12 @@
 #. 이미지가 업데이트되면 아래 키 목록이 바뀔 수 있습니다. 기존
 #. .env.webmanager를 최신 구조에 맞게 재구성하려면:
 #.
-#.   cat .env.webmanager | tee -a .env.webmanager.bak | docker compose exec -T code-docker \
-#.     /etc/code-docker/webmanager/webmanager --env-migrate > .env.webmanager
+#.   cat .env.webmanager >> .env.webmanager.bak && docker compose exec -T code-docker \
+#.     /etc/code-docker/webmanager/webmanager --env-migrate < .env.webmanager > .env.webmanager.new \
+#.     && mv .env.webmanager.new .env.webmanager
+#.
+#. (한 줄 파이프라인 `cat f | tee | ... > f` 형태는 `> f`가 cat보다 먼저 파일을
+#. 비울 수 있어 쓰지 않습니다 - docs/webmanager-config.md 참고.)
 #.
 #. 활성화(주석 해제)해둔 값과 직접 남긴 코멘트는 그대로 보존되고, 더 이상
 #. 안 쓰이는 키는 지우지 않고 파일 맨 아래 "더 이상 쓰이지 않는 키" 섹션으로

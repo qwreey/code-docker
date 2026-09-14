@@ -283,15 +283,43 @@ func (g *Gate) TryUnlock(key, plaintext string) (token string, ok bool, err erro
 // never read from JS and never sent on cross-site requests, only same-site
 // navigation/XHR. MaxAge covers sessionTTL so the browser doesn't discard it
 // before Unlocked's own check would.
-func (g *Gate) SetCookie(w http.ResponseWriter, token string) {
+//
+// Secure is set when the request reached us over TLS — which, in this
+// deployment, always means "the outer TLS-terminating proxy said so via
+// X-Forwarded-Proto", since webmanager itself is plain HTTP behind the
+// in-container nginx. It has to be conditional rather than always-on: a
+// Secure cookie is dropped outright on a plain-HTTP origin, which would
+// break every local/LAN `http://host:81` access (and the container's own
+// loopback) by making the unlock silently never stick.
+func (g *Gate) SetCookie(w http.ResponseWriter, r *http.Request, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   requestIsHTTPS(r),
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   int(sessionTTL.Seconds()),
 	})
+}
+
+// requestIsHTTPS reports whether the browser's own connection was HTTPS.
+// X-Forwarded-Proto is only meaningful because nothing reaches webmanager
+// except through the in-container nginx, which sets it from its own
+// $scheme; a client-supplied value can at worst set Secure on a cookie the
+// client then can't send back to itself.
+func requestIsHTTPS(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	if r.TLS != nil {
+		return true
+	}
+	proto := r.Header.Get("X-Forwarded-Proto")
+	if i := strings.IndexByte(proto, ','); i >= 0 {
+		proto = proto[:i]
+	}
+	return strings.EqualFold(strings.TrimSpace(proto), "https")
 }
 
 // RequirePassword gates next behind the configured password. If the gate
@@ -332,7 +360,7 @@ func (g *Gate) refreshCookie(w http.ResponseWriter, r *http.Request) {
 	if now.Sub(refreshed) < refreshThreshold {
 		return
 	}
-	g.SetCookie(w, g.mintToken(origin, now))
+	g.SetCookie(w, r, g.mintToken(origin, now))
 }
 
 func writeUnauthorized(w http.ResponseWriter) {

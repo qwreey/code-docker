@@ -23,7 +23,92 @@ var (
 	// ErrInvalidBranchName is returned by ValidateBranchName when branch
 	// isn't a safe git ref name.
 	ErrInvalidBranchName = errors.New("branch must be a valid git ref name (letters, numbers, dot, underscore, dash, slash, starting with a letter or number)")
+	// ErrInvalidCloneURL is returned by ValidateCloneURL for anything that
+	// isn't one of the four network transports or the scp-style form.
+	ErrInvalidCloneURL = errors.New("url must be http://, https://, git://, ssh:// or scp-style user@host:path")
 )
+
+// allowedCloneSchemes is the same set passed to git as GIT_ALLOW_PROTOCOL
+// (see handlers_projects.go's handleCloneProject). Everything else git
+// understands here is either a local-filesystem read (`file://`, a bare
+// path) or a *command execution* transport (`ext::`, `fd::`, and any other
+// `<helper>::<address>` remote helper — `ext::sh -c id` runs a shell, since
+// git's own protocol.ext.allow defaults to "user").
+var allowedCloneSchemes = map[string]bool{
+	"http":  true,
+	"https": true,
+	"git":   true,
+	"ssh":   true,
+}
+
+// scpHostRe matches the host part of the scp-style `[user@]host:path`
+// form — a hostname or IPv4 literal, nothing else. No brackets (a
+// bracketed IPv6 literal contains "::", which is rejected outright as a
+// remote-helper marker; ssh://[::1]/repo is the supported spelling for
+// that).
+var scpHostRe = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$`)
+
+// ValidateCloneURL restricts a clone URL to the transports that actually
+// talk to a remote over the network. Argument injection is already handled
+// by the "--" separator in handleCloneProject; this is about git's *own*
+// URL vocabulary, where `ext::sh -c 'id'` is a documented way to spell
+// "run this command" and `file:///` or a bare path is a way to read the
+// container's filesystem through a route that isn't the file manager's
+// jail.
+//
+// Accepted:
+//   - http://, https://, git://, ssh:// (case-insensitive scheme)
+//   - scp-style [user@]host:path
+//
+// Rejected: every other scheme, any `<helper>::<address>` remote helper, a
+// leading "-" (never mistakable for a flag even without "--"), whitespace
+// and control characters, and bare/relative local paths.
+func ValidateCloneURL(raw string) error {
+	if raw == "" || strings.HasPrefix(raw, "-") {
+		return ErrInvalidCloneURL
+	}
+	for _, r := range raw {
+		if r <= ' ' || r == 0x7f {
+			return ErrInvalidCloneURL
+		}
+	}
+
+	if i := strings.Index(raw, "://"); i > 0 {
+		if !allowedCloneSchemes[strings.ToLower(raw[:i])] {
+			return ErrInvalidCloneURL
+		}
+		if strings.TrimSpace(raw[i+3:]) == "" {
+			return ErrInvalidCloneURL
+		}
+		return nil
+	}
+
+	// No scheme: only the scp-style form is left. "::" anywhere here means
+	// a remote helper (`ext::`, `fd::`, `transport::address`).
+	if strings.Contains(raw, "::") {
+		return ErrInvalidCloneURL
+	}
+	colon := strings.Index(raw, ":")
+	if colon <= 0 || colon == len(raw)-1 {
+		return ErrInvalidCloneURL
+	}
+	// A "/" before the first ":" means this is a path, not host:path —
+	// git treats it as a local repository.
+	if slash := strings.Index(raw, "/"); slash >= 0 && slash < colon {
+		return ErrInvalidCloneURL
+	}
+	host := raw[:colon]
+	if at := strings.LastIndex(host, "@"); at >= 0 {
+		if at == 0 || at == len(host)-1 {
+			return ErrInvalidCloneURL
+		}
+		host = host[at+1:]
+	}
+	if !scpHostRe.MatchString(host) {
+		return ErrInvalidCloneURL
+	}
+	return nil
+}
 
 // cloneNameRe mirrors mise.toolIDRe/versionRe's convention (a leading `-`
 // could otherwise be misparsed as a flag) but is stricter: no `/` at all, so
