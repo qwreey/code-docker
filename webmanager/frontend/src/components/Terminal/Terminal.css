@@ -525,6 +525,16 @@
   touch-action: none;
 }
 
+/* No native long-press selection or callout on the rendered rows. xterm keeps
+   its own selection model, so the browser's would never have been copyable
+   anyway — all it did was claim a press-and-hold as a native gesture and
+   cancel the drag the touch modes are trying to start. Scoped to the rows,
+   not .xterm-screen, so the input fields living beside them stay editable. */
+.terminal-container .xterm-rows {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
 .terminal-controls {
   display: flex;
   flex-wrap: nowrap;

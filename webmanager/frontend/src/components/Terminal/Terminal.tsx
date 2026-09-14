@@ -236,8 +236,8 @@ function saveTouchMode(mode: TouchMode) {
 
 const TOUCH_MODE_OPTIONS: { id: TouchMode; label: string; title: string; Icon: typeof Hand }[] = [
   { id: 'scroll', label: '스크롤', title: '드래그하면 화면이 스크롤됩니다', Icon: Hand },
-  { id: 'mouse', label: '마우스', title: '드래그를 마우스 입력으로 앱에 전달합니다 (tmux/vim/claude 등)', Icon: MousePointer2 },
-  { id: 'select', label: '선택', title: '드래그하면 텍스트가 선택됩니다 (복사용)', Icon: TextSelect },
+  { id: 'mouse', label: '마우스', title: '드래그(또는 꾹 누른 뒤 드래그)를 마우스 입력으로 앱에 전달합니다 (tmux/vim/claude 등)', Icon: MousePointer2 },
+  { id: 'select', label: '선택', title: '드래그하거나 꾹 누른 뒤 드래그하면 텍스트가 선택됩니다 (복사용)', Icon: TextSelect },
 ]
 
 // Debug overlay for the input path (INPUT_DEBUG_KEY above). Built
@@ -449,12 +449,15 @@ function saveAltScreenWheelScrollEnabled(enabled: boolean) {
 // Read through a ref like altScreenTouchScrollEnabled so it applies
 // immediately rather than on the next remount.
 //
-// Deliberately scoped to viewport scrolling only, never the
-// scroll-as-input path: in the alternate screen buffer (or with mouse
-// tracking on) each scroll step is a real keystroke or mouse report to the
-// running application, so a fling would fire dozens of arrow keys into
-// claude/vim after the finger already left the screen. Momentum is a
-// display affordance; input is not something to coast through.
+// Where a scroll step is *input* to the running application, momentum is
+// only allowed when that input is a mouse-wheel report. An app that turned
+// mouse tracking on (vim with mouse=a, tmux) asked for wheel events and
+// treats them as scrolling — the same thing a desktop trackpad's inertial
+// coast already sends it. An alternate-screen app *without* mouse tracking
+// gets arrow keys instead, and a fling there would fire dozens of arrow
+// keys into it after the finger already left the screen, so no momentum.
+// (The first version refused momentum for both; vim with mouse=a was the
+// device report that showed the line was drawn in the wrong place.)
 const TOUCH_MOMENTUM_KEY = 'webmanager.terminal.touchMomentum'
 
 function loadTouchMomentumEnabled(): boolean {
@@ -499,27 +502,27 @@ function saveLiveCompositionEnabled(enabled: boolean) {
 // Refocus at each word boundary: blur and immediately refocus the field
 // after a space, so the keyboard drops its association with the previous
 // word (stale suggestions, a predictive buffer that might re-emit it). The
-// repo owner's original design for this bug. Off by default, and not
-// because the idea is wrong: the prefix diff already makes a re-emitted word
-// produce no bytes, so this is no longer needed for correctness — only to
-// clear the suggestion bar. What it costs is uncertain: a programmatic
-// focus() outside a real user gesture can close the on-screen keyboard on
-// some Android builds, which would mean the keyboard flickering on every
-// space. A toggle lets that be measured on the actual device.
+// repo owner's original design for this bug. Not needed for correctness any
+// more — the prefix diff already makes a re-emitted word produce no bytes —
+// but it fully clears the suggestion bar after a space, which is the
+// behavior the repo owner wanted. On by default since 2026-09-14, once a
+// Galaxy showed no keyboard flicker from it. The toggle stays because a
+// programmatic focus() outside a real user gesture can still close the
+// on-screen keyboard on other Android builds.
 const REFOCUS_ON_WORD_KEY = 'webmanager.terminal.refocusOnWord'
 
 function loadRefocusOnWordEnabled(): boolean {
   try {
-    return localStorage.getItem(REFOCUS_ON_WORD_KEY) === '1'
+    return localStorage.getItem(REFOCUS_ON_WORD_KEY) !== '0'
   } catch {
-    return false
+    return true
   }
 }
 
 function saveRefocusOnWordEnabled(enabled: boolean) {
   try {
-    if (enabled) localStorage.setItem(REFOCUS_ON_WORD_KEY, '1')
-    else localStorage.removeItem(REFOCUS_ON_WORD_KEY)
+    if (enabled) localStorage.removeItem(REFOCUS_ON_WORD_KEY)
+    else localStorage.setItem(REFOCUS_ON_WORD_KEY, '0')
   } catch {
     // localStorage unavailable (e.g. private browsing) - the toggle just won't persist
   }
@@ -1343,12 +1346,31 @@ export function Terminal({
     // so touchmove keeps feeding the same drag and touchend can close it.
     let pointerDragging = false
     let lineRemainder = 0
+    // Press-and-hold starts a 'mouse'/'select' drag without any movement,
+    // the way native text selection works on a phone. Before this, a drag
+    // only began once the finger moved past TOUCH_SCROLL_THRESHOLD, so
+    // "long-press here, then drag" — the gesture people actually reach for —
+    // sat idle until Android's own long-press gesture claimed the touch
+    // (reported: it only worked after tapping first, "약간 애매한 느낌").
+    const LONG_PRESS_MS = 350
+    let longPressTimer = 0
+    const clearLongPress = () => {
+      if (!longPressTimer) return
+      window.clearTimeout(longPressTimer)
+      longPressTimer = 0
+    }
+    // For the contextmenu guard below: whether a touch sequence is in
+    // progress or only just finished.
+    let touchActive = false
+    let lastTouchEndAt = 0
     const onTouchStart = (e: TouchEvent) => {
       // Any touch stops a fling in progress, including a second finger or a
       // plain tap - "tap to catch the scroll" is what every native list does,
       // and letting a tap land on the terminal while it is still moving would
       // position the cursor somewhere the user never aimed at.
       cancelMomentum()
+      clearLongPress()
+      touchActive = true
       if (e.touches.length !== 1) return
       velocity = 0
       velocitySeeded = false
@@ -1360,6 +1382,16 @@ export function Terminal({
       dragging = false
       pointerDragging = false
       lineRemainder = 0
+      if (touchModeRef.current !== 'scroll') {
+        longPressTimer = window.setTimeout(() => {
+          longPressTimer = 0
+          if (pointerDragging) return
+          beginPointerDrag(startX, startY)
+          // The one cue that the hold registered — without it there is no way
+          // to tell "held long enough" from "not yet" before moving.
+          navigator.vibrate?.(12)
+        }, LONG_PRESS_MS)
+      }
     }
     // A full-screen application (claude, vim, htop, ...) runs in the
     // alternate screen buffer, which has no scrollback at all — so
@@ -1478,6 +1510,7 @@ export function Terminal({
       term.selectLines(term.buffer.active.viewportY + row, term.buffer.active.viewportY + row)
     }
     const beginPointerDrag = (clientX: number, clientY: number) => {
+      clearLongPress()
       const selecting = touchModeRef.current === 'select'
       forceSelectionDrag = selecting && sendsScrollToApp(term)
       if (selecting) {
@@ -1543,29 +1576,44 @@ export function Terminal({
       cancelAnimationFrame(momentumFrame)
       momentumFrame = 0
     }
-    // Coasts the viewport at the velocity the finger let go at, decaying to a
-    // stop. Only ever reached on the term.scrollLines path - see
-    // TOUCH_MOMENTUM_KEY's doc comment for why a fling must not be turned
-    // into input for the running application.
-    const startMomentum = () => {
+    // Coasts at the velocity the finger let go at, decaying to a stop. `toApp`
+    // picks the same destination the drag itself used: the viewport, or wheel
+    // reports to an application that turned mouse tracking on — see
+    // TOUCH_MOMENTUM_KEY's doc comment for why that, and only that, input
+    // path is safe to coast through.
+    const startMomentum = (toApp: boolean) => {
       cancelMomentum()
       let v = velocity
       let prev = performance.now()
       const step = (now: number) => {
         momentumFrame = 0
+        // The app can exit or drop mouse tracking mid-coast (vim quits back to
+        // the shell). Stop rather than let the rest of the fling change
+        // meaning — from wheel reports to viewport scrolling or arrow keys.
+        if (toApp !== (altScreenScrollRef.current && sendsScrollToApp(term))) return
+        if (toApp && term.modes.mouseTrackingMode === 'none') return
         const dt = Math.min(now - prev, MOMENTUM_MAX_FRAME_MS)
         prev = now
         const rowHeight = container.clientHeight / (term.rows || 1) || 18
         lineRemainder += (v * dt) / rowHeight
         const lines = Math.trunc(lineRemainder)
         if (lines !== 0) {
-          // Stop dead at either end of the scrollback instead of spinning out
-          // the remaining velocity against a wall: viewportY not moving is
-          // the only signal xterm gives that the scroll had nowhere to go.
-          const before = term.buffer.active.viewportY
-          term.scrollLines(lines)
-          lineRemainder -= lines
-          if (term.buffer.active.viewportY === before) return
+          if (toApp) {
+            // No scrollback edge to detect here — the app owns its own limits
+            // and simply ignores wheel reports past them — so this path only
+            // ends when the velocity decays.
+            const [x, y] = clampToScreen(lastX, lastY)
+            dispatchWheel(lines, x, y)
+            lineRemainder -= lines
+          } else {
+            // Stop dead at either end of the scrollback instead of spinning
+            // out the remaining velocity against a wall: viewportY not moving
+            // is the only signal xterm gives that the scroll had nowhere to go.
+            const before = term.buffer.active.viewportY
+            term.scrollLines(lines)
+            lineRemainder -= lines
+            if (term.buffer.active.viewportY === before) return
+          }
         }
         v *= Math.pow(MOMENTUM_FRICTION, dt / 16.67)
         if (Math.abs(v) < MOMENTUM_MIN_VELOCITY) return
@@ -1574,27 +1622,56 @@ export function Terminal({
       momentumFrame = requestAnimationFrame(step)
     }
     const onTouchEnd = (e: TouchEvent) => {
+      clearLongPress()
+      const hadPointerDrag = pointerDragging
+      const hadScrollDrag = dragging
       const t = e.changedTouches[0]
       endPointerDrag(t?.clientX ?? lastX, t?.clientY ?? lastY)
+      // A drag we already replayed to xterm must not also produce the
+      // browser's compatibility mouse events. Android fires mousedown/
+      // mouseup/click at the *release* point after a touch sequence whose
+      // touchstart wasn't cancelled, and in 'select' mode that late mousedown
+      // reaches xterm's _handleSingleClick — clearing the selection the drag
+      // just made and anchoring a new empty one. That was the whole of
+      // "선택 모드를 켜면 모바일에선 아무것도 안 돼": the selection existed
+      // for an instant and was wiped by a click nobody performed. 'mouse' mode
+      // only looked fine because an extra click at the end of a vim drag is
+      // harmless. A plain tap (no drag) keeps its click, which is what moves
+      // the cursor and focuses the terminal.
+      if ((hadPointerDrag || hadScrollDrag) && e.cancelable) e.preventDefault()
       if (e.touches.length > 0) return
+      touchActive = false
+      lastTouchEndAt = performance.now()
+      const toApp = altScreenScrollRef.current && sendsScrollToApp(term)
       if (
-        dragging &&
+        hadScrollDrag &&
         touchMomentumRef.current &&
         touchModeRef.current === 'scroll' &&
-        !(altScreenScrollRef.current && sendsScrollToApp(term)) &&
+        (!toApp || term.modes.mouseTrackingMode !== 'none') &&
         Math.abs(velocity) >= MOMENTUM_MIN_VELOCITY &&
         // A finger that came to rest before lifting means the user stopped
         // deliberately; only a release that was still moving is a fling.
         performance.now() - lastMoveAt < 100
       ) {
-        startMomentum()
+        startMomentum(toApp)
       }
       dragging = false
     }
+    // Android's long-press fires contextmenu, and letting it through hands the
+    // rest of the touch sequence to native selection/callout UI — which is
+    // what used to swallow a press-and-hold drag. The terminal has no native
+    // context menu worth keeping on touch; a real right-click on desktop is
+    // left alone by only acting while a touch is live or just ended.
+    const onContextMenu = (e: MouseEvent) => {
+      if (touchActive || performance.now() - lastTouchEndAt < 800) e.preventDefault()
+    }
     container.addEventListener('touchstart', onTouchStart, { passive: true })
     container.addEventListener('touchmove', onTouchMove, { passive: false })
-    container.addEventListener('touchend', onTouchEnd, { passive: true })
-    container.addEventListener('touchcancel', onTouchEnd, { passive: true })
+    // Not passive: onTouchEnd has to be able to cancel compatibility mouse
+    // events after a drag (see its comment).
+    container.addEventListener('touchend', onTouchEnd, { passive: false })
+    container.addEventListener('touchcancel', onTouchEnd, { passive: false })
+    container.addEventListener('contextmenu', onContextMenu)
     // Drives the copy affordance below: xterm's selection is its own state,
     // invisible to window.getSelection(), so nothing else would ever know a
     // touch drag produced one.
@@ -1607,6 +1684,8 @@ export function Terminal({
       container.removeEventListener('touchmove', onTouchMove)
       container.removeEventListener('touchend', onTouchEnd)
       container.removeEventListener('touchcancel', onTouchEnd)
+      container.removeEventListener('contextmenu', onContextMenu)
+      clearLongPress()
       selectionDisposable.dispose()
     }
 
@@ -1988,6 +2067,12 @@ export function Terminal({
       // previous designs all truncated the field, which meant every such
       // re-emission looked like brand new text.
       let sent = ANCHOR
+      // Set when the keyboard started inserting *before* the anchor instead of
+      // after it, leaving the anchor as the field's last character. See
+      // readValue below — this is what put a phantom space into English
+      // ("aa " → "aab " → "aabc ") and materialized it on the next character
+      // ("claude" + "-" became "claude -").
+      let anchorAtEnd = false
       field.value = ANCHOR
       field.setSelectionRange(ANCHOR.length, ANCHOR.length)
 
@@ -2003,6 +2088,7 @@ export function Terminal({
           if (composing || field.value !== '') return
           field.value = ANCHOR
           sent = ANCHOR
+          anchorAtEnd = false
           field.setSelectionRange(ANCHOR.length, ANCHOR.length)
         })
       }
@@ -2024,11 +2110,40 @@ export function Terminal({
       // grow without bound.
       const MAX_FIELD_LENGTH = 512
       const resetField = (reason: string) => {
+        anchorAtEnd = false
         if (field.value === ANCHOR) return
         field.value = ANCHOR
         sent = ANCHOR
         field.setSelectionRange(ANCHOR.length, ANCHOR.length)
         debug?.log(`  (reset: ${reason})`)
+      }
+      // The field's text as the diff should see it. Normally just
+      // field.value. But a device showed the keyboard sometimes inserting at
+      // offset 0 right after a reset — before the anchor rather than after it
+      // — so the field read "aa " with the anchor trailing. Diffed raw, that
+      // anchor went out to the terminal as a real space that then rode along
+      // at the end of the word and became permanent on the next character.
+      //
+      // The displacement is only unambiguous at one moment: the field was
+      // exactly the anchor (sent === ANCHOR) and now ends with it without
+      // starting with it — nothing the user typed can produce that shape,
+      // since a typed leading space would sit after the anchor, not replace
+      // its position. From there on, until the field is repaired or reset,
+      // the trailing anchor is moved back to the front before diffing, so
+      // the terminal sees exactly what it would have if the caret had been
+      // in the right place all along.
+      const readValue = () => {
+        const raw = field.value
+        if (!anchorAtEnd && sent === ANCHOR && raw.length > ANCHOR.length && raw.endsWith(ANCHOR) && !raw.startsWith(ANCHOR)) {
+          anchorAtEnd = true
+          debug?.log('  (anchor displaced to the end — normalizing)')
+        }
+        if (!anchorAtEnd) return raw
+        if (!raw.endsWith(ANCHOR)) {
+          anchorAtEnd = false
+          return raw
+        }
+        return ANCHOR + raw.slice(0, -ANCHOR.length)
       }
       // Keeps the caret pinned to the end of the field after every committed
       // change. This is not cosmetic: a real device typed "claude" and got
@@ -2042,6 +2157,18 @@ export function Terminal({
       // selection under an active IME is how composition gets cancelled.
       const pinCaretToEnd = () => {
         if (composing) return
+        // Outside a composition is the safe moment to actually repair a
+        // displaced anchor in the field itself (moving text under an active
+        // IME cancels the composition), so the normalization in readValue
+        // only ever has to cover the stretch while composing.
+        if (anchorAtEnd) {
+          const repaired = readValue()
+          anchorAtEnd = false
+          if (field.value !== repaired) {
+            field.value = repaired
+            debug?.log('  (anchor moved back to the front)')
+          }
+        }
         const end = field.value.length
         field.setSelectionRange(end, end)
       }
@@ -2066,7 +2193,7 @@ export function Terminal({
       }
 
       const flush = () => {
-        const value = field.value
+        const value = readValue()
         if (value === sent) return
         let common = 0
         const max = Math.min(value.length, sent.length)
@@ -2124,9 +2251,16 @@ export function Terminal({
         // skipped — so compositionend sees no new bytes and flush returns
         // before reaching it. Catch that case here, now that the keyboard
         // has actually let go of the word.
-        if (field.value !== ANCHOR && field.value.endsWith(' ')) {
+        // Read through readValue, not field.value: a displaced anchor also
+        // ends in a space, and treating it as the user's word boundary reset
+        // the field on every compositionend — which, with the refocus that
+        // follows, put the caret right back where the displacement started.
+        const logical = readValue()
+        if (logical !== ANCHOR && logical.endsWith(' ')) {
           resetField('word boundary')
           if (refocusOnWordRef.current) scheduleRefocus()
+        } else {
+          pinCaretToEnd()
         }
       }
       const onInput = (e: Event) => {
@@ -2159,6 +2293,15 @@ export function Terminal({
         if (refocusing) return
         resetField('blur')
       }
+      // Every way this field gains focus — a tap on the terminal redirected
+      // here, keepFocus, the word-boundary refocus — pins the caret to the
+      // end. focus() on Android does not reliably keep the last explicit
+      // selection, and a caret that lands at offset 0 is exactly the
+      // before-the-anchor insertion readValue has to clean up after; this
+      // stops it at the source rather than only repairing it.
+      const onFocus = () => {
+        pinCaretToEnd()
+      }
       // Observed only, never acted on: an IME that keeps a composing region
       // fires several of these between one compositionstart/end pair, and an
       // IME that has given up composing fires none. That difference is the
@@ -2170,8 +2313,10 @@ export function Terminal({
       field.addEventListener('input', onInput)
       field.addEventListener('keydown', onKeyDown)
       field.addEventListener('blur', onBlur)
+      field.addEventListener('focus', onFocus)
       cleanups.push(() => {
         window.clearTimeout(refocusTimer)
+        field.removeEventListener('focus', onFocus)
         field.removeEventListener('compositionstart', onCompositionStart)
         field.removeEventListener('compositionupdate', onCompositionUpdate)
         field.removeEventListener('compositionend', onCompositionEnd)
