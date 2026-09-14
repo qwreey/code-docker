@@ -556,3 +556,114 @@ mousedown/mouseup/click을 쏜다. 선택 모드에서는 그 늦은 mousedown�
 - **확인 못 한 것**: 드래그 후 선택이 실제로 남는지(자동화에서는 xterm 행 텍스트를 읽을 수
   없고, 빈 셀 위 드래그라 복사 버튼이 안 뜬 것일 수 있음), vim 관성(숨겨진 자동화 탭은
   `requestAnimationFrame`이 돌지 않음). 둘 다 실기기 확인 필요.
+
+
+---
+
+# 실기기 6차 결과 (2026-09-14) — 탭 복귀 후 입력, 첫 터치 선택 앵커, 키보드 리사이즈, vim 관성
+
+사용자 확인: `claude-`는 이제 공백 없이 들어가고, 스크롤 모드 탭은 커서를 잘 옮긴다.
+새로 나온 문제 4개:
+
+## 1. 탭을 갔다 오면 공백이 남고, 백스페이스가 어느 순간부터 안 먹힘
+
+증상: 공백이 있는 채로 다른 탭에 갔다 오면 생긴다. 그 상태에서 지우면 어느 부분부터
+안 지워지다가, 뭔가 새로 입력하고 다시 지우면 잘 지워진다.
+
+"새로 입력하면 풀린다"가 핵심 단서다 — 입력은 캐럿을 움직인다. 즉 백스페이스가 죽은
+상태는 **캐럿이 오프셋 0에 박혀서 네이티브 삭제가 지울 게 없는 상태**다. 그리고 페이지가
+숨겨지는 동안 진행 중이던 조합은 `compositionend`를 못 받아서 `composing`이 `true`로
+굳을 수 있는데, 그러면 캐럿 고정과 단어 경계 리셋이 전부 조용히 꺼진다.
+
+수정 (세 겹):
+
+- **복귀 시 재동기화**: `visibilitychange`(visible) / `pageshow` / window `focus`에서
+  필드가 활성 요소면 조합 상태를 끄고, 필드를 앵커로 리셋하고, 캐럿을 끝으로. 터미널
+  자체는 건드리지 않는다 — blur가 하는 것과 같은 필드 장부 정리다.
+- **조합 상태 자가 복구**: `input` 이벤트의 `isComposing`이 `false`인데 `composing`이
+  `true`면 이벤트 쪽을 믿는다.
+- **캐럿 0에서만 백스페이스 대체 처리**: `keydown` Backspace와 `beforeinput`
+  `deleteContentBackward` 둘 다에서, **캐럿이 0일 때만** 우리가 `\x7f`를 보내고 필드를
+  터미널과 맞추고 캐럿을 끝으로 돌린다. 앵커가 캐럿 뒤에 정상적으로 있는 일반 삭제는
+  이미 동작이 확인된 네이티브 경로에 그대로 둔다 — 키보드가 실제로 할 수 있는 삭제를
+  막으면 키보드 쪽 필드 모델이 어긋나서 오히려 이 버그를 만들 수 있다.
+
+## 2. 그냥 터치하고 움직이면 선택 앵커가 엉뚱한 데 박힘 — xterm이 스스로 포커스를 걸고 있었다
+
+증상: 한 번 탭하고 다시 터치해서 움직이면 괜찮다. 첫 터치로 바로 움직이면(꾹 누르든
+그냥 움직이든) 앵커가 이상한 곳에 박힌다.
+
+xterm의 mousedown 리스너가 이렇다:
+
+```js
+addDisposableListener(t, "mousedown", e => { e.preventDefault(), this.focus(), ... })
+focus() { this.textarea && this.textarea.focus({ preventScroll: true }) }
+```
+
+**조건 없이 포커스를 건다.** 우리가 합성한 mousedown도 똑같이 포커스를 걸고 → 입력
+이펙트가 그걸 입력 필드로 리다이렉트하고 → **드래그 도중에 키보드가 열린다** → 터미널이
+줄어들며 손가락 아래 행이 밀리고 → 앵커가 거기로 옮겨간 줄에 박힌다. 먼저 탭해서 키보드를
+열어두면 드래그 중에 아무것도 안 움직이니 멀쩡했던 것이다.
+
+수정: 합성 mousedown을 dispatch하는 동안만 `textarea.focus`를 인스턴스 속성으로 가려서
+그 한 번의 포커스 호출을 삼킨다. 끝나면 속성을 지워 프로토타입 메서드를 복구한다. 드래그는
+키보드가 필요 없다. 실제 탭의 호환 클릭은 이 경로를 안 타므로 기존대로 포커스와 키보드를
+연다. 부수 효과로, 키보드가 이미 열린 상태의 드래그에서도 포커스가 xterm textarea로 잠깐
+넘어갔다 돌아오며 blur 리셋이 돌던 것이 사라진다.
+
+## 3. 키보드를 열고 닫아도 크기가 제대로 반영 안 됨, vim에 `-- INSERT --`가 여러 줄
+
+증상: 키보드 열고 닫을 때 화면 크기는 바뀌는데 터미널이 따라가지 않는다. 확대/축소로
+vim을 되돌리면 `-- INSERT --` 줄이 여러 개 보이고, 키보드를 열고 닫으며 여러 번 다시
+그려야 멀쩡해진다.
+
+줌은 고쳐지는데 키보드는 안 된다는 게 단서다: 줌 이펙트는 `sendResize()`를 직접 부르지만
+키보드 경로는 `--kb-inset`이 바뀌어 컨테이너 크기가 변할 때 ResizeObserver에만 기댄다.
+vim의 중복 상태 줄은 PTY가 최종 크기를 못 받아 SIGWINCH가 안 왔고, 그래서 vim이 다시
+안 그렸다는 모양이다.
+
+유력한 원인(기기 미확인): `useKeyboardInset`이 visualViewport의 resize/scroll만
+들었는데, 키보드 애니메이션 동안 visualViewport와 `innerHeight`가 서로 다른 시점에
+갱신된다. 마지막 visualViewport 이벤트가 `innerHeight`가 자리 잡기 전에 오면 계산된
+inset이 틀린 채로 굳고, 다시 계산하게 만들 이벤트가 없다.
+
+수정:
+
+- `useKeyboardInset`: window `resize`와 `focusin`/`focusout`도 트리거로 쓰고, 트리거마다
+  120/300/600ms 뒤에 다시 측정해서 애니메이션이 끝난 값을 항상 읽는다. 정수 px로 반올림
+  (데스크탑의 0.45px 같은 반올림 노이즈로 리렌더·리핏하지 않게).
+- 터미널: inset이 바뀔 때마다 250/600ms 뒤에 `fit` + `sendResize`를 한 번 더 한다. 크기가
+  이미 맞았으면 커널이 SIGWINCH를 안 보내므로 비용이 없다.
+
+## 4. vim에서 관성이 안 먹음 — 코드로는 원인을 못 찾음, 계측 추가
+
+컨테이너의 vim을 직접 확인했다: vimrc 없음 → defaults.vim → **`mouse=nvi`**. 즉 마우스
+트래킹이 켜져 있으니 5차에서 옮긴 기준상 관성이 **붙어야 한다.** 코드를 다시 읽어도 막는
+조건을 찾지 못했다(4차 이전처럼 추측으로 고치지 않기로 함).
+
+대신 관성의 모든 관문에 이름을 붙여 디버그 로그에 남긴다:
+
+```
+(momentum start v=1.83px/ms toApp=true mouse=drag buffer=alternate idle=12ms)
+(momentum skipped: too slow ...)          ← 어느 조건에서 막혔는지
+(momentum end: decayed, 41 frames, 23 lines)
+(momentum end: caught by touch)
+```
+
+같은 로그에 리사이즈(`(resize 412x530px -> 45x27)`), 키보드 inset(`(keyboard inset 312px)`),
+settle 리핏도 찍힌다. 3번과 4번은 로그 한 번으로 둘 다 판별된다.
+
+## 브라우저 실측 (2026-09-14, 배포 번들 `index-7cg9LBg5.js`)
+
+- 선택 모드 합성 드래그 도중 `document.activeElement`가 `BODY`에 머문다 — 터미널로 포커스가
+  안 넘어간다(= 키보드를 안 연다) ✓. 끝난 뒤 textarea에 `focus` 인스턴스 속성이 남지 않는다 ✓
+- 캐럿 0에서 `keydown` Backspace: 기본 동작 막힘, `\x7f` 전송, 필드 `" claude"` → `" claud"`,
+  캐럿 끝 ✓ / `beforeinput deleteContentBackward`: 동일하게 `" clau"` ✓ / **캐럿이 끝에 있는
+  일반 백스페이스는 막지 않음** ✓ (네이티브 경로 유지)
+- window `focus` → `(reset: window focus)`, 필드 `" "`, 캐럿 1 ✓
+- `compositionstart` 뒤 `isComposing: false`인 input이 오면 조합 상태가 풀려서, 이어지는
+  `" ab "`에서 단어 경계 리셋 + 재포커스가 정상 발동 ✓
+- 관성 로그 줄이 모든 관문 값과 함께 찍힘 ✓. **단, 자동화 탭은 숨겨진 탭이라 타이머가 1초로
+  늘어나서** 합성 플릭의 측정값(`v≈0.03px/ms`, `idle=1000ms`)은 의미가 없다 — 실제 원인은
+  기기 로그로만 판별 가능.
+- 키보드 리사이즈는 자동화에서 재현 불가(창 높이 조절이 WM에 막힘, `browser-qa-notes.md` 참고).

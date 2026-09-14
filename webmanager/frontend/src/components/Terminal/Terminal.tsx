@@ -692,6 +692,10 @@ export function Terminal({
   // predictive-text buffering (the exact bug the workaround exists to
   // avoid) the moment any toolbar button is pressed if left unchecked.
   const mobileInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
+  // The input debug overlay's log function while that overlay exists, so code
+  // outside the mobile-input effect (resize, momentum) writes into the same
+  // copyable log rather than needing an overlay of its own.
+  const debugLogRef = useRef<((line: string) => void) | null>(null)
 
   const [state, setState] = useState<ConnectionState>('connecting')
   const [settings, setSettings] = useState<TerminalSettings | null>(null)
@@ -980,6 +984,30 @@ export function Terminal({
       sendResize()
     }
   }, [fontSize, fitIfVisible, sendResize])
+
+  // The on-screen keyboard's open/close animation arrives as a burst of
+  // keyboardInset changes, and the ResizeObserver refits on whichever
+  // intermediate sizes it happens to see — nothing guarantees the last size
+  // the PTY hears about is the settled one. Reported from a device as vim's
+  // "-- INSERT --" line repeated down the screen after the keyboard closed,
+  // fixed only by zooming (which forces its own resize). Refit and resend
+  // once more after the animation has had time to finish, so the final state
+  // always lands. Costs nothing when everything already matched: the kernel
+  // does not deliver SIGWINCH for a window size that didn't change.
+  useEffect(() => {
+    debugLogRef.current?.(`  (keyboard inset ${Math.round(keyboardInset)}px)`)
+    const timers = [250, 600].map((ms) =>
+      window.setTimeout(() => {
+        fitIfVisible()
+        sendResize()
+        const term = termRef.current
+        debugLogRef.current?.(`  (settle fit +${ms}ms: ${term?.cols}x${term?.rows})`)
+      }, ms),
+    )
+    return () => {
+      for (const t of timers) window.clearTimeout(t)
+    }
+  }, [keyboardInset, fitIfVisible, sendResize])
 
   // Always holds the latest connection state, readable from the foreground
   // handler below without making that effect re-subscribe its listeners on
@@ -1476,18 +1504,41 @@ export function Terminal({
     }
     const dispatchMouse = (type: 'mousedown' | 'mousemove' | 'mouseup', clientX: number, clientY: number, forceSelection: boolean) => {
       const [x, y] = clampToScreen(clientX, clientY)
-      wheelTarget().dispatchEvent(
-        new MouseEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          clientX: x,
-          clientY: y,
-          button: 0,
-          buttons: type === 'mouseup' ? 0 : 1,
-          shiftKey: forceSelection,
-          view: window,
-        }),
-      )
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        button: 0,
+        buttons: type === 'mouseup' ? 0 : 1,
+        shiftKey: forceSelection,
+        view: window,
+      })
+      // xterm's own mousedown listener calls focus() unconditionally
+      // (`e.preventDefault(), this.focus(), ...`), which focuses its textarea,
+      // which the mobile-input effect redirects to the input field — so every
+      // synthetic drag was opening the on-screen keyboard. That shrinks the
+      // terminal mid-drag and reflows the rows under the finger, and the
+      // selection anchor ends up on whatever line moved there: the device
+      // report "그냥 터치하고 움직이면 이상한 곳에 앵커가 박힘", fine only when
+      // an earlier tap had already opened the keyboard so nothing moved.
+      // A drag never needs the keyboard, so swallow that one focus call for the
+      // duration of our own dispatch. xterm's focus() is
+      // `this.textarea.focus(...)`, so an own property on the textarea shadows
+      // it; deleting that property afterwards restores the prototype method.
+      // A real tap's compatibility click is not dispatched through here, so it
+      // still focuses and opens the keyboard exactly as before.
+      const textarea = term.textarea
+      if (type === 'mousedown' && textarea) {
+        textarea.focus = () => {}
+        try {
+          wheelTarget().dispatchEvent(event)
+        } finally {
+          Reflect.deleteProperty(textarea, 'focus')
+        }
+        return
+      }
+      wheelTarget().dispatchEvent(event)
     }
     // Whether this drag has to force its way past mouse reporting. Only true
     // in select mode against an application that turned mouse tracking on —
@@ -1575,6 +1626,7 @@ export function Terminal({
       if (!momentumFrame) return
       cancelAnimationFrame(momentumFrame)
       momentumFrame = 0
+      debugLogRef.current?.('  (momentum end: caught by touch)')
     }
     // Coasts at the velocity the finger let go at, decaying to a stop. `toApp`
     // picks the same destination the drag itself used: the viewport, or wheel
@@ -1585,13 +1637,25 @@ export function Terminal({
       cancelMomentum()
       let v = velocity
       let prev = performance.now()
+      let frames = 0
+      let moved = 0
+      const finish = (reason: string) => {
+        debugLogRef.current?.(`  (momentum end: ${reason}, ${frames} frames, ${moved} lines)`)
+      }
       const step = (now: number) => {
         momentumFrame = 0
         // The app can exit or drop mouse tracking mid-coast (vim quits back to
         // the shell). Stop rather than let the rest of the fling change
         // meaning — from wheel reports to viewport scrolling or arrow keys.
-        if (toApp !== (altScreenScrollRef.current && sendsScrollToApp(term))) return
-        if (toApp && term.modes.mouseTrackingMode === 'none') return
+        frames++
+        if (toApp !== (altScreenScrollRef.current && sendsScrollToApp(term))) {
+          finish('app state changed')
+          return
+        }
+        if (toApp && term.modes.mouseTrackingMode === 'none') {
+          finish('mouse tracking turned off')
+          return
+        }
         const dt = Math.min(now - prev, MOMENTUM_MAX_FRAME_MS)
         prev = now
         const rowHeight = container.clientHeight / (term.rows || 1) || 18
@@ -1605,6 +1669,7 @@ export function Terminal({
             const [x, y] = clampToScreen(lastX, lastY)
             dispatchWheel(lines, x, y)
             lineRemainder -= lines
+            moved += Math.abs(lines)
           } else {
             // Stop dead at either end of the scrollback instead of spinning
             // out the remaining velocity against a wall: viewportY not moving
@@ -1612,11 +1677,18 @@ export function Terminal({
             const before = term.buffer.active.viewportY
             term.scrollLines(lines)
             lineRemainder -= lines
-            if (term.buffer.active.viewportY === before) return
+            if (term.buffer.active.viewportY === before) {
+              finish('scrollback edge')
+              return
+            }
+            moved += Math.abs(lines)
           }
         }
         v *= Math.pow(MOMENTUM_FRICTION, dt / 16.67)
-        if (Math.abs(v) < MOMENTUM_MIN_VELOCITY) return
+        if (Math.abs(v) < MOMENTUM_MIN_VELOCITY) {
+          finish('decayed')
+          return
+        }
         momentumFrame = requestAnimationFrame(step)
       }
       momentumFrame = requestAnimationFrame(step)
@@ -1643,17 +1715,22 @@ export function Terminal({
       touchActive = false
       lastTouchEndAt = performance.now()
       const toApp = altScreenScrollRef.current && sendsScrollToApp(term)
-      if (
-        hadScrollDrag &&
-        touchMomentumRef.current &&
-        touchModeRef.current === 'scroll' &&
-        (!toApp || term.modes.mouseTrackingMode !== 'none') &&
-        Math.abs(velocity) >= MOMENTUM_MIN_VELOCITY &&
+      if (hadScrollDrag && touchModeRef.current === 'scroll') {
+        // Each gate is named so a copied debug log says which one refused a
+        // fling — "vim 안에서 관성은 없어" on a vim that does have mouse
+        // tracking on (mouse=nvi) could not be explained from the code alone.
+        const sinceMove = performance.now() - lastMoveAt
+        let skip: string | null = null
+        if (!touchMomentumRef.current) skip = 'disabled'
+        else if (toApp && term.modes.mouseTrackingMode === 'none') skip = 'app without mouse tracking'
+        else if (Math.abs(velocity) < MOMENTUM_MIN_VELOCITY) skip = 'too slow'
         // A finger that came to rest before lifting means the user stopped
         // deliberately; only a release that was still moving is a fling.
-        performance.now() - lastMoveAt < 100
-      ) {
-        startMomentum(toApp)
+        else if (sinceMove >= 100) skip = 'finger rested before release'
+        debugLogRef.current?.(
+          `  (momentum ${skip ? `skipped: ${skip}` : 'start'} v=${velocity.toFixed(2)}px/ms toApp=${toApp} mouse=${term.modes.mouseTrackingMode} buffer=${term.buffer.active.type} idle=${Math.round(sinceMove)}ms)`,
+        )
+        if (!skip) startMomentum(toApp)
       }
       dragging = false
     }
@@ -1789,6 +1866,7 @@ export function Terminal({
       if (container.clientWidth === 0 || container.clientHeight === 0) return
       fitAddon.fit()
       sendResize()
+      debugLogRef.current?.(`  (resize ${container.clientWidth}x${container.clientHeight}px -> ${term.cols}x${term.rows})`)
     })
     resizeObserver.observe(container)
 
@@ -1841,6 +1919,7 @@ export function Terminal({
       ].join('\n')
     }
     const debug = inputDebugEnabled ? createInputDebugOverlay(container, debugMeta) : null
+    debugLogRef.current = debug ? debug.log : null
     const logEvent = (source: string, e: Event, value?: string) => {
       if (!debug) return
       const composing = 'isComposing' in e ? String((e as InputEvent).isComposing) : '-'
@@ -1875,6 +1954,7 @@ export function Terminal({
         for (const type of ['compositionstart', 'compositionupdate', 'compositionend', 'input', 'keydown']) {
           textarea.removeEventListener(type, onNativeEvent)
         }
+        debugLogRef.current = null
         debug.dispose()
       }
     }
@@ -2265,6 +2345,11 @@ export function Terminal({
       }
       const onInput = (e: Event) => {
         logEvent('field', e, field.value)
+        // A composition whose compositionend never arrived — typically one
+        // cut off by the page being hidden — would leave `composing` stuck
+        // true, silently disabling caret pinning and word-boundary resets from
+        // then on. The input event's own isComposing is authoritative.
+        if (composing && e instanceof InputEvent && !e.isComposing) composing = false
         // Mid-composition the field holds a half-assembled syllable. With
         // live composition on it goes out anyway, and the next input's diff
         // backspaces over it once the IME assembles it further — that is
@@ -2275,9 +2360,41 @@ export function Terminal({
         if (composing && !liveCompositionRef.current) return
         flush()
       }
+      // A delete with the caret parked at offset 0, where the native default
+      // has nothing before the caret to remove and silently does nothing. A
+      // device showed exactly that after returning from another tab:
+      // backspace stopped deleting "from some point" and only recovered once
+      // something new was typed (typing moves the caret). Deliberately scoped
+      // to that one state — the ordinary anchor deletion with the caret at the
+      // end is left to the native path that is already confirmed working,
+      // since cancelling a delete the keyboard *could* perform would desync
+      // its own model of the field. Sends the delete itself, keeps the field
+      // consistent with what the terminal now holds, and puts the caret back.
+      const deleteAtCaretStart = () => {
+        if (composing || field.selectionStart !== 0 || field.selectionEnd !== 0) return false
+        const logical = readValue()
+        emit('\x7f')
+        if (logical !== ANCHOR) {
+          const trimmed = logical.slice(0, -1)
+          field.value = trimmed.startsWith(ANCHOR) ? trimmed : ANCHOR + trimmed
+          sent = field.value
+        }
+        anchorAtEnd = false
+        pinCaretToEnd()
+        debug?.log('  (backspace at caret 0 handled)')
+        return true
+      }
+      const onBeforeInput = (ev: Event) => {
+        const e = ev as InputEvent
+        if (e.inputType === 'deleteContentBackward' && !e.isComposing && deleteAtCaretStart()) e.preventDefault()
+      }
       const onKeyDown = (ev: Event) => {
         const e = ev as KeyboardEvent
         logEvent('field', e, field.value)
+        if (e.key === 'Backspace' && !e.isComposing && deleteAtCaretStart()) {
+          e.preventDefault()
+          return
+        }
         if (e.key === 'Enter' && !composing) {
           // The line is over, so the field's accumulated copy of it is
           // meaningless from here on — reset rather than carrying it into
@@ -2302,6 +2419,27 @@ export function Terminal({
       const onFocus = () => {
         pinCaretToEnd()
       }
+      // Returning to the page — from another browser tab or app, or the screen
+      // turning back on — reconnects the keyboard to this field with a model of
+      // its contents nothing guarantees is current, and a composition in
+      // progress when the page was hidden never gets its compositionend. The
+      // device symptom: a space left behind after "claude-" and backspace dying
+      // partway through, both after coming back from another tab. Start over
+      // from a known state instead: no composition, anchor only, caret at the
+      // end. The terminal itself is untouched; only the field's bookkeeping is
+      // reset, exactly as a blur would.
+      const resync = (reason: string) => {
+        if (document.activeElement !== field) return
+        composing = false
+        resetField(reason)
+        pinCaretToEnd()
+      }
+      const onVisibilityChange = () => {
+        if (document.visibilityState === 'hidden') composing = false
+        else resync('resume')
+      }
+      const onPageShow = () => resync('pageshow')
+      const onWindowFocus = () => resync('window focus')
       // Observed only, never acted on: an IME that keeps a composing region
       // fires several of these between one compositionstart/end pair, and an
       // IME that has given up composing fires none. That difference is the
@@ -2314,9 +2452,17 @@ export function Terminal({
       field.addEventListener('keydown', onKeyDown)
       field.addEventListener('blur', onBlur)
       field.addEventListener('focus', onFocus)
+      field.addEventListener('beforeinput', onBeforeInput)
+      document.addEventListener('visibilitychange', onVisibilityChange)
+      window.addEventListener('pageshow', onPageShow)
+      window.addEventListener('focus', onWindowFocus)
       cleanups.push(() => {
         window.clearTimeout(refocusTimer)
         field.removeEventListener('focus', onFocus)
+        field.removeEventListener('beforeinput', onBeforeInput)
+        document.removeEventListener('visibilitychange', onVisibilityChange)
+        window.removeEventListener('pageshow', onPageShow)
+        window.removeEventListener('focus', onWindowFocus)
         field.removeEventListener('compositionstart', onCompositionStart)
         field.removeEventListener('compositionupdate', onCompositionUpdate)
         field.removeEventListener('compositionend', onCompositionEnd)
@@ -2344,6 +2490,7 @@ export function Terminal({
       cleanups = []
       field.remove()
       mobileInputRef.current = null
+      debugLogRef.current = null
       debug?.dispose()
     }
   }, [inputMode, inputDebugEnabled, sendBytes])
