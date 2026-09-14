@@ -398,6 +398,50 @@ function saveAltScreenTouchScrollEnabled(enabled: boolean) {
   }
 }
 
+// Desktop counterpart of the alt-screen touch forwarding above, for a real
+// mouse wheel or trackpad. xterm.js's own alt-screen wheel handler
+// (CoreBrowserTerminal, confirmed by reading node_modules/@xterm/xterm)
+// converts wheel input into arrow keys, but discards magnitude: it checks
+// only whether its internal line accumulator crossed zero and then sends
+// exactly one Up/Down keystroke, no matter how many lines that event's delta
+// actually represented — any accumulated amount beyond one line is thrown
+// away every single event. In the normal buffer this doesn't matter (a
+// separate, unrelated widget scrolls the viewport proportionally to the
+// full delta), but for a full-screen app it means a fast flick or a
+// trackpad's inertial coast phase (many small-delta events, each still
+// capped at one line) moves the app's own scroll far less than the physical
+// distance suggests — exactly the "have to keep scrolling by hand" pain
+// this toggle exists to fix.
+//
+// The fix mirrors the touch-forwarding approach above rather than
+// reimplementing xterm's key-conversion logic: intercept the real wheel
+// event via attachCustomWheelEventHandler, accumulate its delta ourselves
+// (without the 1-line-per-event cap), and replay it as that many single-line
+// synthetic wheel events through the exact same dispatchWheel() xterm's own
+// listener already converts correctly — see the xterm-creation effect.
+// Off switch kept for the same reason as every other toggle in this group:
+// wheel/trackpad delta reporting is notoriously inconsistent across
+// OS/browser combinations, and a full-screen app is free to interpret
+// repeated arrow keys however it wants.
+const ALT_SCREEN_WHEEL_SCROLL_KEY = 'webmanager.terminal.altScreenWheelScroll'
+
+function loadAltScreenWheelScrollEnabled(): boolean {
+  try {
+    return localStorage.getItem(ALT_SCREEN_WHEEL_SCROLL_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function saveAltScreenWheelScrollEnabled(enabled: boolean) {
+  try {
+    if (enabled) localStorage.removeItem(ALT_SCREEN_WHEEL_SCROLL_KEY)
+    else localStorage.setItem(ALT_SCREEN_WHEEL_SCROLL_KEY, '0')
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - the toggle just won't persist
+  }
+}
+
 // Momentum ("fling") scrolling: after a touch-drag is released, keep
 // scrolling at the speed the finger let go at and decay to a stop, the way
 // Termux and every native Android list behave. On by default - a 1:1 drag
@@ -614,6 +658,11 @@ export function Terminal({
   // reads the toggle through a ref rather than closing over the state.
   const altScreenScrollRef = useRef(altScreenTouchScrollEnabled)
   altScreenScrollRef.current = altScreenTouchScrollEnabled
+  const [altScreenWheelScrollEnabled, setAltScreenWheelScrollEnabled] = useState<boolean>(loadAltScreenWheelScrollEnabled)
+  // Same "listener installed once with the xterm instance" reasoning as
+  // altScreenScrollRef right above, this time for the real wheel handler.
+  const altScreenWheelScrollRef = useRef(altScreenWheelScrollEnabled)
+  altScreenWheelScrollRef.current = altScreenWheelScrollEnabled
   const [autoReconnectEnabled, setAutoReconnectEnabledState] = useState<boolean>(loadAutoReconnectEnabled)
   // Unlike mobileInputWorkaroundEnabled above (only read once, at xterm
   // creation - toggling it requires leaving/re-entering the tab), this one
@@ -1057,6 +1106,11 @@ export function Terminal({
     setAltScreenTouchScrollEnabled(enabled)
   }, [])
 
+  const toggleAltScreenWheelScroll = useCallback((enabled: boolean) => {
+    saveAltScreenWheelScrollEnabled(enabled)
+    setAltScreenWheelScrollEnabled(enabled)
+  }, [])
+
   const toggleAutoReconnect = useCallback((enabled: boolean) => {
     saveAutoReconnectEnabled(enabled)
     setAutoReconnectEnabledState(enabled)
@@ -1245,21 +1299,26 @@ export function Terminal({
     // apart. DOM_DELTA_LINE with ±1 per event is used because xterm sends
     // exactly one arrow key per wheel event regardless of magnitude.
     const wheelTarget = () => container.querySelector('.xterm-screen') ?? container
+    // Marks a synthetic single-line event so the real-wheel handler below
+    // (attachCustomWheelEventHandler) recognizes and ignores it instead of
+    // accumulating it again — without this, every event this function
+    // dispatches would loop straight back into that handler.
+    const SYNTHETIC_WHEEL_TAG = '__webmanagerSyntheticWheel'
     const dispatchWheel = (lines: number, clientX: number, clientY: number) => {
       const direction = lines > 0 ? 1 : -1
       const steps = Math.min(Math.abs(lines), MAX_WHEEL_STEPS_PER_MOVE)
       const target = wheelTarget()
       for (let i = 0; i < steps; i++) {
-        target.dispatchEvent(
-          new WheelEvent('wheel', {
-            deltaY: direction,
-            deltaMode: WheelEvent.DOM_DELTA_LINE,
-            bubbles: true,
-            cancelable: true,
-            clientX,
-            clientY,
-          }),
-        )
+        const synthetic = new WheelEvent('wheel', {
+          deltaY: direction,
+          deltaMode: WheelEvent.DOM_DELTA_LINE,
+          bubbles: true,
+          cancelable: true,
+          clientX,
+          clientY,
+        })
+        ;(synthetic as unknown as Record<string, boolean>)[SYNTHETIC_WHEEL_TAG] = true
+        target.dispatchEvent(synthetic)
       }
     }
     // 'mouse'/'select' touch modes: replay the drag as the mouse events a
@@ -1529,6 +1588,39 @@ export function Terminal({
         event.preventDefault()
       }
       return true
+    })
+
+    // Real mouse-wheel/trackpad scrolling over a full-screen app — see
+    // ALT_SCREEN_WHEEL_SCROLL_KEY's doc comment above for why xterm's own
+    // default handling drops most of a flick's or an inertial coast's
+    // distance. Accumulate the event's own delta (never discarding the
+    // remainder past one line, unlike xterm's built-in accumulator) and
+    // replay it as that many single-line synthetic wheel events through
+    // dispatchWheel, which hands each one back to xterm's own listener
+    // exactly like the touch path above does. A plain accumulator, not a
+    // ref-driven one: it's local to this one wheel handler's closure and
+    // never read from outside it.
+    let realWheelLineRemainder = 0
+    const wheelLinesPerEvent = (event: WheelEvent): number => {
+      if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return event.deltaY
+      if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) return event.deltaY * (term.rows || 1)
+      const rowHeight = container.clientHeight / (term.rows || 1) || 18
+      return event.deltaY / rowHeight
+    }
+    term.attachCustomWheelEventHandler((event) => {
+      if ((event as unknown as Record<string, boolean>)[SYNTHETIC_WHEEL_TAG]) return true
+      if (!altScreenWheelScrollRef.current || !sendsScrollToApp(term) || event.deltaY === 0) {
+        realWheelLineRemainder = 0
+        return true
+      }
+      realWheelLineRemainder += wheelLinesPerEvent(event)
+      const lines = Math.trunc(realWheelLineRemainder)
+      if (lines !== 0) {
+        dispatchWheel(lines, event.clientX, event.clientY)
+        realWheelLineRemainder -= lines
+      }
+      event.preventDefault()
+      return false
     })
 
     const resizeObserver = new ResizeObserver(() => {
@@ -2570,6 +2662,8 @@ export function Terminal({
         onToggleTouchMomentum={toggleTouchMomentum}
         altScreenTouchScrollEnabled={altScreenTouchScrollEnabled}
         onToggleAltScreenTouchScroll={toggleAltScreenTouchScroll}
+        altScreenWheelScrollEnabled={altScreenWheelScrollEnabled}
+        onToggleAltScreenWheelScroll={toggleAltScreenWheelScroll}
         autoReconnectEnabled={autoReconnectEnabled}
         onToggleAutoReconnect={toggleAutoReconnect}
         controlBarEnabled={controlBarEnabled}

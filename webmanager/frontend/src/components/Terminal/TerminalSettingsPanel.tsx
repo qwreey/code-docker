@@ -45,6 +45,8 @@ export function TerminalSettingsPanel({
   onToggleTouchMomentum,
   altScreenTouchScrollEnabled,
   onToggleAltScreenTouchScroll,
+  altScreenWheelScrollEnabled,
+  onToggleAltScreenWheelScroll,
   autoReconnectEnabled,
   onToggleAutoReconnect,
   controlBarEnabled,
@@ -67,6 +69,8 @@ export function TerminalSettingsPanel({
   onToggleTouchMomentum: (enabled: boolean) => void
   altScreenTouchScrollEnabled: boolean
   onToggleAltScreenTouchScroll: (enabled: boolean) => void
+  altScreenWheelScrollEnabled: boolean
+  onToggleAltScreenWheelScroll: (enabled: boolean) => void
   autoReconnectEnabled: boolean
   onToggleAutoReconnect: (enabled: boolean) => void
   controlBarEnabled: boolean
@@ -372,6 +376,27 @@ export function TerminalSettingsPanel({
             onChange={(e) => onToggleAltScreenTouchScroll(e.target.checked)}
           />
           전체 화면 앱에서 터치 스크롤을 앱으로 전달
+        </label>
+      </section>
+
+      <section className="terminal-settings-section">
+        <h4>데스크탑 휠 스크롤 (실험적)</h4>
+        <p className="section-description">
+          <code>claude</code>, <code>vim</code>, <code>htop</code>처럼 화면 전체를 쓰는 앱에서는 xterm 자체의
+          휠 처리가 이벤트 한 번당 딱 한 줄만 방향키로 바꿔 보내고, 그 이상 쌓인 스크롤 양은 그냥 버립니다. 그래서
+          마우스/트랙패드를 빠르게 굴리거나 관성(inertial) 스크롤로 손을 뗀 뒤에도 화면은 물리적으로 굴린 양보다
+          훨씬 적게 움직이고, 결국 같은 위치를 계속 손으로 굴려야 합니다. 이 옵션은 실제 휠 이벤트의 스크롤 양을
+          직접 누적해서(버리지 않고) 필요한 줄 수만큼 앱에 전달합니다 — 일반 셸 화면(대체 화면 버퍼가 아닌 경우)에는
+          영향이 없습니다. 앱이 여러 줄을 한 번에 받는 걸 이상하게 처리하면 꺼서 예전 동작(줄당 한 이벤트)으로
+          되돌릴 수 있습니다. 바꾸면 바로 적용되며, 탭을 나갔다 들어올 필요가 없습니다.
+        </p>
+        <label className="checkbox-option">
+          <input
+            type="checkbox"
+            checked={altScreenWheelScrollEnabled}
+            onChange={(e) => onToggleAltScreenWheelScroll(e.target.checked)}
+          />
+          전체 화면 앱에서 마우스 휠 스크롤 양을 그대로 전달
         </label>
       </section>
 
