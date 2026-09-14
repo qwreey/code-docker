@@ -696,6 +696,10 @@ export function Terminal({
   // outside the mobile-input effect (resize, momentum) writes into the same
   // copyable log rather than needing an overlay of its own.
   const debugLogRef = useRef<((line: string) => void) | null>(null)
+  // performance.now() deadline before which a focus redirect must not open the
+  // on-screen keyboard — written by the touch handler during drags and momentum
+  // (holdFocus there), read by the mobile-input effect's focus redirect.
+  const suppressFocusUntilRef = useRef(0)
 
   const [state, setState] = useState<ConnectionState>('connecting')
   const [settings, setSettings] = useState<TerminalSettings | null>(null)
@@ -1382,6 +1386,21 @@ export function Terminal({
     // (reported: it only worked after tapping first, "약간 애매한 느낌").
     const LONG_PRESS_MS = 350
     let longPressTimer = 0
+    // Keeps focus redirects from opening the on-screen keyboard while a touch
+    // drag or a momentum coast is under way, and for a moment after. xterm
+    // focuses its own textarea from places a synthetic mousedown can't cover:
+    // on any platform whose navigator.platform contains "Linux" — which
+    // Android does — every selection refresh runs
+    // `this._onLinuxMouseSelection.fire(...)`, whose handler is
+    // `this.textarea.value = e, this.textarea.focus()`, so a selection drag
+    // opened the keyboard mid-drag regardless of the mousedown shadowing in
+    // dispatchMouse. And the device reported the keyboard opening during
+    // plain scroll-mode flicks too, source not yet identified. The
+    // mobile-input effect's focus redirect consults this window and refuses
+    // to open the keyboard inside it (see onTextareaFocus there).
+    const holdFocus = (ms: number) => {
+      suppressFocusUntilRef.current = Math.max(suppressFocusUntilRef.current, performance.now() + ms)
+    }
     const clearLongPress = () => {
       if (!longPressTimer) return
       window.clearTimeout(longPressTimer)
@@ -1504,6 +1523,19 @@ export function Terminal({
     }
     const dispatchMouse = (type: 'mousedown' | 'mousemove' | 'mouseup', clientX: number, clientY: number, forceSelection: boolean) => {
       const [x, y] = clampToScreen(clientX, clientY)
+      // detail: 1 is load-bearing, not decoration. xterm's selection service
+      // only anchors a new selection for a click count of exactly one:
+      //
+      //     this._enabled && e.shiftKey ? this._handleIncrementalClick(e)
+      //       : 1 === e.detail ? this._handleSingleClick(e)
+      //       : 2 === e.detail ? this._handleDoubleClick(e) : ...
+      //
+      // A constructed MouseEvent defaults detail to 0, which matches no branch,
+      // so a drag in the shell never anchored anything and selected nothing —
+      // "모바일에서 아예 선택할 방법이 없더라", with only a real double-tap
+      // (detail 2) still selecting a word. It is also what made the previous
+      // round's anchor look random: a real tap (detail 1) had planted one
+      // earlier and the synthetic drag merely extended from it.
       const event = new MouseEvent(type, {
         bubbles: true,
         cancelable: true,
@@ -1511,6 +1543,7 @@ export function Terminal({
         clientY: y,
         button: 0,
         buttons: type === 'mouseup' ? 0 : 1,
+        detail: 1,
         shiftKey: forceSelection,
         view: window,
       })
@@ -1540,35 +1573,24 @@ export function Terminal({
       }
       wheelTarget().dispatchEvent(event)
     }
-    // Whether this drag has to force its way past mouse reporting. Only true
-    // in select mode against an application that turned mouse tracking on —
-    // and it is exactly the case where xterm gives us the incremental-click
-    // path with no anchor of its own, so seedSelectionAnchor below has to
-    // provide one.
+    // Whether this drag has to force its way past mouse reporting: select mode
+    // against an application that turned mouse tracking on. Keyed on mouse
+    // tracking specifically, not sendsScrollToApp — an alternate-screen app
+    // *without* tracking (less) leaves xterm's selection service enabled, and
+    // there shift would take the incremental "extend the old anchor" branch.
+    // With tracking on, xterm has called selectionService.disable()
+    // (`clearSelection(), this._enabled = !1`), so shift only passes the
+    // shouldForceSelection gate and the incremental branch — which requires
+    // _enabled — is skipped: detail 1 then reaches _handleSingleClick and the
+    // anchor lands exactly under the finger. That is why the earlier
+    // selectLines() seeding, which anchored at the start of the touched row in
+    // vim, is gone.
     let forceSelectionDrag = false
-    // Gives _handleIncrementalClick something to extend from. Without this,
-    // an empty selectionStart makes it a no-op and the whole drag selects
-    // nothing (or worse, extends whatever was selected minutes ago).
-    // selectLines anchors at the start of the touched row rather than the
-    // exact column — predictable, and the best available: nothing in xterm's
-    // public API sets an arbitrary selection anchor.
-    const seedSelectionAnchor = (clientY: number) => {
-      const r = screenRect()
-      const rows = term.rows || 1
-      const rowHeight = r.height / rows
-      if (!(rowHeight > 0)) return
-      const row = Math.min(Math.max(Math.floor((clientY - r.top) / rowHeight), 0), rows - 1)
-      term.selectLines(term.buffer.active.viewportY + row, term.buffer.active.viewportY + row)
-    }
     const beginPointerDrag = (clientX: number, clientY: number) => {
       clearLongPress()
+      holdFocus(600)
       const selecting = touchModeRef.current === 'select'
-      forceSelectionDrag = selecting && sendsScrollToApp(term)
-      if (selecting) {
-        // A fresh drag must never inherit the previous drag's anchor.
-        term.clearSelection()
-        if (forceSelectionDrag) seedSelectionAnchor(clientY)
-      }
+      forceSelectionDrag = selecting && term.modes.mouseTrackingMode !== 'none'
       pointerDragging = true
       dispatchMouse('mousedown', clientX, clientY, forceSelectionDrag)
     }
@@ -1588,6 +1610,7 @@ export function Terminal({
         // one would make selecting a single line impossible.
         if (!pointerDragging && Math.abs(y - startY) < TOUCH_SCROLL_THRESHOLD && Math.abs(x - startX) < TOUCH_SCROLL_THRESHOLD) return
         if (!pointerDragging) beginPointerDrag(startX, startY)
+        holdFocus(600)
         dispatchMouse('mousemove', x, y, forceSelectionDrag)
         lastX = x
         lastY = y
@@ -1596,6 +1619,7 @@ export function Terminal({
       }
       if (!dragging && Math.abs(y - startY) < TOUCH_SCROLL_THRESHOLD) return
       dragging = true
+      holdFocus(600)
       const rowHeight = container.clientHeight / (term.rows || 1) || 18
       const now = performance.now()
       const dt = lastMoveAt ? now - lastMoveAt : 0
@@ -1648,6 +1672,7 @@ export function Terminal({
         // the shell). Stop rather than let the rest of the fling change
         // meaning — from wheel reports to viewport scrolling or arrow keys.
         frames++
+        holdFocus(400)
         if (toApp !== (altScreenScrollRef.current && sendsScrollToApp(term))) {
           finish('app state changed')
           return
@@ -1710,6 +1735,7 @@ export function Terminal({
       // only looked fine because an extra click at the end of a vim drag is
       // harmless. A plain tap (no drag) keeps its click, which is what moves
       // the cursor and focuses the terminal.
+      if (hadPointerDrag || hadScrollDrag) holdFocus(600)
       if ((hadPointerDrag || hadScrollDrag) && e.cancelable) e.preventDefault()
       if (e.touches.length > 0) return
       touchActive = false
@@ -2479,6 +2505,17 @@ export function Terminal({
     // itself targets mobileInputRef directly; this listener covers every
     // OTHER path, above all xterm's own real click-to-focus.)
     const onTextareaFocus = () => {
+      // Inside a touch drag or momentum coast (see holdFocus in the touch
+      // handler), whatever focused xterm's textarea was xterm itself, never a
+      // user asking to type — so hand focus straight back instead of
+      // forwarding it, and the keyboard stays as it was. A tap made after the
+      // window has passed redirects normally.
+      if (performance.now() < suppressFocusUntilRef.current) {
+        textarea.blur()
+        debug?.log('  (focus redirect suppressed: touch drag/momentum)')
+        return
+      }
+      debug?.log('  (focus redirected to input field)')
       field.focus()
     }
     textarea.addEventListener('focus', onTextareaFocus)

@@ -525,14 +525,25 @@
   touch-action: none;
 }
 
-/* No native long-press selection or callout on the rendered rows. xterm keeps
-   its own selection model, so the browser's would never have been copyable
-   anyway — all it did was claim a press-and-hold as a native gesture and
-   cancel the drag the touch modes are trying to start. Scoped to the rows,
-   not .xterm-screen, so the input fields living beside them stay editable. */
-.terminal-container .xterm-rows {
+/* No native long-press selection or callout anywhere in the terminal area.
+   xterm keeps its own selection model (select mode + the copy button), so
+   the browser's could never have produced a useful copy — it only claimed a
+   press-and-hold as a native gesture, and a device showed it still "working
+   oddly" when this was scoped to .xterm-rows alone: xterm's helper elements
+   (the character-measure span, its own textarea) carry text a long-press
+   could still grab. The input fields are opted back in explicitly, so the
+   mobile input field and the debug overlay's manual-copy textarea stay
+   editable and selectable. */
+.terminal-container {
   -webkit-touch-callout: none;
+  -webkit-user-select: none;
   user-select: none;
+}
+
+.terminal-container textarea,
+.terminal-container input {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .terminal-controls {

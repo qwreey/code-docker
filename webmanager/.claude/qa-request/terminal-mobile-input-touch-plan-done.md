@@ -667,3 +667,105 @@ settle 리핏도 찍힌다. 3번과 4번은 로그 한 번으로 둘 다 판별�
   늘어나서** 합성 플릭의 측정값(`v≈0.03px/ms`, `idle=1000ms`)은 의미가 없다 — 실제 원인은
   기기 로그로만 판별 가능.
 - 키보드 리사이즈는 자동화에서 재현 불가(창 높이 조절이 WM에 막힘, `browser-qa-notes.md` 참고).
+
+
+---
+
+# 실기기 7차 결과 (2026-09-14) — 셸 선택 불가의 진짜 원인, 스크롤 중 키보드
+
+사용자 확인: **1(탭 복귀 입력)·3(키보드 리사이즈) 해소, vim 관성 동작.** 이번 로그의 UA는
+`SamsungBrowser/30`이 아니라 **`Chrome/152`**다. 이 브라우저에서는 키보드가 열려도
+`keyboardInset`이 0이고 레이아웃 자체가 줄어든다(로그: `resize 411x675px` → `411x322px`,
+`(keyboard inset ...)` 줄 없음). 리사이즈는 그 경로로도 정상 동작했다.
+
+vim 관성 로그 — 설계대로 동작:
+
+```
+(momentum start v=-1.76px/ms toApp=true mouse=drag buffer=alternate idle=8ms)
+(momentum end: decayed, 64 frames, 24 lines)
+```
+
+지난 차수까지 왜 안 됐는지는 코드 차이로 설명되지 않는다. 6차에서 관성 로직 자체는 로그만
+추가했고, 브라우저가 Samsung Browser에서 Chrome으로 바뀐 것이 유일하게 크게 달라진
+조건이다. 원인을 단정하지 않고 둔다.
+
+## 셸에서 선택이 아예 안 됨 — `MouseEvent.detail`이 0이었다
+
+증상: 꾹 누르든 터치하고 움직이든 셸에서는 선택이 전혀 안 된다. 더블탭하고 가만히 있으면
+그 단어만 선택된다. vim에서는 선택되지만 첫 선택이 줄 맨 앞부터 시작한다.
+
+xterm의 선택 서비스(`handleMouseDown`)가 이렇다:
+
+```js
+if (!this._enabled) { if (!this.shouldForceSelection(e)) return; e.stopPropagation() }
+e.preventDefault(), this._dragScrollAmount = 0,
+this._enabled && e.shiftKey ? this._handleIncrementalClick(e)
+  : 1 === e.detail ? this._handleSingleClick(e)
+  : 2 === e.detail ? this._handleDoubleClick(e)
+  : 3 === e.detail && this._handleTripleClick(e)
+```
+
+**새 선택의 기준점은 클릭 횟수(`detail`)가 정확히 1일 때만 잡힌다.** 직접 만든
+`MouseEvent`의 `detail` 기본값은 0이라 어떤 분기에도 안 걸린다. 그래서 셸(선택 서비스
+활성, shift 없음)에서 합성 드래그는 기준점을 못 잡고 아무것도 선택하지 못했다. 실제
+더블탭은 브라우저가 `detail: 2`를 실어 보내므로 단어 선택이 됐다.
+
+**6차 진단을 정정한다.** 6차에서 "그냥 터치하고 움직이면 앵커가 이상한 곳에 박힘"의 원인을
+"드래그 도중 키보드가 열려 행이 밀림"으로 적었는데, 주원인은 이것이었다. 먼저 한 번 탭하면
+실제 탭(`detail: 1`)이 그 자리에 기준점을 심고, 합성 드래그는 그 오래된 기준점에서 확장만
+했다 — "탭 하고 다시 드래그하면 괜찮다"가 정확히 그 모양이다. 키보드가 열리는 문제도 실재하지만
+(아래) 앵커 증상의 주원인은 아니었다.
+
+vim에서 줄 맨 앞부터 선택된 것은 5차에서 넣은 `selectLines()` 기준점 심기 때문이다. 마우스
+트래킹이 켜지면 xterm이 `disable(){ this.clearSelection(), this._enabled = !1 }`을 부르므로,
+shift는 `shouldForceSelection` 관문만 통과시키고 `_enabled`가 필요한 확장 분기는 건너뛴다.
+즉 **`detail: 1`만 있으면 `_handleSingleClick`이 손가락 아래에 정확히 기준점을 잡는다.**
+
+수정:
+
+- 합성 mousedown/mousemove/mouseup에 `detail: 1`
+- shift(강제 선택)는 `sendsScrollToApp`이 아니라 **마우스 트래킹이 켜졌을 때만** — 마우스
+  없는 대체 화면 앱(less)은 선택 서비스가 활성이라 shift가 확장 분기를 타 버린다
+- `selectLines()` 기준점 심기와 선택 모드의 사전 `clearSelection()` 제거 — `_handleSingleClick`이
+  기준점을 새로 잡으므로 둘 다 필요 없다
+
+## 스크롤·선택 중에도 키보드가 열림
+
+xterm이 자기 textarea에 포커스를 거는 곳이 mousedown 말고 하나 더 있다:
+
+```js
+refresh(e) { ...; c.isLinux && e && this.selectionText.length && this._onLinuxMouseSelection.fire(this.selectionText) }
+// 핸들러
+this._selectionService.onLinuxMouseSelection(e => { this.textarea.value = e, this.textarea.focus() })
+// isLinux = navigator.platform.indexOf("Linux") >= 0   ← Android는 "Linux armv8l"
+```
+
+리눅스의 "선택하면 곧 primary selection" 흉내인데, **안드로이드도 리눅스로 판정되어 선택
+드래그 중 매 갱신마다 textarea에 포커스를 건다** → 입력 이펙트가 입력 필드로 넘기고 → 키보드가
+열린다. 6차의 mousedown 포커스 가리기로는 이 경로를 못 막았다.
+
+스크롤 모드 플릭 중 키보드가 열리는 경로는 **아직 특정하지 못했다**(선택이 개입하지 않는다).
+
+수정: 터치 드래그와 관성 코스팅 동안, 그리고 끝난 뒤 잠시 동안은 포커스 리다이렉트가 키보드를
+열지 않게 한다. 터치 핸들러가 드래그 시작·이동·종료와 관성 매 프레임마다 억제 시한을 늘리고,
+xterm textarea의 포커스를 입력 필드로 넘기는 핸들러가 그 시한 안이면 넘기지 않고 blur한다.
+원인이 어디든 드래그·관성 도중 xterm이 거는 포커스는 막히고, 시한이 지난 뒤의 탭은 평소대로
+키보드를 연다. 부수 효과로, 관성을 멈추려고 친 탭도 키보드를 열지 않는다. 리다이렉트
+허용/억제 여부를 디버그 로그에 남겨 스크롤 경로의 포커스 출처를 다음 로그로 판별할 수 있게 했다.
+
+## "네이티브 선택도 이상하게 먹힘" — 의도 아님
+
+의도한 선택 수단은 xterm 자체 선택(선택 모드 + 복사 버튼)이고, 브라우저 네이티브 선택은
+복사에 쓸 수 없다. 5차에서 `.xterm-rows`에만 `user-select: none`을 걸었는데, xterm 보조
+요소(문자 폭 측정용 span, 자체 textarea)에 남아 있는 텍스트를 롱프레스가 잡을 수 있었다.
+`.terminal-container` 전체로 넓히고 textarea/input만 다시 선택 가능하게 열었다(입력 필드와
+디버그 수동 복사 textarea가 동작해야 하므로).
+
+## 브라우저 실측 (2026-09-14, 배포 번들 `index-CQceE-OM.js`)
+
+- **셸 선택 모드 합성 드래그 → 선택이 실제로 생긴다** ✓ — 드래그 전 복사 버튼 없음,
+  드래그 후 나타남(`hasSelection`). `detail: 1` 수정 전에는 같은 드래그로 선택이 생기지 않았다.
+- **드래그·관성 중 포커스 리다이렉트 억제는 자동화로 확인하지 못했다.** 숨겨진 자동화 탭은
+  `setTimeout`이 1초로 늘어나고 rAF가 돌지 않아서, 입력 필드를 만드는 설정 전환(React 렌더 대기)과
+  억제 시한 경과를 안정적으로 재현할 수 없었다(동기식 스크립트로는 설정 시트가 렌더되지 않음).
+  기기 로그의 `(focus redirected to input field)` / `(focus redirect suppressed: ...)` 줄로 판별한다.
