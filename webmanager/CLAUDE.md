@@ -87,23 +87,53 @@ persistent sessions with a real tab bar/pin-toggle backed by
 `internal/termsession`, keyboard-aware mobile layout, edge-to-edge
 theme-matched surface; three selectable mobile input paths —
 `TerminalInputMode` `native`/`password`/**`diff`**, the last being the
-default and the only one that survives a Samsung keyboard: it lets a hidden
-`<textarea>` accumulate the line and sends only the common-prefix diff
-against what was already written to the PTY, so a keyboard re-emitting a
-phrase it already committed produces no bytes at all. Every earlier design
-truncated the field after each keystroke, which is exactly why such a
-re-emission always looked like new text. Reset only on Enter/blur/a length
-cap — never on an idle timer, since the accumulated value *is* the
-protection. Paired with an opt-in on-screen input-debug overlay, because
-three rounds of guessing at Android IME behavior have each been wrong at
-least once; see `.claude/archive/terminal-mobile-input-touch-plan-done.md`.
+default and the only one that survives a Samsung keyboard. Device-verified
+2026-09-14 after eight real-phone round-trips; the full chronological record
+(later rounds correct earlier diagnoses) is
+`.claude/archive/terminal-mobile-input-touch-plan-done.md`. What `diff` rests
+on, each point learned from a device log rather than guessed:
+a hidden `<textarea>` accumulates the word and only the common-prefix diff
+against what was already sent goes to the PTY, so a keyboard re-emitting text
+it already committed produces no bytes (every earlier design truncated the
+field per keystroke, which is why re-emissions looked like new text);
+composition is forwarded live — ㅇ→아→안 goes out as "ㅇ", "\x7f아", "\x7f안" —
+because Samsung composes a whole word and waiting for compositionend showed
+nothing until the space bar; the field must copy xterm's own helper-textarea
+box at the cursor cell with `pointer-events: none`, because a 0x0 off-screen
+field makes the Android IME commit every jamo separately; the caret is pinned
+to the end after each commit and on every focus, and `readValue()` repairs
+the keyboard inserting before the leading anchor space (which otherwise leaked
+out as a phantom trailing space); the field resets on Enter, blur, a word
+boundary (and blur→refocuses there, `refocusOnWord`, default on), a length
+cap and page resume, never an idle timer, since the accumulated value *is*
+the duplication protection. An opt-in debug overlay with a copy button logs
+input events, sent bytes, resizes, focus redirects and momentum decisions —
+that copied log is what finally ended the guessing.
 A `touchMode` selector (`scroll`/`mouse`/`select`) replays a one-finger drag
-as synthetic mouse events on `.xterm-screen`, with `select` differing only by
-setting `shiftKey` — xterm's own force-selection modifier — which is what
-finally makes text selection (and therefore copying) possible on a touch
-device. Control-bar buttons go through `keepFocus`, which refocuses *only*
-when the field already has focus, so an open keyboard stays open and a
-closed one is never forced open. On the Terminal tab the app's own
+(or a 350ms press-and-hold) as synthetic mouse events on `.xterm-screen`. Two
+non-obvious requirements there: synthetic events carry `detail: 1`, because
+xterm's selection service only anchors a selection for a click count of
+exactly one and a constructed MouseEvent defaults to 0; and `shiftKey` is set
+only when the app has mouse tracking on (then xterm's selection service is
+disabled, shift merely passes its force-selection gate, and `detail: 1` still
+anchors under the finger) — with tracking off, shift takes xterm's "extend the
+old anchor" branch instead. `touchend` cancels compatibility mouse events
+after a drag, since their late mousedown would otherwise wipe the selection.
+xterm focuses its textarea on mousedown and — because Android's
+`navigator.platform` contains "Linux" — on every selection refresh
+(`onLinuxMouseSelection`), so the focus redirect is suppressed during and just
+after drags and momentum; a later tap opens the keyboard normally. Momentum
+scrolling applies to the viewport and to apps with mouse tracking on (wheel
+reports), never to an alternate-screen app without tracking (wheel becomes
+arrow keys). Once a row-count change settles, full-screen apps get a one-row
+repaint nudge, same trick as the backend's `nudgeRepaint` — vim was measured
+to redraw correctly from a single SIGWINCH in a real PTY, yet its mode line
+could stay missing on the device after a keyboard resize. Control-bar buttons
+go through `keepFocus`, which refocuses only when the field already has focus
+*and* visualViewport reports a real keyboard inset, so a closed keyboard is
+never forced open (note that Chrome on Android with a resizing layout viewport
+reports an inset of 0 even with the keyboard up; resizes then arrive through
+the ResizeObserver instead). On the Terminal tab the app's own
 `.mobile-topbar` is hidden and its hamburger is adopted into
 `.terminal-topbar`, reclaiming ~3.6rem of the height a phone keyboard makes
 scarce), a Font Manager tab (`internal/fonts` — upload/list/
