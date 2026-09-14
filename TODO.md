@@ -25,16 +25,11 @@
   등의 원인으로 추정. 중요도는 낮음(사용자 본인 평가) — 급하게 다룰 필요는
   없고, 나중에 `entrypoint.sh`의 시그널 트랩 처리와 supervisord 기동 타이밍을
   같이 살펴봐야 함.
-- (2026-08-19, 사용자 제보, 에이전트가 추가) webmanager 터미널의 모바일 입력
-  워크어라운드(실험적, 터미널 설정 패널에서 끄고 켤 수 있음, localStorage) —
-  가상 키보드 예측입력 때문에 글자가 스페이스 누르기 전까진 버퍼링되던 문제와
-  비밀번호 저장 자동완성 팝업은 실기기 확인상 해결됨. 다만 연속으로 빠르게
-  입력하면 여전히 입력이 씹히는 속도 문제가 남아있음 — 매 키 입력마다
-  `requestAnimationFrame`으로 숨겨진 `<input type="password">`의 값을
-  리셋하는 방식이 원인으로 추정되지만 에이전트가 직접 프로파일링은 못 해봐서
-  확실친 않음. 나중에 실기기(안드로이드 Chrome)로 붙어서 디버깅 필요 — 관련
-  코드는 `webmanager/frontend/src/components/Terminal/Terminal.tsx`의 xterm
-  생성 이펙트 안 `mobileInput` 관련 블록.
+- ~~(2026-08-19, 사용자 제보, 에이전트가 추가) webmanager 터미널의 모바일 입력
+  워크어라운드의 빠른 연속 입력 속도 문제~~ — **해결됨 (2026-09-14, 실기기 확인).**
+  password 필드 방식 자체를 기본값에서 내리고 새 입력 방식(`diff`)으로 교체했다.
+  갤럭시에서 한글 조합·영문·백스페이스·빠른 입력 모두 랙 없이 정상, 회귀 없음.
+  전체 경위: `webmanager/.claude/qa-request/terminal-mobile-input-touch-plan-done.md`
 - (2026-09-06, 사용자가 나중에 더 보기로 함) **authgate의 per-IP 백오프가
   클라이언트를 구분하지 못함** — router-manager는 유닉스 소켓으로만 listen해서
   `r.RemoteAddr`가 모든 호출자에 대해 동일하고, 그 값을 키로 쓰는 실패 백오프가
