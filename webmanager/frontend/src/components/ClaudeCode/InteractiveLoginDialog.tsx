@@ -60,9 +60,11 @@ type Phase = 'starting' | 'connecting' | 'running' | 'reconnecting' | 'locked' |
 // the wizard's own separate "onboarding complete" state (~/.claude.json's
 // hasCompletedOnboarding) - so a bare `claude` in e.g. code-server's
 // integrated terminal still showed the login-method screen from scratch.
-// Current CLIs (measured 2.1.252-2.1.267) set that flag from `claude auth
-// login` too, and the flag isn't one-time either: the CLI's own `/logout`
-// resets it. See webmanager/CLAUDE.md for both incidents. ClaudeCode.tsx
+// That still holds on 2.1.267: a headless re-login left the flag false on
+// the real server (2026-09-13). The flag isn't one-time either - the CLI's
+// own `/logout` resets it - so this wizard is also the repair for a
+// logged-in-but-not-onboarded instance. See webmanager/CLAUDE.md for both
+// incidents. ClaudeCode.tsx
 // makes this dialog the primary CTA only while onboarding-status reports
 // incomplete; elsewhere it's a fallback that can open on an instance that
 // is already onboarded - see the baseline check in the status poll below.

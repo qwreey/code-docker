@@ -192,9 +192,11 @@ flag is **not** one-time, though (2026-09-11 incident): the CLI's own
 runs, does not), and a login that saves credentials but dies before the
 wizard's last screen leaves `loggedIn` true with the flag still false. The
 logged-in card therefore reads `onboarding-status` too and shows a repair
-notice for that state. Since at least 2.1.252 `claude auth login` sets the
-flag itself on success, so the headless flow is the repair — the "only the
-real wizard can set it" premise above held for 2.1.220 only. The dialog itself also polls
+notice whose repair action opens the interactive dialog. Not the headless
+flow: grepping the 2.1.267 binary suggested `claude auth login` sets the
+flag itself, but a headless re-login left it false on the real server
+(2026-09-13), so the "only the real wizard sets it" premise still holds.
+The dialog itself also polls
 `onboarding-status` (not `auth.loggedIn`) to decide when it's actually safe
 to auto-close — confirmed live that `loggedIn` flips true well before the
 wizard's remaining screens (a continue prompt, then a security notice) are

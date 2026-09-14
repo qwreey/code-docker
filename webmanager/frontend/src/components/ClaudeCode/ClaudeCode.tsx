@@ -394,9 +394,9 @@ function InstalledView({
   //
   // Logged out, it picks the primary login CTA: already onboarded means the
   // headless flow (LoginPanel) is enough; otherwise the interactive dialog
-  // leads, since on older CLIs only the real wizard could set the flag. null
-  // (still loading) defaults to the dialog - skipping a wizard that's still
-  // needed is worse than one extra click.
+  // leads, because only the real wizard sets the flag. null (still loading)
+  // defaults to the dialog - skipping a wizard that's still needed is worse
+  // than one extra click.
   //
   // Logged in, it catches the state the original design assumed couldn't
   // happen: onboarding is not one-time. The CLI's own `/logout` resets the
@@ -404,9 +404,12 @@ function InstalledView({
   // logout`, which LogoutButton runs, does not), and a later login that
   // saves credentials but never reaches the wizard's last screen - e.g. the
   // dialog's WebSocket dying while the user copies the code on a phone -
-  // leaves `auth status` saying logged in with the flag still false. Fetched
-  // on every status reload (keyed on the auth object, not just loggedIn) so
-  // a repair login clears the notice as soon as it lands.
+  // leaves `auth status` saying logged in with the flag still false. The
+  // repair is the wizard again, not LoginPanel: reading the 2.1.267 binary
+  // suggested `claude auth login` sets the flag, but a headless re-login
+  // left it false on the real server (2026-09-13). Fetched on every status
+  // reload (keyed on the auth object, not just loggedIn) so the notice
+  // clears as soon as the wizard finishes.
   const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -423,7 +426,6 @@ function InstalledView({
 
   const [showInteractiveLogin, setShowInteractiveLogin] = useState(false)
   const [showAdvancedLogin, setShowAdvancedLogin] = useState(false)
-  const [showRepairLogin, setShowRepairLogin] = useState(false)
 
   return (
     <div className="claude-installed-wrap">
@@ -466,26 +468,17 @@ function InstalledView({
                   <span>
                     로그인은 되어 있지만 CLI 온보딩이 끝나지 않은 상태라, 터미널에서 <code>claude</code>를
                     실행하면 로그인부터 다시 묻습니다. <code>claude</code> 안에서 <code>/logout</code>을
-                    했거나 로그인 도중 창이 끊기면 이렇게 됩니다.
+                    했거나 로그인 도중 창이 끊기면 이렇게 됩니다. 브라우저 로그인만 다시 해서는 복구되지
+                    않으니, 온보딩을 마지막 화면까지 진행해주세요.
                   </span>
                 </div>
                 <button
                   type="button"
                   className="btn btn-primary btn-small"
-                  onClick={() => setShowRepairLogin((v) => !v)}
+                  onClick={() => setShowInteractiveLogin(true)}
                 >
-                  {showRepairLogin ? '복구 로그인 닫기' : '다시 로그인해서 복구'}
+                  온보딩으로 다시 로그인
                 </button>
-                {showRepairLogin && <LoginPanel onLoggedIn={onLoggedIn} />}
-                <div className="claude-card-note">
-                  <button
-                    type="button"
-                    className="claude-advanced-login-toggle"
-                    onClick={() => setShowInteractiveLogin(true)}
-                  >
-                    안 되면: 터미널로 온보딩
-                  </button>
-                </div>
                 {showInteractiveLogin && (
                   <InteractiveLoginDialog
                     onLoggedIn={onLoggedIn}
