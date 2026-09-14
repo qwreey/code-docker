@@ -29,7 +29,7 @@
   워크어라운드의 빠른 연속 입력 속도 문제~~ — **해결됨 (2026-09-14, 실기기 확인).**
   password 필드 방식 자체를 기본값에서 내리고 새 입력 방식(`diff`)으로 교체했다.
   갤럭시에서 한글 조합·영문·백스페이스·빠른 입력 모두 랙 없이 정상, 회귀 없음.
-  전체 경위: `webmanager/.claude/qa-request/terminal-mobile-input-touch-plan-done.md`
+  전체 경위: `webmanager/.claude/archive/terminal-mobile-input-touch-plan-done.md`
 - (2026-09-06, 사용자가 나중에 더 보기로 함) **authgate의 per-IP 백오프가
   클라이언트를 구분하지 못함** — router-manager는 유닉스 소켓으로만 listen해서
   `r.RemoteAddr`가 모든 호출자에 대해 동일하고, 그 값을 키로 쓰는 실패 백오프가

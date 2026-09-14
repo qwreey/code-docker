@@ -96,7 +96,7 @@ re-emission always looked like new text. Reset only on Enter/blur/a length
 cap — never on an idle timer, since the accumulated value *is* the
 protection. Paired with an opt-in on-screen input-debug overlay, because
 three rounds of guessing at Android IME behavior have each been wrong at
-least once; see `.claude/qa-request/terminal-mobile-input-touch-plan-done.md`.
+least once; see `.claude/archive/terminal-mobile-input-touch-plan-done.md`.
 A `touchMode` selector (`scroll`/`mouse`/`select`) replays a one-finger drag
 as synthetic mouse events on `.xterm-screen`, with `select` differing only by
 setting `shiftKey` — xterm's own force-selection modifier — which is what

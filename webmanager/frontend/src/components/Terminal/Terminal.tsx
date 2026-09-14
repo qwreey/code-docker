@@ -129,7 +129,7 @@ function saveFontSize(value: number) {
 //                silently dropped keystroke.
 //
 // Background and the measurements behind each of those claims:
-// webmanager/.claude/qa-request/terminal-mobile-input-touch-plan-done.md.
+// webmanager/.claude/archive/terminal-mobile-input-touch-plan-done.md.
 //
 // Per-device localStorage like fontSize above, not backend-persisted. Only
 // consulted on a touch device (pointer: coarse) - a mouse/trackpad never

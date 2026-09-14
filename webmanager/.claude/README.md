@@ -51,7 +51,6 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 | `qa-request/sshkeys-plan-done.md` | SSH authorized_keys 관리 |
 | `qa-request/gitconfig-plan-done.md` | git user/email, 커밋 사이닝(SSH/GPG), 호스트별 SSH 키, HTTPS credential, git-lfs install, .gitconfig 원본 편집, known_hosts 관리 |
 | `qa-request/project-git-status-plan-done.md` | 프로젝트별 git 상태 패널(신규) — staged/changed/untracked/behind/ahead/diverged/stashed/conflicts 요약, 커밋 로그/diff, 리모트/브랜치/태그. 읽기 전용만(스테이징/커밋/push·pull은 다음 마일스톤). `gitconfig-plan-done.md`(전역 git 설정)와는 별개 기능이니 혼동 금지 |
-| `qa-request/terminal-mobile-input-touch-plan-done.md` | 터미널 모바일 입력 방식 3종(native/password/diff, 기본 diff) + 입력 디버그 오버레이 + 터치 모드 3종(스크롤/마우스/선택)과 선택 복사 + 컨트롤 바 버튼이 키보드를 열지 않게 하는 `keepFocus` + 터미널 탭 상단 바 한 줄로 합치기. `research/mobile-ime-hangul-plan.md`를 대체함 |
 | `qa-request/url-state-and-file-overlay-plan-done.md` | 탭 안 상태를 URL에(`?session=`/`?path=`/`?project=`) + 파일 브라우저 전체화면 오버레이 + 파일 에디터 전체화면·줄바꿈 토글 + code-server 위젯의 "새 탭으로 열기" |
 | `qa-request/dind-plan-done.md` | Docker/dind 관리 — M1(목록/로그, 읽기 전용)+M2(start/stop/remove, 비밀번호 게이트)+M3(docker inspect 상세 뷰, 비밀번호 게이트) 전부 코드/빌드 검증까지 완료 |
 | `qa-request/caddy-plan-done.md` | Dev Proxy 탭 — 내부 Caddy 인스턴스로 dev 서버를 와일드카드 서브도메인에 노출, `internal/devproxy`(Caddyfile 조각 CRUD) + `internal/authgate`의 `forward_auth` 연동. 설계 조사 문서였다가 실제로 구현 완료됨 — webmanager가 직접 구현했던 시절의 기록(이후 Dev Proxy 전체가 router로 완전히 이관되어 webmanager 쪽 코드는 삭제됨, 인증도 tinyauth로 대체됨. 지금은 `router/frontend`가 이 UI를 소유). 여기 남겨둔 "사용자 검증 대기" 상태 자체도 이 기능엔 더 이상 의미 없음 — 코드가 이미 다른 곳으로 옮겨갔기 때문 |
@@ -60,6 +59,7 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 
 | 문서 | 기능 |
 |---|---|
+| `archive/terminal-mobile-input-touch-plan-done.md` | 터미널 모바일 입력 방식 3종(native/password/diff, 기본 diff) + 입력 디버그 오버레이 + 터치 모드 3종(스크롤/마우스/선택)과 선택 복사 + 컨트롤 바 버튼이 키보드를 열지 않게 하는 `keepFocus` + 터미널 탭 상단 바 한 줄로 합치기. `research/mobile-ime-hangul-plan.md`를 대체함 — 2026-09-14 실기기 사용자 확인 완료(8차례 왕복) |
 | `archive/supervisor-plan-done.md` | supervisord 프로세스 관리(목록/시작/정지/재시작/로그, 프로그램별 메타데이터로 특정 컨트롤 비활성화, PID 트리 펼침) |
 | `archive/tailscale-plan-done.md` | tailscale forwards/publish 설정 CRUD — webmanager가 직접 구현했던 시절의 기록(이후 이 기능 자체가 router로 완전히 이관되어 webmanager 쪽 코드는 삭제됨, 지금은 `router/frontend`가 이 UI를 소유). tailscaled 인프라 설계 자체는 `router/.claude/archive/tailscale-design.md` |
 | `archive/vector-logs-plan-done.md` | vector 로그 파이프라인 도입 + webmanager Logs 페이지(시간범위 필터, 커서 페이지네이션, 실시간 누적, 비밀번호 게이트) |
