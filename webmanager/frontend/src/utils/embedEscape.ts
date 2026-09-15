@@ -20,6 +20,14 @@ export function useEmbedEscapeClose() {
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Escape') return
+      // Escape typed into the terminal belongs to the program running there
+      // (vim, less, a readline prompt), not to the widget. A desktop keyboard
+      // never gets this far - xterm stops propagation on its own textarea -
+      // but on a touch device keys land in the terminal's own input field
+      // (Terminal.tsx), which hands a copy to xterm and only
+      // preventDefault()s the original, so that original still bubbles here.
+      if (e.defaultPrevented) return
+      if (e.target instanceof Element && e.target.closest('.xterm')) return
       if (document.querySelector(DIALOG_SELECTOR)) return
       window.parent.postMessage({ type: 'cd-webmanager-close-request' }, window.location.origin)
     }
