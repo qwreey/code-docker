@@ -53,11 +53,12 @@
    sidebar's own transform transition runs for the same duration in the
    same commit, so the two edges travel together and stay flush.
 
-   App.tsx sets the direction class and never clears it: the class
-   alternates by construction (a toggle always reverses direction), so the
-   animation-name always changes and always re-triggers, and a finished
-   animation with the default `animation-fill-mode: none` leaves no
-   transform behind to interfere with anything. */
+   App.tsx sets the direction class on toggle and removes it on
+   animationend. Leaving it in place looked harmless (a finished animation
+   with `animation-fill-mode: none` leaves no transform behind), but the
+   animation replays whenever rendering resumes - code-server's widget
+   hides this iframe with display:none and every reopen re-ran the last
+   slide. */
 @media (min-width: 721px) {
   .app-main {
     margin-left: var(--sidebar-width);

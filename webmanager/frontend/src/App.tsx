@@ -127,9 +127,10 @@ function App() {
   // this page load. Only drives the compensating slide animation on
   // .app-main (App.css) - the layout itself is already correct the instant
   // sidebarCollapsed flips, which is the whole point (see App.css's
-  // "sidebar collapse" comment). Never cleared: the value alternates by
-  // construction, so the animation-name always changes and re-triggers,
-  // and a finished animation leaves no transform behind.
+  // "sidebar collapse" comment). Cleared again once the animation ends: a
+  // class left in place gets its animation replayed whenever the page stops
+  // and resumes rendering, which is exactly what code-server's widget does
+  // to this iframe every time it hides (display:none) and reopens it.
   const [sidebarShift, setSidebarShift] = useState<'in' | 'out' | null>(null)
   const { status: authStatus } = useAuthStatus()
 
@@ -308,7 +309,12 @@ function App() {
           </span>
         </button>
       )}
-      <div className={`app-main${sidebarShift ? ` app-main-shift-${sidebarShift}` : ''}`}>
+      <div
+        className={`app-main${sidebarShift ? ` app-main-shift-${sidebarShift}` : ''}`}
+        onAnimationEnd={(e) => {
+          if (e.target === e.currentTarget) setSidebarShift(null)
+        }}
+      >
         <EnvVersionBanner />
         <RouterAuthSetupBanner />
         <main className="app-content">
