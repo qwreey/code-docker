@@ -169,14 +169,58 @@
         popout.textContent = "↗";
         popout.title = "새 탭으로 열기";
         popout.addEventListener("click", () => {
+            const frame = overlay?.querySelector("iframe");
             let url = MANAGER_URL;
             try {
-                const live = overlay?.querySelector("iframe")?.contentWindow?.location?.href;
+                const live = frame?.contentWindow?.location?.href;
                 if (live && live !== "about:blank") url = live;
             } catch {
                 // Cross-origin iframe - fall back to the base URL below.
             }
-            window.open(url, "_blank", "noopener");
+            // Only a terminal session is a problem to have open twice, so only
+            // that is taken away from the widget: it stays on the Terminal tab,
+            // just without ?session= (which lands on the terminal's own home,
+            // not attached to anything). Every other page is left as it is.
+            let released = null;
+            try {
+                const u = new URL(url);
+                if (u.searchParams.has("session")) {
+                    u.searchParams.delete("session");
+                    released = u.href;
+                }
+            } catch {
+                // Unparseable - treat it as nothing to release.
+            }
+            if (!frame || !released) {
+                window.open(url, "_blank", "noopener");
+                return;
+            }
+            // The widget has to let go of the session *before* the new tab
+            // picks it up: a terminal session attached from both at once gets
+            // resized by whichever client reported last, so the two fight over
+            // the PTY's size. So the tab is opened blank right now (still
+            // inside the click, or the popup blocker eats it), the widget
+            // navigates off the session, and only once that has loaded - the
+            // old page, and its WebSocket, gone - does the tab navigate.
+            // noopener can't be used here (it makes window.open return null),
+            // so the opener link is cut by hand instead.
+            const tab = window.open("", "_blank");
+            if (!tab) return;
+            tab.opener = null;
+            let done = false;
+            const go = () => {
+                if (done) return;
+                done = true;
+                frame.removeEventListener("load", go);
+                tab.location.replace(url);
+            };
+            frame.addEventListener("load", go);
+            setTimeout(go, 2000);
+            try {
+                frame.contentWindow.location.replace(released);
+            } catch {
+                frame.src = released;
+            }
         });
 
         const maximize = document.createElement("button");
