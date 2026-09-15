@@ -828,3 +828,33 @@ after shrink to 15 rows, no input -> bytes: 747 | VISUAL redrawn: True | any CUP
   N이 수백 바이트면 앱은 다시 그렸는데 화면에 안 보인 것(b/c), 0이면 신호 자체가 안 간 것(a)이다.
 
 자동화 탭에서는 vim 화면 글자를 읽을 수 없어 브라우저 확인은 하지 않았다 — 기기 로그로 판별한다.
+
+
+---
+
+# 아카이브 후 9차 (2026-09-15) — 태블릿 물리 키보드의 방향키가 탭으로 포커스를 옮김
+
+사용자 제보: 태블릿(키보드 커버)에서 방향키를 누르면 포커스가 위쪽 세션 탭으로 넘어가고
+터미널에는 방향키가 안 들어간다. 컴퓨터(Windows, Chrome)에서는 정상.
+
+원인: 터치 기기라 포커스가 xterm의 textarea가 아니라 **새 입력 필드**(diff 모드 textarea)에
+있다. 이 필드는 글자는 diff로 보내지만 방향키·Home/End·Tab·Esc·F키·Ctrl/Alt 조합 같은
+**글자가 아닌 키를 터미널로 넘기는 경로가 아예 없었다**(Enter와 캐럿 0 백스페이스만 처리).
+xterm의 키 처리(`_keyDown`)는 xterm 자신의 textarea에만 붙어 있다. 필드가 쓸 수 없는 방향키
+(캐럿이 이미 끝)는 브라우저의 키보드 공간 탐색이 가져가서 가장 가까운 포커스 대상인 세션 탭으로
+포커스를 옮겼다. 앱 코드에는 방향키로 포커스를 옮기는 핸들러가 없다(확인함). 데스크탑은 정밀
+포인터라 xterm textarea를 직접 써서 문제가 없었다.
+
+수정: 필드의 keydown에서 그런 키를 **xterm textarea에 복제해 다시 보내** xterm이 판단하게 한다.
+xterm의 `evaluateKeyboardEvent`는 `keyCode`로 분기하고(`case 37:` → `ESC[D`, 앱 커서 모드면
+`ESC OD`, 수식키면 `ESC[1;5D`), 이걸 그대로 쓰면 DECCKM과 수식키 인코딩이 xterm과 똑같다.
+직접 만든 `KeyboardEvent`는 `keyCode`를 가질 수 없어서 복제본의 `keyCode`/`which`를 원본 값으로
+가린다(0으로 보고하는 키보드면 키 이름에서 유도). 결과는 `term.onData` → `sendBytes`로 나간다.
+원본 이벤트는 취소해서 필드 캐럿 이동·Tab 포커스 이동·공간 탐색이 일어나지 않게 한다.
+
+넘기지 않는 것: 조합 중이거나 IME의 `keyCode 229`인 키, Enter/Backspace(모드별로 이미 처리),
+수식키 없는 글자 키(필드 입력 경로), Ctrl/Meta+V(붙여넣기는 필드로 들어가 diff로 나가야 함),
+Ctrl/Shift+Space(삼성 키보드의 언어 전환).
+
+diff 모드에서는 커서 이동 키(방향키·Home/End·PageUp/Down) 뒤에 필드를 리셋한다 — 셸 커서가
+필드에 쌓인 단어의 끝에서 벗어났으니, 키보드가 그 단어를 고쳐 쓰면 엉뚱한 글자를 지운다.

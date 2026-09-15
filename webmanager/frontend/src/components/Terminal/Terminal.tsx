@@ -2136,6 +2136,73 @@ export function Terminal({
     let composing = false
     let cleanups: (() => void)[] = []
 
+    // Keys that produce no text — arrows, Home/End, Tab, Escape, F-keys — and
+    // Ctrl/Alt chords, as sent by a physical keyboard attached to a touch
+    // device (a tablet's keyboard cover). xterm's own handler lives on *its*
+    // textarea, and focus here sits on the workaround field instead, so none
+    // of these reached the terminal at all. Worse, an arrow the field couldn't
+    // use (caret already at the end) was taken by the browser's keyboard
+    // spatial navigation and moved focus up onto the session tabs — the device
+    // report "태블릿에서 방향키 누르니 포커스가 위쪽 탭 선택으로 넘어간다".
+    // Desktop never hit this: a fine pointer uses xterm's textarea directly.
+    //
+    // Rather than re-derive escape sequences here, replay the keydown on
+    // xterm's textarea and let its evaluateKeyboardEvent decide — that keeps
+    // application cursor mode (ESC O A vs ESC [ A) and modifier encodings
+    // (ESC [1;5D) exactly as xterm has them. It switches on keyCode, which a
+    // constructed KeyboardEvent can't carry, so the clone's keyCode is
+    // shadowed with the original's (or derived from the key name when a
+    // keyboard reports 0). xterm's own data event then goes through
+    // term.onData → sendBytes like any other keystroke.
+    //
+    // Left alone on purpose: anything mid-composition or reported as the IME's
+    // keyCode 229; Enter and Backspace, which each mode already handles; plain
+    // printable keys, which arrive as text through the field; Ctrl/Meta+V, so a
+    // paste still lands in the field and goes out through the diff; and
+    // Ctrl/Shift+Space, which Samsung keyboards use to switch input language.
+    const FORWARDED_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Insert', 'Delete', 'Tab', 'Escape'])
+    const NAVIGATION_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'])
+    const KEY_CODES: Record<string, number> = {
+      Tab: 9, Escape: 27, PageUp: 33, PageDown: 34, End: 35, Home: 36,
+      ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Insert: 45, Delete: 46,
+    }
+    const keyCodeFor = (e: KeyboardEvent): number => {
+      if (e.keyCode) return e.keyCode
+      if (e.key in KEY_CODES) return KEY_CODES[e.key]
+      const fkey = /^F(\d{1,2})$/.exec(e.key)
+      if (fkey) return 111 + Number(fkey[1])
+      return e.key.length === 1 ? e.key.toUpperCase().charCodeAt(0) : 0
+    }
+    // Returns whether the key was handed to xterm; the caller cancels the
+    // original event so the field (and the browser) do nothing with it.
+    const forwardSpecialKey = (e: KeyboardEvent): boolean => {
+      if (e.isComposing || e.keyCode === 229) return false
+      if (e.key === 'Enter' || e.key === 'Backspace') return false
+      const special = FORWARDED_KEYS.has(e.key) || /^F\d{1,2}$/.test(e.key)
+      const chord = (e.ctrlKey || e.altKey) && e.key.length === 1
+      if (!special && !chord) return false
+      if (chord && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') return false
+      if (e.key === ' ' && (e.ctrlKey || e.shiftKey)) return false
+      const clone = new KeyboardEvent('keydown', {
+        key: e.key,
+        code: e.code,
+        location: e.location,
+        repeat: e.repeat,
+        ctrlKey: e.ctrlKey,
+        altKey: e.altKey,
+        shiftKey: e.shiftKey,
+        metaKey: e.metaKey,
+        bubbles: true,
+        cancelable: true,
+      })
+      const keyCode = keyCodeFor(e)
+      Object.defineProperty(clone, 'keyCode', { get: () => keyCode })
+      Object.defineProperty(clone, 'which', { get: () => keyCode })
+      textarea.dispatchEvent(clone)
+      debug?.log(`  (key ${e.ctrlKey ? 'Ctrl+' : ''}${e.altKey ? 'Alt+' : ''}${e.shiftKey ? 'Shift+' : ''}${e.key} forwarded to xterm)`)
+      return true
+    }
+
     if (inputMode === 'password') {
       // Length-based diff against a field that is reset back to ANCHOR after
       // every keystroke. Correct only because a password field suppresses
@@ -2193,6 +2260,10 @@ export function Terminal({
       const onKeyDown = (ev: Event) => {
         const e = ev as KeyboardEvent
         logEvent('field', e, field.value)
+        if (forwardSpecialKey(e)) {
+          e.preventDefault()
+          return
+        }
         // Enter never reaches the input-event handling above — a
         // single-line <input> doesn't insert a line break the way a
         // <textarea> does. Most mobile keyboards (Gboard included) do
@@ -2471,6 +2542,15 @@ export function Terminal({
       const onKeyDown = (ev: Event) => {
         const e = ev as KeyboardEvent
         logEvent('field', e, field.value)
+        if (forwardSpecialKey(e)) {
+          e.preventDefault()
+          // The shell's cursor just moved away from the end of what this field
+          // has accumulated, so a keyboard rewriting that word would now
+          // backspace over the wrong characters. A cursor jump is a boundary
+          // like a space is — start the next word fresh.
+          if (NAVIGATION_KEYS.has(e.key)) resetField('navigation key')
+          return
+        }
         if (e.key === 'Backspace' && !e.isComposing && deleteAtCaretStart()) {
           e.preventDefault()
           return

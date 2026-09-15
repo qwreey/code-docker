@@ -583,3 +583,17 @@ Task Manager는 flex 표, Supervisor 탭은 그 아래 펼쳐지는 일반 auto-
 **아직 개별 확인 기록이 없는 것**: 위 "URL 상태 / 오버레이"와 "VNC 연결 클라이언트" 항목. 이 배치의
 실기기 테스트는 터미널에 집중됐다 — 확인되면 체크하고
 `webmanager/.claude/qa-request/url-state-and-file-overlay-plan-done.md`를 `archive/`로 옮길 것.
+
+---
+
+## 배치 4-9 — 2026-09-15 (태블릿 물리 키보드 특수키)
+
+관련 문서: `webmanager/.claude/archive/terminal-mobile-input-touch-plan-done.md`의 "아카이브 후 9차"
+
+- [ ] 태블릿 키보드 커버에서 **방향키**가 터미널에 들어가는가 (셸 히스토리 ↑↓, 커서 ←→)
+- [ ] 방향키를 눌러도 포커스가 **위쪽 세션 탭으로 넘어가지 않는가**
+- [ ] vim에서 방향키·Esc가 되는가, **Tab** 자동완성이 되는가
+- [ ] Ctrl+C로 실행 중인 명령이 끊기는가, Ctrl+V 붙여넣기는 여전히 되는가
+- [ ] 한글/영문 입력, 조합 표시, 한/영 전환(Shift+Space 등)이 여전히 정상인가 (회귀 확인)
+- [ ] 방향키로 커서를 옮긴 뒤 이어서 입력·백스페이스해도 엉뚱한 글자가 지워지지 않는가
+- [ ] 안 되면: 입력 디버그 → 지우기 → 재현 → 복사. `(key ... forwarded to xterm)` 줄이 핵심

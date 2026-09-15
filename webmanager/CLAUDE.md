@@ -133,7 +133,7 @@ go through `keepFocus`, which refocuses only when the field already has focus
 *and* visualViewport reports a real keyboard inset, so a closed keyboard is
 never forced open (note that Chrome on Android with a resizing layout viewport
 reports an inset of 0 even with the keyboard up; resizes then arrive through
-the ResizeObserver instead). On the Terminal tab the app's own
+the ResizeObserver instead). Keys that produce no text — arrows, Home/End, Tab, Escape, F-keys, Ctrl/Alt chords — from a physical keyboard on a touch device are replayed onto xterm's own textarea with `keyCode` shadowed (xterm's `evaluateKeyboardEvent` switches on it), since focus sits on the workaround field and those keys otherwise never reached the PTY; an unconsumed arrow was even taken by the browser's spatial navigation and moved focus onto the session tabs. On the Terminal tab the app's own
 `.mobile-topbar` is hidden and its hamburger is adopted into
 `.terminal-topbar`, reclaiming ~3.6rem of the height a phone keyboard makes
 scarce), a Font Manager tab (`internal/fonts` — upload/list/
