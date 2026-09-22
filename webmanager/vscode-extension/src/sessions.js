@@ -75,21 +75,39 @@ function validateName(name, taken) {
   return undefined
 }
 
+// The workspace folder of the text editor the user last looked at. Not just
+// activeTextEditor: that is empty while a webview tab (one of ours) has
+// focus, which is exactly when a view asks for a new session.
+let lastEditorUri
+function trackActiveEditor(context) {
+  const remember = (e) => {
+    if (e && e.document.uri.scheme === 'file') lastEditorUri = e.document.uri
+  }
+  remember(vscode.window.activeTextEditor)
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(remember))
+}
+
+function activeFolder() {
+  const uri = (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri) || lastEditorUri
+  const f = uri && vscode.workspace.getWorkspaceFolder(uri)
+  return f && f.uri.scheme === 'file' ? f.uri.fsPath : undefined
+}
+
+// On-disk workspace folders, the active editor's first.
+function fileFolders() {
+  const all = (vscode.workspace.workspaceFolders || []).filter((f) => f.uri.scheme === 'file').map((f) => f.uri.fsPath)
+  const active = activeFolder()
+  return active ? [active, ...all.filter((p) => p !== active)] : all
+}
+
 // The folder a new session should start in: the active editor's workspace
 // folder, else the first one, else none (webmanager's own default).
 function defaultCwd() {
-  const folders = vscode.workspace.workspaceFolders || []
-  const active = vscode.window.activeTextEditor
-  if (active) {
-    const f = vscode.workspace.getWorkspaceFolder(active.document.uri)
-    if (f && f.uri.scheme === 'file') return f.uri.fsPath
-  }
-  const first = folders.find((f) => f.uri.scheme === 'file')
-  return first ? first.uri.fsPath : undefined
+  return fileFolders()[0]
 }
 
 function folderBase(cwd) {
   return cwd ? path.basename(cwd) : ''
 }
 
-module.exports = { NAME_RE, internalBaseUrl, fetchSessionNames, uniqueName, validateName, defaultCwd, folderBase }
+module.exports = { NAME_RE, internalBaseUrl, fetchSessionNames, uniqueName, validateName, defaultCwd, activeFolder, trackActiveEditor, fileFolders, folderBase }

@@ -2905,6 +2905,12 @@ export function Terminal({
 
   const addSession = useCallback(
     (opts?: SessionCreateOptions) => {
+      // Embedded, a new session without a set cwd asks the extension: it
+      // knows the workspace folders and which one the user is looking at.
+      if (embedded && !opts?.cwd) {
+        postToHost({ type: 'new-session', label: opts?.label, command: opts?.command })
+        return
+      }
       const alsoTaken = activeSession === HOME_TAB_ID ? '' : activeSession
       const name = nextSessionName(sessions, alsoTaken, opts?.label)
       const cwd = opts?.cwd ?? (embedded ? embedCwdRef.current : undefined)

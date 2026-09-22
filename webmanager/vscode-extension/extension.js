@@ -267,11 +267,14 @@ async function pickSession(placeHolder) {
     error = e
   }
   const items = []
-  const folders = (vscode.workspace.workspaceFolders || []).filter((f) => f.uri.scheme === 'file')
+  const folders = S.fileFolders()
   if (folders.length > 1) {
-    for (const f of folders) items.push({ label: '$(add) 새 세션', description: f.uri.fsPath, cwd: f.uri.fsPath, isNew: true })
+    const active = S.activeFolder()
+    for (const f of folders) {
+      items.push({ label: '$(add) 새 세션', description: f, detail: f === active ? '현재 에디터의 폴더' : undefined, cwd: f, isNew: true })
+    }
   } else {
-    const cwd = S.defaultCwd()
+    const cwd = folders[0]
     items.push({ label: '$(add) 새 세션', description: cwd || '', cwd, isNew: true })
   }
   if (error) {
@@ -355,6 +358,37 @@ async function openTerminalFromEmbed(m) {
     },
     vscode.ViewColumn.Beside,
   )
+}
+
+// The Terminal Home's "+" (or a profile without a cwd) inside a view: the
+// view itself becomes the new session. Where it starts is decided here, the
+// way VS Code's own new terminal does - the one workspace folder, or with
+// several, a pick with the active editor's folder first.
+async function newSessionInView(host, m) {
+  const folders = S.fileFolders()
+  let cwd = folders[0]
+  if (folders.length > 1) {
+    const active = S.activeFolder()
+    const pick = await vscode.window.showQuickPick(
+      folders.map((f) => ({ label: S.folderBase(f), description: f, detail: f === active ? '현재 에디터의 폴더' : undefined, cwd: f })),
+      { placeHolder: '새 세션을 열 폴더' },
+    )
+    if (!pick) return
+    cwd = pick.cwd
+  }
+  let names = []
+  try {
+    names = await S.fetchSessionNames()
+  } catch {
+    // a collision just joins that session instead
+  }
+  const base = (typeof m.label === 'string' && m.label) || S.folderBase(cwd) || '세션'
+  navigateHost(host, {
+    section: 'terminal',
+    session: S.uniqueName(base, names),
+    cwd,
+    command: typeof m.command === 'string' ? m.command : undefined,
+  })
 }
 
 // ---- messages from views ---------------------------------------------------
@@ -443,6 +477,9 @@ async function onMessage(host, m) {
       break
     case 'open-file':
       await openFileFromEmbed(m)
+      break
+    case 'new-session':
+      await newSessionInView(host, m)
       break
     case 'open-terminal':
       await openTerminalFromEmbed(m)
@@ -557,6 +594,7 @@ function activate(context) {
   output = vscode.window.createOutputChannel('webmanager')
   context.subscriptions.push(output)
   build = readBuild()
+  S.trackActiveEditor(context)
   log(`activated: version ${context.extension.packageJSON.version}, build ${build}`)
 
   const reg = (id, fn) => context.subscriptions.push(vscode.commands.registerCommand(id, fn))
