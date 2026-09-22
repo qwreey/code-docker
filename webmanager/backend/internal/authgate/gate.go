@@ -331,6 +331,20 @@ func (g *Gate) SetCookie(w http.ResponseWriter, r *http.Request, token string) {
 	})
 }
 
+// ClearCookie expires the unlock cookie on w - "lock now" for this browser.
+// The token itself stays valid until it expires; it's just no longer sent.
+func (g *Gate) ClearCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     CookieName,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   requestIsHTTPS(r),
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   -1,
+	})
+}
+
 // requestIsHTTPS reports whether the browser's own connection was HTTPS.
 // X-Forwarded-Proto is only meaningful because nothing reaches webmanager
 // except through the in-container nginx, which sets it from its own

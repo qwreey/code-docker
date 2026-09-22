@@ -376,6 +376,7 @@ func main() {
 	// client unlocks in the first place, and handleAuthStatus lets the
 	// frontend render the right prompt state without guessing from a 401.
 	mux.HandleFunc("POST /api/auth/unlock", s.handleAuthUnlock)
+	mux.HandleFunc("POST /api/auth/lock", s.handleAuthLock)
 	mux.HandleFunc("GET /api/auth/status", s.handleAuthStatus)
 	// Fingerprint (WebAuthn) unlock - see handlers_webauthn.go. The unlock
 	// pair is necessarily ungated; enrollment checks the password itself.

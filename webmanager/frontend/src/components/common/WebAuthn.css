@@ -52,3 +52,29 @@
   font-size: 0.9rem;
   cursor: pointer;
 }
+
+.webauthn-manager-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.webauthn-manager-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.webauthn-manager-actions + .webauthn-unlock-message {
+  margin-top: 0.5rem;
+}
+
+.webauthn-this-device {
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-size: 0.75rem;
+}

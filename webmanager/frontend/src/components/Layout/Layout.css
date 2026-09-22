@@ -335,7 +335,6 @@
   border-color: var(--color-green-border);
   background: var(--color-green-bg);
   color: var(--color-green-fg);
-  cursor: default;
 }
 
 @media (max-width: 720px) {

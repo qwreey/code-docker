@@ -130,7 +130,8 @@ func (s *Server) handleWebAuthnUnlockFinish(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusTooManyRequests, err.Error())
 		return
 	}
-	if err := s.webauthn.FinishUnlock(r.URL.Query().Get("ceremony"), rpID, r.Body); err != nil {
+	credID, err := s.webauthn.FinishUnlock(r.URL.Query().Get("ceremony"), rpID, r.Body)
+	if err != nil {
 		// Only a response that was actually checked and failed counts toward
 		// the backoff. The key is the TCP peer - nginx for every browser - so
 		// counting a stale tab's expired ceremony or a garbled body would
@@ -149,7 +150,9 @@ func (s *Server) handleWebAuthnUnlockFinish(w http.ResponseWriter, r *http.Reque
 	}
 	s.gate.RecordSuccess(key)
 	s.gate.SetCookie(w, r, token)
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	// Which enrolled credential this was, so the device list can say which
+	// entry is this device's (a passkey provider shows none of that).
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "credentialId": credID})
 }
 
 // GET /api/auth/webauthn/credentials (gated)

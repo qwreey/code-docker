@@ -59,6 +59,7 @@ function render(webview, extensionUri, { state, build }) {
     path: buildPath(state),
     state,
     chords: passthroughChords(),
+    theme: vscode.workspace.getConfiguration('webmanager').get('theme') || 'auto',
     build,
   }
   const json = JSON.stringify(config).replace(/</g, '\\u003c')

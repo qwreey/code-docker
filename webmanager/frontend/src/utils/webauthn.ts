@@ -40,6 +40,28 @@ function writeFlag(key: string, on: boolean) {
   }
 }
 
+// The credential this browser last enrolled or unlocked with, so the device
+// list can point at "this device" - a passkey provider's own list shows the
+// host, not which of the server's entries it is.
+const CREDENTIAL_KEY = 'webmanager-webauthn-credential'
+
+function rememberCredential(id: string | undefined) {
+  if (!id) return
+  try {
+    localStorage.setItem(CREDENTIAL_KEY, id)
+  } catch {
+    // storage unavailable - the list just can't mark this device
+  }
+}
+
+export function thisDeviceCredential(): string | null {
+  try {
+    return localStorage.getItem(CREDENTIAL_KEY)
+  } catch {
+    return null
+  }
+}
+
 export const deviceEnrolled = () => readFlag(ENROLLED_KEY)
 export const offerDeclined = () => readFlag(DECLINED_KEY)
 export const declineOffer = () => writeFlag(DECLINED_KEY, true)
@@ -120,7 +142,7 @@ type JsonRequestOptions = Omit<PublicKeyCredentialRequestOptions, 'challenge' | 
 // Unlocks with the fingerprint (or whatever user verification the device
 // uses). Resolves with the outcome rather than throwing, since every
 // failure has the same remedy: the password field stays right there.
-export async function unlockWithWebAuthn(): Promise<{ outcome: WebAuthnOutcome; message?: string }> {
+export async function unlockWithWebAuthn(): Promise<{ outcome: WebAuthnOutcome; message?: string; credentialId?: string }> {
   try {
     const begin = await api.post<BeginResponse<JsonRequestOptions>>('/auth/webauthn/unlock/begin')
     const pk = begin.options.publicKey
@@ -132,9 +154,13 @@ export async function unlockWithWebAuthn(): Promise<{ outcome: WebAuthnOutcome; 
       },
     })) as PublicKeyCredential | null
     if (!cred) return { outcome: 'cancelled' }
-    await api.post(`/auth/webauthn/unlock/finish?ceremony=${encodeURIComponent(begin.ceremony)}`, credentialToJSON(cred))
+    const res = await api.post<{ credentialId?: string }>(
+      `/auth/webauthn/unlock/finish?ceremony=${encodeURIComponent(begin.ceremony)}`,
+      credentialToJSON(cred),
+    )
     writeFlag(ENROLLED_KEY, true)
-    return { outcome: 'ok' }
+    rememberCredential(res?.credentialId)
+    return { outcome: 'ok', credentialId: res?.credentialId }
   } catch (err) {
     return { outcome: outcomeOf(err), message: err instanceof Error ? err.message : String(err) }
   }
@@ -192,6 +218,7 @@ export async function enrollWebAuthn(password: string, label: string): Promise<{
     if (!cred) return { outcome: 'cancelled' }
     await api.post(`/auth/webauthn/register/finish?ceremony=${encodeURIComponent(begin.ceremony)}`, credentialToJSON(cred))
     writeFlag(ENROLLED_KEY, true)
+    rememberCredential(cred.id)
     return { outcome: 'ok' }
   } catch (err) {
     return { outcome: outcomeOf(err), message: err instanceof Error ? err.message : String(err) }

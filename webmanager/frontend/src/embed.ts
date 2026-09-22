@@ -34,6 +34,8 @@ export type HostMessage =
   | { type: 'theme'; theme: 'light' | 'dark' }
   | { type: 'pin'; pinned: boolean }
   | { type: 'rename'; name: string }
+  | { type: 'open-webauthn' }
+  | { type: 'lock' }
 
 export function postToHost(msg: Record<string, unknown>) {
   if (!EMBED) return

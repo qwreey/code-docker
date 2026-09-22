@@ -451,38 +451,39 @@ func (m *Manager) BeginUnlock(rpID string) (*protocol.CredentialAssertion, strin
 	return assertion, id, nil
 }
 
-// FinishUnlock verifies the browser's assertion. On success the caller mints
-// the unlock cookie.
-func (m *Manager) FinishUnlock(ceremonyID, rpID string, body io.Reader) error {
+// FinishUnlock verifies the browser's assertion and returns the base64url ID
+// of the credential that signed it. On success the caller mints the unlock
+// cookie.
+func (m *Manager) FinishUnlock(ceremonyID, rpID string, body io.Reader) (string, error) {
 	parsed, err := protocol.ParseCredentialRequestResponseBody(body)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrMalformed, err)
+		return "", fmt.Errorf("%w: %v", ErrMalformed, err)
 	}
 	if err := checkOrigin(parsed.Response.CollectedClientData.Origin, rpID); err != nil {
-		return err
+		return "", err
 	}
 	rp, err := relyingParty(rpID, []string{parsed.Response.CollectedClientData.Origin})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	c, err := m.takeCeremony(ceremonyID, kindUnlock)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if c.rpID != rpID {
-		return ErrBadOrigin
+		return "", ErrBadOrigin
 	}
 	cred, err := rp.ValidateLogin(m.userLocked(rpID), c.data, parsed)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// A counter that went backwards means a cloned authenticator. Most
 	// platform authenticators (passkeys) always report 0, which is fine.
 	if cred.Authenticator.CloneWarning {
-		return errors.New("webauthn: authenticator signature counter went backwards - refusing (possible cloned key)")
+		return "", errors.New("webauthn: authenticator signature counter went backwards - refusing (possible cloned key)")
 	}
 	now := time.Now()
 	for i := range m.doc.Credentials {
@@ -492,5 +493,5 @@ func (m *Manager) FinishUnlock(ceremonyID, rpID string, body io.Reader) error {
 			sc.LastUsedAt = &now
 		}
 	}
-	return m.saveLocked()
+	return base64.RawURLEncoding.EncodeToString(cred.ID), m.saveLocked()
 }

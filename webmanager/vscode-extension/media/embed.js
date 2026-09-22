@@ -51,7 +51,10 @@
   persist({ ...cfg.state, ...(saved && saved.bind === cfg.bind ? saved : {}), path: startPath })
   vscode.postMessage({ type: 'wv-ready', secure: window.isSecureContext })
 
+  // webmanager.theme: follow VS Code (auto), or a fixed light/dark.
+  let themePref = cfg.theme || 'auto'
   function currentTheme() {
+    if (themePref === 'light' || themePref === 'dark') return themePref
     const c = document.body.classList
     return c.contains('vscode-light') || c.contains('vscode-high-contrast-light') ? 'light' : 'dark'
   }
@@ -214,7 +217,13 @@
         break
       case 'pin':
       case 'rename':
+      case 'open-webauthn':
+      case 'lock':
         toEmbed(data)
+        break
+      case 'theme-pref':
+        themePref = data.theme
+        toEmbed({ type: 'theme', theme: currentTheme() })
         break
     }
   })

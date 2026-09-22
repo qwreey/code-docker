@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { Fingerprint, Trash2 } from 'lucide-react'
-import { api, errorMessage } from '../../api/client'
+import { Fingerprint, Lock, Trash2 } from 'lucide-react'
+import { api, errorMessage, lockNow } from '../../api/client'
 import {
   declineOffer,
   defaultDeviceLabel,
   deviceEnrolled,
   enrollWebAuthn,
   forgetDeviceEnrollment,
+  thisDeviceCredential,
   unlockWithWebAuthn,
   webauthnSupported,
   type WebAuthnOutcome,
@@ -34,6 +35,9 @@ const OUTCOME_MESSAGE: Record<Exclude<WebAuthnOutcome, 'ok'>, string> = {
   failed: '지문 잠금 해제에 실패했습니다 — 비밀번호를 입력하세요.',
 }
 
+const NOT_ENROLLED_MESSAGE =
+  '이 기기에는 아직 등록된 지문(패스키)이 없는 것 같습니다 — 비밀번호로 잠금을 푼 뒤 나오는 안내에서 등록하거나, 사이드바의 지문 아이콘(기기 관리)에서 등록하세요.'
+
 export function WebAuthnUnlockButton({ onUnlocked, autoStart }: { onUnlocked: () => void; autoStart?: boolean }) {
   const [working, setWorking] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -45,6 +49,10 @@ export function WebAuthnUnlockButton({ onUnlocked, autoStart }: { onUnlocked: ()
     const { outcome } = await unlockWithWebAuthn()
     setWorking(false)
     if (outcome === 'ok') onUnlocked()
+    // A device that never enrolled has no passkey for this host, and the
+    // browser then offers only another device (QR) or a security key - which
+    // reads like the fingerprint path is broken rather than just not set up.
+    else if ((outcome === 'cancelled' || outcome === 'failed') && !deviceEnrolled()) setMessage(NOT_ENROLLED_MESSAGE)
     else setMessage(OUTCOME_MESSAGE[outcome])
   }, [onUnlocked])
 
@@ -92,6 +100,9 @@ export function WebAuthnHost() {
   const [listError, setListError] = useState<string | null>(null)
   const [managerPassword, setManagerPassword] = useState('')
   const [pendingDelete, setPendingDelete] = useState<CredentialInfo | null>(null)
+  const [testing, setTesting] = useState(false)
+  const [testMessage, setTestMessage] = useState<string | null>(null)
+  const [thisDevice, setThisDevice] = useState<string | null>(null)
 
   const loadCredentials = useCallback(async () => {
     try {
@@ -113,6 +124,8 @@ export function WebAuthnHost() {
         setManagerOpen(true)
         setManagerPassword('')
         setEnrollMessage(null)
+        setTestMessage(null)
+        setThisDevice(thisDeviceCredential())
         void loadCredentials()
       },
     })
@@ -128,7 +141,10 @@ export function WebAuthnHost() {
       setEnrollPassword(null)
       setManagerPassword('')
       setEnrollMessage('이 기기가 등록되었습니다. 다음부터 지문으로 잠금을 해제할 수 있습니다.')
-      if (managerOpen) void loadCredentials()
+      if (managerOpen) {
+        setThisDevice(thisDeviceCredential())
+        void loadCredentials()
+      }
       return
     }
     setEnrollMessage(
@@ -136,14 +152,41 @@ export function WebAuthnHost() {
     )
   }
 
+  // Runs the real unlock ceremony without locking first, and says which
+  // enrolled entry answered - the only way to see that the fingerprint path
+  // works, and which passkey on this device it is.
+  async function testUnlock() {
+    setTesting(true)
+    setTestMessage(null)
+    const { outcome, credentialId } = await unlockWithWebAuthn()
+    setTesting(false)
+    if (outcome !== 'ok') {
+      setTestMessage(!deviceEnrolled() && outcome !== 'rate-limited' && outcome !== 'password-required' ? NOT_ENROLLED_MESSAGE : OUTCOME_MESSAGE[outcome])
+      return
+    }
+    setThisDevice(credentialId ?? null)
+    const match = credentials?.find((c) => c.id === credentialId)
+    setTestMessage(match ? `확인됨 — "${match.label}"(으)로 인증했습니다. 표에 "이 기기"로 표시됩니다.` : '확인됨 — 지문 인증이 동작합니다.')
+    void loadCredentials()
+  }
+
+  async function lock() {
+    try {
+      await lockNow()
+      setManagerOpen(false)
+    } catch (e) {
+      setListError(errorMessage(e))
+    }
+  }
+
   async function confirmDelete() {
     if (!pendingDelete) return
     try {
       await api.del(`/auth/webauthn/credentials/${encodeURIComponent(pendingDelete.id)}`)
-      // Can't tell which entry is this browser's own, so a delete here
-      // stops the automatic attempt until this device unlocks with a
-      // fingerprint again (which sets the flag back).
-      forgetDeviceEnrollment()
+      // This device's own entry (or, when it isn't known which one that is,
+      // any entry) stops the automatic attempt until this device unlocks
+      // with a fingerprint again, which sets the flag back.
+      if (!thisDevice || thisDevice === pendingDelete.id) forgetDeviceEnrollment()
       setPendingDelete(null)
       void loadCredentials()
     } catch (e) {
@@ -227,7 +270,10 @@ export function WebAuthnHost() {
             <tbody>
               {credentials.map((c) => (
                 <tr key={c.id}>
-                  <td>{c.label}</td>
+                  <td>
+                    {c.label}
+                    {c.id === thisDevice && <span className="webauthn-this-device">이 기기</span>}
+                  </td>
                   <td>{c.rpId}</td>
                   <td>{formatTime(c.createdAt)}</td>
                   <td>{formatTime(c.lastUsedAt)}</td>
@@ -248,6 +294,17 @@ export function WebAuthnHost() {
           </table>
           </div>
         )}
+        <div className="webauthn-manager-actions">
+          {webauthnSupported() && credentials && credentials.length > 0 && (
+            <button type="button" className="btn btn-secondary" onClick={testUnlock} disabled={testing}>
+              <Fingerprint size={16} aria-hidden="true" /> {testing ? '확인 중...' : '지문으로 시험해 보기'}
+            </button>
+          )}
+          <button type="button" className="btn btn-secondary" onClick={lock} title="이 브라우저의 잠금 해제를 지금 끝냅니다">
+            <Lock size={16} aria-hidden="true" /> 지금 잠그기
+          </button>
+        </div>
+        {testMessage && <p className="webauthn-unlock-message">{testMessage}</p>}
         {webauthnSupported() ? (
           <form
             className="webauthn-enroll-form"

@@ -94,6 +94,24 @@
         "category": "webmanager"
       },
       {
+        "command": "webmanager.manageFingerprint",
+        "title": "Fingerprint Unlock Devices…",
+        "category": "webmanager",
+        "icon": "$(key)"
+      },
+      {
+        "command": "webmanager.lockNow",
+        "title": "Lock Now",
+        "category": "webmanager",
+        "icon": "$(lock)"
+      },
+      {
+        "command": "webmanager.setTheme",
+        "title": "Theme…",
+        "category": "webmanager",
+        "icon": "$(color-mode)"
+      },
+      {
         "command": "webmanager.showBuildInfo",
         "title": "Show Build Info",
         "category": "webmanager"
@@ -141,6 +159,18 @@
         "icon": "$(arrow-swap)"
       },
       {
+        "command": "webmanager.view.manageFingerprint",
+        "title": "Fingerprint Unlock Devices…",
+        "category": "webmanager",
+        "icon": "$(key)"
+      },
+      {
+        "command": "webmanager.view.lockNow",
+        "title": "Lock Now",
+        "category": "webmanager",
+        "icon": "$(lock)"
+      },
+      {
         "command": "webmanager.slot.term1.changeSession",
         "title": "Change Session…",
         "category": "webmanager",
@@ -181,6 +211,18 @@
         "title": "Reload",
         "category": "webmanager",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "webmanager.slot.term1.manageFingerprint",
+        "title": "Fingerprint Unlock Devices…",
+        "category": "webmanager",
+        "icon": "$(key)"
+      },
+      {
+        "command": "webmanager.slot.term1.lockNow",
+        "title": "Lock Now",
+        "category": "webmanager",
+        "icon": "$(lock)"
       },
       {
         "command": "webmanager.slot.term2.changeSession",
@@ -225,6 +267,18 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "webmanager.slot.term2.manageFingerprint",
+        "title": "Fingerprint Unlock Devices…",
+        "category": "webmanager",
+        "icon": "$(key)"
+      },
+      {
+        "command": "webmanager.slot.term2.lockNow",
+        "title": "Lock Now",
+        "category": "webmanager",
+        "icon": "$(lock)"
+      },
+      {
         "command": "webmanager.slot.term3.changeSession",
         "title": "Change Session…",
         "category": "webmanager",
@@ -265,6 +319,18 @@
         "title": "Reload",
         "category": "webmanager",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "webmanager.slot.term3.manageFingerprint",
+        "title": "Fingerprint Unlock Devices…",
+        "category": "webmanager",
+        "icon": "$(key)"
+      },
+      {
+        "command": "webmanager.slot.term3.lockNow",
+        "title": "Lock Now",
+        "category": "webmanager",
+        "icon": "$(lock)"
       },
       {
         "command": "webmanager.slot.term4.changeSession",
@@ -309,6 +375,18 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "webmanager.slot.term4.manageFingerprint",
+        "title": "Fingerprint Unlock Devices…",
+        "category": "webmanager",
+        "icon": "$(key)"
+      },
+      {
+        "command": "webmanager.slot.term4.lockNow",
+        "title": "Lock Now",
+        "category": "webmanager",
+        "icon": "$(lock)"
+      },
+      {
         "command": "webmanager.slot.page1.switchTab",
         "title": "Switch webmanager Tab…",
         "category": "webmanager",
@@ -339,6 +417,18 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "webmanager.slot.page1.manageFingerprint",
+        "title": "Fingerprint Unlock Devices…",
+        "category": "webmanager",
+        "icon": "$(key)"
+      },
+      {
+        "command": "webmanager.slot.page1.lockNow",
+        "title": "Lock Now",
+        "category": "webmanager",
+        "icon": "$(lock)"
+      },
+      {
         "command": "webmanager.slot.page2.switchTab",
         "title": "Switch webmanager Tab…",
         "category": "webmanager",
@@ -367,6 +457,18 @@
         "title": "Reload",
         "category": "webmanager",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "webmanager.slot.page2.manageFingerprint",
+        "title": "Fingerprint Unlock Devices…",
+        "category": "webmanager",
+        "icon": "$(key)"
+      },
+      {
+        "command": "webmanager.slot.page2.lockNow",
+        "title": "Lock Now",
+        "category": "webmanager",
+        "icon": "$(lock)"
       }
     ],
     "menus": {
@@ -549,6 +651,62 @@
         },
         {
           "command": "webmanager.slot.page2.switchTab",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term1.manageFingerprint",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term1.lockNow",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term2.manageFingerprint",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term2.lockNow",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term3.manageFingerprint",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term3.lockNow",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term4.manageFingerprint",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term4.lockNow",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page1.manageFingerprint",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page1.lockNow",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page2.manageFingerprint",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page2.lockNow",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.view.manageFingerprint",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.view.lockNow",
           "when": "false"
         }
       ],
@@ -742,6 +900,66 @@
           "command": "webmanager.slot.page2.reload",
           "when": "view == webmanager.page2",
           "group": "2_view@2"
+        },
+        {
+          "command": "webmanager.slot.term1.manageFingerprint",
+          "when": "view == webmanager.term1",
+          "group": "3_security@1"
+        },
+        {
+          "command": "webmanager.slot.term1.lockNow",
+          "when": "view == webmanager.term1",
+          "group": "3_security@2"
+        },
+        {
+          "command": "webmanager.slot.term2.manageFingerprint",
+          "when": "view == webmanager.term2",
+          "group": "3_security@1"
+        },
+        {
+          "command": "webmanager.slot.term2.lockNow",
+          "when": "view == webmanager.term2",
+          "group": "3_security@2"
+        },
+        {
+          "command": "webmanager.slot.term3.manageFingerprint",
+          "when": "view == webmanager.term3",
+          "group": "3_security@1"
+        },
+        {
+          "command": "webmanager.slot.term3.lockNow",
+          "when": "view == webmanager.term3",
+          "group": "3_security@2"
+        },
+        {
+          "command": "webmanager.slot.term4.manageFingerprint",
+          "when": "view == webmanager.term4",
+          "group": "3_security@1"
+        },
+        {
+          "command": "webmanager.slot.term4.lockNow",
+          "when": "view == webmanager.term4",
+          "group": "3_security@2"
+        },
+        {
+          "command": "webmanager.slot.page1.manageFingerprint",
+          "when": "view == webmanager.page1",
+          "group": "3_security@1"
+        },
+        {
+          "command": "webmanager.slot.page1.lockNow",
+          "when": "view == webmanager.page1",
+          "group": "3_security@2"
+        },
+        {
+          "command": "webmanager.slot.page2.manageFingerprint",
+          "when": "view == webmanager.page2",
+          "group": "3_security@1"
+        },
+        {
+          "command": "webmanager.slot.page2.lockNow",
+          "when": "view == webmanager.page2",
+          "group": "3_security@2"
         }
       ],
       "editor/title": [
@@ -779,6 +997,16 @@
           "command": "webmanager.view.reload",
           "when": "activeWebviewPanelId == 'webmanager.page'",
           "group": "2_view@2"
+        },
+        {
+          "command": "webmanager.view.manageFingerprint",
+          "when": "activeWebviewPanelId == 'webmanager.page'",
+          "group": "3_security@1"
+        },
+        {
+          "command": "webmanager.view.lockNow",
+          "when": "activeWebviewPanelId == 'webmanager.page'",
+          "group": "3_security@2"
         }
       ]
     },
@@ -859,6 +1087,21 @@
             }
           ],
           "scope": "machine"
+        },
+        "webmanager.theme": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "light",
+            "dark"
+          ],
+          "enumDescriptions": [
+            "Follow the VS Code color theme (light or dark).",
+            "Always light.",
+            "Always dark."
+          ],
+          "default": "auto",
+          "description": "Theme of the embedded webmanager views. webmanager's own theme toggle lives in its sidebar, which a view doesn't show."
         },
         "webmanager.retainContextWhenHidden": {
           "type": "object",

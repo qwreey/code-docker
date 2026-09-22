@@ -421,6 +421,19 @@ async function newSessionInView(host, m) {
   })
 }
 
+// The view a palette command acts on: the focused editor tab, else a
+// visible panel slot, else any open view.
+function withTargetHost(fn) {
+  const visibleSlot = [...slotHosts.values()].find((h) => h.view.visible)
+  const host = activePanelHost || visibleSlot || [...hosts][0]
+  if (!host) {
+    vscode.window.showInformationMessage('webmanager 뷰를 먼저 여세요 (webmanager: Open Terminal Session… 등).')
+    return
+  }
+  revealHost(host)
+  fn(host)
+}
+
 // ---- messages from views ---------------------------------------------------
 
 function isHttpUrl(u) {
@@ -682,12 +695,38 @@ function activate(context) {
   reg('webmanager.view.openInBrowser', () => openInBrowser(activePanelHost))
   reg('webmanager.view.reload', () => reload(activePanelHost))
   reg('webmanager.view.moveToPanel', () => moveToPanel(activePanelHost))
+  // Fingerprint devices, lock and theme live in webmanager's sidebar, which a
+  // view doesn't show. Lock reaches every view (webmanager broadcasts it);
+  // the device list opens in the view the action came from.
+  reg('webmanager.manageFingerprint', () => withTargetHost((h) => h.webview.postMessage({ type: 'open-webauthn' })))
+  reg('webmanager.lockNow', () => withTargetHost((h) => h.webview.postMessage({ type: 'lock' })))
+  reg('webmanager.view.manageFingerprint', () => activePanelHost && activePanelHost.webview.postMessage({ type: 'open-webauthn' }))
+  reg('webmanager.view.lockNow', () => activePanelHost && activePanelHost.webview.postMessage({ type: 'lock' }))
+  reg('webmanager.setTheme', async () => {
+    const cfg = vscode.workspace.getConfiguration('webmanager')
+    const current = cfg.get('theme') || 'auto'
+    const pick = await vscode.window.showQuickPick(
+      [
+        { label: 'VS Code 따라가기', value: 'auto' },
+        { label: '라이트', value: 'light' },
+        { label: '다크', value: 'dark' },
+      ].map((i) => ({ ...i, description: i.value === current ? '현재' : undefined })),
+      { placeHolder: 'webmanager 뷰의 테마' },
+    )
+    if (pick) await cfg.update('theme', pick.value, vscode.ConfigurationTarget.Global)
+  })
   reg('webmanager.view.changeSession', () => activePanelHost && changeSession(activePanelHost))
   reg('webmanager.view.switchTab', () => switchTab(activePanelHost))
 
   // A view's title-bar action doesn't say which view it came from, so each
   // slot gets its own copy of every action (see package.json).
-  const slotActions = { moveToEditor, openInBrowser, reload }
+  const slotActions = {
+    moveToEditor,
+    openInBrowser,
+    reload,
+    manageFingerprint: (h) => h.webview.postMessage({ type: 'open-webauthn' }),
+    lockNow: (h) => h.webview.postMessage({ type: 'lock' }),
+  }
   const terminalSlotActions = { changeSession, renameSession, togglePin }
   for (const id of SLOT_IDS) {
     const actions = isTerminalSlot(id) ? { ...slotActions, ...terminalSlotActions } : { ...slotActions, switchTab }
@@ -720,6 +759,10 @@ function activate(context) {
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('webmanager.theme')) {
+        const theme = vscode.workspace.getConfiguration('webmanager').get('theme') || 'auto'
+        for (const h of hosts) h.webview.postMessage({ type: 'theme-pref', theme })
+      }
       if (!e.affectsConfiguration('webmanager.passthroughKeys')) return
       const chords = passthroughChords()
       for (const h of hosts) h.webview.postMessage({ type: 'keys', chords })

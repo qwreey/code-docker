@@ -2,7 +2,7 @@ import { useCallback, useEffect } from 'react'
 import { Fingerprint, Lock, LockOpen, Monitor, Moon, Sun } from 'lucide-react'
 import { useTheme } from '../../useTheme'
 import type { ThemeChoice } from '../../theme'
-import { requestUnlock } from '../../api/client'
+import { lockNow, requestUnlock } from '../../api/client'
 import { useAuthStatus } from '../common/useAuthStatus'
 import { openWebAuthnManager, webauthnEnrollAvailable } from '../common/webauthnGate'
 import { withViewTransition } from '../../utils/viewTransition'
@@ -69,10 +69,15 @@ export function SidebarFooter() {
     <div className="sidebar-footer">
       {status?.required &&
         (status.unlocked ? (
-          <div className="sidebar-lock-status sidebar-lock-status-unlocked" title="잠금 해제됨">
+          <button
+            type="button"
+            className="sidebar-lock-status sidebar-lock-status-unlocked"
+            onClick={() => void lockNow().catch(() => undefined)}
+            title="잠금 해제됨 - 클릭하면 지금 잠급니다"
+          >
             <LockOpen size={14} aria-hidden="true" />
             <span>{formatRemaining(status.unlockedUntil) || '해제됨'}</span>
-          </div>
+          </button>
         ) : (
           <button
             type="button"

@@ -88,6 +88,14 @@ function notifyAuthStatusChange() {
   authChannel?.postMessage('changed')
 }
 
+// Drops this browser's unlock cookie (POST /auth/lock) and tells every view
+// - this page's listeners and, over the channel, the other webmanager pages
+// and code-server views - so they show their lock prompt right away.
+export async function lockNow(): Promise<void> {
+  await request<void>('/auth/lock', { method: 'POST' })
+  notifyAuthStatusChange()
+}
+
 // import.meta.env.BASE_URL is '/' in dev and '/manager/' in a production
 // build (see vite.config.ts) - prefixing every API URL with it is what lets
 // the same build work whether nginx strips a /manager prefix in front of it

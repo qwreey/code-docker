@@ -4,6 +4,8 @@ import './index.css'
 import App from './App.tsx'
 import { initTheme, setEmbedTheme } from './theme.ts'
 import { EMBED, embedParams, installEmbedBridges, onHostMessage } from './embed.ts'
+import { lockNow } from './api/client.ts'
+import { openWebAuthnManager } from './components/common/webauthnGate.ts'
 
 // Applied synchronously before the first render so the stored theme choice
 // (if any) is already on <html> before anything paints - see theme.ts.
@@ -13,6 +15,9 @@ if (EMBED) {
   if (embedParams.theme) setEmbedTheme(embedParams.theme)
   onHostMessage((msg) => {
     if (msg.type === 'theme') setEmbedTheme(msg.theme)
+    // The sidebar that normally holds these isn't there in a view.
+    else if (msg.type === 'open-webauthn') openWebAuthnManager()
+    else if (msg.type === 'lock') void lockNow().catch(() => undefined)
   })
 }
 
