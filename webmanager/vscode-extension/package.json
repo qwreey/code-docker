@@ -129,6 +129,18 @@
         "icon": "$(layout-panel)"
       },
       {
+        "command": "webmanager.view.switchTab",
+        "title": "Switch webmanager Tab…",
+        "category": "webmanager",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "webmanager.view.changeSession",
+        "title": "Change Session…",
+        "category": "webmanager",
+        "icon": "$(arrow-swap)"
+      },
+      {
         "command": "webmanager.slot.term1.changeSession",
         "title": "Change Session…",
         "category": "webmanager",
@@ -297,6 +309,12 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "webmanager.slot.page1.switchTab",
+        "title": "Switch webmanager Tab…",
+        "category": "webmanager",
+        "icon": "$(list-selection)"
+      },
+      {
         "command": "webmanager.slot.page1.moveToEditor",
         "title": "Move to Editor",
         "category": "webmanager",
@@ -319,6 +337,12 @@
         "title": "Reload",
         "category": "webmanager",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "webmanager.slot.page2.switchTab",
+        "title": "Switch webmanager Tab…",
+        "category": "webmanager",
+        "icon": "$(list-selection)"
       },
       {
         "command": "webmanager.slot.page2.moveToEditor",
@@ -349,11 +373,11 @@
       "commandPalette": [
         {
           "command": "webmanager.view.renameSession",
-          "when": "activeWebviewPanelId == 'webmanager.page'"
+          "when": "activeWebviewPanelId == 'webmanager.page' && webmanager.activePanelSession"
         },
         {
           "command": "webmanager.view.togglePin",
-          "when": "activeWebviewPanelId == 'webmanager.page'"
+          "when": "activeWebviewPanelId == 'webmanager.page' && webmanager.activePanelSession"
         },
         {
           "command": "webmanager.view.openInBrowser",
@@ -366,6 +390,14 @@
         {
           "command": "webmanager.view.moveToPanel",
           "when": "activeWebviewPanelId == 'webmanager.page'"
+        },
+        {
+          "command": "webmanager.view.switchTab",
+          "when": "activeWebviewPanelId == 'webmanager.page'"
+        },
+        {
+          "command": "webmanager.view.changeSession",
+          "when": "activeWebviewPanelId == 'webmanager.page' && webmanager.activePanelTerminal"
         },
         {
           "command": "webmanager.slot.term1.changeSession",
@@ -510,6 +542,14 @@
         {
           "command": "webmanager.slot.page2.reload",
           "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page1.switchTab",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page2.switchTab",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -530,12 +570,12 @@
         },
         {
           "command": "webmanager.slot.term1.renameSession",
-          "when": "view == webmanager.term1",
+          "when": "view == webmanager.term1 && view in webmanager.sessionSlots",
           "group": "1_session@1"
         },
         {
           "command": "webmanager.slot.term1.togglePin",
-          "when": "view == webmanager.term1",
+          "when": "view == webmanager.term1 && view in webmanager.sessionSlots",
           "group": "1_session@2"
         },
         {
@@ -565,12 +605,12 @@
         },
         {
           "command": "webmanager.slot.term2.renameSession",
-          "when": "view == webmanager.term2",
+          "when": "view == webmanager.term2 && view in webmanager.sessionSlots",
           "group": "1_session@1"
         },
         {
           "command": "webmanager.slot.term2.togglePin",
-          "when": "view == webmanager.term2",
+          "when": "view == webmanager.term2 && view in webmanager.sessionSlots",
           "group": "1_session@2"
         },
         {
@@ -600,12 +640,12 @@
         },
         {
           "command": "webmanager.slot.term3.renameSession",
-          "when": "view == webmanager.term3",
+          "when": "view == webmanager.term3 && view in webmanager.sessionSlots",
           "group": "1_session@1"
         },
         {
           "command": "webmanager.slot.term3.togglePin",
-          "when": "view == webmanager.term3",
+          "when": "view == webmanager.term3 && view in webmanager.sessionSlots",
           "group": "1_session@2"
         },
         {
@@ -635,12 +675,12 @@
         },
         {
           "command": "webmanager.slot.term4.renameSession",
-          "when": "view == webmanager.term4",
+          "when": "view == webmanager.term4 && view in webmanager.sessionSlots",
           "group": "1_session@1"
         },
         {
           "command": "webmanager.slot.term4.togglePin",
-          "when": "view == webmanager.term4",
+          "when": "view == webmanager.term4 && view in webmanager.sessionSlots",
           "group": "1_session@2"
         },
         {
@@ -652,6 +692,11 @@
           "command": "webmanager.slot.term4.reload",
           "when": "view == webmanager.term4",
           "group": "2_view@2"
+        },
+        {
+          "command": "webmanager.slot.page1.switchTab",
+          "when": "view == webmanager.page1",
+          "group": "navigation@1"
         },
         {
           "command": "webmanager.slot.page1.moveToEditor",
@@ -672,6 +717,11 @@
           "command": "webmanager.slot.page1.reload",
           "when": "view == webmanager.page1",
           "group": "2_view@2"
+        },
+        {
+          "command": "webmanager.slot.page2.switchTab",
+          "when": "view == webmanager.page2",
+          "group": "navigation@1"
         },
         {
           "command": "webmanager.slot.page2.moveToEditor",
@@ -696,18 +746,28 @@
       ],
       "editor/title": [
         {
+          "command": "webmanager.view.switchTab",
+          "when": "activeWebviewPanelId == 'webmanager.page'",
+          "group": "navigation@0"
+        },
+        {
           "command": "webmanager.view.moveToPanel",
           "when": "activeWebviewPanelId == 'webmanager.page'",
           "group": "navigation@1"
         },
         {
+          "command": "webmanager.view.changeSession",
+          "when": "activeWebviewPanelId == 'webmanager.page' && webmanager.activePanelTerminal",
+          "group": "1_session@0"
+        },
+        {
           "command": "webmanager.view.renameSession",
-          "when": "activeWebviewPanelId == 'webmanager.page'",
+          "when": "activeWebviewPanelId == 'webmanager.page' && webmanager.activePanelSession",
           "group": "1_session@1"
         },
         {
           "command": "webmanager.view.togglePin",
-          "when": "activeWebviewPanelId == 'webmanager.page'",
+          "when": "activeWebviewPanelId == 'webmanager.page' && webmanager.activePanelSession",
           "group": "1_session@2"
         },
         {

@@ -67,7 +67,35 @@ function titleOf(state) {
   return sectionLabel(state.section)
 }
 
+// Menu `when` clauses read these: session actions (rename, pin) only where
+// a session is shown, Change Session only on a terminal. Slots go in a list
+// (`view in webmanager.sessionSlots`) since one context key per slot would
+// still need the view id to pick the right one.
+let lastContexts = ''
+function refreshContexts() {
+  const p = activePanelHost && activePanelHost.state
+  const sessionSlots = []
+  for (const [id, h] of slotHosts) {
+    if (h.state && h.state.section === 'terminal' && h.state.session) sessionSlots.push(`webmanager.${id}`)
+  }
+  const next = {
+    'webmanager.activePanelTerminal': !!p && p.section === 'terminal',
+    'webmanager.activePanelSession': !!p && p.section === 'terminal' && !!p.session,
+    'webmanager.sessionSlots': sessionSlots,
+  }
+  const key = JSON.stringify(next)
+  if (key === lastContexts) return
+  lastContexts = key
+  for (const [k, v] of Object.entries(next)) vscode.commands.executeCommand('setContext', k, v)
+}
+
+function setActivePanel(host) {
+  activePanelHost = host
+  refreshContexts()
+}
+
 function updateTitle(host) {
+  refreshContexts()
   const title = titleOf(host.state)
   if (host.kind === 'panel') {
     host.panel.title = host.state.pinned ? `📌 ${title}` : title
@@ -143,13 +171,14 @@ function setupPanel(panel, state) {
   hosts.add(host)
   panel.iconPath = mediaUri('icon.svg')
   attach(host, panel.webview, state)
-  if (panel.active) activePanelHost = host
+  if (panel.active) setActivePanel(host)
   panel.onDidChangeViewState((e) => {
-    if (e.webviewPanel.active) activePanelHost = host
+    if (e.webviewPanel.active) setActivePanel(host)
+    else if (activePanelHost === host) setActivePanel(null)
   })
   panel.onDidDispose(() => {
     detach(host)
-    if (activePanelHost === host) activePanelHost = null
+    if (activePanelHost === host) setActivePanel(null)
   })
   return host
 }
@@ -203,6 +232,7 @@ function slotProvider(id) {
       view.onDidDispose(() => {
         detach(host)
         if (slotHosts.get(id) === host) slotHosts.delete(id)
+        refreshContexts()
       })
     },
   }
@@ -516,6 +546,27 @@ async function changeSession(host) {
   else navigateHost(host, state)
 }
 
+// Another webmanager tab in the same view. A page slot stays a page (the
+// terminal has its own slots); an editor tab can become anything, a
+// terminal session included.
+async function switchTab(host) {
+  if (!host) return
+  const pageOnly = host.kind === 'slot'
+  const pick = await vscode.window.showQuickPick(
+    SECTIONS.filter((x) => !(pageOnly && x.id === 'terminal')).map((x) => ({
+      label: `$(${x.icon}) ${x.label}`,
+      description: x.id === host.state.section ? '지금 이 뷰' : x.id,
+      id: x.id,
+    })),
+    { placeHolder: '이 뷰에 띄울 webmanager 탭' },
+  )
+  if (!pick) return
+  if (pick.id === 'terminal') return changeSession(host)
+  const state = { section: pick.id }
+  if (host.kind === 'slot') await bindSlot(host.id, state)
+  else navigateHost(host, state)
+}
+
 async function renameSession(host) {
   if (!host || host.state.section !== 'terminal' || !host.state.session) return
   let names = []
@@ -631,13 +682,15 @@ function activate(context) {
   reg('webmanager.view.openInBrowser', () => openInBrowser(activePanelHost))
   reg('webmanager.view.reload', () => reload(activePanelHost))
   reg('webmanager.view.moveToPanel', () => moveToPanel(activePanelHost))
+  reg('webmanager.view.changeSession', () => activePanelHost && changeSession(activePanelHost))
+  reg('webmanager.view.switchTab', () => switchTab(activePanelHost))
 
   // A view's title-bar action doesn't say which view it came from, so each
   // slot gets its own copy of every action (see package.json).
   const slotActions = { moveToEditor, openInBrowser, reload }
   const terminalSlotActions = { changeSession, renameSession, togglePin }
   for (const id of SLOT_IDS) {
-    const actions = isTerminalSlot(id) ? { ...slotActions, ...terminalSlotActions } : slotActions
+    const actions = isTerminalSlot(id) ? { ...slotActions, ...terminalSlotActions } : { ...slotActions, switchTab }
     for (const [name, fn] of Object.entries(actions)) {
       reg(`webmanager.slot.${id}.${name}`, () => {
         const host = slotHosts.get(id)
