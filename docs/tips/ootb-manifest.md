@@ -23,7 +23,7 @@ YAML/JSON이 아니라 이 형식을 씁니다 - `ootb.sh`는 호스트에 `yq`/
 OOTB_NAME="Roblox Studio"
 OOTB_DESCRIPTION="Wine 기반 Roblox Studio (GPU passthrough + headless Wayland + wayvnc)"
 OOTB_COMPOSE_INCLUDE="roblox-studio-code-docker.yml"
-OOTB_ROUTER_ALLOWED_TARGET_HOSTS="vnc-only"
+OOTB_ROUTER_ALLOWED_TARGET_HOSTS="roblox-studio-vnc"
 OOTB_GENERATE_SECRETS="MCP_TOKEN"
 ```
 
