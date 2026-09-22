@@ -1,0 +1,819 @@
+{
+  "name": "webmanager",
+  "displayName": "webmanager",
+  "description": "code-docker's webmanager (terminal sessions and every other tab) as editor tabs and bottom-panel views. Built into the code-docker image and synced on every start - see config/code/code-extensions.default.sh.",
+  "publisher": "code-docker",
+  "version": "0.1.0",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onWebviewPanel:webmanager.page"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "webmanager",
+          "title": "webmanager",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "webmanager": [
+        {
+          "type": "webview",
+          "id": "webmanager.term1",
+          "name": "Terminal 1"
+        },
+        {
+          "type": "webview",
+          "id": "webmanager.term2",
+          "name": "Terminal 2",
+          "when": "webmanager.slot.term2"
+        },
+        {
+          "type": "webview",
+          "id": "webmanager.term3",
+          "name": "Terminal 3",
+          "when": "webmanager.slot.term3"
+        },
+        {
+          "type": "webview",
+          "id": "webmanager.term4",
+          "name": "Terminal 4",
+          "when": "webmanager.slot.term4"
+        },
+        {
+          "type": "webview",
+          "id": "webmanager.page1",
+          "name": "Page 1",
+          "when": "webmanager.slot.page1"
+        },
+        {
+          "type": "webview",
+          "id": "webmanager.page2",
+          "name": "Page 2",
+          "when": "webmanager.slot.page2"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "webmanager.openTerminal",
+        "title": "Open Terminal Session…",
+        "category": "webmanager",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "webmanager.openTerminalToSide",
+        "title": "Open Terminal Session to the Side…",
+        "category": "webmanager"
+      },
+      {
+        "command": "webmanager.openTab",
+        "title": "Open webmanager Tab…",
+        "category": "webmanager"
+      },
+      {
+        "command": "webmanager.openTerminalInPanel",
+        "title": "Open Terminal Session in Panel…",
+        "category": "webmanager"
+      },
+      {
+        "command": "webmanager.openTabInPanel",
+        "title": "Open webmanager Tab in Panel…",
+        "category": "webmanager"
+      },
+      {
+        "command": "webmanager.showBuildInfo",
+        "title": "Show Build Info",
+        "category": "webmanager"
+      },
+      {
+        "command": "webmanager.view.renameSession",
+        "title": "Rename Session…",
+        "category": "webmanager",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "webmanager.view.togglePin",
+        "title": "Pin / Unpin Session",
+        "category": "webmanager",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "webmanager.view.openInBrowser",
+        "title": "Open in Browser",
+        "category": "webmanager",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "webmanager.view.reload",
+        "title": "Reload",
+        "category": "webmanager",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "webmanager.view.moveToPanel",
+        "title": "Move to Panel",
+        "category": "webmanager",
+        "icon": "$(layout-panel)"
+      },
+      {
+        "command": "webmanager.slot.term1.changeSession",
+        "title": "Change Session…",
+        "category": "webmanager",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "webmanager.slot.term1.moveToEditor",
+        "title": "Move to Editor",
+        "category": "webmanager",
+        "icon": "$(multiple-windows)"
+      },
+      {
+        "command": "webmanager.slot.term1.closeSlot",
+        "title": "Close Slot",
+        "category": "webmanager",
+        "icon": "$(close)"
+      },
+      {
+        "command": "webmanager.slot.term1.renameSession",
+        "title": "Rename Session…",
+        "category": "webmanager",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "webmanager.slot.term1.togglePin",
+        "title": "Pin / Unpin Session",
+        "category": "webmanager",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "webmanager.slot.term1.openInBrowser",
+        "title": "Open in Browser",
+        "category": "webmanager",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "webmanager.slot.term1.reload",
+        "title": "Reload",
+        "category": "webmanager",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "webmanager.slot.term2.changeSession",
+        "title": "Change Session…",
+        "category": "webmanager",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "webmanager.slot.term2.moveToEditor",
+        "title": "Move to Editor",
+        "category": "webmanager",
+        "icon": "$(multiple-windows)"
+      },
+      {
+        "command": "webmanager.slot.term2.closeSlot",
+        "title": "Close Slot",
+        "category": "webmanager",
+        "icon": "$(close)"
+      },
+      {
+        "command": "webmanager.slot.term2.renameSession",
+        "title": "Rename Session…",
+        "category": "webmanager",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "webmanager.slot.term2.togglePin",
+        "title": "Pin / Unpin Session",
+        "category": "webmanager",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "webmanager.slot.term2.openInBrowser",
+        "title": "Open in Browser",
+        "category": "webmanager",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "webmanager.slot.term2.reload",
+        "title": "Reload",
+        "category": "webmanager",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "webmanager.slot.term3.changeSession",
+        "title": "Change Session…",
+        "category": "webmanager",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "webmanager.slot.term3.moveToEditor",
+        "title": "Move to Editor",
+        "category": "webmanager",
+        "icon": "$(multiple-windows)"
+      },
+      {
+        "command": "webmanager.slot.term3.closeSlot",
+        "title": "Close Slot",
+        "category": "webmanager",
+        "icon": "$(close)"
+      },
+      {
+        "command": "webmanager.slot.term3.renameSession",
+        "title": "Rename Session…",
+        "category": "webmanager",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "webmanager.slot.term3.togglePin",
+        "title": "Pin / Unpin Session",
+        "category": "webmanager",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "webmanager.slot.term3.openInBrowser",
+        "title": "Open in Browser",
+        "category": "webmanager",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "webmanager.slot.term3.reload",
+        "title": "Reload",
+        "category": "webmanager",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "webmanager.slot.term4.changeSession",
+        "title": "Change Session…",
+        "category": "webmanager",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "webmanager.slot.term4.moveToEditor",
+        "title": "Move to Editor",
+        "category": "webmanager",
+        "icon": "$(multiple-windows)"
+      },
+      {
+        "command": "webmanager.slot.term4.closeSlot",
+        "title": "Close Slot",
+        "category": "webmanager",
+        "icon": "$(close)"
+      },
+      {
+        "command": "webmanager.slot.term4.renameSession",
+        "title": "Rename Session…",
+        "category": "webmanager",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "webmanager.slot.term4.togglePin",
+        "title": "Pin / Unpin Session",
+        "category": "webmanager",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "webmanager.slot.term4.openInBrowser",
+        "title": "Open in Browser",
+        "category": "webmanager",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "webmanager.slot.term4.reload",
+        "title": "Reload",
+        "category": "webmanager",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "webmanager.slot.page1.moveToEditor",
+        "title": "Move to Editor",
+        "category": "webmanager",
+        "icon": "$(multiple-windows)"
+      },
+      {
+        "command": "webmanager.slot.page1.closeSlot",
+        "title": "Close Slot",
+        "category": "webmanager",
+        "icon": "$(close)"
+      },
+      {
+        "command": "webmanager.slot.page1.openInBrowser",
+        "title": "Open in Browser",
+        "category": "webmanager",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "webmanager.slot.page1.reload",
+        "title": "Reload",
+        "category": "webmanager",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "webmanager.slot.page2.moveToEditor",
+        "title": "Move to Editor",
+        "category": "webmanager",
+        "icon": "$(multiple-windows)"
+      },
+      {
+        "command": "webmanager.slot.page2.closeSlot",
+        "title": "Close Slot",
+        "category": "webmanager",
+        "icon": "$(close)"
+      },
+      {
+        "command": "webmanager.slot.page2.openInBrowser",
+        "title": "Open in Browser",
+        "category": "webmanager",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "webmanager.slot.page2.reload",
+        "title": "Reload",
+        "category": "webmanager",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "webmanager.view.renameSession",
+          "when": "activeWebviewPanelId == 'webmanager.page'"
+        },
+        {
+          "command": "webmanager.view.togglePin",
+          "when": "activeWebviewPanelId == 'webmanager.page'"
+        },
+        {
+          "command": "webmanager.view.openInBrowser",
+          "when": "activeWebviewPanelId == 'webmanager.page'"
+        },
+        {
+          "command": "webmanager.view.reload",
+          "when": "activeWebviewPanelId == 'webmanager.page'"
+        },
+        {
+          "command": "webmanager.view.moveToPanel",
+          "when": "activeWebviewPanelId == 'webmanager.page'"
+        },
+        {
+          "command": "webmanager.slot.term1.changeSession",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term1.moveToEditor",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term1.closeSlot",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term1.renameSession",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term1.togglePin",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term1.openInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term1.reload",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term2.changeSession",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term2.moveToEditor",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term2.closeSlot",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term2.renameSession",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term2.togglePin",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term2.openInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term2.reload",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term3.changeSession",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term3.moveToEditor",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term3.closeSlot",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term3.renameSession",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term3.togglePin",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term3.openInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term3.reload",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term4.changeSession",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term4.moveToEditor",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term4.closeSlot",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term4.renameSession",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term4.togglePin",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term4.openInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.term4.reload",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page1.moveToEditor",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page1.closeSlot",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page1.openInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page1.reload",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page2.moveToEditor",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page2.closeSlot",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page2.openInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.slot.page2.reload",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "webmanager.slot.term1.changeSession",
+          "when": "view == webmanager.term1",
+          "group": "navigation@1"
+        },
+        {
+          "command": "webmanager.slot.term1.moveToEditor",
+          "when": "view == webmanager.term1",
+          "group": "navigation@2"
+        },
+        {
+          "command": "webmanager.slot.term1.closeSlot",
+          "when": "view == webmanager.term1",
+          "group": "navigation@3"
+        },
+        {
+          "command": "webmanager.slot.term1.renameSession",
+          "when": "view == webmanager.term1",
+          "group": "1_session@1"
+        },
+        {
+          "command": "webmanager.slot.term1.togglePin",
+          "when": "view == webmanager.term1",
+          "group": "1_session@2"
+        },
+        {
+          "command": "webmanager.slot.term1.openInBrowser",
+          "when": "view == webmanager.term1",
+          "group": "2_view@1"
+        },
+        {
+          "command": "webmanager.slot.term1.reload",
+          "when": "view == webmanager.term1",
+          "group": "2_view@2"
+        },
+        {
+          "command": "webmanager.slot.term2.changeSession",
+          "when": "view == webmanager.term2",
+          "group": "navigation@1"
+        },
+        {
+          "command": "webmanager.slot.term2.moveToEditor",
+          "when": "view == webmanager.term2",
+          "group": "navigation@2"
+        },
+        {
+          "command": "webmanager.slot.term2.closeSlot",
+          "when": "view == webmanager.term2",
+          "group": "navigation@3"
+        },
+        {
+          "command": "webmanager.slot.term2.renameSession",
+          "when": "view == webmanager.term2",
+          "group": "1_session@1"
+        },
+        {
+          "command": "webmanager.slot.term2.togglePin",
+          "when": "view == webmanager.term2",
+          "group": "1_session@2"
+        },
+        {
+          "command": "webmanager.slot.term2.openInBrowser",
+          "when": "view == webmanager.term2",
+          "group": "2_view@1"
+        },
+        {
+          "command": "webmanager.slot.term2.reload",
+          "when": "view == webmanager.term2",
+          "group": "2_view@2"
+        },
+        {
+          "command": "webmanager.slot.term3.changeSession",
+          "when": "view == webmanager.term3",
+          "group": "navigation@1"
+        },
+        {
+          "command": "webmanager.slot.term3.moveToEditor",
+          "when": "view == webmanager.term3",
+          "group": "navigation@2"
+        },
+        {
+          "command": "webmanager.slot.term3.closeSlot",
+          "when": "view == webmanager.term3",
+          "group": "navigation@3"
+        },
+        {
+          "command": "webmanager.slot.term3.renameSession",
+          "when": "view == webmanager.term3",
+          "group": "1_session@1"
+        },
+        {
+          "command": "webmanager.slot.term3.togglePin",
+          "when": "view == webmanager.term3",
+          "group": "1_session@2"
+        },
+        {
+          "command": "webmanager.slot.term3.openInBrowser",
+          "when": "view == webmanager.term3",
+          "group": "2_view@1"
+        },
+        {
+          "command": "webmanager.slot.term3.reload",
+          "when": "view == webmanager.term3",
+          "group": "2_view@2"
+        },
+        {
+          "command": "webmanager.slot.term4.changeSession",
+          "when": "view == webmanager.term4",
+          "group": "navigation@1"
+        },
+        {
+          "command": "webmanager.slot.term4.moveToEditor",
+          "when": "view == webmanager.term4",
+          "group": "navigation@2"
+        },
+        {
+          "command": "webmanager.slot.term4.closeSlot",
+          "when": "view == webmanager.term4",
+          "group": "navigation@3"
+        },
+        {
+          "command": "webmanager.slot.term4.renameSession",
+          "when": "view == webmanager.term4",
+          "group": "1_session@1"
+        },
+        {
+          "command": "webmanager.slot.term4.togglePin",
+          "when": "view == webmanager.term4",
+          "group": "1_session@2"
+        },
+        {
+          "command": "webmanager.slot.term4.openInBrowser",
+          "when": "view == webmanager.term4",
+          "group": "2_view@1"
+        },
+        {
+          "command": "webmanager.slot.term4.reload",
+          "when": "view == webmanager.term4",
+          "group": "2_view@2"
+        },
+        {
+          "command": "webmanager.slot.page1.moveToEditor",
+          "when": "view == webmanager.page1",
+          "group": "navigation@2"
+        },
+        {
+          "command": "webmanager.slot.page1.closeSlot",
+          "when": "view == webmanager.page1",
+          "group": "navigation@3"
+        },
+        {
+          "command": "webmanager.slot.page1.openInBrowser",
+          "when": "view == webmanager.page1",
+          "group": "2_view@1"
+        },
+        {
+          "command": "webmanager.slot.page1.reload",
+          "when": "view == webmanager.page1",
+          "group": "2_view@2"
+        },
+        {
+          "command": "webmanager.slot.page2.moveToEditor",
+          "when": "view == webmanager.page2",
+          "group": "navigation@2"
+        },
+        {
+          "command": "webmanager.slot.page2.closeSlot",
+          "when": "view == webmanager.page2",
+          "group": "navigation@3"
+        },
+        {
+          "command": "webmanager.slot.page2.openInBrowser",
+          "when": "view == webmanager.page2",
+          "group": "2_view@1"
+        },
+        {
+          "command": "webmanager.slot.page2.reload",
+          "when": "view == webmanager.page2",
+          "group": "2_view@2"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "webmanager.view.moveToPanel",
+          "when": "activeWebviewPanelId == 'webmanager.page'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "webmanager.view.renameSession",
+          "when": "activeWebviewPanelId == 'webmanager.page'",
+          "group": "1_session@1"
+        },
+        {
+          "command": "webmanager.view.togglePin",
+          "when": "activeWebviewPanelId == 'webmanager.page'",
+          "group": "1_session@2"
+        },
+        {
+          "command": "webmanager.view.openInBrowser",
+          "when": "activeWebviewPanelId == 'webmanager.page'",
+          "group": "2_view@1"
+        },
+        {
+          "command": "webmanager.view.reload",
+          "when": "activeWebviewPanelId == 'webmanager.page'",
+          "group": "2_view@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "webmanager",
+      "properties": {
+        "webmanager.basePath": {
+          "type": "string",
+          "default": "/manager/",
+          "description": "Path webmanager is served at on this code-server's own origin."
+        },
+        "webmanager.internalUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL the extension host uses to list terminal sessions. Empty = http://$WEBMANAGER_ADDR (default private:81)."
+        },
+        "webmanager.passthroughKeys": {
+          "type": "array",
+          "description": "Key chords that leave an embedded webmanager view and run a VS Code command instead. Chord format: modifiers in the order ctrl+shift+alt+meta, then the key (letters/digits lowercase, f1..f12, pageup, pagedown, `, etc.) - read from the physical key, so keyboard layout doesn't matter.",
+          "items": {
+            "type": "object",
+            "required": [
+              "key",
+              "command"
+            ],
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              },
+              "args": {}
+            }
+          },
+          "default": [
+            {
+              "key": "ctrl+shift+p",
+              "command": "workbench.action.showCommands"
+            },
+            {
+              "key": "f1",
+              "command": "workbench.action.showCommands"
+            },
+            {
+              "key": "meta+shift+p",
+              "command": "workbench.action.showCommands"
+            },
+            {
+              "key": "ctrl+`",
+              "command": "workbench.action.togglePanel"
+            },
+            {
+              "key": "ctrl+pageup",
+              "command": "workbench.action.previousEditor"
+            },
+            {
+              "key": "ctrl+pagedown",
+              "command": "workbench.action.nextEditor"
+            },
+            {
+              "key": "ctrl+1",
+              "command": "workbench.action.focusFirstEditorGroup"
+            },
+            {
+              "key": "ctrl+2",
+              "command": "workbench.action.focusSecondEditorGroup"
+            },
+            {
+              "key": "ctrl+3",
+              "command": "workbench.action.focusThirdEditorGroup"
+            },
+            {
+              "key": "ctrl+shift+e",
+              "command": "workbench.view.explorer"
+            }
+          ]
+        },
+        "webmanager.retainContextWhenHidden": {
+          "type": "object",
+          "default": {
+            "terminal": true,
+            "other": false
+          },
+          "properties": {
+            "terminal": {
+              "type": "boolean"
+            },
+            "other": {
+              "type": "boolean"
+            }
+          },
+          "description": "Keep a hidden view's page alive. On for terminals (keeps the connection, scroll position and the session attached); off for everything else to save memory. Applies to views created after the change (editor tabs) or after a reload (panel slots)."
+        }
+      }
+    }
+  }
+}

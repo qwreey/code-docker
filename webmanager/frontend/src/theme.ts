@@ -48,8 +48,20 @@ export function subscribeTheme(listener: (choice: ThemeChoice) => void) {
   return () => listeners.delete(listener)
 }
 
+// Set only in embed mode (see embed.ts): the theme code-server's own
+// workbench is using, followed live. Never persisted - localStorage is shared
+// with the standalone /manager/ page (same origin), and following VS Code
+// there would silently change that page's theme too.
+let embedTheme: 'light' | 'dark' | null = null
+
+export function setEmbedTheme(theme: 'light' | 'dark') {
+  embedTheme = theme
+  applyTheme(theme)
+  listeners.forEach((listener) => listener(theme))
+}
+
 export function getTheme(): ThemeChoice {
-  return currentTheme
+  return embedTheme ?? currentTheme
 }
 
 export function persistTheme(choice: ThemeChoice) {

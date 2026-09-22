@@ -257,3 +257,11 @@
     margin: 0.75rem 0.85rem 0;
   }
 }
+
+/* Embed mode (code-server extension view, see embed.ts): no sidebar, so no
+   room reserved for it either. After the rules above so it wins at every
+   width. */
+.app-shell-embed .app-main,
+.app-shell-embed.app-shell-sidebar-collapsed .app-main {
+  margin-left: 0;
+}

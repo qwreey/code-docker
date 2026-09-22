@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { api, ApiError, setUnlockPrompter } from '../../api/client'
+import { api, ApiError, onAuthStatusChange, setUnlockPrompter } from '../../api/client'
 import { ErrorBanner } from './ErrorBanner'
 import './UnlockModal.css'
 
@@ -34,6 +34,28 @@ export function UnlockModalHost() {
     setUnlockPrompter(prompt)
     return () => setUnlockPrompter(null)
   }, [prompt])
+
+  // Unlocked somewhere else meanwhile - another code-server extension view
+  // or browser tab (the auth BroadcastChannel in api/client.ts). The cookie
+  // is shared, so the waiting requests can simply go ahead; leaving the
+  // prompt up would ask for a password that is no longer needed.
+  useEffect(() => {
+    if (!open) return
+    return onAuthStatusChange(() => {
+      void api
+        .get<{ unlocked: boolean }>('/auth/status')
+        .then((status) => {
+          if (!status.unlocked || waitersRef.current.length === 0) return
+          const waiters = waitersRef.current
+          waitersRef.current = []
+          resetForm()
+          waiters.forEach((w) => w.resolve())
+        })
+        .catch(() => {
+          // status unknown - keep the prompt up
+        })
+    })
+  }, [open])
 
   function resetForm() {
     setOpen(false)

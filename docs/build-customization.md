@@ -17,6 +17,7 @@
 - [`recommendations.*.yaml`](#recommendationsyaml-추천-목록)
 - [`code-patch.*.sh`](#code-patchsh-code-patch-심기-스크립트)
 - [`code-patch/`](#code-patch-기본-제공-브라우저-패치-모음)
+- [`code-extensions.*.sh`](#code-extensionssh-내장-webmanager-확장-동기화)
 
 **`config/git/hooks/`**
 - [`prepare-commit-msg.*.sh` / `commit-msg.*.sh`](#prepare-commit-msgsh--commit-msgsh-ai-커밋-trailer-치환)
@@ -173,6 +174,10 @@ SERVFAIL을 건너뛰고 router로 넘어가는 폴백 자체를 dnsmasq 내부�
 ### `code-patch.*.sh` (code-patch 심기 스크립트)
 
 `code-patch/` 폴더(아래 참고)의 내용을 `/code/.local/share/code-docker/code/patch/` 로 심는 스크립트입니다. `user-init` 과 마찬가지로 매 부팅마다 항상 실행되지만, `user-init` 과는 별도로 `code-service.*.sh` 에서 (`install.sh` 로 실제 `/code/.local/share/code-docker/code` 가 만들어진 *이후에*) 실행됩니다 - `user-init` 은 fish 설정 등 홈 폴더/셸 초기화를 위한 곳이라, code-server 내부(`/code/.local/share/code-docker/code`)를 다루는 이 로직과는 관심사를 분리했습니다.
+
+### `code-extensions.*.sh` (내장 webmanager 확장 동기화)
+
+code-server가 시작될 때마다 (`code-service.*.sh` 에서, `code-settings` 다음에) 실행되어, 이미지에 들어 있는 webmanager 확장(`webmanager/vscode-extension/`, 빌드 때 `.vsix` 로 묶임)을 그 빌드 그대로 설치해 둡니다. 버전이 아니라 확장 소스의 해시로 비교하므로 확장만 바꿔 다시 빌드해도 반드시 반영되고(업데이트·다운그레이드 모두), 달라진 게 없으면 파일 몇 개만 읽고 넘어갑니다. Extensions 화면에서 지워도 다음 시작 때 다시 깔립니다 — 끄려면 `.env` 에 `CODE_WEBMANAGER_EXTENSION=false` 를 두세요(지우고 다시 깔지 않음). 실패해도 경고만 남기고 code-server는 그대로 뜹니다. 확장이 하는 일은 [webmanager 문서의 "code-server 안에서 쓰기"](webmanager.md#code-server-안에서-쓰기-내장-확장) 참고.
 
 ### `code-patch/` (기본 제공 브라우저 패치 모음)
 

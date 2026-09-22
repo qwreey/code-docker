@@ -36,6 +36,17 @@ else
     /etc/code-docker/code/code-settings.default.sh
 fi
 
+# Keep the built-in webmanager extension at this image's build. Non-
+# essential: a failure warns and code-server starts anyway.
+if [ -e /etc/code-docker/code/code-extensions.override.sh ]; then
+    CODE_EXTENSIONS_SCRIPT=/etc/code-docker/code/code-extensions.override.sh
+else
+    CODE_EXTENSIONS_SCRIPT=/etc/code-docker/code/code-extensions.default.sh
+fi
+if ! "$CODE_EXTENSIONS_SCRIPT"; then
+    echo "WARN: code-extensions sync failed - continuing without it"
+fi
+
 # source code env
 if [ -e /etc/code-docker/code/code-env.override.sh ]; then
     source /etc/code-docker/code/code-env.override.sh

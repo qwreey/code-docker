@@ -1,0 +1,34 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+#cd-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  display: block;
+}
+
+#cd-banner {
+  padding: 6px 10px;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-editorWarning-foreground);
+  background: var(--vscode-editorWidget-background);
+  border-bottom: 1px solid var(--vscode-editorWidget-border);
+}
+
+#cd-banner[hidden] {
+  display: none;
+}

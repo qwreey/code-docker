@@ -672,3 +672,10 @@
     height: calc(100dvh - var(--kb-inset, 0px));
   }
 }
+
+/* Embed mode's "session ended" card (Terminal.tsx): two actions side by side. */
+.terminal-ended-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}

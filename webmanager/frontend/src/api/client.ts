@@ -65,8 +65,19 @@ export function onAuthStatusChange(cb: () => void): () => void {
   return () => authStatusListeners.delete(cb)
 }
 
+// Other pages of this same origin get told too: every code-server
+// extension view is its own copy of webmanager (see embed.ts), and so is a
+// second browser tab. They share the unlock cookie already, but each would
+// otherwise keep showing its own lock prompt until something made it
+// re-check. A message received here only notifies this page's own
+// listeners - never re-broadcast - so two pages can't echo forever.
+const authChannel: BroadcastChannel | null =
+  typeof BroadcastChannel === 'function' ? new BroadcastChannel('webmanager-auth') : null
+authChannel?.addEventListener('message', () => authStatusListeners.forEach((cb) => cb()))
+
 function notifyAuthStatusChange() {
   authStatusListeners.forEach((cb) => cb())
+  authChannel?.postMessage('changed')
 }
 
 // import.meta.env.BASE_URL is '/' in dev and '/manager/' in a production

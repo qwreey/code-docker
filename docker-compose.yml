@@ -116,6 +116,7 @@ services:
       # code-server's own env var, passed straight through - the default
       # (proxy off) lives in code-server-autoinstall's start.sh, not here.
       CS_DISABLE_PROXY: "${CS_DISABLE_PROXY:-}"
+      CODE_WEBMANAGER_EXTENSION: "${CODE_WEBMANAGER_EXTENSION:-}"
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-}"
       NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
       # The WebDAV-only nginx listener (see example-env). Not published to

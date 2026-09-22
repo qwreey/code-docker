@@ -312,9 +312,19 @@ func relayTerminalSession(ctx context.Context, conn *websocket.Conn, sess *terms
 	// come. The ctx.Done() branch lets this goroutine exit once the normal
 	// path's own `defer cancel()` fires, so it doesn't leak past this
 	// connection's lifetime.
+	//
+	// Closes with an explicit 1000 "session ended" first rather than only
+	// cancelling: cancelling makes the library drop the TCP connection with
+	// no close frame, which a client sees as 1006 - identical to webmanager
+	// restarting or the network dropping. The embedded terminal view
+	// (code-server extension) tells those apart by exactly this: an ended
+	// session gets an "ended" card, anything else reconnects (and so
+	// recreates the session). `webmanager --attach` reads 1000 as "the
+	// session ended" too.
 	go func() {
 		select {
 		case <-sess.Done():
+			_ = conn.Close(websocket.StatusNormalClosure, "session ended")
 			cancel()
 		case <-ctx.Done():
 		}

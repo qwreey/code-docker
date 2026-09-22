@@ -42,6 +42,23 @@ RUN go mod download
 COPY webmanager/backend/ ./
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /webmanager .
 
+# code-docker's built-in webmanager extension for code-server
+# (webmanager/vscode-extension/, plain JS - no build step beyond packaging).
+# The stamp is a hash of the extension's source files, so it changes exactly
+# when the extension does, whatever the layer cache did; code-extensions.
+# default.sh compares it on every start to keep the installed copy in sync
+# with this image (installing, upgrading or downgrading as needed).
+FROM node:24-alpine AS code-extension
+RUN npm install -g @vscode/vsce@3
+WORKDIR /src
+COPY webmanager/vscode-extension/ ./
+RUN STAMP="$(find . -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-16)" \
+ && VER="$(node -p 'require("./package.json").version')" \
+ && printf '{"build":"%s"}\n' "$STAMP" > build.json \
+ && mkdir /out \
+ && vsce package --no-dependencies --skip-license --allow-missing-repository -o /out/code-docker-webmanager.vsix \
+ && printf '%s %s\n' "$VER" "$STAMP" > /out/code-docker-webmanager.stamp
+
 FROM archlinux AS main
 
 # Init makepkg user and install yay
@@ -67,6 +84,7 @@ COPY --from=docker-bin /usr/local/bin/docker /usr/bin/docker
 COPY --from=webmanager-backend /webmanager /etc/code-docker/webmanager/webmanager
 COPY --from=webmanager-frontend /src/webmanager/frontend/dist /etc/code-docker/webmanager/static
 COPY example-env.webmanager /etc/code-docker/webmanager/example-env.webmanager
+COPY --from=code-extension /out/ /etc/code-docker/code/extensions/
 
 # Log directories for per-program rotated log files (read by vector).
 # tailscaled/tailscale-forward/tailscale-status/caddy-adapter moved to

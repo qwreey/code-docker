@@ -263,6 +263,14 @@
 # the key.
 #CS_DISABLE_PROXY="1"
 
+# code-docker's built-in webmanager extension for code-server: webmanager
+# terminal sessions (and any other webmanager tab) as editor tabs and in the
+# bottom panel's "webmanager" tab. Installed automatically and kept at this
+# image's build on every start - an uninstall from the Extensions view is
+# undone at the next start. "false" removes it and keeps it removed.
+# Needs code-server over HTTPS (or localhost); see docs/webmanager.md.
+#CODE_WEBMANAGER_EXTENSION="true"
+
 # Comma-separated allowlist of Host header values the in-container nginx
 # will accept on port 80 (e.g. "code.yaeji.moe" or "code.yaeji.moe,
 # 192.168.1.50"), no scheme/port. Empty (default) disables the check

@@ -29,6 +29,7 @@ import { useAuthStatus } from './components/common/useAuthStatus'
 import { ensureUnlocked } from './components/common/useUnlockGate'
 import { withViewTransition } from './utils/viewTransition'
 import { useEmbedEscapeClose } from './utils/embedEscape'
+import { EMBED, embedParams, postToHost, reportEmbedState } from './embed'
 import './App.css'
 
 // FileManager pulls in the CodeMirror editor chunk and is a sizable feature
@@ -114,6 +115,7 @@ function writeQuery(key: string, value: string | null) {
   else params.delete(key)
   const qs = params.toString()
   window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''))
+  reportEmbedState()
 }
 
 function App() {
@@ -166,8 +168,11 @@ function App() {
   // Only meaningful for the very first render of the Terminal tab — see
   // Terminal.tsx's restoreSession prop for why a URL-supplied session name
   // must be verified rather than selected blind.
+  // An embedded terminal view is opened *for* its session - Terminal.tsx
+  // takes it straight from embedParams and recreates it if it's gone,
+  // rather than falling back to Home the way a stale bookmark does.
   const [restoreTerminalSession, setRestoreTerminalSession] = useState<string | null>(
-    () => (initialSplit.section === 'terminal' ? initialQuery.get('session') : null),
+    () => (initialSplit.section === 'terminal' && !EMBED ? initialQuery.get('session') : null),
   )
   // The file browser as an overlay over the current tab (see
   // FileManagerDialog). '' means "the default root", matching FileManager's
@@ -185,6 +190,12 @@ function App() {
   // terminal already running `claude --resume <id>`.
   function openInTerminal(cwd: string, label?: string, command?: string) {
     setProjectInfoPath(null)
+    // An embedded view shows one page only; the extension opens the
+    // terminal as its own tab instead.
+    if (EMBED) {
+      postToHost({ type: 'open-terminal', cwd, label, command })
+      return
+    }
     setPendingTerminalOpen({ cwd, label, command })
     withViewTransition(() => setActive('terminal'))
   }
@@ -194,6 +205,10 @@ function App() {
   // jump back to a session rather than spawning a duplicate.
   function openTerminalSession(name: string) {
     setProjectInfoPath(null)
+    if (EMBED) {
+      postToHost({ type: 'open-terminal', session: name })
+      return
+    }
     setPendingTerminalOpen({ session: name })
     withViewTransition(() => setActive('terminal'))
   }
@@ -249,6 +264,10 @@ function App() {
 
   useEmbedEscapeClose()
 
+  useEffect(() => {
+    reportEmbedState()
+  }, [active])
+
   return (
     /* The Terminal tab hides the app's own mobile top bar and adopts its
        hamburger into its own header row (Terminal.tsx / Terminal.css) — with
@@ -257,8 +276,9 @@ function App() {
     <div
       className={`app-shell${active === 'terminal' ? ' app-shell-terminal' : ''}${
         sidebarCollapsed ? ' app-shell-sidebar-collapsed' : ''
-      }`}
+      }${EMBED ? ' app-shell-embed' : ''}`}
     >
+      {!EMBED && (
       <div className="mobile-topbar">
         <button
           type="button"
@@ -271,6 +291,8 @@ function App() {
         </button>
         <span className="mobile-topbar-title">webmanager</span>
       </div>
+      )}
+      {!EMBED && (
       <SidebarContainer
         active={active}
         onSelect={(id) => (IFRAME_SECTIONS.has(id) ? setActive(id) : withViewTransition(() => setActive(id)))}
@@ -279,6 +301,7 @@ function App() {
         collapsed={sidebarCollapsed}
         onToggleCollapsed={toggleSidebarCollapsed}
       />
+      )}
       {/* EnvVersionBanner lives here, above .app-content rather than inside
           it, deliberately — Terminal.css's full-bleed layout relies on
           .terminal-section being .app-content's *only* child (negative
@@ -295,7 +318,7 @@ function App() {
           screen, which is wider than it is tall. A narrow full-height strip
           at the left edge costs no vertical space at all. Desktop-only; the
           mobile drawer has its own .mobile-topbar hamburger (see App.css). */}
-      {sidebarCollapsed && (
+      {sidebarCollapsed && !EMBED && (
         <button
           type="button"
           className="sidebar-rail"
@@ -315,8 +338,8 @@ function App() {
           if (e.target === e.currentTarget) setSidebarShift(null)
         }}
       >
-        <EnvVersionBanner />
-        <RouterAuthSetupBanner />
+        {!EMBED && <EnvVersionBanner />}
+        {!EMBED && <RouterAuthSetupBanner />}
         <main className="app-content">
           {active === 'supervisor' && <Supervisor />}
           {active === 'ssh-keys' && <SshKeys />}
@@ -356,7 +379,10 @@ function App() {
                 onInitialOpenConsumed={() => setPendingTerminalOpen(null)}
                 onOpenFileManager={openFileManagerOverlay}
                 onOpenProject={openProjectInfo}
-                onToggleSidebar={() => setSidebarOpen((v) => !v)}
+                onToggleSidebar={EMBED ? undefined : () => setSidebarOpen((v) => !v)}
+                embedSession={EMBED ? embedParams.session : undefined}
+                embedCwd={EMBED ? embedParams.cwd : undefined}
+                embedCommand={EMBED ? embedParams.command : undefined}
                 restoreSession={restoreTerminalSession}
                 onRestoreSessionConsumed={() => setRestoreTerminalSession(null)}
                 onActiveSessionChange={handleActiveSessionChange}

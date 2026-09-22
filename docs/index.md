@@ -213,8 +213,10 @@ attach '세션 1'          # 이름에 공백이 있으면 따옴표 필수
 ```
 
 - 없는 이름을 주면 그 이름으로 **새 세션이 만들어집니다** (브라우저 탭 목록에도 나타납니다). 붙기 직전에 `joining existing session ...` / `creating new session ...` 중 어느 쪽인지 한 줄로 알려주니, 오타로 새 세션을 만든 경우 바로 보입니다.
+- 새 세션은 시작 디렉터리를 안 주면 **`attach`를 실행한 그 디렉터리**에서 시작합니다 — 프로젝트로 `cd`하거나 code-server 터미널을 프로젝트에서 연 다음 `attach <새 이름>` 하면 바로 그 자리입니다. 상대 경로도 실행한 위치 기준입니다. 이미 있는 세션에 붙을 때는 위치를 건드리지 않습니다.
 - 이름에 공백이 있는데 따옴표를 빼먹으면 두 번째 토큰이 **시작 디렉터리**로 해석됩니다 (`attach 세션 1` → 이름 `세션` + 시작 디렉터리 `1`). 기본 세션 이름이 `세션 1` 형태라 실수하기 쉽습니다.
-- fish 자동완성으로 세션 이름 후보가 나옵니다. webmanager [비밀번호 게이트](webmanager-config.md#비밀번호-게이트)가 켜져 있으면, 직전 `attach`가 비밀번호를 입력할 때 캐시해둔 인증 쿠키가 살아있는 동안(마지막 사용 후 10분)만 후보가 채워집니다.
+- fish 자동완성으로 세션 이름 후보가 나옵니다. webmanager [비밀번호 게이트](webmanager-config.md#비밀번호-게이트)가 켜져 있어도 마찬가지입니다 — 세션 **이름 목록만**은 게이트 밖(`GET /api/terminal/session-names`)에서 읽을 수 있게 열어뒀습니다. 이름 외의 정보(cwd, pid 등)는 여전히 게이트 안이고, 실제로 붙는 것도 비밀번호를 거칩니다.
+- code-server 안에서라면 `attach`보다 내장 확장이 낫습니다 — 커맨드 팔레트 `webmanager: Open Terminal Session…`으로 webmanager 터미널 자체를 에디터 탭이나 바닥 패널에 띄우므로 복사·스크롤이 브라우저 탭과 같습니다([code-server 안에서 쓰기](webmanager.md#code-server-안에서-쓰기-내장-확장)).
 - 세션 안에서 또 `attach`를 실행하는 중첩은 막혀 있습니다 (세션끼리 순환하면 서로를 비추게 되므로). 먼저 빠져나온 뒤 붙으세요.
 
 **빠져나오기는 `Ctrl+]`** 입니다. 세션은 그대로 살아있고, 이 클라이언트만 떨어집니다.
@@ -408,7 +410,7 @@ webmanager 자체 비밀번호 게이트를 켜는 방법과, 이미지를 업�
 - **셸**: `shell.*` (`config/shell/`, `script/get-user-shell.sh`가 default/override를 고름)
 - **git 훅**: `config/git/hooks/`의 `prepare-commit-msg.*.sh`/`commit-msg.*.sh`(에이전트가 붙이는 `Co-Authored-By: Claude ... <noreply@anthropic.com>` trailer를 원하는 이름/이메일로 치환하고 `Claude-Session:` 줄 제거 — 기본 꺼짐, webmanager Git Config 탭에서 켬)
 - **webmanager**: `webmanager.*.sh`, `example-env.webmanager`(런타임 환경변수 템플릿, 저장소 루트)
-- **기타**: `supervisord.*.conf`, `supervisord/*.conf`(빌드 타임에 이미지로 들어가는 사용자 서비스 — 런타임에 재빌드 없이 추가하려면 [직접 만든 서비스를 supervisord에 올리기](#직접-만든-서비스를-supervisord에-올리기-재빌드-없이) 쪽을 쓰세요), `supervisor-metadata.*.yaml`(webmanager의 Supervisor 탭이 읽지만 프로그램 폴더 밖에 있는 전역 메타데이터), `user-init.*.sh`, `sshd-service.*.sh`, `dns-local.*.sh`(strict-order dnsmasq로 로컬 DNS 리졸버 실행, [build-customization.md](build-customization.md) 참고), `code-patch.*.sh`, `code-patch/`, `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`, `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅, `NGINX_LOG_LEVEL`로 access_log 상세도 조절 — `/tailscale/`·`/dev-proxy/`·`/exports/`는 이제 router 자신의 nginx가 직접 종단합니다, [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고), `nginx-error.*.html`(code-server가 아직 안 떴을 때 502 대신 보여주는 자동 재시도 페이지)
+- **기타**: `supervisord.*.conf`, `supervisord/*.conf`(빌드 타임에 이미지로 들어가는 사용자 서비스 — 런타임에 재빌드 없이 추가하려면 [직접 만든 서비스를 supervisord에 올리기](#직접-만든-서비스를-supervisord에-올리기-재빌드-없이) 쪽을 쓰세요), `supervisor-metadata.*.yaml`(webmanager의 Supervisor 탭이 읽지만 프로그램 폴더 밖에 있는 전역 메타데이터), `user-init.*.sh`, `sshd-service.*.sh`, `dns-local.*.sh`(strict-order dnsmasq로 로컬 DNS 리졸버 실행, [build-customization.md](build-customization.md) 참고), `code-patch.*.sh`, `code-patch/`, `code-extensions.*.sh`(내장 webmanager 확장을 이미지의 빌드로 매 시작 동기화, [build-customization.md](build-customization.md) 참고), `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`, `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅, `NGINX_LOG_LEVEL`로 access_log 상세도 조절 — `/tailscale/`·`/dev-proxy/`·`/exports/`는 이제 router 자신의 nginx가 직접 종단합니다, [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고), `nginx-error.*.html`(code-server가 아직 안 떴을 때 502 대신 보여주는 자동 재시도 페이지)
 
 router 컨테이너(`router/` 서브모듈, 별도 레포 [qwreey/router-docker](https://github.com/qwreey/router-docker)) 자체의 override 파일 목록은 [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md)를
 확인하세요 — `router/config/netgate/`, `router/config/tailscale/`,

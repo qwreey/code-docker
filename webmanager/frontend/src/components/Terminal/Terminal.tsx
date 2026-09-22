@@ -26,6 +26,7 @@ import { TerminalSettingsPanel } from './TerminalSettingsPanel'
 import { TerminalTabs, HOME_TAB_ID } from './TerminalTabs'
 import { TerminalHome } from './TerminalHome'
 import { useKeyboardInset } from './useKeyboardInset'
+import { onHostMessage, postToHost, reportEmbedState } from '../../embed'
 import './Terminal.css'
 
 // Options a new session can be created with — only meaningful the moment a
@@ -661,6 +662,9 @@ export function Terminal({
   restoreSession,
   onRestoreSessionConsumed,
   onActiveSessionChange,
+  embedSession,
+  embedCwd,
+  embedCommand,
 }: {
   initialOpen?: { cwd?: string; label?: string; command?: string; session?: string } | null
   onInitialOpenConsumed?: () => void
@@ -680,7 +684,17 @@ export function Terminal({
   restoreSession?: string | null
   onRestoreSessionConsumed?: () => void
   onActiveSessionChange?: (name: string | null) => void
+  // Embed mode (code-server extension view, see embed.ts). embedSession set
+  // means this view *is* that one session: no tab bar, connected straight
+  // away (creating it in embedCwd, running embedCommand, if it doesn't
+  // exist), and a session that ends shows an "ended" card rather than
+  // falling back to Home. embedCwd alone (an unbound panel slot showing
+  // Home) is the default directory for new sessions.
+  embedSession?: string | null
+  embedCwd?: string
+  embedCommand?: string
 } = {}) {
+  const embedded = embedSession !== undefined
   const containerRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -774,7 +788,12 @@ export function Terminal({
   // sessions from a previous browser session (e.g. pinned ones) still show
   // up normally via refreshSessions() below — this only affects whether a
   // brand new session gets created/attached on mount.
-  const [activeSession, setActiveSession] = useState<string>(HOME_TAB_ID)
+  const [activeSession, setActiveSession] = useState<string>(() => embedSession || HOME_TAB_ID)
+  // Embed only: the session this view shows ended (its shell exited).
+  const [sessionEnded, setSessionEnded] = useState(false)
+  // Embed only: where to recreate the session if it has to be - its live
+  // cwd as last seen, else the directory the view was opened with.
+  const embedCwdRef = useRef(embedCwd)
   const [sessionActionError, setSessionActionError] = useState<string | null>(null)
   const [profiles, setProfiles] = useState<TerminalProfile[]>([])
   const [profilesError, setProfilesError] = useState<string | null>(null)
@@ -789,7 +808,9 @@ export function Terminal({
   // render should react to. Cleared once consumed; harmless if it weren't
   // (GetOrCreate ignores opts on reattach) but keeping it tidy avoids
   // resending stale values on an unrelated later reconnect.
-  const pendingCreateOptionsRef = useRef<Map<string, { cwd?: string; command?: string }>>(new Map())
+  const pendingCreateOptionsRef = useRef<Map<string, { cwd?: string; command?: string }>>(
+    new Map(embedSession ? [[embedSession, { cwd: embedCwd, command: embedCommand }]] : []),
+  )
   const keyboardInset = useKeyboardInset()
   // Mirrored for keepFocus, which runs inside event handlers created before
   // the current render.
@@ -2718,7 +2739,11 @@ export function Terminal({
     const pending = pendingCreateOptionsRef.current.get(activeSession)
     pendingCreateOptionsRef.current.delete(activeSession)
     const params = new URLSearchParams({ session: activeSession })
-    if (pending?.cwd) params.set('cwd', pending.cwd)
+    // An embedded view always says where its session lives: the backend
+    // ignores it for a live session, and uses it to recreate one that died
+    // (idle GC, webmanager restart) under the same name in the same place.
+    const cwd = pending?.cwd ?? (embedded ? embedCwdRef.current : undefined)
+    if (cwd) params.set('cwd', cwd)
     if (pending?.command) params.set('cmd', pending.command)
 
     // The container was hidden until the render that scheduled this effect
@@ -2775,10 +2800,30 @@ export function Terminal({
     // guard the old socket's delayed onclose/onerror would clobber the new
     // tab's real status back to 'disconnected'. Same bug class as the
     // Ctrl+D ghost-tab fix above (activeSessionRef).
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       if (wsRef.current !== ws) return
       setState('disconnected')
       refreshSessions().then((data) => {
+        // Embedded: 1000 is the server closing because the shell exited -
+        // the session is over, say so and offer to start it again. Any other
+        // close (1006: webmanager restarted, network) falls through to the
+        // ordinary reconnect below, which recreates the session if it's
+        // gone - that's the whole "survives a refresh/restart" promise of an
+        // embedded view, so it must not fall back to Home either way.
+        if (embedded) {
+          if (
+            event.code === 1000 &&
+            data &&
+            activeSessionRef.current === activeSession &&
+            !data.some((s) => s.name === activeSession)
+          ) {
+            setSessionEnded(true)
+            postToHost({ type: 'session-ended', session: activeSession })
+            return
+          }
+          if (autoReconnectEnabledRef.current && activeSessionRef.current === activeSession) scheduleReconnect()
+          return
+        }
         if (data && activeSessionRef.current === activeSession && !data.some((s) => s.name === activeSession)) {
           // Session genuinely gone (e.g. Ctrl+D exited the shell) - nothing
           // to reconnect to, so fall back to Home instead of scheduling a
@@ -2826,7 +2871,7 @@ export function Terminal({
       // "don't keep retrying a tab the user left" guard this exists for.
       clearScheduledReconnect()
     }
-  }, [activeSession, refreshSessions, reconnectNonce, fitIfVisible, scheduleReconnect, clearScheduledReconnect])
+  }, [activeSession, refreshSessions, reconnectNonce, fitIfVisible, scheduleReconnect, clearScheduledReconnect, embedded])
 
   const selectSession = useCallback(
     (name: string) => {
@@ -2839,12 +2884,13 @@ export function Terminal({
     (opts?: SessionCreateOptions) => {
       const alsoTaken = activeSession === HOME_TAB_ID ? '' : activeSession
       const name = nextSessionName(sessions, alsoTaken, opts?.label)
-      if (opts && (opts.cwd || opts.command)) {
-        pendingCreateOptionsRef.current.set(name, { cwd: opts.cwd, command: opts.command })
+      const cwd = opts?.cwd ?? (embedded ? embedCwdRef.current : undefined)
+      if (cwd || opts?.command) {
+        pendingCreateOptionsRef.current.set(name, { cwd, command: opts?.command })
       }
       setActiveSession(name)
     },
-    [sessions, activeSession],
+    [sessions, activeSession, embedded],
   )
 
   // A touch device is the only place the touch-mode selector means
@@ -2869,6 +2915,22 @@ export function Terminal({
   useEffect(() => {
     onActiveSessionChange?.(activeSession === HOME_TAB_ID ? null : activeSession)
   }, [activeSession, onActiveSessionChange])
+
+  // Embed: keep the extension told what this view shows - it titles the
+  // tab with the session name and restores from the last live cwd.
+  const activeInfo = useMemo(
+    () => (activeSession === HOME_TAB_ID ? undefined : sessions.find((s) => s.name === activeSession)),
+    [sessions, activeSession],
+  )
+  useEffect(() => {
+    if (!embedded) return
+    if (activeInfo?.cwd) embedCwdRef.current = activeInfo.cwd
+    reportEmbedState({
+      session: activeSession === HOME_TAB_ID ? null : activeSession,
+      cwd: embedCwdRef.current,
+      pinned: activeInfo?.pinned,
+    })
+  }, [embedded, activeSession, activeInfo])
 
   // Restores ?session=<name> from the URL. Deliberately not routed through
   // the initialOpen path below: selecting an unknown name there would
@@ -2960,6 +3022,19 @@ export function Terminal({
     },
     [activeSession, refreshSessions],
   )
+
+  // Embed: the extension's view actions (pin, rename) and focus hand-off.
+  // Done here rather than by the extension itself because this page holds
+  // the unlock cookie those gated PATCHes need.
+  useEffect(() => {
+    if (!embedded) return
+    return onHostMessage((msg) => {
+      if (msg.type === 'focus') termRef.current?.focus()
+      if (activeSession === HOME_TAB_ID) return
+      if (msg.type === 'pin') void togglePin(activeSession, msg.pinned)
+      if (msg.type === 'rename') void renameSession(activeSession, msg.name)
+    })
+  }, [embedded, activeSession, togglePin, renameSession])
 
   const closeSession = useCallback(
     async (name: string) => {
@@ -3082,7 +3157,7 @@ export function Terminal({
             <Menu size={18} />
           </button>
         )}
-        <h1>Terminal</h1>
+        {!embedded && <h1>Terminal</h1>}
         <div className="terminal-header-actions">
           {isCoarsePointer && activeSession !== HOME_TAB_ID && (
             <div className="terminal-touch-mode" role="group" aria-label="터치 동작 모드">
@@ -3171,6 +3246,7 @@ export function Terminal({
           </button>
         </div>
       </div>
+      {!embedded && (
       <TerminalTabs
         sessions={sessions}
         activeSession={activeSession}
@@ -3184,6 +3260,7 @@ export function Terminal({
         showZoomGroup={!controlBarEnabled}
         onZoom={zoom}
       />
+      )}
       {settingsError && (
         <p className="terminal-inline-notice">터미널 설정을 불러오지 못했습니다 ({settingsError}) — 기본값을 사용합니다.</p>
       )}
@@ -3204,7 +3281,34 @@ export function Terminal({
             button still works either way; while a retry is pending it also
             jumps the queue (reconnect() resets the backoff), so it's never
             just a duplicate of waiting. */}
-        {activeSession !== HOME_TAB_ID && state === 'disconnected' && (
+        {sessionEnded && (
+          <div className="terminal-disconnect-overlay">
+            <div className="terminal-disconnect-card">
+              <p>세션이 종료되었습니다</p>
+              <p className="terminal-disconnect-subtext">{activeSession}</p>
+              <div className="terminal-ended-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-small"
+                  onClick={() => {
+                    setSessionEnded(false)
+                    reconnect()
+                  }}
+                >
+                  다시 시작
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small"
+                  onClick={() => postToHost({ type: 'close-request' })}
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {activeSession !== HOME_TAB_ID && state === 'disconnected' && !sessionEnded && (
           <div className="terminal-disconnect-overlay">
             <div className="terminal-disconnect-card">
               {pendingReconnect ? (

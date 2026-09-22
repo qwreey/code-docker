@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { EMBED } from '../embed'
 
 // When webmanager is opened as code-server's overlay widget
 // (config/code/code-patch/webmanager-launcher.default.js embeds /manager/ in
@@ -16,7 +17,9 @@ const DIALOG_SELECTOR = '[role="dialog"], [role="alertdialog"]'
 
 export function useEmbedEscapeClose() {
   useEffect(() => {
-    if (window.parent === window) return
+    // The code-server extension's views have no overlay to close, and
+    // Escape there belongs to whatever is focused.
+    if (window.parent === window || EMBED) return
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Escape') return
