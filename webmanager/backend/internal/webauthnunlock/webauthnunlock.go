@@ -372,9 +372,16 @@ func (m *Manager) BeginRegistration(rpID, label string) (*protocol.CredentialCre
 	for _, c := range u.creds {
 		exclude = append(exclude, c.Descriptor())
 	}
+	// A discoverable credential (a passkey), not "discouraged": on Android,
+	// Chrome sends a discouraged request down the old Play Services FIDO2
+	// path, which offered a security key or a Google Password Manager entry
+	// that led nowhere instead of the fingerprint. Required goes through
+	// Android's Credential Manager and the device's passkey provider. No
+	// authenticatorAttachment: "platform" would drop a USB-attached one such
+	// as passkeyd on a Linux desktop, which advertises rk but is still HID.
 	creation, data, err := rp.BeginRegistration(u,
 		webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{
-			ResidentKey:      protocol.ResidentKeyRequirementDiscouraged,
+			ResidentKey:      protocol.ResidentKeyRequirementRequired,
 			UserVerification: protocol.VerificationRequired,
 		}),
 		webauthn.WithConveyancePreference(protocol.PreferNoAttestation),

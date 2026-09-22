@@ -80,3 +80,13 @@ Reviewed and cleared: origin/RP ID, UV, sign counter, the 12h cap, hash revocati
 
 - **router-manager** has its own authgate copy (`ROUTER_MANAGER_AUTH_PASSWORD_HASH`). It could get the same feature. Its cross-origin iframe inside webmanager would need `allow="publickey-credentials-get <origin>"` on `RouterFrame.tsx`, and Safari can't enroll from a cross-origin iframe, so enrollment would have to happen on router's own page. Deferred, as the owner decided (webmanager first).
 - **The device list can't mark which entry is this browser's own.** Deleting any entry clears the local "enrolled" flag, which only turns off the automatic attempt.
+
+## 2026-09-22: residentKey discouraged → required (Android)
+
+Owner report from a tablet: enrolling or unlocking asked for a physical security key, and the Google Password Manager entry it offered only opened GPM's main page. Cause: `residentKey: "discouraged"` is what makes Chrome on Android use the legacy Play Services **FIDO2 API** (Google's attestation-format post: the FIDO2 API "is invoked by setting the residentKey parameter to discouraged"), the older sheet with security-key/GPM options, instead of the passkey path through Android's Credential Manager and the chosen passkey provider. Registration now asks for `required`.
+
+Not taken: the suggested `authenticatorAttachment: "platform"`. Per the spec an omitted attachment means no filter (not "cross-platform"), and "platform" would exclude a USB/HID-attached authenticator — passkeyd on the owner's Linux desktop is exactly that (it advertises `rk` and `plat` in getInfo but reaches Chrome over uhid). passkeyd supports resident keys, so `required` doesn't cost it anything.
+
+Consequences: a new enrollment is a passkey, so with Google Password Manager it syncs to the owner's other Android/Chrome devices; enrolling again on a device that already holds one is refused by `excludeCredentials`. Credentials enrolled before this stay non-discoverable and keep working (unlock still sends `allowCredentials`).
+
+Verified on the test stack with a CDP virtual authenticator (gate on): enrollment offer → enroll (the authenticator's credential is `isResidentCredential: true`), fingerprint unlock, UV failure stays locked, sidebar modal auto-try. **Needs the tablet re-test**; enrollments already made on the tablet (if any) should be deleted and redone.
