@@ -687,3 +687,14 @@
   padding-top: 0.45rem;
   padding-bottom: 0.45rem;
 }
+
+/* Pinned is a state, not a call to action: an accent outline and icon
+   rather than a filled primary button that pulls the eye every glance. */
+.terminal-pin-on {
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
+.terminal-pin-on:hover:not(:disabled) {
+  background: var(--accent-bg);
+}

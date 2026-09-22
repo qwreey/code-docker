@@ -9,7 +9,6 @@ import {
   Menu,
   MousePointer2,
   Pin,
-  PinOff,
   Settings,
   TextSelect,
   ZoomIn,
@@ -3273,14 +3272,14 @@ export function Terminal({
           {embedded && activeSession !== HOME_TAB_ID && (
             <button
               type="button"
-              className={`btn btn-small ${activeInfo?.pinned ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn btn-small btn-secondary${activeInfo?.pinned ? ' terminal-pin-on' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => void togglePin(activeSession, !activeInfo?.pinned)}
-              title={activeInfo?.pinned ? '고정 해제 (유휴 자동 정리 대상이 됨)' : '고정 (유휴 자동 정리에서 제외)'}
+              title={activeInfo?.pinned ? '고정됨 - 누르면 해제 (유휴 자동 정리 대상이 됨)' : '고정 (유휴 자동 정리에서 제외)'}
               aria-pressed={!!activeInfo?.pinned}
             >
-              {activeInfo?.pinned ? <PinOff size={14} /> : <Pin size={14} />}{' '}
-              <span className="btn-label">{activeInfo?.pinned ? '고정 해제' : '고정'}</span>
+              <Pin size={14} />{' '}
+              <span className="btn-label">{activeInfo?.pinned ? '고정됨' : '고정'}</span>
             </button>
           )}
           {embedded && activeSession !== HOME_TAB_ID && !controlBarEnabled && (
