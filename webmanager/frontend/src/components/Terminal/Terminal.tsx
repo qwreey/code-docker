@@ -55,6 +55,9 @@ type ConnectionState = 'connecting' | 'connected' | 'disconnected'
 // within a beat, long enough to stay a cheap background poll.
 const CWD_POLL_INTERVAL_MS = 3000
 
+// The PTY size last sent on each socket (see sendResize).
+const sentSizes = new WeakMap<WebSocket, string>()
+
 const STATE_LABEL: Record<ConnectionState, string> = {
   connecting: '연결 중...',
   connected: '연결됨',
@@ -1043,15 +1046,22 @@ export function Terminal({
     const ws = wsRef.current
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'resize', cols, rows }))
+      sentSizes.set(ws, `${cols}x${rows}`)
       debugLogRef.current?.(`  (pty size ${cols}x${rows} sent: ${why})`)
     } else {
       debugLogRef.current?.(`  (pty size ${cols}x${rows} dropped, socket ${ws ? ws.readyState : 'none'}: ${why})`)
     }
   }, [])
 
+  // Only when the grid actually changed: every SIGWINCH makes the shell or a
+  // full-screen app repaint, and a pixel-level resize often lands on the
+  // same cols/rows. Keyed per socket, so a fresh connection always sends.
   const sendResize = useCallback(() => {
     const term = termRef.current
-    if (term) sendSize(term.cols, term.rows, 'resize')
+    const ws = wsRef.current
+    if (!term) return
+    if (ws && sentSizes.get(ws) === `${term.cols}x${term.rows}`) return
+    sendSize(term.cols, term.rows, 'resize')
   }, [sendSize])
 
   // Apply the zoom (font size) level live — same "initial value at creation,
@@ -1980,9 +1990,18 @@ export function Terminal({
     // whole screen anyway, while a shell prompt in the normal buffer (fish)
     // repaints on every SIGWINCH and would stack duplicate prompts.
     const REPAINT_NUDGE_DELAY_MS = 300
+    // A container that keeps changing size - VS Code animating a panel pane
+    // open or shut, a window being dragged - fired a fit and a PTY resize on
+    // every frame, and the app behind it redrew the whole screen each time.
+    // The first change of a burst still applies at once (a keyboard opening,
+    // a window snapping), the rest wait until the size has held still this
+    // long, then apply once.
+    const RESIZE_SETTLE_MS = 100
     let lastObservedRows = term.rows
     let repaintNudgeTimer = 0
-    const resizeObserver = new ResizeObserver(() => {
+    let resizeSettleTimer = 0
+    let lastResizeAt = 0
+    const applyResize = () => {
       // Also fires when the container is hidden on a switch to the Home tab
       // (a 0x0 box is still a size change), which is exactly the case
       // fitIfVisible exists to skip.
@@ -2011,12 +2030,21 @@ export function Terminal({
           outputProbeRef.current = null
         }, 600)
       }, REPAINT_NUDGE_DELAY_MS)
+    }
+    const resizeObserver = new ResizeObserver(() => {
+      const now = performance.now()
+      const inBurst = now - lastResizeAt < RESIZE_SETTLE_MS
+      lastResizeAt = now
+      window.clearTimeout(resizeSettleTimer)
+      if (!inBurst) applyResize()
+      resizeSettleTimer = window.setTimeout(applyResize, RESIZE_SETTLE_MS)
     })
     resizeObserver.observe(container)
 
     return () => {
       resizeObserver.disconnect()
       window.clearTimeout(repaintNudgeTimer)
+      window.clearTimeout(resizeSettleTimer)
       touchCleanup?.()
       oscDisposable.dispose()
       dataDisposable.dispose()
@@ -2795,6 +2823,7 @@ export function Terminal({
       // this effect running and the handshake completing.
       fitIfVisible()
       ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
+      sentSizes.set(ws, `${term.cols}x${term.rows}`)
       refreshSessions()
     }
     // Also refetches the session list on close, not just on open — the
