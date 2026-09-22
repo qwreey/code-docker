@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CollapseChevron } from './components/common/CollapseChevron'
 import { FileManagerDialog } from './components/FileManager/FileManagerDialog'
 import { ProjectInfoDialog } from './components/Projects/ProjectInfoDialog'
@@ -8,7 +8,7 @@ import type { SectionId } from './components/Layout/sections'
 import { Supervisor } from './components/Supervisor/Supervisor'
 import { SshKeys } from './components/SshKeys/SshKeys'
 import { GitConfig } from './components/GitConfig/GitConfig'
-import { RouterFrame } from './components/RouterEmbed/RouterFrame'
+import { RouterFrame, type RouterFrameCommand } from './components/RouterEmbed/RouterFrame'
 import { Logs } from './components/Logs/Logs'
 import { Processes } from './components/Processes/Processes'
 import { Projects } from './components/Projects/Projects'
@@ -30,7 +30,7 @@ import { useAuthStatus } from './components/common/useAuthStatus'
 import { ensureUnlocked } from './components/common/useUnlockGate'
 import { withViewTransition } from './utils/viewTransition'
 import { useEmbedEscapeClose } from './utils/embedEscape'
-import { EMBED, embedParams, postToHost, reportEmbedState } from './embed'
+import { EMBED, embedParams, onHostMessage, postToHost, reportEmbedState } from './embed'
 import './App.css'
 
 // FileManager pulls in the CodeMirror editor chunk and is a sizable feature
@@ -148,6 +148,59 @@ function App() {
     setActiveState(id)
     window.history.pushState(null, '', rootPath + id)
   }
+
+  // The VNC tab's frame stays mounted once visited, hidden while another
+  // tab shows, so leaving VNC doesn't disconnect its viewers - only closing
+  // a viewer's own tab does (router/frontend's Vnc.tsx). display:none is
+  // safe for a remote-resize viewer thanks to router's noVNC patch (no 0x0
+  // desktop request); coming back finds it at the same size.
+  const [vncVisited, setVncVisited] = useState(active === 'vnc')
+  if (active === 'vnc' && !vncVisited) setVncVisited(true)
+  // Which target is showing inside it (null = the target list), as router
+  // last reported - mirrored into ?target= while the tab is showing, the way
+  // Terminal mirrors ?session=.
+  const vncActiveRef = useRef<string | null>(
+    initialSplit.section === 'vnc' ? initialQuery.get('target') : null,
+  )
+  // Only for the frame's first load; later opens go through vncCommand.
+  const [vncInitialParams] = useState(() => {
+    const target = vncActiveRef.current
+    return target ? { target } : undefined
+  })
+  const [vncCommand, setVncCommand] = useState<RouterFrameCommand | null>(null)
+
+  const handleVncMessage = useCallback(
+    (data: Record<string, unknown>) => {
+      if (data.type !== 'vnc-state') return
+      vncActiveRef.current = typeof data.active === 'string' ? data.active : null
+      if (active === 'vnc') writeQuery('target', vncActiveRef.current)
+    },
+    [active],
+  )
+
+  // Coming back to the tab: the frame reports nothing new (nothing inside
+  // changed), but setActive just dropped the query, so put it back.
+  useEffect(() => {
+    if (active === 'vnc') writeQuery('target', vncActiveRef.current)
+  }, [active])
+
+  // Opens a VNC target as a tab in the (possibly already running) frame.
+  function openVncTarget(name: string) {
+    setVncCommand((prev) => ({ type: 'vnc-open', payload: { name }, seq: (prev?.seq ?? 0) + 1 }))
+    if (active !== 'vnc') withViewTransition(() => setActive('vnc'))
+  }
+
+  // The code-server extension's "Open VNC…" reuses a view already showing
+  // VNC by asking it to open the target there.
+  useEffect(
+    () =>
+      onHostMessage((msg) => {
+        if (msg.type === 'open-vnc' && msg.name) openVncTarget(msg.name)
+      }),
+    // re-subscribed per active tab so openVncTarget sees the current one
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [active],
+  )
 
   // Cross-tab "open in ..." actions (Projects/Files/Terminal) - each just
   // stashes a one-shot payload here and switches tabs; the target tab
@@ -349,7 +402,6 @@ function App() {
           {active === 'git-config' && <GitConfig />}
           {active === 'dev-proxy' && <RouterFrame tab="dev-proxy" />}
           {active === 'app-routes' && <RouterFrame tab="app-routes" />}
-          {active === 'vnc' && <RouterFrame tab="vnc" />}
           {active === 'tailscale' && <RouterFrame tab="tailscale" />}
           {active === 'dns' && <RouterFrame tab="dns" />}
           {active === 'net' && <RouterFrame tab="net" />}
@@ -418,6 +470,14 @@ function App() {
             <RequiresUnlock>
               <Sessions />
             </RequiresUnlock>
+          )}
+          {/* Last, so a section's own :first-child/only-child layout never
+              sees it. display:contents keeps RouterFrame.css's full-bleed
+              sizing measured against .app-content itself. */}
+          {vncVisited && (
+            <div style={{ display: active === 'vnc' ? 'contents' : 'none' }}>
+              <RouterFrame tab="vnc" params={vncInitialParams} onEmbedMessage={handleVncMessage} command={vncCommand} />
+            </div>
           )}
         </main>
       </div>

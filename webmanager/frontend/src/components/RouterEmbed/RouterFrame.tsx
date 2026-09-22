@@ -23,8 +23,22 @@ const LOAD_SETTLE_MS = 200
 // never come promptly.
 const LOAD_HARD_CAP_MS = 3000
 
+// A request for the embedded page, e.g. { type: 'vnc-open', name }. `seq`
+// makes a repeat of the same request a new value, so it is sent again.
+export interface RouterFrameCommand {
+  type: string
+  payload: Record<string, unknown>
+  seq: number
+}
+
 interface RouterFrameProps {
   tab: 'dev-proxy' | 'app-routes' | 'vnc' | 'tailscale' | 'dns' | 'net' | 'tinyauth' | 'settings'
+  // Extra query parameters for the initial load only (e.g. VNC's ?target=).
+  params?: Record<string, string>
+  // Messages the embedded page sends about itself (router/frontend's
+  // embedTheme.ts notifyEmbedParent), other than the 'ready' handled here.
+  onEmbedMessage?: (data: Record<string, unknown>) => void
+  command?: RouterFrameCommand | null
 }
 
 /**
@@ -42,20 +56,24 @@ interface RouterFrameProps {
  * these tabs specifically - a genuinely cross-origin iframe has no DOM/
  * cookie access into router-manager at all, unlike a same-origin embed.
  */
-export function RouterFrame({ tab }: RouterFrameProps) {
+export function RouterFrame(props: RouterFrameProps) {
   const trustedHosts = useRouterTrustedHosts()
 
   if (trustedHosts === null) return <Skeleton />
-  return <RouterIframe host={trustedHosts[0]} tab={tab} />
+  return <RouterIframe host={trustedHosts[0]} {...props} />
 }
 
 // host is undefined when no dedicated ROUTER_MANAGER_HOSTS domain is
 // configured - the iframe then just points at this same origin's own
 // /router/ path instead of a cross-origin one.
-function RouterIframe({ host, tab }: { host?: string; tab: RouterFrameProps['tab'] }) {
+function RouterIframe({ host, tab, params, onEmbedMessage, command }: RouterFrameProps & { host?: string }) {
   const { theme } = useTheme()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [loaded, setLoaded] = useState(false)
+  const onEmbedMessageRef = useRef(onEmbedMessage)
+  useEffect(() => {
+    onEmbedMessageRef.current = onEmbedMessage
+  })
 
   // src is only computed once per (host, tab) - the initial ?theme= just
   // avoids a flash on first paint (see router/frontend/src/embedTheme.ts);
@@ -73,7 +91,8 @@ function RouterIframe({ host, tab }: { host?: string; tab: RouterFrameProps['tab
     // to render a viewer - see router/frontend's own useViewerOrigin.ts.
     // Harmless for every other tab, which simply never reads it.
     const origin = encodeURIComponent(window.location.origin)
-    return `${base}/router/?embed=1&tab=${tab}&theme=${theme}&origin=${origin}`
+    const extra = params ? new URLSearchParams(params).toString() : ''
+    return `${base}/router/?embed=1&tab=${tab}&theme=${theme}&origin=${origin}${extra ? `&${extra}` : ''}`
   })
   const targetOrigin = host ? `https://${host}` : window.location.origin
 
@@ -91,9 +110,10 @@ function RouterIframe({ host, tab }: { host?: string; tab: RouterFrameProps['tab
     function onMessage(event: MessageEvent) {
       if (event.origin !== targetOrigin) return
       const data = event.data
-      if (data && typeof data === 'object' && data.source === MESSAGE_SOURCE && data.type === 'ready') {
-        setLoaded(true)
-      }
+      if (!data || typeof data !== 'object' || data.source !== MESSAGE_SOURCE) return
+      if (event.source !== iframeRef.current?.contentWindow) return
+      if (data.type === 'ready') setLoaded(true)
+      else onEmbedMessageRef.current?.(data)
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
@@ -102,6 +122,17 @@ function RouterIframe({ host, tab }: { host?: string; tab: RouterFrameProps['tab
   useEffect(() => {
     iframeRef.current?.contentWindow?.postMessage({ source: MESSAGE_SOURCE, type: 'theme', theme }, targetOrigin)
   }, [theme, targetOrigin])
+
+  // A command that arrives before the page inside has mounted would be
+  // lost (nothing listening yet), so it waits for `loaded` - the 'ready'
+  // message, normally.
+  useEffect(() => {
+    if (!command || !loaded) return
+    iframeRef.current?.contentWindow?.postMessage(
+      { source: MESSAGE_SOURCE, type: command.type, ...command.payload },
+      targetOrigin,
+    )
+  }, [command, loaded, targetOrigin])
 
   function handleLoad() {
     setTimeout(() => setLoaded(true), LOAD_SETTLE_MS)

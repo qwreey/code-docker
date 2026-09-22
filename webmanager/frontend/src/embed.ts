@@ -36,6 +36,7 @@ export type HostMessage =
   | { type: 'rename'; name: string }
   | { type: 'open-webauthn' }
   | { type: 'lock' }
+  | { type: 'open-vnc'; name: string }
 
 export function postToHost(msg: Record<string, unknown>) {
   if (!EMBED) return
