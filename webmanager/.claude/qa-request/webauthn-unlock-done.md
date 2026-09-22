@@ -58,6 +58,17 @@ Unit tests cover:
 - `webauthnunlock`: revocation, per-host scoping, RP ID and origin rules, single-use ceremonies.
 - `authgate.IssueFrom`: the cap, zero or future origin, and an unconfigured gate.
 
+## Code review follow-ups (2026-09-22, commit be3a88b)
+
+- **Ceremonies carry their kind** (register/unlock), and finishing one only accepts its own kind. Before this, an unlock challenge was issued ungated, and it could reach `FinishRegistration`. The only thing stopping that was go-webauthn happening to reject a login session's empty `CredParams`. Pinned by `TestCeremonyKindsDontMix`.
+- **At most 64 unfinished ceremonies**, oldest dropped (unlock/begin is ungated).
+- **Only verified-and-failed assertions feed the backoff.** An unknown or expired ceremony, or a malformed body, doesn't count. The backoff key is the TCP peer, which is nginx for every browser.
+- **Labels are cut by rune.**
+- **`Delete` rolls back memory when the save fails**, and a failed `PasswordAt` save is logged.
+- **Frontend:** 429 now shows "too many attempts". A 404 on unlock/begin clears this browser's enrolled flag.
+
+Reviewed and cleared: origin/RP ID, UV, sign counter, the 12h cap, hash revocation, gated vs. ungated routes, the `isUnlockPath` exclusions.
+
 ## Needs the owner (real devices, HTTPS)
 
 - **Android Chrome** (Google Password Manager, fingerprint) and **iPhone/iPad Safari** (Face/Touch ID).
