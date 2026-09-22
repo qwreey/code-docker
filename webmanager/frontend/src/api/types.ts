@@ -619,6 +619,10 @@ export interface AuthStatus {
   required: boolean
   unlocked: boolean
   unlockedUntil?: string | null // RFC3339, only set when unlocked
+  // Fingerprint (WebAuthn) unlock: can be enrolled on this host / has a
+  // credential enrolled here. See components/common/WebAuthn.tsx.
+  webauthnEnroll?: boolean
+  webauthn?: boolean
 }
 
 export interface FileEntry {

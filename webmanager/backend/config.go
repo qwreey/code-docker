@@ -61,6 +61,12 @@ type Config struct {
 	// existing reverse-proxy-only trust model.
 	AuthPasswordHash string
 
+	// WebAuthnEnabled turns fingerprint (WebAuthn) unlock of that gate on or
+	// off (internal/webauthnunlock); only meaningful while the gate is
+	// configured. WebAuthnPath is its credential store.
+	WebAuthnEnabled bool
+	WebAuthnPath    string
+
 	// FilesRoot defaults to /code rather than / — narrower, safer default;
 	// an operator who wants full-container browsing can widen it.
 	FilesRoot           string
@@ -224,6 +230,8 @@ func loadConfig() Config {
 		SupervisorMetadataOverridePath: getenv("WEBMANAGER_SUPERVISOR_METADATA_OVERRIDE_PATH", "/etc/code-docker/supervisor-metadata.override.yaml"),
 
 		AuthPasswordHash: getenv("WEBMANAGER_AUTH_PASSWORD_HASH", ""),
+		WebAuthnEnabled:  getenv("WEBMANAGER_WEBAUTHN_ENABLED", "true") != "false",
+		WebAuthnPath:     getenv("WEBMANAGER_WEBAUTHN_PATH", "/code/.local/share/code-docker/webmanager/webauthn.json"),
 
 		FilesRoot:           filesRoot,
 		FilesMaxUploadBytes: getenv("WEBMANAGER_FILES_MAX_UPLOAD_BYTES", "2147483648"),

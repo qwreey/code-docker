@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, ApiError, onAuthStatusChange, setUnlockPrompter } from '../../api/client'
 import { ErrorBanner } from './ErrorBanner'
+import { useAuthStatus } from './useAuthStatus'
+import { WebAuthnUnlockButton } from './WebAuthn'
+import { offerWebAuthnEnroll, webauthnUnlockAvailable } from './webauthnGate'
 import './UnlockModal.css'
 
 interface PendingUnlock {
@@ -22,6 +25,7 @@ export function UnlockModalHost() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const waitersRef = useRef<PendingUnlock[]>([])
+  const { status } = useAuthStatus()
 
   const prompt = useCallback(() => {
     return new Promise<void>((resolve, reject) => {
@@ -64,6 +68,13 @@ export function UnlockModalHost() {
     setSubmitting(false)
   }
 
+  function finishUnlocked() {
+    const waiters = waitersRef.current
+    waitersRef.current = []
+    resetForm()
+    waiters.forEach((w) => w.resolve())
+  }
+
   function handleCancel() {
     const waiters = waitersRef.current
     waitersRef.current = []
@@ -77,10 +88,9 @@ export function UnlockModalHost() {
     setSubmitError(null)
     try {
       await api.post<{ ok: true }>('/auth/unlock', { password })
-      const waiters = waitersRef.current
-      waitersRef.current = []
-      resetForm()
-      waiters.forEach((w) => w.resolve())
+      const typed = password
+      finishUnlocked()
+      offerWebAuthnEnroll(status, typed)
     } catch (err) {
       // Distinguishes a real wrong-password 401 from a 429 lockout (see
       // authgate's rate limiting) — both used to show the same generic
@@ -121,6 +131,7 @@ export function UnlockModalHost() {
             />
           </div>
           {submitError && <ErrorBanner message={submitError} onDismiss={() => setSubmitError(null)} />}
+          {webauthnUnlockAvailable(status) && <WebAuthnUnlockButton onUnlocked={finishUnlocked} autoStart />}
           <div className="unlock-modal-actions">
             <button type="button" className="btn btn-secondary" onClick={handleCancel}>
               취소

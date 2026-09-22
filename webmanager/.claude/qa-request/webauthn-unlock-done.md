@@ -1,0 +1,71 @@
+# Fingerprint (WebAuthn) unlock of the password gate — done, needs device QA
+
+Implemented on 2026-09-22 as research option **B**: a server-side WebAuthn relying party. It was not built as a PRF-wrapped password, and the reasons are in `../research/webauthn-prf-unlock-research.md`:
+- passkeyd has no hmac-secret/PRF;
+- a wrapped password would be rebuilt in same-origin page JS on every unlock.
+
+The owner chose B.
+
+## What shipped
+
+**Backend**
+
+`internal/webauthnunlock` handles the credential store (JSON, 0600) and the ceremonies (go-webauthn v0.17.4 — the last release that builds with the image's Go 1.25; v0.18 needs 1.26).
+
+Routes (`handlers_webauthn.go`):
+
+| Route | Gating |
+|---|---|
+| `POST /api/auth/webauthn/unlock/{begin,finish}` | ungated; shares the password path's per-IP backoff via new `Gate.CheckAttempt/RecordFailure/RecordSuccess` |
+| `POST /api/auth/webauthn/register/{begin,finish}` | begin takes the **password** itself, not just a cookie |
+| `GET/DELETE /api/auth/webauthn/credentials[/{id}]` | gated |
+
+`/api/auth/status` gained two fields: `webauthnEnroll` and `webauthn` (a credential exists for this host).
+
+**Rules**
+
+- **RP ID** is the request's exact hostname. IP hosts are refused.
+- **Origin** is checked against the RP ID: https, or http only on localhost. The port is taken from what the browser signed.
+- **User verification is required.**
+- **The 12h hard cap counts from the last *typed* password.** The mechanism: `Gate.IssueFrom(passwordAt)`, with `passwordAt` persisted in the store and recorded by both password paths.
+- **A hash change revokes everything.** The store keeps a hash tag and logs the count it revoked.
+- **Clone warning** (signature counter went backwards) is refused.
+
+**Frontend**
+
+- `utils/webauthn.ts` is the ceremony and encoding helper (base64url shim, `toJSON` equivalent).
+- `components/common/WebAuthn.tsx`:
+  - the unlock button in both password forms — auto-tried once only when this browser enrolled **and** user activation is live, with a retry label after a cancel;
+  - the enrollment offer after a password unlock (다시 묻지 않기 is stored per browser);
+  - the device list in a Sheet, opened from a sidebar-footer fingerprint icon.
+- `webauthnGate.ts` holds the non-component helpers.
+- `api/client.ts` treats `/auth/webauthn/{unlock,register}/` as unlock paths: a 401 there never pops the password prompt, and a success notifies listeners.
+
+**Env** (`example-env.webmanager` v19): `WEBMANAGER_WEBAUTHN_ENABLED` (default true, only meaningful with the gate on) and `WEBMANAGER_WEBAUTHN_PATH`.
+
+## Verified (test stack, 2026-09-22)
+
+End to end through the real UI, driven over CDP. The test used a Chrome **virtual authenticator** (ctap2, internal, UV). For a secure context, `http://localhost` inside `code-docker-chrome` was forwarded to code-docker's nginx.
+
+- Password unlock shows the enrollment offer. 등록 stores a credential (`Linux Chrome`, rpId `localhost`) and sets the device flag.
+- Cookie cleared → 지문으로 잠금 해제 → unlocked.
+- UV failure → "취소되었습니다" plus "지문으로 다시 시도", and the page stays locked.
+- Enrolling from the device list works (password re-typed there).
+- A modal opened by clicking the sidebar lock auto-tries the fingerprint and closes unlocked.
+- Changing the password hash logs `revoked 2 enrolled fingerprint unlock credential(s)`, and status reports `webauthn:false`.
+
+Unit tests cover:
+- `webauthnunlock`: revocation, per-host scoping, RP ID and origin rules, single-use ceremonies.
+- `authgate.IssueFrom`: the cap, zero or future origin, and an unconfigured gate.
+
+## Needs the owner (real devices, HTTPS)
+
+- **Android Chrome** (Google Password Manager, fingerprint) and **iPhone/iPad Safari** (Face/Touch ID).
+- **Linux Chrome/Firefox with passkeyd + fprintd.** passkeyd appears as a USB security key, so Chrome may show a "use a security key" step first.
+- **Inside the code-server extension's webviews and the titlebar overlay.** Both are same-origin, so it should work, but it was not exercised on a real authenticator. The password fallback covers failure.
+- **Multiple hostnames** (public plus tailnet): each needs its own enrollment, by design.
+
+## Not done / follow-ups
+
+- **router-manager** has its own authgate copy (`ROUTER_MANAGER_AUTH_PASSWORD_HASH`). It could get the same feature. Its cross-origin iframe inside webmanager would need `allow="publickey-credentials-get <origin>"` on `RouterFrame.tsx`, and Safari can't enroll from a cross-origin iframe, so enrollment would have to happen on router's own page. Deferred, as the owner decided (webmanager first).
+- **The device list can't mark which entry is this browser's own.** Deleting any entry clears the local "enrolled" flag, which only turns off the automatic attempt.

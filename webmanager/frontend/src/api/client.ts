@@ -35,6 +35,14 @@ export function requestUnlock(): Promise<void> {
 // of re-triggering the prompter (which could otherwise recurse).
 const UNLOCK_PATH = '/auth/unlock'
 
+// The fingerprint unlock/enroll endpoints (utils/webauthn.ts) are unlock
+// paths too: a failed one answers 401, which must reach its own caller
+// rather than pop the password prompt it is part of. A successful unlock
+// through them notifies like a password one.
+function isUnlockPath(path: string): boolean {
+  return path === UNLOCK_PATH || path.startsWith('/auth/webauthn/unlock/') || path.startsWith('/auth/webauthn/register/')
+}
+
 // How long a dismissed prompt suppresses the *next* read-triggered one.
 // Several tabs poll a gated endpoint on a short timer (the Terminal tab
 // every 3s), so without this, cancelling the modal just meant it reopened
@@ -131,7 +139,7 @@ async function request<T>(
     if (timeoutId !== undefined) clearTimeout(timeoutId)
   }
 
-  if (path === UNLOCK_PATH && res.ok) {
+  if (isUnlockPath(path) && res.ok) {
     // Any successful unlock — this modal, the inline RequiresUnlock form,
     // the sidebar's proactive button — clears a previous decline, so the
     // 401 interceptor is immediately live again.
@@ -155,7 +163,7 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    if (res.status === 401 && !retried && unlockPrompter && path !== UNLOCK_PATH && !promptSuppressed(init)) {
+    if (res.status === 401 && !retried && unlockPrompter && !isUnlockPath(path) && !promptSuppressed(init)) {
       let unlocked = false
       try {
         await unlockPrompter()

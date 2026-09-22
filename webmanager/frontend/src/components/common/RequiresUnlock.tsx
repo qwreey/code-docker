@@ -3,6 +3,8 @@ import { api, ApiError } from '../../api/client'
 import { ErrorBanner } from './ErrorBanner'
 import { Skeleton } from './Skeleton'
 import { useAuthStatus } from './useAuthStatus'
+import { WebAuthnUnlockButton } from './WebAuthn'
+import { offerWebAuthnEnroll, webauthnUnlockAvailable } from './webauthnGate'
 import './RequiresUnlock.css'
 
 /**
@@ -24,8 +26,10 @@ export function RequiresUnlock({ children }: { children: ReactNode }) {
     setSubmitError(null)
     try {
       await api.post<{ ok: true }>('/auth/unlock', { password })
+      const typed = password
       await refresh()
       setPassword('')
+      offerWebAuthnEnroll(status, typed)
     } catch (err) {
       setSubmitError(
         err instanceof ApiError && err.status === 429
@@ -67,6 +71,7 @@ export function RequiresUnlock({ children }: { children: ReactNode }) {
             />
           </div>
           {submitError && <ErrorBanner message={submitError} onDismiss={() => setSubmitError(null)} />}
+          {webauthnUnlockAvailable(status) && <WebAuthnUnlockButton onUnlocked={() => void refresh()} />}
           <button type="submit" className="btn btn-primary" disabled={submitting || !password}>
             {submitting ? '확인 중...' : '잠금 해제'}
           </button>

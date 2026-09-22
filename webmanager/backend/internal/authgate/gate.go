@@ -279,6 +279,34 @@ func (g *Gate) TryUnlock(key, plaintext string) (token string, ok bool, err erro
 	return g.issueToken(), true, nil
 }
 
+// IssueFrom mints a token for an unlock that didn't involve typing the
+// password (internal/webauthnunlock), counting the maxSessionLifetime hard
+// cap from origin - the last time the password actually was typed - rather
+// than from now. So a fingerprint unlock never stretches that cap: the
+// password is still needed at least once per maxSessionLifetime. ok is false
+// when that window has already closed (or origin is zero, i.e. never).
+func (g *Gate) IssueFrom(origin time.Time) (token string, ok bool) {
+	now := time.Now()
+	if !g.Configured() || origin.IsZero() || now.Sub(origin) >= maxSessionLifetime || origin.After(now) {
+		return "", false
+	}
+	return g.mintToken(origin, now), true
+}
+
+// CheckAttempt returns ErrRateLimited while key is locked out by failed
+// unlocks - for unlock paths other than TryUnlock, so they share its
+// backoff instead of offering an unthrottled way around it.
+func (g *Gate) CheckAttempt(key string) error {
+	if remaining, locked := g.rateLimited(key); locked {
+		return fmt.Errorf("%w: try again in %s", ErrRateLimited, remaining.Round(time.Second))
+	}
+	return nil
+}
+
+// RecordFailure / RecordSuccess feed CheckAttempt's backoff from those paths.
+func (g *Gate) RecordFailure(key string) { g.recordFailure(key) }
+func (g *Gate) RecordSuccess(key string) { g.recordSuccess(key) }
+
 // SetCookie sets the unlock cookie on w. HttpOnly + SameSite=Strict: it's
 // never read from JS and never sent on cross-site requests, only same-site
 // navigation/XHR. MaxAge covers sessionTTL so the browser doesn't discard it

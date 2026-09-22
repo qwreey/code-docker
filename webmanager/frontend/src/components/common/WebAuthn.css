@@ -1,0 +1,54 @@
+.webauthn-unlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.webauthn-unlock-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.webauthn-unlock-message {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.webauthn-enroll-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.webauthn-enroll-form h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.webauthn-enroll-form .btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* One-line confirmation after an enrollment made from the offer dialog. */
+.webauthn-toast {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  max-width: calc(100vw - 2rem);
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+  font-size: 0.9rem;
+  cursor: pointer;
+}

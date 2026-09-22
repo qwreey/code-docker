@@ -22,6 +22,7 @@ import { FileShare } from './components/FileShare/FileShare'
 import { Sessions } from './components/Sessions/Sessions'
 import { RequiresUnlock } from './components/common/RequiresUnlock'
 import { UnlockModalHost } from './components/common/UnlockModal'
+import { WebAuthnHost } from './components/common/WebAuthn'
 import { EnvVersionBanner } from './components/common/EnvVersionBanner'
 import { RouterAuthSetupBanner } from './components/common/RouterAuthSetupBanner'
 import { Skeleton } from './components/common/Skeleton'
@@ -434,6 +435,7 @@ function App() {
         onOpenTerminalSession={openTerminalSession}
       />
       <UnlockModalHost />
+      <WebAuthnHost />
     </div>
   )
 }

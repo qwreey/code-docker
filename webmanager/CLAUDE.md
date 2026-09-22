@@ -451,7 +451,22 @@ collapsed-by-default/lazy-fetched since most projects have never had Claude
 Code run against them. Git Config also gained a global-gitignore editor
 (`components/GitConfig/GlobalGitignore.tsx`, `internal/gitconfig/
 excludesfile.go` — whatever `core.excludesFile` points at, read ungated/
-write gated, same raw-editor shape as `.gitconfig`'s own raw editing). Keep extending as
+write gated, same raw-editor shape as `.gitconfig`'s own raw editing). An
+**embed mode** (`?embed=vscode`, `src/embed.ts`) for the built-in code-server
+extension in `vscode-extension/` (root `CLAUDE.md`, `code-extensions`
+paragraph): no sidebar/banners, a single-session Terminal that recreates its
+session (same name, last cwd) instead of falling back to Home and shows an
+"ended" card only on a real `1000 "session ended"` close, links/`window.open`
+handed to the extension (the webview sandbox has no popups), a non-persisted
+theme override that follows VS Code, and a `BroadcastChannel` so an unlock in
+one view (or browser tab) unlocks the rest — see
+`.claude/qa-request/code-server-embed-plan-done.md`. Fingerprint (WebAuthn)
+unlock of the password gate (`internal/webauthnunlock`,
+`components/common/WebAuthn.tsx`): a server-side relying party that mints
+the same unlock cookie, never a stored/wrapped password; enrollment needs the
+password itself, credentials are per exact hostname, and a WebAuthn unlock
+counts the 12h hard cap from the last *typed* password
+(`authgate.IssueFrom`) — see `.claude/qa-request/webauthn-unlock-done.md`. Keep extending as
 needed; see `plan.md`'s "구현 완료" table before assuming something isn't
 done yet. **Open questions the repo owner still needs to weigh in on are
 consolidated in `.claude/question.md`** — none of them block further work,

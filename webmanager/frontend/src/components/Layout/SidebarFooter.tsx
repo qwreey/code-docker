@@ -1,9 +1,10 @@
 import { useCallback, useEffect } from 'react'
-import { Lock, LockOpen, Monitor, Moon, Sun } from 'lucide-react'
+import { Fingerprint, Lock, LockOpen, Monitor, Moon, Sun } from 'lucide-react'
 import { useTheme } from '../../useTheme'
 import type { ThemeChoice } from '../../theme'
 import { requestUnlock } from '../../api/client'
 import { useAuthStatus } from '../common/useAuthStatus'
+import { openWebAuthnManager, webauthnEnrollAvailable } from '../common/webauthnGate'
 import { withViewTransition } from '../../utils/viewTransition'
 
 const THEME_CYCLE: ThemeChoice[] = ['system', 'light', 'dark']
@@ -83,6 +84,17 @@ export function SidebarFooter() {
             <span>잠김</span>
           </button>
         ))}
+      {webauthnEnrollAvailable(status) && (
+        <button
+          type="button"
+          className="sidebar-theme-btn"
+          title="지문 잠금 해제 기기 관리"
+          aria-label="지문 잠금 해제 기기 관리"
+          onClick={openWebAuthnManager}
+        >
+          <Fingerprint size={16} aria-hidden="true" />
+        </button>
+      )}
 
       <button
         type="button"

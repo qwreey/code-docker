@@ -15,6 +15,7 @@ import (
 	"webmanager/internal/sessionheartbeat"
 	"webmanager/internal/supervisor"
 	"webmanager/internal/termsession"
+	"webmanager/internal/webauthnunlock"
 	"webmanager/internal/webdavshare"
 )
 
@@ -47,6 +48,8 @@ type Server struct {
 	termSessions        *termsession.Registry
 	sessionHeartbeats   *sessionheartbeat.Store
 	gate                *authgate.Gate
+	// nil unless the gate is configured and fingerprint unlock is enabled.
+	webauthn *webauthnunlock.Manager
 	// webdav is both the File share tab's settings store and the handler
 	// serving /webdav/ itself — it holds the live config, so a change made
 	// in the tab takes effect on the next request with no restart.

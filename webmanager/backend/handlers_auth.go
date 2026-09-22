@@ -2,12 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"net"
 	"net/http"
 	"time"
-
-	"webmanager/internal/authgate"
 )
 
 // clientKey identifies the caller for authgate's rate limiting, derived
@@ -36,21 +33,9 @@ func (s *Server) handleAuthUnlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, ok, err := s.gate.TryUnlock(clientKey(r), body.Password)
-	if err != nil {
-		if errors.Is(err, authgate.ErrRateLimited) {
-			writeError(w, http.StatusTooManyRequests, err.Error())
-			return
-		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+	if !s.passwordUnlock(w, r, body.Password) {
 		return
 	}
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "incorrect password")
-		return
-	}
-
-	s.gate.SetCookie(w, r, token)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -58,6 +43,11 @@ type authStatusResponse struct {
 	Required      bool    `json:"required"`
 	Unlocked      bool    `json:"unlocked"`
 	UnlockedUntil *string `json:"unlockedUntil,omitempty"` // RFC3339, only set when Unlocked
+	// WebAuthn: fingerprint unlock can be enrolled on this host
+	// (webauthnEnroll) / has a credential enrolled here (webauthn). Whether
+	// this *browser* can do WebAuthn is the frontend's call.
+	WebAuthnEnroll bool `json:"webauthnEnroll"`
+	WebAuthn       bool `json:"webauthn"`
 }
 
 // handleAuthStatus lets the frontend know whether to show a password
@@ -67,6 +57,10 @@ type authStatusResponse struct {
 // unlocked/locked bool.
 func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	resp := authStatusResponse{Required: s.gate.Configured()}
+	if rpID, ok := s.webauthnRPID(r); ok {
+		resp.WebAuthnEnroll = true
+		resp.WebAuthn = s.webauthn.HasCredentials(rpID)
+	}
 	if until, ok := s.gate.UnlockedUntil(r); ok {
 		resp.Unlocked = true
 		formatted := until.UTC().Format(time.RFC3339)

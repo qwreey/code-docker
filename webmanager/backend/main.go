@@ -23,6 +23,7 @@ import (
 	"webmanager/internal/sessionheartbeat"
 	"webmanager/internal/supervisor"
 	"webmanager/internal/termsession"
+	"webmanager/internal/webauthnunlock"
 	"webmanager/internal/webdavshare"
 )
 
@@ -92,6 +93,22 @@ func main() {
 	}
 	gate := authgate.New(authPasswordHash)
 
+	// Fingerprint unlock of that gate. Non-essential: a store that can't be
+	// opened just leaves the password as the only way in.
+	var webauthnMgr *webauthnunlock.Manager
+	if gate.Configured() && cfg.WebAuthnEnabled {
+		mgr, revoked, err := webauthnunlock.Open(cfg.WebAuthnPath, authPasswordHash)
+		switch {
+		case err != nil:
+			log.Printf("main: fingerprint unlock disabled - opening %s: %v", cfg.WebAuthnPath, err)
+		default:
+			webauthnMgr = mgr
+			if revoked > 0 {
+				log.Printf("main: the gate password changed - revoked %d enrolled fingerprint unlock credential(s)", revoked)
+			}
+		}
+	}
+
 	// Same /etc/environment cross-check as above, for the same reason: an
 	// operator who pins the WebDAV credential host-side is relying on it
 	// not being changeable from inside the container. Fail open here means
@@ -160,6 +177,7 @@ func main() {
 		termSessions:        termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
 		sessionHeartbeats:   sessionheartbeat.NewStore(),
 		gate:                gate,
+		webauthn:            webauthnMgr,
 		webdav: webdavshare.New(webdavshare.Options{
 			SettingsPath:    cfg.WebDAVSettingsPath,
 			Root:            cfg.WebDAVRoot,
@@ -359,6 +377,14 @@ func main() {
 	// frontend render the right prompt state without guessing from a 401.
 	mux.HandleFunc("POST /api/auth/unlock", s.handleAuthUnlock)
 	mux.HandleFunc("GET /api/auth/status", s.handleAuthStatus)
+	// Fingerprint (WebAuthn) unlock - see handlers_webauthn.go. The unlock
+	// pair is necessarily ungated; enrollment checks the password itself.
+	mux.HandleFunc("POST /api/auth/webauthn/unlock/begin", s.handleWebAuthnUnlockBegin)
+	mux.HandleFunc("POST /api/auth/webauthn/unlock/finish", s.handleWebAuthnUnlockFinish)
+	mux.HandleFunc("POST /api/auth/webauthn/register/begin", s.handleWebAuthnRegisterBegin)
+	mux.HandleFunc("POST /api/auth/webauthn/register/finish", s.handleWebAuthnRegisterFinish)
+	mux.Handle("GET /api/auth/webauthn/credentials", gate.RequirePassword(http.HandlerFunc(s.handleWebAuthnCredentials)))
+	mux.Handle("DELETE /api/auth/webauthn/credentials/{id}", gate.RequirePassword(http.HandlerFunc(s.handleWebAuthnCredentialDelete)))
 
 	// session-heartbeat: see webmanager/.claude/qa-request/
 	// session-heartbeat-plan-done.md for why this pair inverts the usual

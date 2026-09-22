@@ -424,6 +424,9 @@ Sessions/File share/Supervisor의 프로그램별 로그 조회, Claude Code 탭
 [webmanager-config.md#비밀번호-게이트](webmanager-config.md#비밀번호-게이트)를
 확인하세요.
 
+한 번 비밀번호로 푼 기기는 **지문(또는 Face ID·기기 PIN)으로 잠금 해제**하도록 등록할 수
+있습니다(HTTPS에서만) — [지문으로 잠금 해제](webmanager-config.md#지문으로-잠금-해제-webauthn).
+
 ## 구조화 로그 (vector)
 
 각 supervisord program의 표준출력은 이제 `/var/log/<프로그램명>/stdout.log` 로 실제 파일에

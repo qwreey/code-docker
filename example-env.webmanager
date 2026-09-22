@@ -55,6 +55,15 @@ WEBMANAGER_ENV_VERSION=19
 #. env_file도 $변수 형태로 해석해서, 따옴표 없이 붙이면 해시 안의 $ 뒤 조각들이
 #. 조용히 빈 문자열로 사라져 해시가 깨집니다.
 #WEBMANAGER_AUTH_PASSWORD_HASH=
+#. 위 비밀번호 게이트를 지문(또는 기기 PIN, Face ID 등 WebAuthn)으로도 풀 수
+#. 있게 합니다. 게이트가 켜져 있을 때만 의미가 있고, 기본 켜짐 - 비밀번호로 푼
+#. 직후 "이 기기 등록"을 제안하고, 등록한 기기에서는 잠금 해제 창에 지문 버튼이
+#. 생깁니다. HTTPS(또는 localhost) 주소에서만 동작합니다. 지문으로 풀어도
+#. 비밀번호는 12시간마다 한 번은 필요하고, 비밀번호 해시를 바꾸면 등록된 기기는
+#. 모두 해제됩니다. "false"로 끕니다.
+#WEBMANAGER_WEBAUTHN_ENABLED=true
+#. 등록된 기기(공개키)를 저장하는 파일.
+#WEBMANAGER_WEBAUTHN_PATH=/code/.local/share/code-docker/webmanager/webauthn.json
 
 #. --- File Manager ---
 #. 브라우징을 허용할 최상위 경로. 컨테이너 전체를 열어주려면 "/"로.
