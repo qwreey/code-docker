@@ -41,6 +41,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/url"
 	"os"
@@ -59,11 +60,28 @@ import (
 // Browsers time a WebAuthn prompt out on their own well before this.
 const ceremonyTTL = 3 * time.Minute
 
+// maxCeremonies caps how many begun-but-unfinished ceremonies are kept. The
+// unlock begin is ungated, so without a cap a loop of begins could grow the
+// map (and the sweep every insert does under the lock) without bound; past
+// the cap the oldest is dropped, which only fails a ceremony that was
+// abandoned anyway.
+const maxCeremonies = 64
+
+type ceremonyKind int
+
+const (
+	kindRegister ceremonyKind = iota + 1
+	kindUnlock
+)
+
 var (
 	ErrUnknownCeremony = errors.New("webauthn: unknown or expired ceremony - start again")
 	ErrNoCredentials   = errors.New("webauthn: no credential enrolled for this host")
 	ErrBadOrigin       = errors.New("webauthn: response came from an unexpected origin")
-	ErrNotFound        = errors.New("webauthn: no such credential")
+	// ErrMalformed marks a response that couldn't even be parsed - a client
+	// mishap, not a failed verification.
+	ErrMalformed = errors.New("webauthn: malformed response")
+	ErrNotFound  = errors.New("webauthn: no such credential")
 )
 
 type storedCredential struct {
@@ -82,6 +100,12 @@ type document struct {
 }
 
 type ceremony struct {
+	// kind keeps the two ceremonies apart: an unlock challenge (handed out
+	// without a password) must never be usable to finish a registration.
+	// Without it, only go-webauthn happening to check an unlock session's
+	// empty credential parameters stood between that and enrolling a key
+	// with no password at all.
+	kind    ceremonyKind
 	rpID    string
 	label   string
 	data    webauthn.SessionData
@@ -168,7 +192,9 @@ func (m *Manager) RecordPasswordUnlock(now time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.doc.PasswordAt = now
-	_ = m.saveLocked()
+	if err := m.saveLocked(); err != nil {
+		log.Printf("webauthn: recording the password unlock time: %v", err)
+	}
 }
 
 // PasswordAt is the last typed password unlock (zero if never, or since
@@ -219,8 +245,13 @@ func (m *Manager) Delete(id string) error {
 	defer m.mu.Unlock()
 	for i, c := range m.doc.Credentials {
 		if bytes.Equal(c.Credential.ID, raw) {
-			m.doc.Credentials = append(m.doc.Credentials[:i], m.doc.Credentials[i+1:]...)
-			return m.saveLocked()
+			prev := m.doc.Credentials
+			m.doc.Credentials = append(append([]storedCredential(nil), prev[:i]...), prev[i+1:]...)
+			if err := m.saveLocked(); err != nil {
+				m.doc.Credentials = prev
+				return err
+			}
+			return nil
 		}
 	}
 	return ErrNotFound
@@ -303,16 +334,25 @@ func (m *Manager) putCeremony(c ceremony) string {
 			delete(m.ceremonies, id)
 		}
 	}
+	for len(m.ceremonies) >= maxCeremonies {
+		oldestID, oldest := "", time.Time{}
+		for id, old := range m.ceremonies {
+			if oldestID == "" || old.expires.Before(oldest) {
+				oldestID, oldest = id, old.expires
+			}
+		}
+		delete(m.ceremonies, oldestID)
+	}
 	id := newCeremonyID()
 	c.expires = now.Add(ceremonyTTL)
 	m.ceremonies[id] = c
 	return id
 }
 
-func (m *Manager) takeCeremony(id string) (ceremony, error) {
+func (m *Manager) takeCeremony(id string, kind ceremonyKind) (ceremony, error) {
 	c, ok := m.ceremonies[id]
 	delete(m.ceremonies, id)
-	if !ok || time.Now().After(c.expires) {
+	if !ok || c.kind != kind || time.Now().After(c.expires) {
 		return ceremony{}, ErrUnknownCeremony
 	}
 	return c, nil
@@ -343,7 +383,7 @@ func (m *Manager) BeginRegistration(rpID, label string) (*protocol.CredentialCre
 	if err != nil {
 		return nil, "", err
 	}
-	id := m.putCeremony(ceremony{rpID: rpID, label: label, data: *data})
+	id := m.putCeremony(ceremony{kind: kindRegister, rpID: rpID, label: label, data: *data})
 	return creation, id, nil
 }
 
@@ -352,7 +392,7 @@ func (m *Manager) BeginRegistration(rpID, label string) (*protocol.CredentialCre
 func (m *Manager) FinishRegistration(ceremonyID, rpID string, body io.Reader) error {
 	parsed, err := protocol.ParseCredentialCreationResponseBody(body)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %v", ErrMalformed, err)
 	}
 	if err := checkOrigin(parsed.Response.CollectedClientData.Origin, rpID); err != nil {
 		return err
@@ -364,7 +404,7 @@ func (m *Manager) FinishRegistration(ceremonyID, rpID string, body io.Reader) er
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	c, err := m.takeCeremony(ceremonyID)
+	c, err := m.takeCeremony(ceremonyID, kindRegister)
 	if err != nil {
 		return err
 	}
@@ -400,7 +440,7 @@ func (m *Manager) BeginUnlock(rpID string) (*protocol.CredentialAssertion, strin
 	if err != nil {
 		return nil, "", err
 	}
-	id := m.putCeremony(ceremony{rpID: rpID, data: *data})
+	id := m.putCeremony(ceremony{kind: kindUnlock, rpID: rpID, data: *data})
 	return assertion, id, nil
 }
 
@@ -409,7 +449,7 @@ func (m *Manager) BeginUnlock(rpID string) (*protocol.CredentialAssertion, strin
 func (m *Manager) FinishUnlock(ceremonyID, rpID string, body io.Reader) error {
 	parsed, err := protocol.ParseCredentialRequestResponseBody(body)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %v", ErrMalformed, err)
 	}
 	if err := checkOrigin(parsed.Response.CollectedClientData.Origin, rpID); err != nil {
 		return err
@@ -421,7 +461,7 @@ func (m *Manager) FinishUnlock(ceremonyID, rpID string, body io.Reader) error {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	c, err := m.takeCeremony(ceremonyID)
+	c, err := m.takeCeremony(ceremonyID, kindUnlock)
 	if err != nil {
 		return err
 	}

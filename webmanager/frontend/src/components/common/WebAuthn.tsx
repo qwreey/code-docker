@@ -30,6 +30,7 @@ import './WebAuthn.css'
 const OUTCOME_MESSAGE: Record<Exclude<WebAuthnOutcome, 'ok'>, string> = {
   cancelled: '취소되었습니다 — 비밀번호를 입력하거나 다시 시도하세요.',
   'password-required': '마지막 비밀번호 입력 후 12시간이 지나 비밀번호가 필요합니다.',
+  'rate-limited': '시도 횟수가 너무 많습니다. 잠시 후 다시 시도하세요.',
   failed: '지문 잠금 해제에 실패했습니다 — 비밀번호를 입력하세요.',
 }
 

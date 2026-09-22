@@ -55,9 +55,10 @@ func (s *Server) handleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Requ
 	if !s.passwordUnlock(w, r, body.Password) {
 		return
 	}
+	// By characters, not bytes: a byte cut splits a Korean label mid-rune.
 	label := strings.TrimSpace(body.Label)
-	if len(label) > 80 {
-		label = label[:80]
+	if r := []rune(label); len(r) > 80 {
+		label = string(r[:80])
 	}
 	if label == "" {
 		label = "이 기기"
@@ -130,7 +131,13 @@ func (s *Server) handleWebAuthnUnlockFinish(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if err := s.webauthn.FinishUnlock(r.URL.Query().Get("ceremony"), rpID, r.Body); err != nil {
-		s.gate.RecordFailure(key)
+		// Only a response that was actually checked and failed counts toward
+		// the backoff. The key is the TCP peer - nginx for every browser - so
+		// counting a stale tab's expired ceremony or a garbled body would
+		// lock everyone out over ordinary client mishaps.
+		if !errors.Is(err, webauthnunlock.ErrUnknownCeremony) && !errors.Is(err, webauthnunlock.ErrMalformed) {
+			s.gate.RecordFailure(key)
+		}
 		log.Printf("webauthn: unlock on %s failed: %v", rpID, err)
 		writeError(w, http.StatusUnauthorized, "fingerprint unlock failed")
 		return

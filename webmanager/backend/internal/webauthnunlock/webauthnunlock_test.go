@@ -100,11 +100,44 @@ func TestCeremonyIsSingleUse(t *testing.T) {
 	if _, id, err := m.BeginRegistration("code.example", "x"); err != nil {
 		t.Fatal(err)
 	} else {
-		if _, err := m.takeCeremony(id); err != nil {
+		if _, err := m.takeCeremony(id, kindRegister); err != nil {
 			t.Fatalf("first take: %v", err)
 		}
-		if _, err := m.takeCeremony(id); err != ErrUnknownCeremony {
+		if _, err := m.takeCeremony(id, kindRegister); err != ErrUnknownCeremony {
 			t.Fatalf("second take = %v, want ErrUnknownCeremony", err)
 		}
+	}
+}
+
+// An unlock challenge is handed out without a password; it must never be
+// usable to finish a registration (or vice versa).
+func TestCeremonyKindsDontMix(t *testing.T) {
+	m, _, err := Open(filepath.Join(t.TempDir(), "w.json"), "h")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.doc.Credentials = []storedCredential{{RPID: "code.example", Credential: webauthn.Credential{ID: []byte{1}}}}
+	_, unlockID, err := m.BeginUnlock("code.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.takeCeremony(unlockID, kindRegister); err != ErrUnknownCeremony {
+		t.Fatalf("finishing a registration with an unlock ceremony = %v, want ErrUnknownCeremony", err)
+	}
+}
+
+func TestCeremonyCap(t *testing.T) {
+	m, _, err := Open(filepath.Join(t.TempDir(), "w.json"), "h")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.doc.Credentials = []storedCredential{{RPID: "code.example", Credential: webauthn.Credential{ID: []byte{1}}}}
+	for i := 0; i < maxCeremonies*3; i++ {
+		if _, _, err := m.BeginUnlock("code.example"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := len(m.ceremonies); n > maxCeremonies {
+		t.Fatalf("%d ceremonies kept, want at most %d", n, maxCeremonies)
 	}
 }

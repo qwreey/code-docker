@@ -95,7 +95,7 @@ function credentialToJSON(cred: PublicKeyCredential): Record<string, unknown> {
   }
 }
 
-export type WebAuthnOutcome = 'ok' | 'cancelled' | 'password-required' | 'failed'
+export type WebAuthnOutcome = 'ok' | 'cancelled' | 'password-required' | 'rate-limited' | 'failed'
 
 // NotAllowedError covers a cancelled prompt, a timeout, and "no credential
 // on this device" alike - browsers deliberately don't tell them apart. All
@@ -103,6 +103,10 @@ export type WebAuthnOutcome = 'ok' | 'cancelled' | 'password-required' | 'failed
 function outcomeOf(err: unknown): WebAuthnOutcome {
   if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')) return 'cancelled'
   if (err instanceof ApiError && err.status === 409) return 'password-required'
+  if (err instanceof ApiError && err.status === 429) return 'rate-limited'
+  // Nothing enrolled for this host any more (deleted from another device):
+  // stop auto-starting a prompt that can't succeed here.
+  if (err instanceof ApiError && err.status === 404) writeFlag(ENROLLED_KEY, false)
   return 'failed'
 }
 
