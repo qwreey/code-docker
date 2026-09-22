@@ -10,16 +10,20 @@ type EnvVersionStatus = {
   dismissed: boolean
 }
 
-// Single tee'd command rather than a separate `cp ... .bak` step first - two
-// steps means people skip the backup half in practice, and this way every
-// run also appends to .env.webmanager.bak instead of overwriting it, so
-// older backups aren't lost either. Leading `touch` covers the "no
+// One copy-paste line that includes the backup rather than a separate
+// `cp ... .bak` step first - two steps means people skip the backup half in
+// practice, and appending to .env.webmanager.bak instead of overwriting it
+// keeps older backups too. Leading `touch` covers the "no
 // .env.webmanager at all yet" case (fileVersion shows as 알수없음 below) -
 // without it `cat` errors on a missing file and the rest of the pipe still
 // limps along on empty stdin, which is confusing; `touch` is a no-op when
 // the file already exists, so this is safe unconditionally.
+// Sequential, never a single `cat f | tee | ... > f` pipeline: the stages of
+// a pipeline start concurrently, so the final `> f` can truncate the file
+// before cat reads it and the migration then writes a bare template over it
+// (see backend/envmigratecmd.go).
 const MIGRATE_CMD =
-  'touch .env.webmanager && cat .env.webmanager | tee -a .env.webmanager.bak | docker compose exec -T code-docker /etc/code-docker/webmanager/webmanager --env-migrate > .env.webmanager'
+  'touch .env.webmanager && cat .env.webmanager >> .env.webmanager.bak && docker compose exec -T code-docker /etc/code-docker/webmanager/webmanager --env-migrate < .env.webmanager > .env.webmanager.new && mv .env.webmanager.new .env.webmanager'
 
 // Fetched once on mount — .env.webmanager only changes on a container
 // recreate (docker compose up -d), never mid-session, so there's nothing to
