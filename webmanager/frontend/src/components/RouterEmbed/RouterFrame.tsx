@@ -23,14 +23,6 @@ const LOAD_SETTLE_MS = 200
 // never come promptly.
 const LOAD_HARD_CAP_MS = 3000
 
-// A request for the embedded page, e.g. { type: 'vnc-open', name }. `seq`
-// makes a repeat of the same request a new value, so it is sent again.
-export interface RouterFrameCommand {
-  type: string
-  payload: Record<string, unknown>
-  seq: number
-}
-
 interface RouterFrameProps {
   tab: 'dev-proxy' | 'app-routes' | 'vnc' | 'tailscale' | 'dns' | 'net' | 'tinyauth' | 'settings'
   // Extra query parameters for the initial load only (e.g. VNC's ?target=).
@@ -38,7 +30,6 @@ interface RouterFrameProps {
   // Messages the embedded page sends about itself (router/frontend's
   // embedTheme.ts notifyEmbedParent), other than the 'ready' handled here.
   onEmbedMessage?: (data: Record<string, unknown>) => void
-  command?: RouterFrameCommand | null
 }
 
 /**
@@ -66,7 +57,7 @@ export function RouterFrame(props: RouterFrameProps) {
 // host is undefined when no dedicated ROUTER_MANAGER_HOSTS domain is
 // configured - the iframe then just points at this same origin's own
 // /router/ path instead of a cross-origin one.
-function RouterIframe({ host, tab, params, onEmbedMessage, command }: RouterFrameProps & { host?: string }) {
+function RouterIframe({ host, tab, params, onEmbedMessage }: RouterFrameProps & { host?: string }) {
   const { theme } = useTheme()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [loaded, setLoaded] = useState(false)
@@ -122,17 +113,6 @@ function RouterIframe({ host, tab, params, onEmbedMessage, command }: RouterFram
   useEffect(() => {
     iframeRef.current?.contentWindow?.postMessage({ source: MESSAGE_SOURCE, type: 'theme', theme }, targetOrigin)
   }, [theme, targetOrigin])
-
-  // A command that arrives before the page inside has mounted would be
-  // lost (nothing listening yet), so it waits for `loaded` - the 'ready'
-  // message, normally.
-  useEffect(() => {
-    if (!command || !loaded) return
-    iframeRef.current?.contentWindow?.postMessage(
-      { source: MESSAGE_SOURCE, type: command.type, ...command.payload },
-      targetOrigin,
-    )
-  }, [command, loaded, targetOrigin])
 
   function handleLoad() {
     setTimeout(() => setLoaded(true), LOAD_SETTLE_MS)

@@ -1,6 +1,31 @@
 # Backlog: VNC tab rework — full-bleed, multi-tab, extension-ready
 
-Status: idea/plan only, nothing implemented. Written 2026-09-22.
+Status: **done 2026-09-22**, owner-verified tab switching in the browser.
+Decision taken differs from the "recommended (b)" below: the tab shell
+stayed in **router** (option a) plus a small postMessage contract, because
+(b) would have made webmanager read router's API directly, which a
+ROUTER_MANAGER_HOSTS deployment (cross-origin, router's own lock) can't do
+and which undoes the 2026-08-08 decoupling. What shipped:
+
+- router `Vnc.tsx`/`VncTabs.tsx`: full-bleed, fixed "대상 목록" tab + one tab
+  per target (label only, no rename), dedup by name, close = disconnect,
+  inactive viewers stacked with visibility:hidden (no remote resize on
+  switch), `<Vnc>` kept mounted across router tabs, localStorage restore,
+  `?target=` deep link.
+- router → parent `vnc-state` / `vnc-targets` / (host mode) `vnc-open-request`,
+  sent only to the origin the parent declared in `?origin=`.
+- webmanager: VNC RouterFrame kept mounted across webmanager tabs,
+  `?target=` mirrored into its URL.
+- code-server extension (answer A, "like terminals"): one editor tab per
+  target via `?mode=host`, `webmanager: Open VNC…`/`…in Panel…`, dedup by
+  target, labels as titles, VNC views retained when hidden
+  (`retainContextWhenHidden.vnc`). Target list cached from what a view
+  reports - the extension host can't reach `/router/` (router denies the
+  internal network).
+- Also renamed roblox-studio-docker's alias vnc-only → roblox-studio-vnc
+  (a test target had been pointed at chrome-vnc by mistake because of it).
+
+The original plan follows.
 
 ## Current state
 

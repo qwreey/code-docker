@@ -79,6 +79,17 @@
         "category": "webmanager"
       },
       {
+        "command": "webmanager.openVnc",
+        "title": "Open VNC…",
+        "category": "webmanager",
+        "icon": "$(vm)"
+      },
+      {
+        "command": "webmanager.openVncInPanel",
+        "title": "Open VNC in Panel…",
+        "category": "webmanager"
+      },
+      {
         "command": "webmanager.openTab",
         "title": "Open webmanager Tab…",
         "category": "webmanager"
@@ -1107,17 +1118,21 @@
           "type": "object",
           "default": {
             "terminal": true,
+            "vnc": true,
             "other": false
           },
           "properties": {
             "terminal": {
               "type": "boolean"
             },
+            "vnc": {
+              "type": "boolean"
+            },
             "other": {
               "type": "boolean"
             }
           },
-          "description": "Keep a hidden view's page alive. On for terminals (keeps the connection, scroll position and the session attached); off for everything else to save memory. Applies to views created after the change (editor tabs) or after a reload (panel slots)."
+          "description": "Keep a hidden view's page alive. On for terminals and VNC (keeps the connection, scroll position and the session attached - a VNC view that isn't kept reconnects every time it's shown again); off for everything else to save memory. Page slots follow `vnc` as well as `other`, since either can end up showing VNC. Applies to views created after the change (editor tabs) or after a reload (panel slots)."
         }
       }
     }

@@ -24,6 +24,10 @@ const { buildPath, render, passthroughChords, canonicalChord } = require('./src/
 const VIEW_TYPE = 'webmanager.page'
 const SLOT_IDS = ['term1', 'term2', 'term3', 'term4', 'page1', 'page2']
 const SLOTS_KEY = 'webmanager.slots'
+// VNC targets as a view last reported them ([{ name, label }]) - see
+// rememberVncTargets. Global rather than per-workspace: they're router's,
+// not this folder's.
+const VNC_TARGETS_KEY = 'webmanager.vncTargets'
 
 let ctx
 let output
@@ -45,9 +49,52 @@ function isTerminalSlot(id) {
   return id.startsWith('term')
 }
 
+// A VNC view is a live connection like a terminal is, so it is kept alive
+// when hidden by default too; a page slot can end up showing one, so those
+// follow the VNC setting as well as `other`.
 function retainFor(kind) {
   const r = vscode.workspace.getConfiguration('webmanager').get('retainContextWhenHidden') || {}
-  return kind === 'terminal' ? r.terminal !== false : r.other === true
+  if (kind === 'terminal') return r.terminal !== false
+  if (kind === 'vnc') return r.vnc !== false
+  if (kind === 'page-slot') return r.other === true || r.vnc !== false
+  return r.other === true
+}
+
+function retainKind(section) {
+  return section === 'terminal' ? 'terminal' : section === 'vnc' ? 'vnc' : 'other'
+}
+
+// ---- VNC ---------------------------------------------------------------------
+
+// The target a VNC view shows (?target=), or null for the target list.
+function vncTarget(state) {
+  if (!state || state.section !== 'vnc' || !state.query) return null
+  return new URLSearchParams(state.query).get('target')
+}
+
+function vncState(name) {
+  return { section: 'vnc', query: new URLSearchParams({ target: name }).toString() }
+}
+
+function vncTargets() {
+  return ctx.globalState.get(VNC_TARGETS_KEY, [])
+}
+
+function vncLabel(name) {
+  const t = vncTargets().find((x) => x.name === name)
+  return (t && t.label) || name
+}
+
+// The extension host can't reach router's API (router refuses its own
+// admin API to the internal network code-docker sits on), so the list comes
+// from a view: router reports it to webmanager, webmanager to its view.
+async function rememberVncTargets(list) {
+  if (!Array.isArray(list)) return
+  const clean = list
+    .filter((t) => t && typeof t.name === 'string' && t.name)
+    .map((t) => ({ name: t.name, label: typeof t.label === 'string' ? t.label : '' }))
+  await ctx.globalState.update(VNC_TARGETS_KEY, clean)
+  for (const h of hosts) if (h.state && h.state.section === 'vnc') updateTitle(h)
 }
 
 // Only the fields a view is identified by. Everything else a `state`
@@ -64,6 +111,8 @@ function normalizeState(s) {
 
 function titleOf(state) {
   if (state.section === 'terminal') return state.session || 'Terminal'
+  const target = vncTarget(state)
+  if (target) return vncLabel(target)
   return sectionLabel(state.section)
 }
 
@@ -142,21 +191,35 @@ function navigateHost(host, state) {
   updateTitle(host)
 }
 
-// Where a session is already shown in this window: a live view, or a panel
-// slot bound to it that simply hasn't been expanded since the last reload
-// (its view isn't resolved yet, so it isn't in `hosts` - but opening the
-// session elsewhere would still end up with two clients once it is).
-function findSessionHost(name, except) {
+// What makes two views "the same thing" - a terminal session or a VNC
+// target - so it is shown once per window. null for anything else.
+function identityOf(state) {
+  if (!state) return null
+  if (state.section === 'terminal' && state.session) return `terminal:${state.session}`
+  const target = vncTarget(state)
+  return target ? `vnc:${target}` : null
+}
+
+// Where a session or VNC target is already shown in this window: a live
+// view, or a panel slot bound to it that simply hasn't been expanded since
+// the last reload (its view isn't resolved yet, so it isn't in `hosts` - but
+// opening it elsewhere would still end up with two clients once it is).
+function findHostFor(state, except) {
+  const id = identityOf(state)
+  if (!id) return null
   for (const h of hosts) {
-    if (h !== except && h.state && h.state.section === 'terminal' && h.state.session === name) return h
+    if (h !== except && identityOf(h.state) === id) return h
   }
   const bindings = slotBindings()
-  for (const id of SLOT_IDS) {
-    if (slotHosts.has(id) || (except && except.kind === 'slot' && except.id === id)) continue
-    const b = bindings[id]
-    if (b && b.section === 'terminal' && b.session === name) return { kind: 'slot', id }
+  for (const slot of SLOT_IDS) {
+    if (slotHosts.has(slot) || (except && except.kind === 'slot' && except.id === slot)) continue
+    if (identityOf(bindings[slot]) === id) return { kind: 'slot', id: slot }
   }
   return null
+}
+
+function findSessionHost(name, except) {
+  return findHostFor({ section: 'terminal', session: name }, except)
 }
 
 function revealHost(host) {
@@ -191,7 +254,7 @@ function createPanel(state, column) {
     {
       enableScripts: true,
       enableForms: true,
-      retainContextWhenHidden: retainFor(state.section === 'terminal' ? 'terminal' : 'other'),
+      retainContextWhenHidden: retainFor(retainKind(state.section)),
       localResourceRoots: [mediaUri('')],
     },
   )
@@ -325,6 +388,26 @@ async function pickSession(placeHolder) {
   return { section: 'terminal', session: name.trim(), cwd: pick.cwd }
 }
 
+async function pickVnc() {
+  const targets = vncTargets()
+  const items = targets.map((t) => ({
+    label: `$(vm) ${t.label || t.name}`,
+    description: [t.label && t.label !== t.name ? t.name : '', findHostFor(vncState(t.name)) ? '열려 있음' : '']
+      .filter(Boolean)
+      .join(' · '),
+    name: t.name,
+  }))
+  items.push({ label: '', kind: vscode.QuickPickItemKind.Separator })
+  items.push({ label: '$(list-unordered) 대상 목록', description: '추가·편집·접속자 관리', list: true })
+  const pick = await vscode.window.showQuickPick(items, {
+    placeHolder: targets.length
+      ? 'VNC 대상'
+      : 'VNC 대상을 아직 모릅니다 — 대상 목록을 한 번 열면 여기에 나옵니다',
+  })
+  if (!pick) return undefined
+  return pick.list ? { section: 'vnc' } : vncState(pick.name)
+}
+
 async function pickSection() {
   const pick = await vscode.window.showQuickPick(
     SECTIONS.map((s) => ({ label: `$(${s.icon}) ${s.label}`, description: s.id, id: s.id })),
@@ -332,32 +415,29 @@ async function pickSection() {
   )
   if (!pick) return undefined
   if (pick.id === 'terminal') return pickSession()
+  if (pick.id === 'vnc') return pickVnc()
   return { section: pick.id }
 }
 
 // ---- opening ---------------------------------------------------------------
 
-// One place a given session is shown per window: asking for it again
-// brings the existing view forward instead of opening a second copy that
-// would fight the first over the terminal size.
+// One place a given session or VNC target is shown per window: asking for
+// it again brings the existing view forward instead of opening a second
+// copy that would fight the first over the terminal or desktop size.
 function openState(state, column) {
-  if (state.section === 'terminal' && state.session) {
-    const existing = findSessionHost(state.session)
-    if (existing) {
-      revealHost(existing)
-      return
-    }
+  const existing = findHostFor(state)
+  if (existing) {
+    revealHost(existing)
+    return
   }
   createPanel(state, column)
 }
 
 async function openStateInPanel(state) {
-  if (state.section === 'terminal' && state.session) {
-    const existing = findSessionHost(state.session)
-    if (existing) {
-      revealHost(existing)
-      return
-    }
+  const existing = findHostFor(state)
+  if (existing) {
+    revealHost(existing)
+    return
   }
   await openInPanel(state)
 }
@@ -527,6 +607,13 @@ async function onMessage(host, m) {
     case 'open-terminal':
       await openTerminalFromEmbed(m)
       break
+    // "열기" in a VNC target list: each target is its own editor tab.
+    case 'open-vnc':
+      if (typeof m.name === 'string' && m.name) openState(vncState(m.name), vscode.ViewColumn.Active)
+      break
+    case 'vnc-targets':
+      await rememberVncTargets(m.targets)
+      break
     case 'close-request':
       if (host.kind === 'panel') host.panel.dispose()
       else await closeSlot(host.id)
@@ -575,7 +662,16 @@ async function switchTab(host) {
   )
   if (!pick) return
   if (pick.id === 'terminal') return changeSession(host)
-  const state = { section: pick.id }
+  let state = { section: pick.id }
+  if (pick.id === 'vnc') {
+    state = await pickVnc()
+    if (!state) return
+    const existing = findHostFor(state, host)
+    if (existing) {
+      revealHost(existing)
+      return
+    }
+  }
   if (host.kind === 'slot') await bindSlot(host.id, state)
   else navigateHost(host, state)
 }
@@ -671,6 +767,14 @@ function activate(context) {
     const s = await pickSession()
     if (s) openState(s, vscode.ViewColumn.Beside)
   })
+  reg('webmanager.openVnc', async () => {
+    const s = await pickVnc()
+    if (s) openState(s, vscode.ViewColumn.Active)
+  })
+  reg('webmanager.openVncInPanel', async () => {
+    const s = await pickVnc()
+    if (s) await openStateInPanel(s)
+  })
   reg('webmanager.openTab', async () => {
     const s = await pickSection()
     if (s) openState(s, vscode.ViewColumn.Active)
@@ -740,7 +844,7 @@ function activate(context) {
 
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(`webmanager.${id}`, slotProvider(id), {
-        webviewOptions: { retainContextWhenHidden: retainFor(isTerminalSlot(id) ? 'terminal' : 'other') },
+        webviewOptions: { retainContextWhenHidden: retainFor(isTerminalSlot(id) ? 'terminal' : 'page-slot') },
       }),
     )
   }

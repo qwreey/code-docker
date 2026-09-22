@@ -8,7 +8,7 @@ import type { SectionId } from './components/Layout/sections'
 import { Supervisor } from './components/Supervisor/Supervisor'
 import { SshKeys } from './components/SshKeys/SshKeys'
 import { GitConfig } from './components/GitConfig/GitConfig'
-import { RouterFrame, type RouterFrameCommand } from './components/RouterEmbed/RouterFrame'
+import { RouterFrame } from './components/RouterEmbed/RouterFrame'
 import { Logs } from './components/Logs/Logs'
 import { Processes } from './components/Processes/Processes'
 import { Projects } from './components/Projects/Projects'
@@ -30,7 +30,7 @@ import { useAuthStatus } from './components/common/useAuthStatus'
 import { ensureUnlocked } from './components/common/useUnlockGate'
 import { withViewTransition } from './utils/viewTransition'
 import { useEmbedEscapeClose } from './utils/embedEscape'
-import { EMBED, embedParams, onHostMessage, postToHost, reportEmbedState } from './embed'
+import { EMBED, embedParams, postToHost, reportEmbedState } from './embed'
 import './App.css'
 
 // FileManager pulls in the CodeMirror editor chunk and is a sizable feature
@@ -162,18 +162,30 @@ function App() {
   const vncActiveRef = useRef<string | null>(
     initialSplit.section === 'vnc' ? initialQuery.get('target') : null,
   )
-  // Only for the frame's first load; later opens go through vncCommand.
+  // Only for the frame's first load. Inside code-server each target is its
+  // own editor tab (the extension owns the tabs), so router is told to show
+  // just this view's target, or the list - see router/frontend's Vnc.tsx
+  // HOST_MODE.
   const [vncInitialParams] = useState(() => {
-    const target = vncActiveRef.current
-    return target ? { target } : undefined
+    const params: Record<string, string> = {}
+    if (vncActiveRef.current) params.target = vncActiveRef.current
+    if (EMBED) params.mode = 'host'
+    return params
   })
-  const [vncCommand, setVncCommand] = useState<RouterFrameCommand | null>(null)
 
   const handleVncMessage = useCallback(
     (data: Record<string, unknown>) => {
-      if (data.type !== 'vnc-state') return
-      vncActiveRef.current = typeof data.active === 'string' ? data.active : null
-      if (active === 'vnc') writeQuery('target', vncActiveRef.current)
+      if (data.type === 'vnc-state') {
+        vncActiveRef.current = typeof data.active === 'string' ? data.active : null
+        if (active === 'vnc') writeQuery('target', vncActiveRef.current)
+      } else if (data.type === 'vnc-open-request' && typeof data.name === 'string') {
+        // Host mode only: "열기" in the list becomes a new editor tab.
+        postToHost({ type: 'open-vnc', name: data.name })
+      } else if (data.type === 'vnc-targets' && Array.isArray(data.targets)) {
+        // The extension can't reach router's API itself; this is how its
+        // "Open VNC…" learns what there is to open and what to call it.
+        postToHost({ type: 'vnc-targets', targets: data.targets })
+      }
     },
     [active],
   )
@@ -183,24 +195,6 @@ function App() {
   useEffect(() => {
     if (active === 'vnc') writeQuery('target', vncActiveRef.current)
   }, [active])
-
-  // Opens a VNC target as a tab in the (possibly already running) frame.
-  function openVncTarget(name: string) {
-    setVncCommand((prev) => ({ type: 'vnc-open', payload: { name }, seq: (prev?.seq ?? 0) + 1 }))
-    if (active !== 'vnc') withViewTransition(() => setActive('vnc'))
-  }
-
-  // The code-server extension's "Open VNC…" reuses a view already showing
-  // VNC by asking it to open the target there.
-  useEffect(
-    () =>
-      onHostMessage((msg) => {
-        if (msg.type === 'open-vnc' && msg.name) openVncTarget(msg.name)
-      }),
-    // re-subscribed per active tab so openVncTarget sees the current one
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [active],
-  )
 
   // Cross-tab "open in ..." actions (Projects/Files/Terminal) - each just
   // stashes a one-shot payload here and switches tabs; the target tab
@@ -476,7 +470,7 @@ function App() {
               sizing measured against .app-content itself. */}
           {vncVisited && (
             <div style={{ display: active === 'vnc' ? 'contents' : 'none' }}>
-              <RouterFrame tab="vnc" params={vncInitialParams} onEmbedMessage={handleVncMessage} command={vncCommand} />
+              <RouterFrame tab="vnc" params={vncInitialParams} onEmbedMessage={handleVncMessage} />
             </div>
           )}
         </main>
