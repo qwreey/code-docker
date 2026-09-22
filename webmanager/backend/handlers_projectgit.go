@@ -43,6 +43,8 @@ func writeProjectGitErr(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "not a git repository")
 	case errors.Is(err, projectgit.ErrInvalidHash):
 		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, projectgit.ErrUnknownCommit):
+		writeError(w, http.StatusNotFound, err.Error())
 	default:
 		writeError(w, http.StatusBadGateway, err.Error())
 	}
@@ -105,6 +107,21 @@ func (s *Server) handleProjectGitDiffCommit(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"text": text})
+}
+
+// GET /api/projects/git/commit?path=&hash= - one commit by (abbreviated)
+// hash, for a hash ctrl+clicked in the terminal.
+func (s *Server) handleProjectGitCommit(w http.ResponseWriter, r *http.Request) {
+	path, ok := s.projectGitPath(w, r)
+	if !ok {
+		return
+	}
+	c, err := projectgit.CommitInfo(path, r.URL.Query().Get("hash"))
+	if err != nil {
+		writeProjectGitErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
 }
 
 func (s *Server) handleProjectGitDiffUnstaged(w http.ResponseWriter, r *http.Request) {

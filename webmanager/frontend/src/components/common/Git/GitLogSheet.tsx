@@ -14,7 +14,9 @@ const PAGE_SIZE = 50
 // ClaudeCode's SessionViewer). Clicking a commit swaps the same Sheet body
 // over to that commit's diff (reusing DiffView) instead of opening a nested
 // Sheet - "뒤로" returns to the list without re-fetching it.
-export function GitLogSheet({ path, onClose }: { path: string; onClose: () => void }) {
+// initialHash opens straight onto that commit (a hash ctrl+clicked in the
+// terminal) - looked up on its own, since it may be far past the first page.
+export function GitLogSheet({ path, initialHash, onClose }: { path: string; initialHash?: string; onClose: () => void }) {
   const [commits, setCommits] = useState<GitCommit[]>([])
   const [cursor, setCursor] = useState<string | undefined>(undefined)
   const [hasMore, setHasMore] = useState(false)
@@ -53,6 +55,16 @@ export function GitLogSheet({ path, onClose }: { path: string; onClose: () => vo
       cancelled = true
     }
   }, [path])
+
+  useEffect(() => {
+    if (!initialHash) return
+    api
+      .get<GitCommit>(`/projects/git/commit?path=${encodeURIComponent(path)}&hash=${encodeURIComponent(initialHash)}`)
+      .then(openCommit)
+      .catch(() => setError(`커밋 ${initialHash}을(를) 이 저장소에서 찾지 못했습니다.`))
+    // Once per sheet: openCommit is a plain function recreated each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, initialHash])
 
   async function loadMore() {
     if (!cursor) return

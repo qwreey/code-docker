@@ -40,7 +40,7 @@ import { TerminalTabs, HOME_TAB_ID } from './TerminalTabs'
 import { TerminalHome } from './TerminalHome'
 import { useKeyboardInset } from './useKeyboardInset'
 import { onHostMessage, postToHost, reportEmbedState } from '../../embed'
-import { registerFileLinks } from './fileLinks'
+import { registerTerminalLinks } from './terminalLinks'
 import './Terminal.css'
 
 // Options a new session can be created with — only meaningful the moment a
@@ -675,6 +675,7 @@ export function Terminal({
   onInitialOpenConsumed,
   onOpenFileManager,
   onOpenProject,
+  onOpenCommit,
   onToggleSidebar,
   restoreSession,
   onRestoreSessionConsumed,
@@ -689,6 +690,8 @@ export function Terminal({
   // Opens the project's info dialog over the terminal (App.tsx's
   // openProjectInfo) rather than navigating to the Projects tab.
   onOpenProject?: (path: string) => void
+  // A commit hash ctrl+clicked in the terminal, in the session's project.
+  onOpenCommit?: (projectPath: string, hash: string) => void
   // Given only while this tab is the active section: the Terminal tab hides
   // the app's own mobile top bar (see App.tsx) to reclaim the vertical space
   // a phone keyboard makes precious, and adopts its hamburger into its own
@@ -816,6 +819,8 @@ export function Terminal({
   // Embed only: where to recreate the session if it has to be - its live
   // cwd as last seen, else the directory the view was opened with.
   const embedCwdRef = useRef(embedCwd)
+  const activeProjectPathRef = useRef<string | null>(null)
+  const onOpenCommitRef = useRef(onOpenCommit)
   const [sessionActionError, setSessionActionError] = useState<string | null>(null)
   const [profiles, setProfiles] = useState<TerminalProfile[]>([])
   const [profilesError, setProfilesError] = useState<string | null>(null)
@@ -1403,8 +1408,14 @@ export function Terminal({
     fitAddonRef.current = fitAddon
     term.loadAddon(fitAddon)
     term.open(container)
-    // Ctrl+click a path to open it in code-server (disposed with term).
-    if (embedded) registerFileLinks(term, () => embedCwdRef.current)
+    // Ctrl+click URLs, commit hashes and (in code-server) file paths -
+    // disposed with term.
+    registerTerminalLinks(term, {
+      embedded,
+      getCwd: () => embedCwdRef.current,
+      getProject: () => activeProjectPathRef.current,
+      openCommit: (project, hash) => onOpenCommitRef.current?.(project, hash),
+    })
     // Not fitAddon.fit() unconditionally: on a fresh mount the Home tab is
     // active, so this container is still `hidden` here — see fitIfVisible.
     if (container.clientWidth > 0 && container.clientHeight > 0) fitAddon.fit()
@@ -3181,6 +3192,11 @@ export function Terminal({
     () => (activeCwd ? projectPathForCwd(activeCwd, projectRoots) : null),
     [activeCwd, projectRoots],
   )
+  // Read by the xterm link provider, which is created once.
+  useEffect(() => {
+    activeProjectPathRef.current = activeProjectPath
+    onOpenCommitRef.current = onOpenCommit
+  }, [activeProjectPath, onOpenCommit])
 
   const surfaceStyle = {
     '--kb-inset': `${keyboardInset}px`,

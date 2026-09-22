@@ -184,6 +184,7 @@ function App() {
   // which project the current shell sits in shouldn't navigate you out of
   // the terminal you were watching.
   const [projectInfoPath, setProjectInfoPath] = useState<string | null>(null)
+  const [projectInfoCommit, setProjectInfoCommit] = useState<string | null>(null)
 
   // command, when given, is typed into the new session's shell as if the
   // user had entered it (see termsession.CreateOptions.InitialCommand) —
@@ -250,8 +251,9 @@ function App() {
   // ProjectSessionHistory (rendered inside ProjectInfoDialog) see an
   // already-unlocked cookie instead of each popping its own prompt - same
   // reasoning as ProjectTable.tsx's openDetails, see useUnlockGate.ts.
-  async function openProjectInfo(path: string) {
+  async function openProjectInfo(path: string, commit?: string) {
     if (!(await ensureUnlocked(authStatus))) return
+    setProjectInfoCommit(commit ?? null)
     setProjectInfoPath(path)
   }
 
@@ -380,6 +382,7 @@ function App() {
                 onInitialOpenConsumed={() => setPendingTerminalOpen(null)}
                 onOpenFileManager={openFileManagerOverlay}
                 onOpenProject={openProjectInfo}
+                onOpenCommit={openProjectInfo}
                 onToggleSidebar={EMBED ? undefined : () => setSidebarOpen((v) => !v)}
                 embedSession={EMBED ? embedParams.session : undefined}
                 embedCwd={EMBED ? embedParams.cwd : undefined}
@@ -429,6 +432,7 @@ function App() {
       />
       <ProjectInfoDialog
         path={projectInfoPath}
+        commit={projectInfoCommit}
         onClose={() => setProjectInfoPath(null)}
         onOpenInProjectsTab={openProject}
         onOpenTerminal={openInTerminal}

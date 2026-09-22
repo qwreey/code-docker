@@ -60,12 +60,12 @@ type SheetKind = 'log' | 'changes' | 'remotes' | 'branches' | 'tags' | null
 // doesn't need that stylesheet loaded) rather than the caller wrapping it,
 // so it can render nothing at all - no empty bordered strip - once a
 // confirmed non-repo path is known, instead of just an empty inner area.
-export function GitStatusPanel({ path }: { path: string }) {
+export function GitStatusPanel({ path, initialCommit }: { path: string; initialCommit?: string }) {
   const [status, setStatus] = useState<GitStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [openSheet, setOpenSheet] = useState<SheetKind>(null)
+  const [openSheet, setOpenSheet] = useState<SheetKind>(initialCommit ? 'log' : null)
 
   async function load(isRefresh: boolean) {
     if (isRefresh) setRefreshing(true)
@@ -153,7 +153,9 @@ export function GitStatusPanel({ path }: { path: string }) {
         </button>
       </div>
 
-      {openSheet === 'log' && <GitLogSheet path={path} onClose={() => setOpenSheet(null)} />}
+      {openSheet === 'log' && (
+        <GitLogSheet path={path} initialHash={initialCommit} onClose={() => setOpenSheet(null)} />
+      )}
       {openSheet === 'changes' && <GitChangesSheet path={path} onClose={() => setOpenSheet(null)} />}
       {openSheet === 'remotes' && <GitRemotesSheet path={path} onClose={() => setOpenSheet(null)} />}
       {openSheet === 'branches' && <GitBranchesSheet path={path} onClose={() => setOpenSheet(null)} />}

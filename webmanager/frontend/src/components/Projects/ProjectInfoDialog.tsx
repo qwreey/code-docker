@@ -25,12 +25,15 @@ import './Projects.css'
 // there when that's what you actually wanted.
 export function ProjectInfoDialog({
   path,
+  commit,
   onClose,
   onOpenInProjectsTab,
   onOpenTerminal,
   onOpenTerminalSession,
 }: {
   path: string | null
+  // Opens the git history straight onto this commit.
+  commit?: string | null
   onClose: () => void
   onOpenInProjectsTab?: (path: string) => void
   onOpenTerminal?: (cwd: string, label?: string, command?: string) => void
@@ -121,7 +124,7 @@ export function ProjectInfoDialog({
         </section>
 
         <ProjectTerminalSessions path={path} onOpenSession={onOpenTerminalSession} />
-        <GitStatusPanel path={path} />
+        <GitStatusPanel key={commit ?? ''} path={path} initialCommit={commit ?? undefined} />
         <WorktreesPanel path={path} />
         <ProjectSessionHistory path={path} onOpenTerminal={onOpenTerminal} />
         <ProjectMemoryPanel path={path} />

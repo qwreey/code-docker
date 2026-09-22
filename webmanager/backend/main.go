@@ -340,6 +340,7 @@ func main() {
 	mux.HandleFunc("GET /api/projects/git/status", s.handleProjectGitStatus)
 	mux.HandleFunc("GET /api/projects/git/log", s.handleProjectGitLog)
 	mux.HandleFunc("GET /api/projects/git/diff/commit", s.handleProjectGitDiffCommit)
+	mux.HandleFunc("GET /api/projects/git/commit", s.handleProjectGitCommit)
 	mux.HandleFunc("GET /api/projects/git/diff/unstaged", s.handleProjectGitDiffUnstaged)
 	mux.HandleFunc("GET /api/projects/git/diff/staged", s.handleProjectGitDiffStaged)
 	mux.HandleFunc("GET /api/projects/git/remotes", s.handleProjectGitRemotes)

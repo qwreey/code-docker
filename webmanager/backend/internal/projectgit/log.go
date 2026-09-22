@@ -1,6 +1,7 @@
 package projectgit
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -98,4 +99,38 @@ func Log(path string, limit int, cursor string) (LogPage, error) {
 		page.NextCursor = strconv.Itoa(skip + limit)
 	}
 	return page, nil
+}
+
+// ErrUnknownCommit is returned by CommitInfo when hash names no commit in
+// the repository (or is ambiguous).
+var ErrUnknownCommit = errors.New("no such commit")
+
+// CommitInfo looks one commit up by hash - full or abbreviated, as it was
+// printed somewhere (a terminal's `git log --oneline`) - for opening it
+// straight to its detail view. hash must pass ValidateHash; the `--` after
+// it keeps git from reading it as a path.
+func CommitInfo(path, hash string) (Commit, error) {
+	if !IsGitRepo(path) {
+		return Commit{}, ErrNotGitRepo
+	}
+	if err := ValidateHash(hash); err != nil {
+		return Commit{}, err
+	}
+	format := strings.Join([]string{"%H", "%h", "%an", "%ae", "%aI", "%s"}, logFieldSep)
+	out, err := runGit(path, "log", "-1", "--no-walk", "--pretty=format:"+format, hash+"^{commit}", "--")
+	if err != nil {
+		return Commit{}, ErrUnknownCommit
+	}
+	fields := strings.Split(strings.Trim(string(out), "\n"), logFieldSep)
+	if len(fields) < 6 {
+		return Commit{}, ErrUnknownCommit
+	}
+	return Commit{
+		Hash:        fields[0],
+		ShortHash:   fields[1],
+		AuthorName:  fields[2],
+		AuthorEmail: fields[3],
+		Date:        fields[4],
+		Subject:     fields[5],
+	}, nil
 }
