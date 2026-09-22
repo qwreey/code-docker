@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -19,7 +20,6 @@ import (
 	"github.com/coder/websocket"
 	"golang.org/x/term"
 
-	"webmanager/internal/atomicfile"
 	"webmanager/internal/authgate"
 	"webmanager/internal/termsession"
 )
@@ -38,7 +38,9 @@ import (
 //
 // cwd is only honored the moment this actually creates a new session
 // (GetOrCreate ignores it on reattach) - same rule the Terminal tab's own
-// cwd/InitialCommand query params already follow.
+// cwd/InitialCommand query params already follow. Without an explicit
+// start-dir, a new session starts where this command was run from (see
+// attachStartDir), not in webmanager's own default.
 func attachCmd(cfg Config, args []string) int {
 	if len(args) < 1 || len(args) > 2 || args[0] == "" {
 		fmt.Fprintln(os.Stderr, "usage: webmanager --attach <session-name> [start-dir]")
@@ -71,7 +73,7 @@ func attachCmd(cfg Config, args []string) int {
 	}
 
 	baseURL := "http://" + cfg.Addr
-	cookie, err := attachAuthenticate(baseURL, cfg.AttachCookiePath)
+	cookie, err := attachAuthenticate(baseURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "attach: %v\n", err)
 		return 1
@@ -90,18 +92,25 @@ func attachCmd(cfg Config, args []string) int {
 	// exits the shell and so destroys the session for the browser tab too -
 	// as the only exit that appears to work.
 	detachHint := describeDetachSequence(detachSeq)
-	switch exists, known := sessionExists(baseURL, cookie, name); {
+	var explicitDir string
+	if len(args) == 2 {
+		explicitDir = args[1]
+	}
+	startDir := attachStartDir(explicitDir)
+	switch exists, known := sessionExists(baseURL, name); {
 	case !known:
 		fmt.Fprintf(os.Stderr, "attach: connecting to session %q (%s to detach)\n", name, detachHint)
 	case exists:
 		fmt.Fprintf(os.Stderr, "attach: joining existing session %q (%s to detach)\n", name, detachHint)
+	case startDir != "":
+		fmt.Fprintf(os.Stderr, "attach: creating new session %q in %s (%s to detach)\n", name, startDir, detachHint)
 	default:
 		fmt.Fprintf(os.Stderr, "attach: creating new session %q (%s to detach)\n", name, detachHint)
 	}
 
 	query := url.Values{"session": {name}}
-	if len(args) == 2 {
-		query.Set("cwd", args[1])
+	if startDir != "" {
+		query.Set("cwd", startDir)
 	}
 	// Report this terminal's size on the connect URL, not just via the
 	// "resize" control message attachRelay sends once connected: the server
@@ -196,73 +205,44 @@ func fetchDetachSequence(baseURL, cookie string) []byte {
 	return []byte(settings.DetachSequence)
 }
 
-// saveAttachCookie caches a freshly-obtained unlock cookie so the CLI paths
-// that have no terminal to prompt on can reuse it - today just
-// `webmanager --list-sessions`, which is what `attach`'s shell completion
-// shells out to, and which therefore offered *nothing* whenever the
-// password gate was on. That silence is worse than it sounds: the default
-// session names contain a space ("세션 1"), so with no completion to quote
-// them, `attach 세션 1` splits into name + start-dir and quietly creates a
-// session named "세션" instead of joining the one meant.
-//
-// No expiry bookkeeping here on purpose: the token carries its own signed
-// issue time, the gate rejects it past its TTL, and webmanager's HMAC
-// secret is regenerated on every restart - so a stale file simply stops
-// working (completion goes quiet again until the next attach), it can never
-// grant more than the gate itself would. Every failure is ignored: this is
-// a convenience cache, never a reason to fail an attach that already
-// authenticated successfully.
-func saveAttachCookie(path, cookie string) {
-	if path == "" {
-		return
+// attachStartDir picks the directory a newly created session starts in.
+// An explicit start-dir wins, made absolute here because the server
+// resolves it, and a relative one would land relative to webmanager's own
+// working directory rather than the caller's. Without one, it is the
+// directory `attach` itself was run from: `cd` into a project (or open a
+// code-server terminal there) and `attach <new name>` used to land in
+// webmanager's default instead, so the very next `claude` started in the
+// wrong project. Only ever used on creation - reattaching to an existing
+// session never moves it. "" (webmanager's default) if the directory can't
+// be determined.
+func attachStartDir(explicit string) string {
+	if explicit != "" {
+		if abs, err := filepath.Abs(explicit); err == nil {
+			return abs
+		}
+		return explicit
 	}
-	_ = atomicfile.Write(path, []byte(cookie+"\n"), 0o600, 0o755)
-}
-
-// loadAttachCookie reads back whatever saveAttachCookie last stored. An
-// empty string means "nothing usable" - missing file, unreadable, empty -
-// and every caller treats that the same as having no cookie at all.
-func loadAttachCookie(path string) string {
-	if path == "" {
-		return ""
+	// os.Getwd already prefers $PWD when it still names this directory, so
+	// a path reached through a symlink keeps the spelling the user typed.
+	if wd, err := os.Getwd(); err == nil {
+		return wd
 	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
+	return ""
 }
 
 // sessionExists reports whether name is already a live session, so the
 // banner above can say "joining" instead of "creating". known is false when
-// that couldn't be determined at all (network error, non-200 - e.g. an
-// unexpectedly stale cookie - or an unparseable body), in which case the
+// that couldn't be determined at all (network error, non-200 or an
+// unparseable body), in which case the
 // caller says less rather than failing the attach, same graceful-degrade
 // rule as fetchDetachSequence.
-func sessionExists(baseURL, cookie, name string) (exists, known bool) {
-	req, err := http.NewRequest(http.MethodGet, baseURL+"/api/terminal/sessions", nil)
+func sessionExists(baseURL, name string) (exists, known bool) {
+	names, err := fetchSessionNames(&http.Client{Timeout: 5 * time.Second}, baseURL)
 	if err != nil {
 		return false, false
 	}
-	if cookie != "" {
-		req.Header.Set("Cookie", cookie)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return false, false
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return false, false
-	}
-	var sessions []struct {
-		Name string `json:"name"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&sessions); err != nil {
-		return false, false
-	}
-	for _, s := range sessions {
-		if s.Name == name {
+	for _, n := range names {
+		if n == name {
 			return true, true
 		}
 	}
@@ -293,9 +273,8 @@ func describeDetachSequence(seq []byte) string {
 // configured, prompts for it (stdin echo disabled) and exchanges it for the
 // unlock cookie via POST /api/auth/unlock. Returns "" (no error) when no
 // password is configured at all - the common case in this test environment
-// and for anyone who hasn't opted into the gate. A successful unlock is
-// cached via saveAttachCookie for the CLI paths that can't prompt.
-func attachAuthenticate(baseURL, cookiePath string) (string, error) {
+// and for anyone who hasn't opted into the gate.
+func attachAuthenticate(baseURL string) (string, error) {
 	resp, err := http.Get(baseURL + "/api/auth/status")
 	if err != nil {
 		return "", fmt.Errorf("checking auth status: %w", err)
@@ -338,9 +317,7 @@ func attachAuthenticate(baseURL, cookiePath string) (string, error) {
 	}
 	for _, c := range unlockResp.Cookies() {
 		if c.Name == authgate.CookieName {
-			cookie := c.Name + "=" + c.Value
-			saveAttachCookie(cookiePath, cookie)
-			return cookie, nil
+			return c.Name + "=" + c.Value, nil
 		}
 	}
 	return "", fmt.Errorf("unlock succeeded but no cookie was returned")

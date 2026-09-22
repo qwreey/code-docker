@@ -434,6 +434,16 @@ func ResetModesSequence() []byte {
 	}
 	b.WriteString("\x1b>")     // DECKPNM, numeric keypad
 	b.WriteString("\x1b[>4;m") // key-modifier resources back to the default
+	// Kitty keyboard protocol flags back to 0 (legacy encoding). Not
+	// something Preamble restores (see modeTracker), but a shell inside the
+	// session - fish at its prompt, above all - enables it on whatever
+	// terminal is attached, and only turns it off when it next runs a
+	// command. Detaching from a session sitting at a prompt therefore left
+	// the caller's own terminal sending CSI u encodings to every program
+	// started from the outer shell afterwards. "=0;1u" sets the current
+	// flags rather than popping the stack: a pop would also discard an
+	// entry the outer terminal's own stack might still need.
+	b.WriteString("\x1b[=0;1u")
 	for _, designator := range []string{"(", ")", "*", "+"} {
 		b.WriteString("\x1b" + designator + "B") // designate ASCII
 	}

@@ -14,69 +14,44 @@ import (
 // rather than re-implementing the HTTP call + JSON decoding once per shell
 // (fish/bash/zsh) in their own completion languages.
 //
-// Deliberately silent on any failure - a connection error, a non-OK status,
-// a decode error, or (see below) an authgate password requirement with no
-// cached unlock cookie to answer it all just mean "no completions offered"
-// (exit 0, no output), never a scary error or a hang firing on every TAB
-// press. Same "non-essential setup degrades gracefully" convention as root
-// CLAUDE.md.
+// Reads GET /api/terminal/session-names, which is deliberately outside the
+// password gate (see handleListTerminalSessionNames) - so this works the
+// same whether or not the gate is on, with no password prompt and no cached
+// unlock cookie. (An earlier version reused a cookie the last `attach` had
+// cached on disk, and so still went silent whenever that cookie was missing
+// or had expired - most of the time.)
+//
+// Deliberately silent on any failure - a connection error, a non-OK status
+// or a decode error all just mean "no completions offered" (exit 0, no
+// output), never a scary error or a hang firing on every TAB press. Same
+// "non-essential setup degrades gracefully" convention as root CLAUDE.md.
 func listSessionsCmd(cfg Config) int {
-	baseURL := "http://" + cfg.Addr
 	client := &http.Client{Timeout: 800 * time.Millisecond}
-
-	statusResp, err := client.Get(baseURL + "/api/auth/status")
+	names, err := fetchSessionNames(client, "http://"+cfg.Addr)
 	if err != nil {
 		return 0
 	}
-	var status struct {
-		Required bool `json:"required"`
-	}
-	statusErr := json.NewDecoder(statusResp.Body).Decode(&status)
-	statusResp.Body.Close()
-	if statusErr != nil {
-		return 0
-	}
-	// There's no terminal here to prompt for a password on, so a configured
-	// gate is answered with whatever unlock cookie the last `webmanager
-	// --attach` cached (see attachcmd.go's saveAttachCookie) - and with
-	// nothing at all if there is none, or it has expired. Without that
-	// reuse this command went silent for the entire time the gate was on,
-	// which is exactly when `attach`'s completion is most needed: the
-	// default session names contain a space, and an unquoted `attach
-	// 세션 1` silently creates a session named "세션" instead of joining
-	// the one meant.
-	cookie := ""
-	if status.Required {
-		cookie = loadAttachCookie(cfg.AttachCookiePath)
-		if cookie == "" {
-			return 0
-		}
-	}
-
-	req, err := http.NewRequest(http.MethodGet, baseURL+"/api/terminal/sessions", nil)
-	if err != nil {
-		return 0
-	}
-	if cookie != "" {
-		req.Header.Set("Cookie", cookie)
-	}
-	sessionsResp, err := client.Do(req)
-	if err != nil {
-		return 0
-	}
-	defer sessionsResp.Body.Close()
-	if sessionsResp.StatusCode != http.StatusOK {
-		return 0
-	}
-
-	var sessions []struct {
-		Name string `json:"name"`
-	}
-	if err := json.NewDecoder(sessionsResp.Body).Decode(&sessions); err != nil {
-		return 0
-	}
-	for _, s := range sessions {
-		fmt.Println(s.Name)
+	for _, name := range names {
+		fmt.Println(name)
 	}
 	return 0
+}
+
+// fetchSessionNames returns the names of every live terminal session, via
+// the ungated names-only endpoint. Shared by listSessionsCmd and attach's
+// sessionExists.
+func fetchSessionNames(client *http.Client, baseURL string) ([]string, error) {
+	resp, err := client.Get(baseURL + "/api/terminal/session-names")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
+	var names []string
+	if err := json.NewDecoder(resp.Body).Decode(&names); err != nil {
+		return nil, err
+	}
+	return names, nil
 }

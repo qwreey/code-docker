@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -108,11 +110,11 @@ func TestDescribeDetachSequence(t *testing.T) {
 // mismatch that banner exists to make visible.
 func TestSessionExists(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Cookie") != "webmanager_unlock=tok" {
-			w.WriteHeader(http.StatusUnauthorized)
+		if r.URL.Path != "/api/terminal/session-names" {
+			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		fmt.Fprint(w, `[{"name":"quad"},{"name":"세션 1"}]`)
+		fmt.Fprint(w, `["quad","세션 1"]`)
 	}))
 	defer srv.Close()
 
@@ -125,20 +127,38 @@ func TestSessionExists(t *testing.T) {
 		{"세션 1", true, true},
 		{"quad2", false, true},
 	} {
-		exists, known := sessionExists(srv.URL, "webmanager_unlock=tok", c.name)
+		exists, known := sessionExists(srv.URL, c.name)
 		if exists != c.wantExists || known != c.wantKnown {
 			t.Errorf("sessionExists(%q) = (%v, %v), want (%v, %v)", c.name, exists, known, c.wantExists, c.wantKnown)
 		}
 	}
 
-	// A gate rejecting the cookie (or any other non-200) must report
-	// "unknown", not "doesn't exist" - the banner then says less rather
-	// than claiming a join is a create.
-	if exists, known := sessionExists(srv.URL, "", "quad"); exists || known {
-		t.Errorf("sessionExists with rejected cookie = (%v, %v), want (false, false)", exists, known)
-	}
-	if exists, known := sessionExists("http://127.0.0.1:1", "", "quad"); exists || known {
+	// Any failure must report "unknown", not "doesn't exist" - the banner
+	// then says less rather than claiming a join is a create.
+	if exists, known := sessionExists("http://127.0.0.1:1", "quad"); exists || known {
 		t.Errorf("sessionExists against a dead server = (%v, %v), want (false, false)", exists, known)
+	}
+}
+
+// A new session with no explicit start-dir must start where `attach` was
+// run, and an explicit relative one must be resolved against that same
+// directory - the server would otherwise resolve it against its own.
+func TestAttachStartDir(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := attachStartDir(""); got != wd {
+		t.Errorf(`attachStartDir("") = %q, want the current directory %q`, got, wd)
+	}
+	if got, want := attachStartDir("sub"), filepath.Join(wd, "sub"); got != want {
+		t.Errorf(`attachStartDir("sub") = %q, want %q`, got, want)
+	}
+	if got := attachStartDir("/etc"); got != "/etc" {
+		t.Errorf(`attachStartDir("/etc") = %q, want it unchanged`, got)
 	}
 }
 

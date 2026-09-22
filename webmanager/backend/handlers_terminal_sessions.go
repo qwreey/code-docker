@@ -26,6 +26,25 @@ func (s *Server) handleListTerminalSessions(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, s.termSessions.List())
 }
 
+// handleListTerminalSessionNames is the ungated, names-only counterpart of
+// handleListTerminalSessions, for `attach`'s shell completion and its
+// "joining"/"creating" banner (see listsessionscmd.go and attachcmd.go).
+// Neither has a terminal to prompt for the password gate on at TAB time,
+// and a completion that goes silent whenever the gate is on is worse than
+// useless here: the default names contain a space ("세션 1"), so an
+// unquoted `attach 세션 1` splits into name + start-dir and quietly creates
+// a session named "세션" instead of joining the one meant. Only the names
+// are exposed - no pid, cwd or timestamps - and reading them grants nothing:
+// attaching to one still goes through the gated GET /api/terminal.
+func (s *Server) handleListTerminalSessionNames(w http.ResponseWriter, r *http.Request) {
+	sessions := s.termSessions.List()
+	names := make([]string, 0, len(sessions))
+	for _, info := range sessions {
+		names = append(names, info.Name)
+	}
+	writeJSON(w, http.StatusOK, names)
+}
+
 // patchTerminalSessionRequest's fields are pointers so a request touching
 // only one of pinned/name doesn't have to know the other's current value -
 // e.g. a rename-only PATCH must not implicitly reset pinned to false just

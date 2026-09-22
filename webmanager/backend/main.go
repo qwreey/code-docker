@@ -403,6 +403,9 @@ func main() {
 	// than the terminal content, but there's no reason to give it a weaker
 	// bar than everything else terminal-related).
 	mux.Handle("GET /api/terminal/sessions", gate.RequirePassword(http.HandlerFunc(s.handleListTerminalSessions)))
+	// Names only, ungated on purpose: `attach`'s shell completion has no way
+	// to answer the gate at TAB time — see handleListTerminalSessionNames.
+	mux.HandleFunc("GET /api/terminal/session-names", s.handleListTerminalSessionNames)
 	mux.Handle("PATCH /api/terminal/sessions/{name}", gate.RequirePassword(http.HandlerFunc(s.handlePatchTerminalSession)))
 	mux.Handle("DELETE /api/terminal/sessions/{name}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteTerminalSession)))
 	mux.Handle("GET /api/terminal/sessions/{name}/cwd", gate.RequirePassword(http.HandlerFunc(s.handleGetTerminalSessionCwd)))

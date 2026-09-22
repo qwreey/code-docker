@@ -4,9 +4,10 @@
 # Session-name candidates are fetched by shelling out to
 # `webmanager --list-sessions` (webmanager/backend/listsessionscmd.go)
 # rather than talking to the HTTP API directly from fish, so the
-# auth-gate/graceful-degrade logic (silently offers nothing if the password
-# gate is on, webmanager isn't reachable, etc.) lives in one place instead
-# of being reimplemented per shell. This is only a suggestion list, not a
+# graceful-degrade logic (silently offers nothing if webmanager isn't
+# reachable, etc.) lives in one place instead of being reimplemented per
+# shell. The names come from an endpoint outside the password gate, so this
+# works with the gate on too. This is only a suggestion list, not a
 # restriction - `attach <name>` creates a brand-new session for any name
 # that doesn't already exist, so free text typed past these candidates must
 # stay valid.

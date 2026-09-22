@@ -197,7 +197,7 @@ func TestResetModesSequenceLeavesAltScreenLast(t *testing.T) {
 	}
 	for _, want := range []string{
 		"\x1b[?25h", "\x1b[?2004l", "\x1b[?1006l", "\x1b>",
-		"\x1b[4l", "\x1b[>4;m", "\x1b(B", "\x1b)B", "\x0f", "\x1b[r", "\x1b[0 q",
+		"\x1b[4l", "\x1b[>4;m", "\x1b[=0;1u", "\x1b(B", "\x1b)B", "\x0f", "\x1b[r", "\x1b[0 q",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("ResetModesSequence() = %q, missing %q", got, want)
