@@ -14,6 +14,7 @@
 // http(s), folders absolute.
 
 const fs = require('fs')
+const os = require('os')
 const path = require('path')
 const vscode = require('vscode')
 const { SECTIONS, sectionLabel } = require('./src/sections')
@@ -367,6 +368,39 @@ function isHttpUrl(u) {
   }
 }
 
+// Ctrl+click on a path in an embedded terminal (webmanager's fileLinks.ts).
+// A relative path resolves against the session's cwd; one that doesn't
+// exist becomes a Quick Open search for its text - what the user would
+// have typed into Ctrl+P anyway.
+async function openFileFromEmbed(m) {
+  if (typeof m.path !== 'string' || !m.path) return
+  let p = m.path
+  if (p.startsWith('~/')) p = path.posix.join(os.homedir(), p.slice(2))
+  else if (!p.startsWith('/') && typeof m.cwd === 'string' && m.cwd.startsWith('/')) p = path.posix.join(m.cwd, p)
+  let stat
+  if (p.startsWith('/')) {
+    try {
+      stat = await vscode.workspace.fs.stat(vscode.Uri.file(p))
+    } catch {
+      // doesn't exist - Quick Open below
+    }
+  }
+  if (!stat) {
+    const query = m.path.replace(/^(\.{1,2}\/)+/, '') + (Number.isInteger(m.line) ? `:${m.line}` : '')
+    await vscode.commands.executeCommand('workbench.action.quickOpen', query)
+    return
+  }
+  const uri = vscode.Uri.file(p)
+  if (stat.type & vscode.FileType.Directory) {
+    await vscode.commands.executeCommand('revealInExplorer', uri)
+    return
+  }
+  const line = Number.isInteger(m.line) && m.line > 0 ? m.line - 1 : undefined
+  const col = Number.isInteger(m.col) && m.col > 0 ? m.col - 1 : 0
+  const selection = line === undefined ? undefined : new vscode.Range(line, col, line, col)
+  await vscode.window.showTextDocument(uri, { selection })
+}
+
 async function onMessage(host, m) {
   if (!m || typeof m.type !== 'string') return
   switch (m.type) {
@@ -406,6 +440,9 @@ async function onMessage(host, m) {
       if (typeof m.path === 'string' && m.path.startsWith('/')) {
         await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(m.path), { forceNewWindow: true })
       }
+      break
+    case 'open-file':
+      await openFileFromEmbed(m)
       break
     case 'open-terminal':
       await openTerminalFromEmbed(m)

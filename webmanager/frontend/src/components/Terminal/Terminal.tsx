@@ -41,6 +41,7 @@ import { TerminalTabs, HOME_TAB_ID } from './TerminalTabs'
 import { TerminalHome } from './TerminalHome'
 import { useKeyboardInset } from './useKeyboardInset'
 import { onHostMessage, postToHost, reportEmbedState } from '../../embed'
+import { registerFileLinks } from './fileLinks'
 import './Terminal.css'
 
 // Options a new session can be created with — only meaningful the moment a
@@ -1393,6 +1394,8 @@ export function Terminal({
     fitAddonRef.current = fitAddon
     term.loadAddon(fitAddon)
     term.open(container)
+    // Ctrl+click a path to open it in code-server (disposed with term).
+    if (embedded) registerFileLinks(term, () => embedCwdRef.current)
     // Not fitAddon.fit() unconditionally: on a fresh mount the Home tab is
     // active, so this container is still `hidden` here — see fitIfVisible.
     if (container.clientWidth > 0 && container.clientHeight > 0) fitAddon.fit()

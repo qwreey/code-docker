@@ -397,6 +397,7 @@ The main stage does `COPY --from=code-extension /out/ /etc/code-docker/code/exte
 - With the gate on, unlocking one view unlocks the others.
 - HTTPS watchdog.
 - Memory numbers with 1 vs 4 views.
+- Ctrl+click file links (`fileLinks.ts` → `open-file`), verified on the test stack 2026-09-22: a relative `path:7:2` opens at line 7 against the session cwd, an absolute path opens, a missing one opens Quick Open with its text, a plain click does nothing. Not checked: long wrapped paths (links are per buffer row), apps with mouse tracking on (tmux, Claude Code's TUI may take the click).
 
 **8.3 Static checks:**
 - Frontend build and lint.
