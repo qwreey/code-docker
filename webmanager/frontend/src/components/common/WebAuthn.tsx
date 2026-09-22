@@ -172,28 +172,30 @@ export function WebAuthnHost() {
               이 기기({host})를 등록하면 다음부터 비밀번호 대신 지문(또는 기기 PIN)으로 잠금을 해제합니다. 비밀번호는 12시간마다
               한 번은 필요합니다.
             </p>
-            <div className="form-field">
-              <label htmlFor="webauthn-label">기기 이름</label>
-              <input id="webauthn-label" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} />
-            </div>
-            {enrollMessage && <p className="webauthn-unlock-message">{enrollMessage}</p>}
-            <div className="unlock-modal-actions">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  declineOffer()
-                  setEnrollPassword(null)
-                }}
-              >
-                다시 묻지 않기
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setEnrollPassword(null)}>
-                나중에
-              </button>
-              <button type="button" className="btn btn-primary" disabled={enrolling} onClick={() => enroll(enrollPassword)}>
-                {enrolling ? '등록 중...' : '등록'}
-              </button>
+            <div className="unlock-modal-form">
+              <div className="form-field">
+                <label htmlFor="webauthn-label">기기 이름</label>
+                <input id="webauthn-label" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} />
+              </div>
+              {enrollMessage && <p className="webauthn-unlock-message">{enrollMessage}</p>}
+              <div className="unlock-modal-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    declineOffer()
+                    setEnrollPassword(null)
+                  }}
+                >
+                  다시 묻지 않기
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => setEnrollPassword(null)}>
+                  나중에
+                </button>
+                <button type="button" className="btn btn-primary" disabled={enrolling} onClick={() => enroll(enrollPassword)}>
+                  {enrolling ? '등록 중...' : '등록'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
