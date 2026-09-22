@@ -25,9 +25,21 @@ function buildPath(state) {
   return section + (qs ? `?${qs}` : '')
 }
 
+const MODIFIER_ORDER = ['ctrl', 'shift', 'alt', 'meta']
+
+// A chord in the one spelling media/embed.js produces: modifiers in the
+// order ctrl, shift, alt, meta, then the key. Configured chords go through
+// this too, so "meta+shift+p" and "shift+meta+p" mean the same thing.
+function canonicalChord(chord) {
+  const parts = String(chord).toLowerCase().split('+').filter(Boolean)
+  const mods = MODIFIER_ORDER.filter((m) => parts.includes(m))
+  const keys = parts.filter((p) => !MODIFIER_ORDER.includes(p))
+  return [...mods, ...keys].join('+')
+}
+
 function passthroughChords() {
   const entries = vscode.workspace.getConfiguration('webmanager').get('passthroughKeys') || []
-  return entries.filter((e) => e && typeof e.key === 'string').map((e) => e.key.toLowerCase())
+  return entries.filter((e) => e && typeof e.key === 'string').map((e) => canonicalChord(e.key))
 }
 
 // The webview document. Everything real happens in media/embed.js; this only
@@ -41,6 +53,8 @@ function render(webview, extensionUri, { state, build }) {
   const media = (f) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', f))
   const basePath = vscode.workspace.getConfiguration('webmanager').get('basePath') || '/manager/'
   const config = {
+    // Identifies this render; see media/embed.js's startPath.
+    bind: crypto.randomBytes(9).toString('base64'),
     basePath,
     path: buildPath(state),
     state,
@@ -65,4 +79,4 @@ function render(webview, extensionUri, { state, build }) {
 </html>`
 }
 
-module.exports = { buildPath, render, passthroughChords }
+module.exports = { buildPath, render, passthroughChords, canonicalChord }

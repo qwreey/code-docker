@@ -22,6 +22,20 @@ Builds on `../research/code-server-embed-research.md`.
 6. **Known quirk:** the first "Open in Browser" right after a page reload once did nothing, and a second try worked. Probably the browser's popup blocker (no user activation reaches `openExternal` from the palette) or `href` not reported yet. Not investigated.
 7. Not done (deferred): `terminal.pinNewSessions`, measuring retain memory, and the direct VNC embed. For the VNC rework see `../../../.claude/backlog/vnc-tab-rework.md`.
 
+**Code review follow-ups (2026-09-22, two review agents, each finding re-checked by hand).** Fixed:
+- **Focus behind the ended card.** A focus used to reconnect behind the "세션이 종료되었습니다" card, quietly starting a new shell. The focus handler now skips a reconnect while the card is up.
+- **Ended vs. retry.** A 1000 close with the session list unavailable, or a 1008 (the server refused the name), shows the card instead of retrying forever.
+- **Host impersonation.** `embed.js` accepted any non-webmanager message as coming from the host. It now refuses anything posted from inside webmanager's frame tree, walking `parent`, which works cross-origin. Requiring `e.source === window.parent` was tried first and dropped the real host's messages: VS Code's frame layout doesn't make the host the parent. Verified live that both a direct and a nested impersonation are refused and that Change Session still works.
+- **Initial command.** It was never persisted in the webview state, so a refresh no longer re-runs it.
+- **Saved paths.** A saved path is reused only under the same render's binding nonce, so a rebound slot doesn't resurrect its old page. A re-shown terminal rebuilds its path from the saved session and cwd, so it doesn't reconnect under a stale name.
+- **Key chords are canonicalized.** The default `meta+shift+p` could never match `chordOf`'s `shift+meta+p`.
+- **Move to Panel** picks the slot before closing the tab.
+- **Open in Browser** closes a terminal view only if `openExternal` returned true.
+- **Dedup** also sees slot bindings whose views haven't been resolved since a reload.
+- **Closing a slot** ignores a `state` report still in flight from the view being closed.
+- **Config scope.** `passthroughKeys`, `basePath` and `internalUrl` are `machine`-scoped, so workspace settings can't remap keys to commands.
+- **Registration** is limited to the actions each slot actually exposes.
+
 Verified live:
 - sync matrix: first install; fast path (8 ms); reinstall after uninstall; opt-out removes it, and unsetting reinstalls;
 - terminal editor tab: typing, Ctrl+Shift+P/F1 passthrough and focus return;

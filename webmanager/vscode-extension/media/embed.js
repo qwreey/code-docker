@@ -16,19 +16,39 @@
   let chords = new Set(cfg.chords || [])
   let readyTimer = null
 
-  // A view that isn't kept alive while hidden is rebuilt from the same HTML
-  // when shown again - so start from where it last was (the Files folder
-  // browsed to, ...) rather than where it was first opened. Not for a
-  // terminal: its path from the extension carries the cwd a gone session is
-  // recreated in, which the page's own path doesn't.
-  const saved = vscode.getState()
-  const startPath =
-    saved && typeof saved.path === 'string' && saved.section && saved.section !== 'terminal' ? saved.path : cfg.path
+  // What gets saved (setState): everything the extension needs to restore
+  // this view, stamped with this render's binding nonce - but never the
+  // initial command. That one ran when the session was created, and a saved
+  // copy would re-run it whenever a refresh has to recreate the session
+  // (a finished `claude --resume` coming back as a fresh resume).
+  function persist(state) {
+    const { command, source, v, ...rest } = state
+    void command
+    void source
+    void v
+    vscode.setState({ ...rest, bind: cfg.bind })
+  }
 
-  // What the serializer restores from after a browser refresh. The extension
-  // host keeps the authoritative copy; this one only exists because a
-  // panel's saved state is whatever the webview last passed to setState.
-  vscode.setState({ ...cfg.state, ...(saved || {}), path: startPath })
+  // Where to start. A view that isn't kept alive while hidden is rebuilt from
+  // this same HTML when shown again, so it resumes where it last was - the
+  // Files folder browsed to, the session a terminal was switched or renamed
+  // to - rather than where it was first opened. Only state saved under this
+  // render's own binding counts: a slot rebound to another page renders new
+  // HTML (new nonce), and must not resurrect what the slot showed before.
+  function terminalPath(state) {
+    const q = new URLSearchParams()
+    if (state.session) q.set('session', state.session)
+    if (state.cwd) q.set('cwd', state.cwd)
+    const qs = q.toString()
+    return 'terminal' + (qs ? `?${qs}` : '')
+  }
+  const saved = vscode.getState()
+  let startPath = cfg.path
+  if (saved && saved.bind === cfg.bind && typeof saved.section === 'string') {
+    if (saved.section === 'terminal') startPath = terminalPath(saved)
+    else if (typeof saved.path === 'string') startPath = saved.path
+  }
+  persist({ ...cfg.state, ...(saved && saved.bind === cfg.bind ? saved : {}), path: startPath })
   vscode.postMessage({ type: 'wv-ready', secure: window.isSecureContext })
 
   function currentTheme() {
@@ -130,6 +150,24 @@
     attributeFilter: ['class'],
   })
 
+  // Whether win is the webmanager frame or nested anywhere inside it.
+  // `parent` is readable even on a cross-origin window, so this also covers
+  // a cross-origin frame (router on its own host) and its children.
+  function fromEmbedTree(win) {
+    for (let w = win; w; ) {
+      if (w === frame.contentWindow) return true
+      let up
+      try {
+        up = w.parent
+      } catch {
+        return false
+      }
+      if (!up || up === w) return false
+      w = up
+    }
+    return false
+  }
+
   window.addEventListener('message', (e) => {
     const data = e.data
     if (!data || typeof data !== 'object') return
@@ -142,7 +180,7 @@
       }
       if (data.type === 'state') {
         const href = new URL(data.path || '', baseUrl()).toString()
-        vscode.setState({ ...cfg.state, ...data, source: undefined, v: undefined })
+        persist({ ...cfg.state, ...data })
         vscode.postMessage({ ...data, source: undefined, v: undefined, href })
         return
       }
@@ -150,12 +188,17 @@
       return
     }
 
-    // From the extension host.
-    if (data.source) return
+    // From the extension host. Anything posted from inside webmanager's own
+    // frame tree - a router page or whatever it embeds, nested any depth -
+    // is refused, so nothing there can impersonate the host: `navigate` to
+    // terminal?cmd=... would otherwise run a command. (Not "must equal
+    // window.parent": VS Code's own frame layout around this document isn't
+    // something to pin down, and that check dropped the real host's messages.)
+    if (data.source || (e.source && fromEmbedTree(e.source))) return
     switch (data.type) {
       case 'navigate':
         if (data.state) cfg.state = data.state
-        vscode.setState({ ...cfg.state, path: data.path })
+        persist({ ...cfg.state, path: data.path })
         navigate(data.path)
         break
       case 'focus':

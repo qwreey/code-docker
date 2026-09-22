@@ -805,6 +805,11 @@ export function Terminal({
   const [activeSession, setActiveSession] = useState<string>(() => embedSession || HOME_TAB_ID)
   // Embed only: the session this view shows ended (its shell exited).
   const [sessionEnded, setSessionEnded] = useState(false)
+  // Read by the foreground/focus handler, which would otherwise see a plain
+  // 'disconnected' state behind the ended card and reconnect - i.e. quietly
+  // start a new shell under the card the moment the view got focus.
+  const sessionEndedRef = useRef(false)
+  sessionEndedRef.current = sessionEnded
   // Embed only: where to recreate the session if it has to be - its live
   // cwd as last seen, else the directory the view was opened with.
   const embedCwdRef = useRef(embedCwd)
@@ -1188,7 +1193,7 @@ export function Terminal({
     const onForeground = () => {
       fitIfVisible()
       sendResize()
-      if (stateRef.current === 'disconnected' && autoReconnectEnabledRef.current) reconnect()
+      if (stateRef.current === 'disconnected' && autoReconnectEnabledRef.current && !sessionEndedRef.current) reconnect()
     }
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') onForeground()
@@ -2824,13 +2829,14 @@ export function Terminal({
         // ordinary reconnect below, which recreates the session if it's
         // gone - that's the whole "survives a refresh/restart" promise of an
         // embedded view, so it must not fall back to Home either way.
+        // A 1000 with the list unavailable is still the server saying the
+        // session ended - reconnecting would recreate it. 1008 is a name the
+        // server refuses outright; retrying it can only fail forever.
         if (embedded) {
-          if (
-            event.code === 1000 &&
-            data &&
-            activeSessionRef.current === activeSession &&
-            !data.some((s) => s.name === activeSession)
-          ) {
+          const ended =
+            (event.code === 1000 && (!data || !data.some((s) => s.name === activeSession))) || event.code === 1008
+          if (ended && activeSessionRef.current === activeSession) {
+            sessionEndedRef.current = true
             setSessionEnded(true)
             postToHost({ type: 'session-ended', session: activeSession })
             return
@@ -3347,6 +3353,7 @@ export function Terminal({
                   type="button"
                   className="btn btn-primary btn-small"
                   onClick={() => {
+                    sessionEndedRef.current = false
                     setSessionEnded(false)
                     reconnect()
                   }}

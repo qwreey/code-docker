@@ -18,7 +18,7 @@ const path = require('path')
 const vscode = require('vscode')
 const { SECTIONS, sectionLabel } = require('./src/sections')
 const S = require('./src/sessions')
-const { buildPath, render, passthroughChords } = require('./src/html')
+const { buildPath, render, passthroughChords, canonicalChord } = require('./src/html')
 
 const VIEW_TYPE = 'webmanager.page'
 const SLOT_IDS = ['term1', 'term2', 'term3', 'term4', 'page1', 'page2']
@@ -113,9 +113,19 @@ function navigateHost(host, state) {
   updateTitle(host)
 }
 
+// Where a session is already shown in this window: a live view, or a panel
+// slot bound to it that simply hasn't been expanded since the last reload
+// (its view isn't resolved yet, so it isn't in `hosts` - but opening the
+// session elsewhere would still end up with two clients once it is).
 function findSessionHost(name, except) {
   for (const h of hosts) {
     if (h !== except && h.state && h.state.section === 'terminal' && h.state.session === name) return h
+  }
+  const bindings = slotBindings()
+  for (const id of SLOT_IDS) {
+    if (slotHosts.has(id) || (except && except.kind === 'slot' && except.id === id)) continue
+    const b = bindings[id]
+    if (b && b.section === 'terminal' && b.session === name) return { kind: 'slot', id }
   }
   return null
 }
@@ -174,8 +184,8 @@ async function saveBinding(id, state) {
 function setSlotContext(id, on) {
   // term1 has no `when` clause: it is always there, showing the terminal
   // Home while unbound, so the panel tab never disappears.
-  if (id === 'term1') return
-  vscode.commands.executeCommand('setContext', `webmanager.slot.${id}`, on)
+  if (id === 'term1') return Promise.resolve()
+  return vscode.commands.executeCommand('setContext', `webmanager.slot.${id}`, on)
 }
 
 function defaultSlotState(id) {
@@ -200,15 +210,23 @@ function slotProvider(id) {
 async function bindSlot(id, state) {
   state = normalizeState(state)
   await saveBinding(id, state)
-  setSlotContext(id, true)
+  await setSlotContext(id, true)
   const host = slotHosts.get(id)
-  if (host) navigateHost(host, state)
+  if (host) {
+    host.closedState = null
+    navigateHost(host, state)
+  }
   await vscode.commands.executeCommand(`webmanager.${id}.focus`)
 }
 
 async function closeSlot(id) {
-  await saveBinding(id, null)
   const host = slotHosts.get(id)
+  // A `state` report already in flight from the view being closed would
+  // otherwise re-save the binding just removed, and the slot would come back
+  // on the next reload. Anything that names a different page still counts
+  // (term1 goes on to show Home, where the user may pick a new session).
+  if (host) host.closedState = host.state
+  await saveBinding(id, null)
   if (id === 'term1') {
     if (host) navigateHost(host, defaultSlotState(id))
   } else {
@@ -216,21 +234,25 @@ async function closeSlot(id) {
   }
 }
 
-async function openInPanel(state) {
-  state = normalizeState(state)
+// The slot a state should go into: the first free one of its kind, or the
+// one the user picks to replace. undefined when they dismiss the picker.
+async function pickSlot(state) {
   const kind = state.section === 'terminal' ? 'term' : 'page'
   const ids = SLOT_IDS.filter((i) => i.startsWith(kind))
   const bindings = slotBindings()
-  let id = ids.find((i) => !bindings[i])
-  if (!id) {
-    const pick = await vscode.window.showQuickPick(
-      ids.map((i) => ({ label: titleOf(normalizeState(bindings[i])), description: i, id: i })),
-      { placeHolder: '빈 슬롯이 없습니다 — 바꿀 슬롯을 고르세요' },
-    )
-    if (!pick) return
-    id = pick.id
-  }
-  await bindSlot(id, state)
+  const free = ids.find((i) => !bindings[i])
+  if (free) return free
+  const pick = await vscode.window.showQuickPick(
+    ids.map((i) => ({ label: titleOf(normalizeState(bindings[i])), description: i, id: i })),
+    { placeHolder: '빈 슬롯이 없습니다 — 바꿀 슬롯을 고르세요' },
+  )
+  return pick ? pick.id : undefined
+}
+
+async function openInPanel(state) {
+  state = normalizeState(state)
+  const id = await pickSlot(state)
+  if (id) await bindSlot(id, state)
 }
 
 // ---- pickers ---------------------------------------------------------------
@@ -367,7 +389,13 @@ async function onMessage(host, m) {
       // A slot remembers what it shows so a refresh restores it - but only
       // something worth restoring: the terminal Home (no session) isn't.
       if (host.kind === 'slot' && (host.state.section !== 'terminal' || host.state.session)) {
-        await saveBinding(host.id, host.state)
+        const closed = host.closedState
+        const sameAsClosed =
+          closed && closed.section === host.state.section && closed.session === host.state.session && closed.query === host.state.query
+        if (!sameAsClosed) {
+          host.closedState = null
+          await saveBinding(host.id, host.state)
+        }
       }
       break
     }
@@ -391,7 +419,7 @@ async function onMessage(host, m) {
       break
     case 'key': {
       const entries = vscode.workspace.getConfiguration('webmanager').get('passthroughKeys') || []
-      const entry = entries.find((e) => e && typeof e.key === 'string' && e.key.toLowerCase() === m.chord)
+      const entry = entries.find((e) => e && typeof e.key === 'string' && canonicalChord(e.key) === m.chord)
       if (entry && typeof entry.command === 'string') {
         await vscode.commands.executeCommand(entry.command, ...(entry.args === undefined ? [] : [entry.args]))
       }
@@ -445,14 +473,14 @@ async function openInBrowser(host) {
     vscode.window.showInformationMessage('아직 페이지 주소를 모릅니다 — 뷰가 뜬 뒤 다시 시도하세요.')
     return
   }
-  const href = host.href
   // A terminal moves rather than duplicates, same as the titlebar widget's
-  // pop-out: two clients on one session fight over its size.
-  if (host.state.section === 'terminal') {
+  // pop-out: two clients on one session fight over its size. But only once
+  // the browser tab really opened - a blocked popup must not cost the view.
+  const opened = await vscode.env.openExternal(vscode.Uri.parse(host.href))
+  if (opened && host.state.section === 'terminal') {
     if (host.kind === 'panel') host.panel.dispose()
     else await closeSlot(host.id)
   }
-  await vscode.env.openExternal(vscode.Uri.parse(href))
 }
 
 function reload(host) {
@@ -469,8 +497,12 @@ async function moveToEditor(host) {
 async function moveToPanel(host) {
   if (!host) return
   const state = host.state
+  // Slot first, then close the tab: dismissing the "which slot?" picker must
+  // leave the tab where it was.
+  const id = await pickSlot(state)
+  if (!id) return
   host.panel.dispose()
-  await openInPanel(state)
+  await bindSlot(id, state)
 }
 
 // ---- activation --------------------------------------------------------------
@@ -527,9 +559,11 @@ function activate(context) {
 
   // A view's title-bar action doesn't say which view it came from, so each
   // slot gets its own copy of every action (see package.json).
-  const slotActions = { changeSession, moveToEditor, renameSession, togglePin, openInBrowser, reload }
+  const slotActions = { moveToEditor, openInBrowser, reload }
+  const terminalSlotActions = { changeSession, renameSession, togglePin }
   for (const id of SLOT_IDS) {
-    for (const [name, fn] of Object.entries(slotActions)) {
+    const actions = isTerminalSlot(id) ? { ...slotActions, ...terminalSlotActions } : slotActions
+    for (const [name, fn] of Object.entries(actions)) {
       reg(`webmanager.slot.${id}.${name}`, () => {
         const host = slotHosts.get(id)
         if (host) return fn(host)

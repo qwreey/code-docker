@@ -345,7 +345,7 @@ code-server에는 webmanager 확장이 기본으로 깔려 있어서, webmanager
 - **단축키**:
   - 터미널에 포커스가 있을 때도 `Ctrl+Shift+P`/`F1`(팔레트), ``Ctrl+` ``(패널 토글), `Ctrl+PgUp/PgDn`(에디터 전환), `Ctrl+1~3`(에디터 그룹), `Ctrl+Shift+E`(탐색기)는 VS Code로 넘어갑니다.
   - `Ctrl+P`/`Ctrl+J`/`Ctrl+B` 등은 셸이 씁니다.
-  - 목록은 설정 `webmanager.passthroughKeys`에서 바꿉니다(물리 키 기준, `ctrl+shift+alt+meta` 순서).
+  - 목록은 설정 `webmanager.passthroughKeys`에서 바꿉니다(물리 키 기준, 예: `ctrl+shift+p` — 수식키 순서는 상관없음).
 - 새 창이 필요한 링크(Claude 로그인, open-vsx 등)와 "code로 열기"는 확장이 대신 엽니다. 임베드된 화면 안에서는 새 창을 직접 열 수 없기 때문입니다.
 - 한 뷰에서 [비밀번호 게이트](#비밀번호-게이트)를 풀면 다른 뷰와 브라우저 탭도 같이 풀립니다.
 
