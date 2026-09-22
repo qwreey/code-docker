@@ -1,6 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { Code, Copy, FolderKanban, FolderOpen, Hand, Menu, MousePointer2, Settings, TextSelect } from 'lucide-react'
+import {
+  Code,
+  Copy,
+  FolderKanban,
+  FolderOpen,
+  Hand,
+  Menu,
+  MousePointer2,
+  Pin,
+  PinOff,
+  Settings,
+  TextSelect,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
@@ -3140,7 +3154,7 @@ export function Terminal({
   } as CSSProperties
 
   return (
-    <section className="terminal-section" style={surfaceStyle}>
+    <section className={`terminal-section${embedded ? ' terminal-section-embed' : ''}`} style={surfaceStyle}>
       <div className="terminal-topbar">
         {/* The app's own mobile top bar is hidden while this tab is active
             (App.css's .app-shell-terminal rule) and its hamburger moves
@@ -3235,6 +3249,48 @@ export function Terminal({
             >
               <FolderKanban size={14} /> <span className="btn-label">프로젝트 정보</span>
             </button>
+          )}
+          {/* Embed mode has no tab bar (see embedSession), and the tab bar is
+              where pin and the zoom pair normally live - so they move up here
+              rather than disappearing with it. Zoom follows the tab bar's own
+              rule: only while the control bar (which has its own zoom keys)
+              is hidden. */}
+          {embedded && activeSession !== HOME_TAB_ID && (
+            <button
+              type="button"
+              className={`btn btn-small ${activeInfo?.pinned ? 'btn-primary' : 'btn-secondary'}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => void togglePin(activeSession, !activeInfo?.pinned)}
+              title={activeInfo?.pinned ? '고정 해제 (유휴 자동 정리 대상이 됨)' : '고정 (유휴 자동 정리에서 제외)'}
+              aria-pressed={!!activeInfo?.pinned}
+            >
+              {activeInfo?.pinned ? <PinOff size={14} /> : <Pin size={14} />}{' '}
+              <span className="btn-label">{activeInfo?.pinned ? '고정 해제' : '고정'}</span>
+            </button>
+          )}
+          {embedded && activeSession !== HOME_TAB_ID && !controlBarEnabled && (
+            <div className="terminal-zoom-group" role="toolbar" aria-label="터미널 글자 크기 조절">
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                aria-label="글자 축소"
+                title="글자 축소"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => zoom('out')}
+              >
+                <ZoomOut size={14} />
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                aria-label="글자 확대"
+                title="글자 확대"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => zoom('in')}
+              >
+                <ZoomIn size={14} />
+              </button>
+            </div>
           )}
           <button
             type="button"

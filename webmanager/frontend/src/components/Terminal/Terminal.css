@@ -679,3 +679,11 @@
   gap: 0.5rem;
   justify-content: center;
 }
+
+/* Embed mode has no tab bar under the top bar, and the tab bar's own
+   margin-top was the only gap between these buttons and the terminal below -
+   without it they sat flush on the xterm. Even the gap out instead. */
+.terminal-section-embed .terminal-topbar {
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+}
