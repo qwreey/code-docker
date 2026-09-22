@@ -109,6 +109,27 @@ function normalizeState(s) {
   return out
 }
 
+// "새 창" from a VNC view: a webview can't open windows (no allow-popups),
+// so it asks. When the target is open in a view here, that view is closed
+// first and the window opens once its connection is gone - two clients on
+// one target fight over the desktop size, same handoff router's own page
+// does (HANDOFF_DELAY_MS there).
+async function openVncWindow(m) {
+  if (typeof m.name !== 'string' || typeof m.url !== 'string' || !isHttpUrl(m.url)) return
+  const state = vncState(m.name)
+  const existing = findHostFor(state)
+  if (existing) {
+    if (existing.kind === 'panel') existing.panel.dispose()
+    else await closeSlot(existing.id)
+    await new Promise((r) => setTimeout(r, 250))
+  } else {
+    // Not connected, but would connect as a second client once shown.
+    const stale = unresolvedTabsFor(state)
+    if (stale.length) await vscode.window.tabGroups.close(stale)
+  }
+  await vscode.env.openExternal(vscode.Uri.parse(m.url))
+}
+
 function titleOf(state) {
   if (state.section === 'terminal') return state.session || 'Terminal'
   const target = vncTarget(state)
@@ -216,6 +237,29 @@ function findHostFor(state, except) {
     if (identityOf(bindings[slot]) === id) return { kind: 'slot', id: slot }
   }
   return null
+}
+
+// Editor tabs restored after a reload that were never shown since: VS Code
+// only resolves a webview panel when it becomes visible, so these have no
+// host yet and findHostFor can't see them - but showing one later would
+// connect a second client. They can only be matched by title, so this is
+// only used when no resolved panel carries that title (otherwise which tab
+// is which is ambiguous, and nothing is touched).
+function unresolvedTabsFor(state) {
+  const title = titleOf(normalizeState(state))
+  const titles = [title, `📌 ${title}`]
+  for (const h of hosts) {
+    if (h.kind === 'panel' && titles.includes(h.panel.title)) return []
+  }
+  const out = []
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      const input = tab.input
+      if (!(input instanceof vscode.TabInputWebview) || !input.viewType.endsWith(VIEW_TYPE)) continue
+      if (titles.includes(tab.label)) out.push(tab)
+    }
+  }
+  return out
 }
 
 function findSessionHost(name, except) {
@@ -392,7 +436,7 @@ async function pickVnc() {
   const targets = vncTargets()
   const items = targets.map((t) => ({
     label: `$(vm) ${t.label || t.name}`,
-    description: [t.label && t.label !== t.name ? t.name : '', findHostFor(vncState(t.name)) ? '열려 있음' : '']
+    description: [t.label && t.label !== t.name ? t.name : '', findHostFor(vncState(t.name)) || unresolvedTabsFor(vncState(t.name)).length ? '열려 있음' : '']
       .filter(Boolean)
       .join(' · '),
     name: t.name,
@@ -424,11 +468,17 @@ async function pickSection() {
 // One place a given session or VNC target is shown per window: asking for
 // it again brings the existing view forward instead of opening a second
 // copy that would fight the first over the terminal or desktop size.
-function openState(state, column) {
+async function openState(state, column) {
   const existing = findHostFor(state)
   if (existing) {
     revealHost(existing)
     return
+  }
+  // An unresolved tab can't be revealed through the API, so it is replaced.
+  const stale = identityOf(state) ? unresolvedTabsFor(state) : []
+  if (stale.length) {
+    column = stale[0].group.viewColumn
+    await vscode.window.tabGroups.close(stale)
   }
   createPanel(state, column)
 }
@@ -447,7 +497,7 @@ async function openStateInPanel(state) {
 // own to switch to, so it becomes a new editor tab beside the current one.
 async function openTerminalFromEmbed(m) {
   if (typeof m.session === 'string' && m.session) {
-    openState({ section: 'terminal', session: m.session }, vscode.ViewColumn.Beside)
+    await openState({ section: 'terminal', session: m.session }, vscode.ViewColumn.Beside)
     return
   }
   let names = []
@@ -459,7 +509,7 @@ async function openTerminalFromEmbed(m) {
   }
   const cwd = typeof m.cwd === 'string' && m.cwd.startsWith('/') ? m.cwd : undefined
   const base = (typeof m.label === 'string' && m.label) || S.folderBase(cwd) || '세션'
-  openState(
+  await openState(
     {
       section: 'terminal',
       session: S.uniqueName(base, names),
@@ -609,7 +659,10 @@ async function onMessage(host, m) {
       break
     // "열기" in a VNC target list: each target is its own editor tab.
     case 'open-vnc':
-      if (typeof m.name === 'string' && m.name) openState(vncState(m.name), vscode.ViewColumn.Active)
+      if (typeof m.name === 'string' && m.name) await openState(vncState(m.name), vscode.ViewColumn.Active)
+      break
+    case 'open-vnc-window':
+      await openVncWindow(m)
       break
     case 'vnc-targets':
       await rememberVncTargets(m.targets)
@@ -761,15 +814,15 @@ function activate(context) {
 
   reg('webmanager.openTerminal', async () => {
     const s = await pickSession()
-    if (s) openState(s, vscode.ViewColumn.Active)
+    if (s) await openState(s, vscode.ViewColumn.Active)
   })
   reg('webmanager.openTerminalToSide', async () => {
     const s = await pickSession()
-    if (s) openState(s, vscode.ViewColumn.Beside)
+    if (s) await openState(s, vscode.ViewColumn.Beside)
   })
   reg('webmanager.openVnc', async () => {
     const s = await pickVnc()
-    if (s) openState(s, vscode.ViewColumn.Active)
+    if (s) await openState(s, vscode.ViewColumn.Active)
   })
   reg('webmanager.openVncInPanel', async () => {
     const s = await pickVnc()
@@ -777,7 +830,7 @@ function activate(context) {
   })
   reg('webmanager.openTab', async () => {
     const s = await pickSection()
-    if (s) openState(s, vscode.ViewColumn.Active)
+    if (s) await openState(s, vscode.ViewColumn.Active)
   })
   reg('webmanager.openTerminalInPanel', async () => {
     const s = await pickSession()

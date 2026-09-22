@@ -181,6 +181,9 @@ function App() {
       } else if (data.type === 'vnc-open-request' && typeof data.name === 'string') {
         // Host mode only: "열기" in the list becomes a new editor tab.
         postToHost({ type: 'open-vnc', name: data.name })
+      } else if (data.type === 'vnc-open-window' && typeof data.name === 'string' && typeof data.url === 'string') {
+        // Host mode only: the webview can't open windows itself.
+        postToHost({ type: 'open-vnc-window', name: data.name, url: data.url })
       } else if (data.type === 'vnc-targets' && Array.isArray(data.targets)) {
         // The extension can't reach router's API itself; this is how its
         // "Open VNC…" learns what there is to open and what to call it.
