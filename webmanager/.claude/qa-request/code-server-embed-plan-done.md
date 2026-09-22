@@ -16,7 +16,7 @@ Builds on `../research/code-server-embed-research.md`.
    - It now sends `1000 "session ended"` first (`handlers_terminal.go`).
    - `webmanager --attach` benefits too: it already read 1000 as "session ended".
 2. **Every slot has its own copy of each view action** (`webmanager.slot.<id>.<action>`, generated in package.json). VS Code doesn't tell a `view/title` command which view invoked it.
-3. **Rename and pin are view actions** (slot "…" menu, and the editor tab's title menu/palette) as well as in-page, so they work without the tab bar. The extension posts `rename`/`pin` to the page, and the page does the gated PATCH itself because it holds the unlock cookie.
+3. **Pin and zoom live in the embedded terminal's top bar**, since the tab bar that normally carries them is hidden (zoom only while the control bar is off). Added after the owner's first use, together with even top/bottom padding on that bar. **Rename and pin are also view actions** (slot "…" menu, and the editor tab's title menu/palette) as well as in-page, so they work without the tab bar. The extension posts `rename`/`pin` to the page, and the page does the gated PATCH itself because it holds the unlock cookie.
 4. **Duplicates always reveal the existing view.** There is no `terminal.duplicate` setting (owner: "겹치지 않게").
 5. **A pending unlock modal now resolves when another page unlocks** (`UnlockModal.tsx` listens to the auth `BroadcastChannel`). Found while testing: a Projects view kept its modal up after a terminal view unlocked.
 6. Not done (deferred): `terminal.pinNewSessions`, measuring retain memory, and the direct VNC embed. For the VNC rework see `../../../.claude/backlog/vnc-tab-rework.md`.
