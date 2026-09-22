@@ -28,6 +28,12 @@ const SLOTS_KEY = 'webmanager.slots'
 // rememberVncTargets. Global rather than per-workspace: they're router's,
 // not this folder's.
 const VNC_TARGETS_KEY = 'webmanager.vncTargets'
+// [{ id, title }]: which thing each editor tab title has stood for, so a tab
+// restored after a reload - which VS Code leaves unresolved, with only its
+// title to go on, until it's shown - can be told apart from another kind of
+// tab that happens to carry the same title (a terminal session and a VNC
+// target with the same name). See unresolvedTabsFor.
+const PANEL_TITLES_KEY = 'webmanager.panelTitles'
 
 let ctx
 let output
@@ -164,11 +170,45 @@ function setActivePanel(host) {
   refreshContexts()
 }
 
+function panelTitles() {
+  return ctx.workspaceState.get(PANEL_TITLES_KEY, [])
+}
+
+// Anything without an identity (Files, Logs, the VNC list, ...) is recorded
+// by section, which is enough to count as "something else" in a collision.
+function recordId(state) {
+  return identityOf(state) || `page:${state.section}`
+}
+
+function recordTitle(host) {
+  const entry = { id: recordId(host.state), title: host.panel.title }
+  const list = panelTitles()
+  if (list.some((e) => e.id === entry.id && e.title === entry.title)) return
+  ctx.workspaceState.update(PANEL_TITLES_KEY, [...list, entry])
+}
+
+// Only drops the pair once no open panel shows it any more; a pair left
+// behind by a tab closed while unresolved just makes matching more
+// cautious, and activate() prunes pairs no tab carries.
+function forgetTitle(host) {
+  const id = recordId(host.state)
+  const title = host.panel.title
+  for (const h of hosts) {
+    if (h !== host && h.kind === 'panel' && recordId(h.state) === id && h.panel.title === title) return
+  }
+  ctx.workspaceState.update(
+    PANEL_TITLES_KEY,
+    panelTitles().filter((e) => !(e.id === id && e.title === title)),
+  )
+}
+
 function updateTitle(host) {
   refreshContexts()
   const title = titleOf(host.state)
   if (host.kind === 'panel') {
+    if (host.panel.title !== (host.state.pinned ? `📌 ${title}` : title)) forgetTitle(host)
     host.panel.title = host.state.pinned ? `📌 ${title}` : title
+    recordTitle(host)
   } else {
     host.view.title = title
     host.view.description = host.state.section === 'terminal' ? S.folderBase(host.state.cwd) : undefined
@@ -242,15 +282,19 @@ function findHostFor(state, except) {
 // Editor tabs restored after a reload that were never shown since: VS Code
 // only resolves a webview panel when it becomes visible, so these have no
 // host yet and findHostFor can't see them - but showing one later would
-// connect a second client. They can only be matched by title, so this is
-// only used when no resolved panel carries that title (otherwise which tab
-// is which is ambiguous, and nothing is touched).
+// connect a second client. All there is to go on is the title, so a tab is
+// only matched when that title is known (PANEL_TITLES_KEY) to have stood
+// for this thing and nothing else, and no resolved panel carries it;
+// anything ambiguous is left alone.
 function unresolvedTabsFor(state) {
-  const title = titleOf(normalizeState(state))
+  state = normalizeState(state)
+  const title = titleOf(state)
   const titles = [title, `📌 ${title}`]
   for (const h of hosts) {
     if (h.kind === 'panel' && titles.includes(h.panel.title)) return []
   }
+  const ids = new Set(panelTitles().filter((e) => titles.includes(e.title)).map((e) => e.id))
+  if (ids.size !== 1 || !ids.has(recordId(state))) return []
   const out = []
   for (const group of vscode.window.tabGroups.all) {
     for (const tab of group.tabs) {
@@ -284,6 +328,7 @@ function setupPanel(panel, state) {
     else if (activePanelHost === host) setActivePanel(null)
   })
   panel.onDidDispose(() => {
+    forgetTitle(host)
     detach(host)
     if (activePanelHost === host) setActivePanel(null)
   })
@@ -908,6 +953,18 @@ function activate(context) {
         setupPanel(panel, saved && saved.section ? saved : { section: 'terminal' })
       },
     }),
+  )
+
+  // Drop title records no open webmanager tab carries any more.
+  const labels = new Set()
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      if (tab.input instanceof vscode.TabInputWebview && tab.input.viewType.endsWith(VIEW_TYPE)) labels.add(tab.label)
+    }
+  }
+  context.workspaceState.update(
+    PANEL_TITLES_KEY,
+    panelTitles().filter((e) => labels.has(e.title)),
   )
 
   for (const id of Object.keys(slotBindings())) {
