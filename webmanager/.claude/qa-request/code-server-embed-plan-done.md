@@ -19,7 +19,8 @@ Builds on `../research/code-server-embed-research.md`.
 3. **Pin and zoom live in the embedded terminal's top bar**, since the tab bar that normally carries them is hidden (zoom only while the control bar is off). Added after the owner's first use, together with even top/bottom padding on that bar. **Rename and pin are also view actions** (slot "…" menu, and the editor tab's title menu/palette) as well as in-page, so they work without the tab bar. The extension posts `rename`/`pin` to the page, and the page does the gated PATCH itself because it holds the unlock cookie.
 4. **Duplicates always reveal the existing view.** There is no `terminal.duplicate` setting (owner: "겹치지 않게").
 5. **A pending unlock modal now resolves when another page unlocks** (`UnlockModal.tsx` listens to the auth `BroadcastChannel`). Found while testing: a Projects view kept its modal up after a terminal view unlocked.
-6. Not done (deferred): `terminal.pinNewSessions`, measuring retain memory, and the direct VNC embed. For the VNC rework see `../../../.claude/backlog/vnc-tab-rework.md`.
+6. **Known quirk:** the first "Open in Browser" right after a page reload once did nothing, and a second try worked. Probably the browser's popup blocker (no user activation reaches `openExternal` from the palette) or `href` not reported yet. Not investigated.
+7. Not done (deferred): `terminal.pinNewSessions`, measuring retain memory, and the direct VNC embed. For the VNC rework see `../../../.claude/backlog/vnc-tab-rework.md`.
 
 Verified live:
 - sync matrix: first install; fast path (8 ms); reinstall after uninstall; opt-out removes it, and unsetting reinstalls;
