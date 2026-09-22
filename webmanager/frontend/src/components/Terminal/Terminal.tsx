@@ -844,9 +844,32 @@ export function Terminal({
   // legitimately come back not yet containing activeSession right after the
   // user opens one; it'll show up once that first connection opens and this
   // refetches.
+  // The last list refreshSessions saw, by name - only read to recognize a
+  // rename made somewhere else (see refreshSessions).
+  const lastSessionsRef = useRef<TerminalSessionInfo[]>([])
   const refreshSessions = useCallback(async () => {
     try {
       const data = await api.get<TerminalSessionInfo[]>('/terminal/sessions')
+      // Follow a rename made by another client (another browser tab, the
+      // code-server widget) on the session this one is showing. Nothing
+      // tells this client about it - the backend re-keys the same session
+      // in place and this connection keeps working - so the next list
+      // simply lacks the active name, and TerminalTabs' ensureActiveIncluded
+      // then kept the old name alive as a ghost tab next to the new one
+      // until the user clicked the new one. The shell's pid is what stays
+      // the same across a rename. activeSessionRef is updated right here
+      // rather than waiting for its effect, so a ws.onclose that consumes
+      // this same list doesn't mistake the rename for the session dying.
+      const current = activeSessionRef.current
+      if (current !== HOME_TAB_ID && !data.some((s) => s.name === current)) {
+        const pid = lastSessionsRef.current.find((s) => s.name === current)?.pid
+        const moved = pid ? data.find((s) => s.pid === pid) : undefined
+        if (moved) {
+          activeSessionRef.current = moved.name
+          setActiveSession(moved.name)
+        }
+      }
+      lastSessionsRef.current = data
       setSessions(data)
       return data
     } catch {
