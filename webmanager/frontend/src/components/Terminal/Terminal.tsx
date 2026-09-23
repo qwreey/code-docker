@@ -18,8 +18,9 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
 import { copyText } from '../../utils/clipboard'
-import { api, apiUrl, errorMessage, ApiError } from '../../api/client'
+import { api, apiUrl, errorMessage, ApiError, onAuthStatusChange, requestUnlock } from '../../api/client'
 import type {
+  AuthStatus,
   FontManifest,
   ProcessInfo,
   ProjectsResponse,
@@ -1129,6 +1130,31 @@ export function Terminal({
   // overlay can show live feedback instead of looking identical to a plain
   // idle-disconnected state.
   const [pendingReconnect, setPendingReconnect] = useState<{ attempt: number; retryAt: number } | null>(null)
+  // The password gate is locked (expired, or the prompt was dismissed), so
+  // the WebSocket upgrade is answered 401 before it ever becomes a socket -
+  // which reaches the browser as a plain abnormal close, indistinguishable
+  // from a network blip. Retrying that can only fail again, every time, for
+  // as long as it stays locked (the backoff caps at 30s, so it never stops
+  // on its own), and each attempt pops the password prompt once more. So it
+  // is detected and retries stop until the gate is open again.
+  const [lockedOut, setLockedOut] = useState(false)
+  const lockedOutRef = useRef(false)
+  const setLockedOutState = useCallback((value: boolean) => {
+    lockedOutRef.current = value
+    setLockedOut(value)
+  }, [])
+
+  // GET /auth/status is ungated, so asking this never prompts by itself.
+  // A failed check counts as "not locked": a network problem is exactly the
+  // case auto-reconnect exists for.
+  const gateLocked = useCallback(async () => {
+    try {
+      const status = await api.get<AuthStatus>('/auth/status')
+      return Boolean(status.required && !status.unlocked)
+    } catch {
+      return false
+    }
+  }, [])
 
   const clearScheduledReconnect = useCallback(() => {
     if (reconnectTimerRef.current !== null) {
@@ -1147,6 +1173,7 @@ export function Terminal({
   // the Home tab, which is never a real session to reconnect.
   const scheduleReconnect = useCallback(() => {
     if (activeSessionRef.current === HOME_TAB_ID) return
+    if (lockedOutRef.current) return
     if (reconnectTimerRef.current !== null) return
     const attempt = reconnectAttemptRef.current + 1
     reconnectAttemptRef.current = attempt
@@ -1166,9 +1193,37 @@ export function Terminal({
   // an unattended background retry.
   const reconnect = useCallback(() => {
     clearScheduledReconnect()
+    setLockedOutState(false)
     reconnectAttemptRef.current = 0
     setReconnectNonce((n) => n + 1)
-  }, [clearScheduledReconnect])
+  }, [clearScheduledReconnect, setLockedOutState])
+
+  // Asks for the password and reconnects once it's given. Also what the
+  // overlay's button does while locked out.
+  const unlockAndReconnect = useCallback(async () => {
+    try {
+      await requestUnlock()
+    } catch {
+      // dismissed - stay locked out rather than retrying into another 401
+      return
+    }
+    reconnect()
+  }, [reconnect])
+
+  // Unlocking anywhere else (the sidebar's lock indicator, a fingerprint, a
+  // gated action in another tab - api/client.ts broadcasts it) resumes this
+  // terminal on its own, so a session isn't left sitting behind an overlay
+  // after the user has already dealt with the lock.
+  useEffect(
+    () =>
+      onAuthStatusChange(() => {
+        if (!lockedOutRef.current) return
+        void gateLocked().then((locked) => {
+          if (!locked) reconnect()
+        })
+      }),
+    [gateLocked, reconnect],
+  )
 
   // Ticks once a second only while a reconnect is actually pending, purely
   // to re-render the overlay's countdown below - retrySecondsLeft itself is
@@ -2864,46 +2919,57 @@ export function Terminal({
     ws.onclose = (event) => {
       if (wsRef.current !== ws) return
       setState('disconnected')
-      refreshSessions().then((data) => {
-        // Embedded: 1000 is the server closing because the shell exited -
-        // the session is over, say so and offer to start it again. Any other
-        // close (1006: webmanager restarted, network) falls through to the
-        // ordinary reconnect below, which recreates the session if it's
-        // gone - that's the whole "survives a refresh/restart" promise of an
-        // embedded view, so it must not fall back to Home either way.
-        // A 1000 with the list unavailable is still the server saying the
-        // session ended - reconnecting would recreate it. 1008 is a name the
-        // server refuses outright; retrying it can only fail forever.
-        if (embedded) {
-          const ended =
-            (event.code === 1000 && (!data || !data.some((s) => s.name === activeSession))) || event.code === 1008
-          if (ended && activeSessionRef.current === activeSession) {
-            sessionEndedRef.current = true
-            setSessionEnded(true)
-            postToHost({ type: 'session-ended', session: activeSession })
+      // Checked before the session list is even fetched: that fetch is
+      // gated too, so while locked it would answer 401 and pop the password
+      // prompt again on every single retry.
+      void gateLocked().then((locked) => {
+        if (locked) {
+          if (activeSessionRef.current !== activeSession) return
+          clearScheduledReconnect()
+          setLockedOutState(true)
+          return
+        }
+        return refreshSessions().then((data) => {
+          // Embedded: 1000 is the server closing because the shell exited -
+          // the session is over, say so and offer to start it again. Any other
+          // close (1006: webmanager restarted, network) falls through to the
+          // ordinary reconnect below, which recreates the session if it's
+          // gone - that's the whole "survives a refresh/restart" promise of an
+          // embedded view, so it must not fall back to Home either way.
+          // A 1000 with the list unavailable is still the server saying the
+          // session ended - reconnecting would recreate it. 1008 is a name the
+          // server refuses outright; retrying it can only fail forever.
+          if (embedded) {
+            const ended =
+              (event.code === 1000 && (!data || !data.some((s) => s.name === activeSession))) || event.code === 1008
+            if (ended && activeSessionRef.current === activeSession) {
+              sessionEndedRef.current = true
+              setSessionEnded(true)
+              postToHost({ type: 'session-ended', session: activeSession })
+              return
+            }
+            if (autoReconnectEnabledRef.current && activeSessionRef.current === activeSession) scheduleReconnect()
             return
           }
-          if (autoReconnectEnabledRef.current && activeSessionRef.current === activeSession) scheduleReconnect()
-          return
-        }
-        if (data && activeSessionRef.current === activeSession && !data.some((s) => s.name === activeSession)) {
-          // Session genuinely gone (e.g. Ctrl+D exited the shell) - nothing
-          // to reconnect to, so fall back to Home instead of scheduling a
-          // retry that would just silently resurrect it under the backend's
-          // GetOrCreate-on-attach semantics (a "closed" tab quietly coming
-          // back to life would be far more confusing than just losing it).
-          setActiveSession(HOME_TAB_ID)
-          return
-        }
-        // Still the active tab (this refetch itself is async, so the user
-        // may have switched away or closed it while it was in flight) and
-        // not confirmed dead - safe to schedule an automatic retry. Runs
-        // even if the refetch itself failed (data === null, best-effort) -
-        // a network hiccup isn't proof the session is gone, and the manual
-        // 재연결 button always remains available regardless.
-        if (autoReconnectEnabledRef.current && activeSessionRef.current === activeSession) {
-          scheduleReconnect()
-        }
+          if (data && activeSessionRef.current === activeSession && !data.some((s) => s.name === activeSession)) {
+            // Session genuinely gone (e.g. Ctrl+D exited the shell) - nothing
+            // to reconnect to, so fall back to Home instead of scheduling a
+            // retry that would just silently resurrect it under the backend's
+            // GetOrCreate-on-attach semantics (a "closed" tab quietly coming
+            // back to life would be far more confusing than just losing it).
+            setActiveSession(HOME_TAB_ID)
+            return
+          }
+          // Still the active tab (this refetch itself is async, so the user
+          // may have switched away or closed it while it was in flight) and
+          // not confirmed dead - safe to schedule an automatic retry. Runs
+          // even if the refetch itself failed (data === null, best-effort) -
+          // a network hiccup isn't proof the session is gone, and the manual
+          // 재연결 button always remains available regardless.
+          if (autoReconnectEnabledRef.current && activeSessionRef.current === activeSession) {
+            scheduleReconnect()
+          }
+        })
       })
     }
     ws.onerror = () => {
@@ -2933,7 +2999,17 @@ export function Terminal({
       // "don't keep retrying a tab the user left" guard this exists for.
       clearScheduledReconnect()
     }
-  }, [activeSession, refreshSessions, reconnectNonce, fitIfVisible, scheduleReconnect, clearScheduledReconnect, embedded])
+  }, [
+    activeSession,
+    refreshSessions,
+    reconnectNonce,
+    fitIfVisible,
+    scheduleReconnect,
+    clearScheduledReconnect,
+    gateLocked,
+    setLockedOutState,
+    embedded,
+  ])
 
   const selectSession = useCallback(
     (name: string) => {
@@ -3427,6 +3503,19 @@ export function Terminal({
         {activeSession !== HOME_TAB_ID && state === 'disconnected' && !sessionEnded && (
           <div className="terminal-disconnect-overlay">
             <div className="terminal-disconnect-card">
+              {lockedOut ? (
+                <>
+                  {/* Retrying is pointless until the gate is open, so this
+                      says so and offers the prompt instead of counting
+                      attempts that can only 401. */}
+                  <p>잠금이 해제되어야 연결할 수 있습니다</p>
+                  <p className="terminal-disconnect-subtext">비밀번호를 입력하면 이어서 연결합니다.</p>
+                  <button type="button" className="btn btn-primary btn-small" onClick={() => void unlockAndReconnect()}>
+                    잠금 해제
+                  </button>
+                </>
+              ) : (
+                <>
               {pendingReconnect ? (
                 <>
                   <p>재연결 중... ({pendingReconnect.attempt}번째 시도)</p>
@@ -3440,6 +3529,8 @@ export function Terminal({
               <button type="button" className="btn btn-primary btn-small" onClick={reconnect}>
                 {pendingReconnect ? '지금 재연결' : '재연결'}
               </button>
+                </>
+              )}
             </div>
           </div>
         )}
