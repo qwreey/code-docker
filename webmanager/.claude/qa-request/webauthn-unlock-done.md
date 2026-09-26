@@ -27,7 +27,7 @@ Routes (`handlers_webauthn.go`):
 - **RP ID** is the request's exact hostname. IP hosts are refused.
 - **Origin** is checked against the RP ID: https, or http only on localhost. The port is taken from what the browser signed.
 - **User verification is required.**
-- **The 12h hard cap counts from the last *typed* password.** The mechanism: `Gate.IssueFrom(passwordAt)`, with `passwordAt` persisted in the store and recorded by both password paths.
+- **The password is needed at least every 48h.** `Gate.IssueFrom(passwordAt)` refuses past `passwordReauthInterval` (48h) from the last typed password, persisted in the store and recorded by both password paths. The session a fingerprint unlock starts gets the normal 12h cap from *now*, clamped so it never runs past that 48h deadline. (Was a single 12h window until 2026-09-25 — a night's sleep was enough to lose the fingerprint.)
 - **A hash change revokes everything.** The store keeps a hash tag and logs the count it revoked.
 - **Clone warning** (signature counter went backwards) is refused.
 

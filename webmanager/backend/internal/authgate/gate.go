@@ -52,6 +52,15 @@ const sessionTTL = 10 * time.Minute
 // unlock the user actually typed a password for, never extended.
 const maxSessionLifetime = 12 * time.Hour
 
+// passwordReauthInterval is how long after the last typed password a
+// non-password unlock (IssueFrom - WebAuthn with user verification) may
+// still mint sessions. Longer than maxSessionLifetime on purpose: that cap
+// exists to stop a tab left open from staying unlocked, and each WebAuthn
+// unlock is itself a fresh user-verified presence check, so it can start a
+// new session. This interval only bounds how long the password may go
+// untyped - 12h meant a night's sleep was enough to lose the fingerprint.
+const passwordReauthInterval = 48 * time.Hour
+
 // refreshThreshold is how much of sessionTTL must have elapsed before
 // RequirePassword bothers re-issuing the cookie. Purely to keep a fast
 // poll loop from carrying a Set-Cookie header on every single response —
@@ -280,15 +289,23 @@ func (g *Gate) TryUnlock(key, plaintext string) (token string, ok bool, err erro
 }
 
 // IssueFrom mints a token for an unlock that didn't involve typing the
-// password (internal/webauthnunlock), counting the maxSessionLifetime hard
-// cap from origin - the last time the password actually was typed - rather
-// than from now. So a fingerprint unlock never stretches that cap: the
-// password is still needed at least once per maxSessionLifetime. ok is false
-// when that window has already closed (or origin is zero, i.e. never).
-func (g *Gate) IssueFrom(origin time.Time) (token string, ok bool) {
+// password (internal/webauthnunlock). passwordAt is the last time the
+// password actually was typed: past passwordReauthInterval from it this
+// refuses, so the password is still needed at least that often. The session
+// it starts gets the usual maxSessionLifetime from now, but never runs past
+// passwordAt+passwordReauthInterval either. ok is false when that window
+// has already closed (or passwordAt is zero, i.e. never).
+func (g *Gate) IssueFrom(passwordAt time.Time) (token string, ok bool) {
 	now := time.Now()
-	if !g.Configured() || origin.IsZero() || now.Sub(origin) >= maxSessionLifetime || origin.After(now) {
+	if !g.Configured() || passwordAt.IsZero() || now.Sub(passwordAt) >= passwordReauthInterval || passwordAt.After(now) {
 		return "", false
+	}
+	// The token carries a session origin whose hard cap is origin +
+	// maxSessionLifetime; backdating it lands that cap on the reauth
+	// deadline when the deadline comes first.
+	origin := now
+	if latest := passwordAt.Add(passwordReauthInterval - maxSessionLifetime); latest.Before(origin) {
+		origin = latest
 	}
 	return g.mintToken(origin, now), true
 }

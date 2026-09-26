@@ -465,8 +465,9 @@ unlock of the password gate (`internal/webauthnunlock`,
 `components/common/WebAuthn.tsx`): a server-side relying party that mints
 the same unlock cookie, never a stored/wrapped password; enrollment needs the
 password itself, credentials are per exact hostname, and a WebAuthn unlock
-counts the 12h hard cap from the last *typed* password
-(`authgate.IssueFrom`) — see `.claude/qa-request/webauthn-unlock-done.md`. Keep extending as
+is refused 48h after the last *typed* password
+(`authgate.IssueFrom`, `passwordReauthInterval` — separate from the 12h
+session cap, which restarts on each user-verified unlock) — see `.claude/qa-request/webauthn-unlock-done.md`. Keep extending as
 needed; see `plan.md`'s "구현 완료" table before assuming something isn't
 done yet. **Open questions the repo owner still needs to weigh in on are
 consolidated in `.claude/question.md`** — none of them block further work,

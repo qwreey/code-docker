@@ -30,7 +30,7 @@ import './WebAuthn.css'
 
 const OUTCOME_MESSAGE: Record<Exclude<WebAuthnOutcome, 'ok'>, string> = {
   cancelled: '취소되었습니다 — 비밀번호를 입력하거나 다시 시도하세요.',
-  'password-required': '마지막 비밀번호 입력 후 12시간이 지나 비밀번호가 필요합니다.',
+  'password-required': '마지막 비밀번호 입력 후 48시간이 지나 비밀번호가 필요합니다.',
   'rate-limited': '시도 횟수가 너무 많습니다. 잠시 후 다시 시도하세요.',
   failed: '지문 잠금 해제에 실패했습니다 — 비밀번호를 입력하세요.',
 }
@@ -212,7 +212,7 @@ export function WebAuthnHost() {
               <Fingerprint size={18} aria-hidden="true" /> 지문으로 잠금 해제할까요?
             </h2>
             <p className="section-description">
-              이 기기({host})를 등록하면 다음부터 비밀번호 대신 지문(또는 기기 PIN)으로 잠금을 해제합니다. 비밀번호는 12시간마다
+              이 기기({host})를 등록하면 다음부터 비밀번호 대신 지문(또는 기기 PIN)으로 잠금을 해제합니다. 비밀번호는 48시간마다
               한 번은 필요합니다.
             </p>
             <div className="unlock-modal-form">

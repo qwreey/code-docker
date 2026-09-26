@@ -18,9 +18,9 @@
 //     RP ID), never a parent domain - router vhosts put side projects on
 //     sibling hostnames precisely to keep them off this origin.
 //   - Enrollment needs the password itself, not just an unlocked cookie.
-//   - A WebAuthn unlock never extends authgate's 12h hard cap: the token it
-//     mints counts from the last typed password, so the password is still
-//     needed at least every 12h (PasswordAt / authgate.IssueFrom).
+//   - The password is still needed at least every 48h: a WebAuthn unlock is
+//     refused that long after the last typed password, and the session it
+//     starts ends there too (PasswordAt / authgate.IssueFrom).
 //   - Changing the password hash revokes every credential (hash tag).
 //   - User verification (fingerprint, face, device PIN) is required.
 //

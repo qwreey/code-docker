@@ -37,7 +37,7 @@ func (s *Server) webauthnUnavailable(w http.ResponseWriter) {
 // a credential enrolled from it would outlive that unlock by months. The
 // frontend offers enrollment right after a password unlock, still holding
 // what was typed, so in practice nobody types it twice. A correct password
-// here is a real password unlock too (cookie, and the 12h window restarts).
+// here is a real password unlock too (cookie, and the 48h fingerprint window restarts).
 func (s *Server) handleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Request) {
 	rpID, ok := s.webauthnRPID(r)
 	if !ok {
@@ -103,7 +103,7 @@ func (s *Server) handleWebAuthnUnlockBegin(w http.ResponseWriter, r *http.Reques
 	// Checked up front so the browser prompt isn't shown for an unlock that
 	// would be refused anyway.
 	if _, ok := s.gate.IssueFrom(s.webauthn.PasswordAt()); !ok {
-		writeError(w, http.StatusConflict, "password required: fingerprint unlock only works within 12 hours of the last password unlock")
+		writeError(w, http.StatusConflict, "password required: fingerprint unlock only works within 48 hours of the last password unlock")
 		return
 	}
 	assertion, ceremony, err := s.webauthn.BeginUnlock(rpID)
@@ -145,7 +145,7 @@ func (s *Server) handleWebAuthnUnlockFinish(w http.ResponseWriter, r *http.Reque
 	}
 	token, ok := s.gate.IssueFrom(s.webauthn.PasswordAt())
 	if !ok {
-		writeError(w, http.StatusConflict, "password required: fingerprint unlock only works within 12 hours of the last password unlock")
+		writeError(w, http.StatusConflict, "password required: fingerprint unlock only works within 48 hours of the last password unlock")
 		return
 	}
 	s.gate.RecordSuccess(key)
