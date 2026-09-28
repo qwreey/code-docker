@@ -38,30 +38,10 @@
 # 않습니다. 구체적인 예시는 docs/tips/roblox-studio.md 참고.
 #EXTRA_INCLUDE="empty-extra-include.yml"
 
-# [DEPRECATED - 이제 라벨로 대체됨. 다음 주기까지만 동작하고, 쓰이면 경고를 남깁니다]
-# EXTRA_INCLUDE로 붙인 다른 프로젝트가 자기 서비스를 code-docker-internal이 아니라
-# 별도의 `internal: true` 네트워크(예: roblox-studio-docker의 VNC 전용 네트워크,
-# docs/tips/roblox-studio.md 참고)에 붙이고 router가 그 네트워크도 넘나들게 하려면,
-# 최신 Docker Engine의 DOCKER-INTERNAL 체인이 그 네트워크에 대해서도 router의 FORWARD
-# 트래픽을 막습니다.
-#
-# 예전에는 그 네트워크 이름을 여기에 적어줘야 했지만, 이제는 **필요한 쪽이 자기
-# 네트워크에 직접 라벨을 답니다** - 그 프로젝트의 오버레이 파일에서:
-#
-#   networks:
-#     roblox-studio-vnc:
-#       labels:
-#         netinit.provider: "${PREFIX:-}code-docker-netinit-docker"
-#         netinit.exempt-forward: "true"
-#
-# 이렇게 바꾼 이유: 형제 프로젝트를 하나 붙일 때마다 code-docker 쪽 .env를 고쳐야 하는
-# 건 EXTRA_INCLUDE가 없애려던 결합 그 자체였습니다. 라벨은 그 방향을 뒤집어서, 붙는
-# 쪽이 자기 요구를 스스로 기술하게 합니다(ootb-extra.sh가 PREFIX를 이 값에 맞춰
-# 넣어주던 동기화도 함께 불필요해집니다). 자세한 내용은 docs/tips/roblox-studio.md와
-# .claude/backlog/netinit-docker-plan.md 참고.
-#
-# 아래 값은 아직 라벨로 옮기지 못한 기존 배포를 위한 호환 경로일 뿐입니다.
-#NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=""
+# EXTRA_INCLUDE로 붙인 프로젝트가 자기만의 `internal: true` 네트워크에 router를 끌어들일
+# 때는, code-docker의 .env가 아니라 그 프로젝트 오버레이가 네트워크에 직접
+# `netinit.provider`/`netinit.exempt-forward: "true"` 라벨을 답니다 -
+# docs/tips/roblox-studio.md 참고.
 
 # netinit-docker(구 netfilter-fix) 이미지의 build context를 덮어씁니다. 기본값은
 # qwreey/router-docker-client의 원격 git URL이라 보통 건드릴 일이 없고, 그 도구를

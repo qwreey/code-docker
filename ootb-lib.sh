@@ -146,15 +146,14 @@ load_manifest() {
   _lm_dir="${1%/}"
   _lm_manifest="$_lm_dir/ootb-manifest.env"
 
-  unset OOTB_NAME OOTB_DESCRIPTION OOTB_COMPOSE_INCLUDE OOTB_EXTRA_INTERNAL_NETWORKS
+  unset OOTB_NAME OOTB_DESCRIPTION OOTB_COMPOSE_INCLUDE
   unset OOTB_ROUTER_ALLOWED_TARGET_HOSTS OOTB_ENV_TARGET OOTB_GENERATE_SECRETS
   for _lm_v in $(compgen -v OOTB_ENV_PROMPT_ 2>/dev/null); do unset "$_lm_v"; done
 
   [ -f "$_lm_manifest" ] || return 1
 
-  # PREFIX를 미리 환경에 내보내는 이유: 매니페스트가 OOTB_EXTRA_INTERNAL_NETWORKS
-  # 같은 값 안에 "${PREFIX}"를 그대로 써서(예: roblox-studio-docker) 자기 사이드
-  # 네트워크 이름을 code-docker 쪽 PREFIX와 맞출 수 있게 하기 위함 - source 시점에
+  # PREFIX를 미리 환경에 내보내는 이유: 매니페스트가 값 안에 "${PREFIX}"를 그대로
+  # 써서 자기 이름을 code-docker 쪽 PREFIX와 맞출 수 있게 하기 위함 - source 시점에
   # 일반 쉘 변수 치환으로 풀린다. PREFIX가 아직 .env에 없으면 빈 문자열로 취급된다.
   PREFIX="$(get_env_var "$TARGET_DIR/.env" PREFIX)"
   export PREFIX
@@ -182,22 +181,6 @@ apply_manifest_declarative() {
   _amd_indent="${1:-    }"
   _amd_changed=0
 
-  # DEPRECATED 경로. 이제 이런 네트워크는 자기 오버레이 파일에서 직접
-  # `netinit.exempt-forward: "true"` 라벨을 달면 되고, 그러면 code-docker의 .env를
-  # 고칠 일 자체가 없다 - 붙는 쪽이 자기 요구를 스스로 기술하는 게 애초에 EXTRA_INCLUDE의
-  # 취지였다(자세한 건 example-env의 해당 항목과 .claude/archive/netinit-docker-plan-done.md).
-  # 아직 라벨로 옮기지 않은 매니페스트를 위해 한 주기 동안 남겨둔다 - netinit-docker가
-  # 이 env를 읽으면 경고를 남긴다.
-  if [ -n "${OOTB_EXTRA_INTERNAL_NETWORKS:-}" ]; then
-    _amd_cur="$(get_env_var "$TARGET_DIR/.env" NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS)"
-    _amd_new="$(printf '%s %s' "$_amd_cur" "$OOTB_EXTRA_INTERNAL_NETWORKS" | xargs)"
-    if [ "$_amd_new" != "$_amd_cur" ]; then
-      set_env_var "$TARGET_DIR/.env" NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS "\"$_amd_new\""
-      echo "${_amd_indent}- NETFILTER_FIX_EXTRA_INTERNAL_NETWORKS=$_amd_new (DEPRECATED - 오버레이 라벨로 옮기는 걸 권장)"
-      _amd_changed=1
-    fi
-  fi
-
   # router의 Dev Proxy/App Routes(VNC 탭 포함) 대상 호스트 allowlist. 기본값은
   # code-docker/dind 둘뿐이라, 사이드 프로젝트가 자기 컨테이너를 대상으로 쓰려면
   # 여기 등록돼야 한다 - 안 하면 컨테이너는 멀쩡히 뜨는데 대상 등록만 거부돼서
@@ -205,8 +188,7 @@ apply_manifest_declarative() {
   #
   # OOTB_ENV_PROMPT_*로 물어보지 않고 매니페스트가 값을 직접 선언하는 이유:
   # 사용자는 어떤 호스트네임이 필요한지 알 도리가 없고 붙는 프로젝트만 안다.
-  # OOTB_EXTRA_INTERNAL_NETWORKS와 같은 declarative merge지만, 그쪽과 달리 Docker
-  # 라벨로 옮길 수 없다 - router-manager는 (자기가 보안 경계라서) docker.sock을
+  # 네트워크 예외(이제 오버레이의 Docker 라벨)와 달리 이건 라벨로 옮길 수 없다 - router-manager는 (자기가 보안 경계라서) docker.sock을
   # 의도적으로 안 갖고 있어서 라벨을 읽을 수단이 없다. 자세한 건 docs/tips/ootb-manifest.md.
   #
   # 매니페스트는 공백/콤마 아무거나 써도 되고, 여기서 ROUTER_EXTRA_ALLOWED_TARGET_HOSTS가

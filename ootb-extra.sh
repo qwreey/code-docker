@@ -14,7 +14,6 @@
 #   OOTB_NAME="표시 이름"                                   # 필수
 #   OOTB_DESCRIPTION="한 줄 설명"                            # 선택
 #   OOTB_COMPOSE_INCLUDE="상대/경로/overlay.yml"             # 필수 (레포 루트 기준)
-#   OOTB_EXTRA_INTERNAL_NETWORKS="네트워크1 네트워크2"        # 선택
 #   OOTB_ROUTER_ALLOWED_TARGET_HOSTS="호스트1 호스트2"        # 선택
 #   OOTB_ENV_TARGET=".env"                                  # 선택, 기본 .env
 #   OOTB_GENERATE_SECRETS="키1 키2"                          # 선택, 없으면 무작위 생성
