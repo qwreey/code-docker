@@ -20,6 +20,49 @@ SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 OLD_HEAD="$2"
 NEW_HEAD="$(git -C "$SCRIPT_DIR" rev-parse HEAD)"
 
+# router/code-dind/code-server-autoinstall/envmigrate는 submodule이었다가 태그로
+# 핀한 원격 참조로 바뀌었습니다(CLAUDE.md "Development checkout layout"). git pull은
+# submodule을 추적에서 빼기만 하고 그 체크아웃 디렉터리는 untracked로 남겨두므로
+# (실측), 여기서 정리합니다. 빌드에는 이미 안 쓰이고(.dockerignore에도 있음) 남아
+# 있으면 "아직 저걸 쓰나?" 하는 혼란만 남습니다. 단, 그 안에 커밋 안 된 변경이나
+# 어느 원격에도 없는 커밋이 있으면 지우지 않습니다 - 실제로 router의 핀이 push된 적
+# 없는 로컬 커밋이었던 적이 있습니다.
+leftover=()
+for name in router code-dind code-server-autoinstall envmigrate; do
+  dir="$SCRIPT_DIR/$name"
+  [ -e "$dir" ] || continue
+  git -C "$SCRIPT_DIR" ls-files --error-unmatch "$name" >/dev/null 2>&1 && continue
+  if [ ! -f "$dir/.git" ]; then
+    echo "  ! $dir 는 옛 submodule 체크아웃으로 보이지 않아(.git 파일 없음) 그대로 둡니다."
+    continue
+  fi
+  if [ -n "$(git -C "$dir" status --porcelain 2>/dev/null)" ]; then
+    echo "  ! $dir 에 커밋 안 된 변경이 있어 지우지 않았습니다 - 확인 후 직접 지우세요."
+    continue
+  fi
+  unpushed="$(git -C "$dir" log --oneline --branches --not --remotes 2>/dev/null)"
+  if [ -n "$unpushed" ]; then
+    echo "  ! $dir 에 어느 원격에도 없는 커밋이 있어 지우지 않았습니다:"
+    printf '%s\n' "$unpushed" | sed 's/^/      /'
+    echo "    해당 저장소에 push한 뒤 다시 실행하거나, 필요 없으면 직접 지우세요."
+    continue
+  fi
+  leftover+=("$name")
+done
+if [ ${#leftover[@]} -gt 0 ]; then
+  echo "=== 1-1. 옛 submodule 체크아웃 정리 ==="
+  echo "더 이상 쓰지 않는 디렉터리: ${leftover[*]} (변경/미push 커밋 없음 확인)"
+  if confirm "지울까요?" y; then
+    for name in "${leftover[@]}"; do
+      rm -rf "${SCRIPT_DIR:?}/$name" "${SCRIPT_DIR:?}/.git/modules/$name"
+      echo "  - 삭제: $name"
+    done
+  else
+    echo "  - 그대로 둡니다 (빌드에는 영향 없음)."
+  fi
+  echo
+fi
+
 if [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
   echo "=== 2. docker-compose.yml 갱신 확인 ==="
   if diff -q <(git -C "$SCRIPT_DIR" show "$OLD_HEAD:docker-compose.yml") "$TARGET_DIR/docker-compose.yml" >/dev/null 2>&1; then
