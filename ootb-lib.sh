@@ -292,6 +292,8 @@ prompt_router_manager_password() {
   if ! confirm "router-manager 관리자 비밀번호를 지금 설정할까요?" y; then
     echo "  - 건너뜀. 컨테이너를 띄운 뒤 http://<host>/router/ 에서 설정하세요"
     echo "    (그 전까지 Net 관리/DNS/tinyauth 등의 쓰기 동작은 503으로 거부됩니다)."
+    echo "    설정 폼은 router 로그의 1회용 토큰을 요구합니다:"
+    echo "      docker compose logs code-docker-router | grep setup-token"
     return 0
   fi
   printf "Password: "; read -r -s _prmp_pw1; echo
