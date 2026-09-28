@@ -89,6 +89,14 @@ services:
       # builds/code-docker), set BUILD_CONTEXT in .env instead of editing
       # this file - see example-env.
       context: "${BUILD_CONTEXT:-.}"
+      # qwreey/router-docker-client subdirectories the Dockerfile COPYs --from (see its
+      # own comment on why these are named contexts, not ADD). ROUTER_CLIENT_SOURCE is a
+      # *prefix* - the git URL ending in `#main:` by default, a local checkout path
+      # ending in `/` for development (script/dev-clone.sh prints the line) - so one
+      # variable covers every subdirectory, netinit-docker's build below included.
+      additional_contexts:
+        netshare: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#main:}netshare"
+        dns-local: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#main:}dns-local"
       # Name resolution can fail if the host uses something like Tailscale,
       # so we work around this by using the host network only at build time.
       network: host
@@ -425,11 +433,12 @@ services:
       # not a local checkout/submodule, on a floating #main ref (deliberately
       # unpinned; see that repo's own CLAUDE.md, and note Docker CACHES this
       # fetch, so picking up an upstream change can need --no-cache).
-      # NETINIT_DOCKER_CONTEXT overrides it to build from a local checkout - see
-      # example-env. This service used to be called
+      # ROUTER_CLIENT_SOURCE (shared with code-docker's own build above) or the
+      # more specific NETINIT_DOCKER_CONTEXT overrides it to build from a local
+      # checkout - see example-env. This service used to be called
       # code-docker-netfilter-fix, back when the DOCKER-USER exemption was all it
       # did - see that script's own header for the second job it grew.
-      context: "${NETINIT_DOCKER_CONTEXT:-https://github.com/qwreey/router-docker-client.git#main:netinit-docker}"
+      context: "${NETINIT_DOCKER_CONTEXT:-${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#main:}netinit-docker}"
       network: host
     network_mode: host
     cap_add:

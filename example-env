@@ -71,6 +71,14 @@
 # 필요할 수 있습니다 - CLAUDE.md의 netshare 절 참고.
 #NETINIT_DOCKER_CONTEXT=""
 
+# qwreey/router-docker-client(netshare, dns-local, netinit-docker)를 어디서 가져올지
+# 정하는 *접두사*입니다. 기본값은 원격 git URL(`...router-docker-client.git#main:`)이고,
+# 로컬 체크아웃으로 개발할 때만 경로를 `/`로 끝나게 적습니다 - 뒤에 하위 디렉터리
+# 이름이 그대로 붙습니다. script/dev-clone.sh가 dev/에 clone한 뒤 이 줄을 출력해
+# 줍니다. 위 NETINIT_DOCKER_CONTEXT가 설정돼 있으면 netinit-docker만은 그쪽이
+# 우선합니다.
+#ROUTER_CLIENT_SOURCE="./dev/router-docker-client/"
+
 # code-docker-internal/external 두 네트워크의 enable_ipv6를 한 번에
 # 켭니다. PREFIX/BUILD_CONTEXT와 마찬가지로 컨테이너 안 환경변수가 아니라
 # docker-compose.yml의 네트워크 정의에만 쓰입니다. 도커 엔진 자체의 ipv6

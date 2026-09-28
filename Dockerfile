@@ -102,16 +102,21 @@ RUN mkdir -p /var/log/code /var/log/sshd /var/log/webmanager /var/log/nginx \
 RUN mkdir -p /etc/code-docker/supervisord
 
 # Copy config & static files
-# netshare is qwreey/router-docker-client's own subdirectory now - fetched directly at
-# build time (floating #main ref, see that repo's own CLAUDE.md), not a local checkout.
-ADD --chown=root:root https://github.com/qwreey/router-docker-client.git#main:netshare /etc/code-docker/netshare
+# netshare is qwreey/router-docker-client's own subdirectory now - fetched at build time
+# (floating #main ref, see that repo's own CLAUDE.md), not a local checkout. It arrives
+# as a BuildKit named context (build.additional_contexts in docker-compose.yml) rather
+# than `ADD <git url>`, so ROUTER_CLIENT_SOURCE can swap in a local dev/ checkout: a
+# plain ADD of a local path would have to sit inside this build context, and dev/ is
+# .dockerignore'd on purpose. Side effect: a bare `docker build` without compose needs
+# `--build-context netshare=... --build-context dns-local=...` passed by hand.
+COPY --from=netshare --chown=root:root . /etc/code-docker/netshare
 # dns-local moved out to that same repo on 2026-08-27 - it was never
 # code-docker-specific (roblox-studio-docker hit the identical bug), so the
 # script lives there and config/dns-local/dns-local.default.sh is now just
 # the thin wrapper that supplies this image's own paths/defaults. Installed
 # beside netshare rather than into /etc/code-docker/dns-local/, which is
 # where the COPY below puts config/dns-local/'s own git-tracked files.
-ADD --chown=root:root https://github.com/qwreey/router-docker-client.git#main:dns-local /etc/code-docker/router-client/dns-local
+COPY --from=dns-local --chown=root:root . /etc/code-docker/router-client/dns-local
 COPY --chown=root:root \
     config script/entrypoint.sh script/code-service.sh \
     script/user-init.sh script/get-user-shell.sh script/sshd-service.sh \

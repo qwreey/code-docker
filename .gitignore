@@ -9,3 +9,8 @@
 extra-include.yml
 config/**/*-override*
 config/**/*.override*
+# Sibling providers (EXTRA_INCLUDE targets, same builds/<name> layout ootb-extra.sh
+# uses on a real deployment) and local checkouts of core dependencies, both cloned by
+# script/dev-clone.sh - each is its own git repo, never part of this one.
+/builds/
+/dev/

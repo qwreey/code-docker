@@ -427,3 +427,17 @@ router 컨테이너(`router/` 서브모듈, 별도 레포 [qwreey/router-docker]
 자세한 내용은 [code-server-patch.md](code-server-patch.md)를 확인하세요.
 
 기본으로 몇 가지 js 가 이 방식으로 주입됩니다 — 예를 들어 tailscale 로그인이 필요할 때 배너를 띄우는 `tailscale-notify.default.js`, 그리고 타이틀바 좌측 위 아이콘(`.window-appicon`)을 클릭하면 webmanager(위 "webmanager (관리자 패널)" 섹션 참고)를 오버레이 모달로 열어주는 `webmanager-launcher.default.js`가 있습니다. 다른 override 파일들처럼 `config/code/code-patch/webmanager-launcher.override.js`를 만들어 동작을 바꿀 수 있습니다.
+
+# code-docker 자체를 개발하기
+
+code-docker와 함께 만지는 형제 repo들은 이 체크아웃 안으로 받아서 개발합니다 — 각자 독립 git repo이고, 둘 다 gitignore된 두 디렉터리로 나뉩니다.
+
+```sh
+./dev-clone.sh            # 전부 받기 (다시 실행하면 최신으로 pull)
+./dev-clone.sh code-docker-chrome   # 골라서
+```
+
+- `builds/<name>` — `EXTRA_INCLUDE`로 스택에 붙는 provider(chrome, roblox-studio, trilium, firecrawl). 실제 배포에서 `ootb-extra.sh`가 clone하는 경로와 같아서, 스크립트가 출력해 주는 `extra-include.yml`이 배포의 것과 그대로 같습니다.
+- `dev/<name>` — 빌드가 평소엔 원격 git에서 가져오는 코어 의존물의 로컬 체크아웃. 지금은 router-docker-client이고, `.env`에 `ROUTER_CLIENT_SOURCE="./dev/router-docker-client/"`를 넣으면 netshare/dns-local/netinit-docker가 그 체크아웃에서 빌드됩니다.
+
+스크립트는 `.env`와 `extra-include.yml`을 직접 고치지 않고 넣을 줄만 출력합니다. pull은 fast-forward만 하고, 커밋 안 된 변경이 있거나 upstream이 없는 브랜치는 이유를 출력하고 건너뜁니다. clone URL은 기본이 https이고, push까지 할 거라면 `DEV_CLONE_GIT_BASE=git@github.com:qwreey/ ./dev-clone.sh`로 받으세요.

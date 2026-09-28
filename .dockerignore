@@ -18,3 +18,5 @@ node_modules
 webmanager/frontend/node_modules
 webmanager/frontend/dist
 webmanager/backend/webmanager
+builds/
+dev/
