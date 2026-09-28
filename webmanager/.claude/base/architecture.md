@@ -16,7 +16,7 @@
 - **인증**: 리버스 프록시의 forward-auth에만 의존, 자체 로그인 없음(code-server와
   동일 신뢰 모델). dind/git-credential/ssh-key 등 민감한 조작을 다루므로 프록시
   앞단 인증이 필수 — README의 "webmanager" 절 경고 문구 참고.
-- **바인드 주소**: 기본값이 `private:81`(전용 tailscale IP, 내부 전용)로 확정됨
+- **바인드 주소**: 기본값은 `127.0.0.1:81`(2026-09-28부터 — 아래는 그 전 `private:81` 시절의 기록)로, 원래는 `private:81`(전용 tailscale IP, 내부 전용)로 확정됐었음
   — 컨테이너 안 nginx가 `/manager`로 라우팅해주므로 기본 배포에서는 80번 포트
   하나만 외부에 노출되면 됨. `127.0.0.1`이 아니라 `private`인 이유는 레포 루트
   `docs/tailscale.md`의 "보안: tailnet ACL 설정" 절 참고 — loopback 바인드는

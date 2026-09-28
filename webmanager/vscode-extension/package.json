@@ -1033,7 +1033,7 @@
         "webmanager.internalUrl": {
           "type": "string",
           "default": "",
-          "description": "Base URL the extension host uses to list terminal sessions. Empty = http://$WEBMANAGER_ADDR (default private:81).",
+          "description": "Base URL the extension host uses to list terminal sessions. Empty = http://$WEBMANAGER_ADDR (default 127.0.0.1:81).",
           "scope": "machine"
         },
         "webmanager.passthroughKeys": {

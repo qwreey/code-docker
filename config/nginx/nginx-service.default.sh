@@ -38,21 +38,6 @@ else
 fi
 export NGINX_ALLOWED_HOSTS_MAP="$map_body"
 
-# NGINX_BLOCK_LOOPBACK (docker-compose.yml, default "true") becomes
-# nginx.*.conf's `map $server_addr $code_docker_loopback_blocked { ... }`
-# body. "true" (default) blocks requests accepted on 127.0.0.1 (tailscale's
-# automatic loopback-forward path) - "false" disables the check entirely for
-# anyone deliberately proxying into this container via loopback themselves.
-case "${NGINX_BLOCK_LOOPBACK:-true}" in
-    false)
-        export NGINX_LOOPBACK_BLOCK_MAP="default 0;"
-        ;;
-    *)
-        export NGINX_LOOPBACK_BLOCK_MAP="127.0.0.1 1;
-    default 0;"
-        ;;
-esac
-
 # TRUSTED_PROXIES (docker-compose.yml, comma-separated IP/CIDR, empty by
 # default) becomes one `set_real_ip_from X;` line per entry - see the
 # real_ip_header/real_ip_recursive directives next to the placeholder in
@@ -74,8 +59,8 @@ export NGINX_TRUSTED_PROXIES_DIRECTIVES="$directives"
 # place, so overriding CODE_SERVER_BIND_ADDR/WEBMANAGER_ADDR moves both the
 # service's own bind AND nginx's upstream together instead of only one of
 # them (which would just break routing).
-export NGINX_CODE_SERVER_UPSTREAM="${CODE_SERVER_BIND_ADDR:-private:8080}"
-export NGINX_WEBMANAGER_UPSTREAM="${WEBMANAGER_ADDR:-private:81}"
+export NGINX_CODE_SERVER_UPSTREAM="${CODE_SERVER_BIND_ADDR:-127.0.0.1:8080}"
+export NGINX_WEBMANAGER_UPSTREAM="${WEBMANAGER_ADDR:-127.0.0.1:81}"
 
 # NGINX_WEBDAV_PORT (docker-compose.yml, default 82) - the WebDAV-only
 # listener nginx.*.conf's second server{} block binds, so a router vhost can
@@ -103,6 +88,6 @@ export NGINX_WEBDAV_PORT="$webdav_port"
 # these variable names so nginx's own $status/$loggable/$host/etc. in the
 # template pass through untouched instead of being blanked out.
 generated_config=/run/nginx.generated.conf
-envsubst '${NGINX_ACCESS_LOG_IF} ${NGINX_ALLOWED_HOSTS_MAP} ${NGINX_LOOPBACK_BLOCK_MAP} ${NGINX_TRUSTED_PROXIES_DIRECTIVES} ${NGINX_CODE_SERVER_UPSTREAM} ${NGINX_WEBMANAGER_UPSTREAM} ${NGINX_WEBDAV_PORT}' < "$nginx_config" > "$generated_config"
+envsubst '${NGINX_ACCESS_LOG_IF} ${NGINX_ALLOWED_HOSTS_MAP} ${NGINX_TRUSTED_PROXIES_DIRECTIVES} ${NGINX_CODE_SERVER_UPSTREAM} ${NGINX_WEBMANAGER_UPSTREAM} ${NGINX_WEBDAV_PORT}' < "$nginx_config" > "$generated_config"
 
 exec nginx -g "daemon off;" -c "$generated_config"

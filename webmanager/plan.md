@@ -16,11 +16,9 @@ code-docker 내부 상태(tailscale, mise, supervisord, dind, sshd, git, 프로�
 
 스택/배포/인증 등 전체에 걸치는 결정은 `webmanager/.claude/base/architecture.md`.
 요약: Go(stdlib) + Vite/React(TS, CSR), 기존 이미지에 supervisord program으로 추가,
-인증은 forward-auth 전적 위임(자체 로그인 없음), 바인드 주소는 `private:81`(레포 루트
-`docker-compose.yml`의 `private` alias 주석 참고 — 원래 code-docker 자신의
-tailscaled가 쓰던 tailnet 자동노출 회피 이유였지만, code-docker는 이제 tailscaled를
-아예 실행하지 않아 이 근거 자체는 없어짐 — 그냥 기존 기본값을 바꿀 이유가 없어서
-유지 중).
+인증은 forward-auth 전적 위임(자체 로그인 없음), 바인드 주소는 `127.0.0.1:81` —
+같은 컨테이너의 nginx가 유일한 진입로(2026-09-28, 그 전의 `private` alias 바인드는
+code-docker 안에 tailscaled가 있던 시절의 흔적이라 제거).
 
 ## 구현 완료
 

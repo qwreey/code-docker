@@ -131,13 +131,12 @@ services:
       # overriding.
       DOCKER_HOST: "${DOCKER_HOST:-tcp://dind:2375}"
       NGINX_LOG_LEVEL: "${NGINX_LOG_LEVEL:-errors}"
-      CODE_SERVER_BIND_ADDR: "${CODE_SERVER_BIND_ADDR:-private:8080}"
+      CODE_SERVER_BIND_ADDR: "${CODE_SERVER_BIND_ADDR:-127.0.0.1:8080}"
       # code-server's own env var, passed straight through - the default
       # (proxy off) lives in code-server-autoinstall's start.sh, not here.
       CS_DISABLE_PROXY: "${CS_DISABLE_PROXY:-}"
       CODE_WEBMANAGER_EXTENSION: "${CODE_WEBMANAGER_EXTENSION:-}"
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-}"
-      NGINX_BLOCK_LOOPBACK: "${NGINX_BLOCK_LOOPBACK:-true}"
       # The WebDAV-only nginx listener (see example-env). Not published to
       # the host - it exists so a router vhost can point a hostname at
       # code-docker:82 and get the file share without code-server on it too.
@@ -193,22 +192,7 @@ services:
       # transits the code-docker-router service (below) via the route
       # code-docker-netinit-docker continuously (re)plants in this netns
       # from outside it.
-      code-docker-internal:
-        # `private` is CODE_SERVER_BIND_ADDR/WEBMANAGER_ADDR's default bind
-        # address (a dedicated non-loopback IP, see docs/tailscale.md) -
-        # historically this existed so code-docker's own tailscaled could
-        # publish these ports without an automatic loopback-exposure
-        # workaround. Phase 4 of router-docker's own .claude/functional-router-plan.md's
-        # migration (dev/router-docker/.claude/functional-router-plan.md locally) is
-        # now complete (see docs/router.md's "보안" section) - code-docker
-        # runs no tailscaled at all anymore, so that original reasoning no
-        # longer applies. Left as the default anyway since it still works
-        # and nothing forces a change; revisit only if there's a concrete
-        # reason to (e.g. simplifying to a loopback bind now that nginx is
-        # the only thing that needs to reach it, and nginx lives in this
-        # same container).
-        aliases:
-          - private
+      code-docker-internal: {}
     # ports: block left entirely commented out on purpose - Compose rejects
     # a `ports:` key with zero array items, so the key itself has to go too,
     # not just its entries.

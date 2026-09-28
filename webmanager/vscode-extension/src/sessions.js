@@ -8,15 +8,15 @@ const vscode = require('vscode')
 // Same rule as internal/termsession's ValidateName.
 const NAME_RE = /^[\p{L}\p{N} _.-]{1,64}$/u
 
-// Where the extension host reaches webmanager's own API. Never through
-// nginx on this origin: NGINX_BLOCK_LOOPBACK refuses loopback clients
-// there. code-server inherits the container environment (including
+// Where the extension host reaches webmanager's own API: directly on its
+// loopback address rather than through nginx, which would only add a hop
+// and the outer Host/forward-auth assumptions. code-server inherits the container environment (including
 // .env.webmanager), so WEBMANAGER_ADDR is the same value
 // `webmanager --attach` uses.
 function internalBaseUrl() {
   const configured = vscode.workspace.getConfiguration('webmanager').get('internalUrl')
   if (configured) return configured.replace(/\/+$/, '')
-  return 'http://' + (process.env.WEBMANAGER_ADDR || 'private:81')
+  return 'http://' + (process.env.WEBMANAGER_ADDR || '127.0.0.1:81')
 }
 
 function getJson(url, timeoutMs) {

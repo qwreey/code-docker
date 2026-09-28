@@ -188,7 +188,7 @@ func loadConfig() Config {
 	filesRoot := getenv("WEBMANAGER_FILES_ROOT", "/code")
 
 	return Config{
-		Addr:                 getenv("WEBMANAGER_ADDR", "private:81"),
+		Addr:                 getenv("WEBMANAGER_ADDR", "127.0.0.1:81"),
 		SupervisorSock:       getenv("SUPERVISOR_SOCK", "/run/supervisor.sock"),
 		SSHAuthorizedKeys:    getenv("SSH_AUTHORIZED_KEYS", "/code/.ssh/authorized_keys"),
 		GitConfigPath:        getenv("GIT_CONFIG_PATH", "/code/.gitconfig"),
@@ -215,7 +215,7 @@ func loadConfig() Config {
 		// Defaults to wherever CODE_SERVER_BIND_ADDR (code-runner.default.sh)
 		// actually binds code-server, so overriding that one var moves this
 		// target along with it instead of needing to be kept in sync by hand.
-		CodeServerManifestURL: getenv("WEBMANAGER_CODE_SERVER_MANIFEST_URL", "http://"+getenv("CODE_SERVER_BIND_ADDR", "private:8080")+"/manifest.json"),
+		CodeServerManifestURL: getenv("WEBMANAGER_CODE_SERVER_MANIFEST_URL", "http://"+getenv("CODE_SERVER_BIND_ADDR", "127.0.0.1:8080")+"/manifest.json"),
 
 		SystemHistoryIntervalSeconds: getenv("WEBMANAGER_SYSTEM_HISTORY_INTERVAL_SECONDS", "5"),
 		SystemHistoryWindowMinutes:   getenv("WEBMANAGER_SYSTEM_HISTORY_WINDOW_MINUTES", "10"),

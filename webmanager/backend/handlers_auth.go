@@ -2,23 +2,14 @@ package main
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
 	"time"
+	"webmanager/internal/authgate"
 )
 
-// clientKey identifies the caller for authgate's rate limiting, derived
-// from the TCP peer address rather than X-Forwarded-For/X-Real-IP — nginx
-// doesn't rewrite those on the way in (see the security audit), so an
-// attacker could otherwise reset their own lockout just by sending a
-// different header value on each request.
-func clientKey(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
-}
+// clientKey is authgate.ClientKey - see there for why X-Real-IP is trusted
+// from loopback peers only.
+func clientKey(r *http.Request) string { return authgate.ClientKey(r) }
 
 // handleAuthUnlock verifies a submitted password against the configured
 // gate hash and, on success, issues an unlock cookie. Never itself wrapped

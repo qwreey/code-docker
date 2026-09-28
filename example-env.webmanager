@@ -32,7 +32,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=19
+WEBMANAGER_ENV_VERSION=20
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -143,7 +143,7 @@ WEBMANAGER_ENV_VERSION=19
 #. 루트 example-env의 PWA_DISPLAY_MODE를 보세요 - PWA_NAME/PWA_SHORT_NAME과
 #. 같은 code-server 소유 설정이라 webmanager 전용 파일이 아니라 그쪽에
 #. 있습니다.)
-#WEBMANAGER_CODE_SERVER_MANIFEST_URL=http://private:8080/manifest.json
+#WEBMANAGER_CODE_SERVER_MANIFEST_URL=http://127.0.0.1:8080/manifest.json
 
 #. --- Task Manager 탭 ---
 #. 리소스 히스토리 그래프 샘플링 주기(초)와 보관 기간(분).
@@ -230,9 +230,8 @@ WEBMANAGER_ENV_VERSION=19
 #SSH_DEFAULT_KEY_PATH=
 #VECTOR_LOG_DIR=
 #SYSTEM_DISK_PATH=
-#. webmanager는 이제 nginx가 컨테이너 안에서 /manager 경로로 라우팅해주므로
-#. 기본값이 전용 tailscale IP(`private` 호스트네임)로의 내부 전용 바인드입니다
-#. - loopback(127.0.0.1)이 아닌 이유는 tailscale 문서의 보안 절 참고(loopback은
-#. tailscaled가 같은 포트로 tailnet 전체에 자동 노출해버립니다). docker-compose.yml의
-#. 81:81 포트 매핑을 되살려 직접 노출하고 싶을 때만 :81(0.0.0.0)로 바꾸세요.
-#WEBMANAGER_ADDR=private:81
+#. webmanager의 listen 주소. 기본값은 loopback(127.0.0.1:81)입니다 - 같은 컨테이너의
+#. nginx가 /manager로 라우팅해주는 것이 유일한 진입로이고, webmanager 자체엔 로그인이
+#. 없어서(authgate는 선택) 망 위 주소에 열어두면 다른 컨테이너가 nginx를 건너뛰고
+#. 바로 닿습니다.
+#WEBMANAGER_ADDR=127.0.0.1:81

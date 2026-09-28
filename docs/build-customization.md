@@ -64,7 +64,7 @@ code-server 서비스 엔트리포인트입니다. code-server 의 업데이트/
 
 code-server 설정 파일입니다. **매 시작마다 `/code/.local/share/code-docker/code/config.yaml`로 무조건 덮어써집니다** — 다른 override 패턴 파일들과 마찬가지로 완전히 파생된(derived) 파일이라, `/code/.local/share/code-docker/code/config.yaml`을 직접 편집해도 다음 재시작에 사라집니다. 커스터마이징하려면 `code-config.override.yaml`을 만들고 재빌드하세요.
 
-**`bind-addr`는 여기 넣지 마세요 — 넣어도 무시됩니다.** `code-runner.default.sh`가 항상 `--bind-addr` CLI 인자를 붙여서 실행하는데, code-server는 CLI 인자를 config.yaml 값보다 우선하므로 여기(default든 override든)에 뭘 적어도 그 값이 이깁니다. 실제 바인드 주소를 바꾸고 싶으면 `docker-compose.yml`의 `CODE_SERVER_BIND_ADDR`(기본값 `private:8080`)을 바꾸세요 — nginx의 upstream 대상도 같은 값을 따라가므로(`nginx-service.default.sh`) 라우팅이 어긋날 걱정 없이 이거 하나만 바꾸면 됩니다. `private`는 `code-docker-internal` 네트워크 alias일 뿐(전용 tailscale IP가 아닙니다 — tailscale은 이제 [router 컨테이너](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md)에서 실행되고, code-docker 자신은 tailscaled를 갖고 있지 않습니다), loopback 대신 이 alias에 바인드해야 할 필수적인 이유는 더 이상 없지만 기본값은 그대로 유지하고 있습니다.
+**`bind-addr`는 여기 넣지 마세요 — 넣어도 무시됩니다.** `code-runner.default.sh`가 항상 `--bind-addr` CLI 인자를 붙여서 실행하는데, code-server는 CLI 인자를 config.yaml 값보다 우선하므로 여기(default든 override든)에 뭘 적어도 그 값이 이깁니다. 실제 바인드 주소를 바꾸고 싶으면 `docker-compose.yml`의 `CODE_SERVER_BIND_ADDR`(기본값 `127.0.0.1:8080`)을 바꾸세요 — nginx의 upstream 대상도 같은 값을 따라가므로(`nginx-service.default.sh`) 라우팅이 어긋날 걱정 없이 이거 하나만 바꾸면 됩니다. 기본이 loopback인 이유는 code-server에 로그인이 없어서, 같은 컨테이너의 nginx만 닿게 하려는 것입니다.
 
 **`disable-proxy`도 여기 넣지 마세요 — 같은 이유입니다.** code-server의 포트 프록시 경로(`/proxy/<port>/`, `/absproxy/<port>/`, `*.<proxy-domain>`)는 기본으로 **꺼져 있습니다** — 이 기본값은 code-docker가 아니라 `code-server-autoinstall`의 `start.sh`가 정합니다(code-server 자신의 환경변수 `CS_DISABLE_PROXY`를 값이 없을 때 `1`로 채워줍니다). 이 경로들은 컨테이너 안에서 열려 있는 *아무* 포트로나 프록시해 주는데 그걸 막아주는 건 code-server 자신의 인증뿐이고 여기서는 `auth: none`이라(→ [로그인/보안](security-login.md)), 켜 두면 code-server에 닿을 수 있는 쪽은 컨테이너 내부 포트 전부에 닿을 수 있게 됩니다 — VS Code의 PORTS 탭이 dev 서버가 뜨자마자 자동으로 잡아 주는 포트까지 포함해서요. 밖으로 내보낼 포트는 [Dev Proxy](https://github.com/qwreey/router-docker/blob/HEAD/docs/dev-proxy.md)나 [App Routes](https://github.com/qwreey/router-docker/blob/HEAD/docs/app-routes.md)로 명시적으로 여세요. 되돌리려면 `.env`에 `CS_DISABLE_PROXY="0"`을 넣으면 됩니다(code-server는 `1`/`true`만 참으로 읽습니다) — config.yaml에 `disable-proxy: false`를 적는 방식은 동작하지 않습니다(code-server는 이 파일에 boolean 키가 *존재하기만 하면* 값과 무관하게 true로 읽습니다).
 
@@ -277,17 +277,14 @@ override하는 걸로 충분합니다.
 
 ### `nginx.*.conf` (단일 origin 라우팅 설정)
 
-code-server(`/`, 내부 전용 `private:8080`)와 webmanager(`/manager`, 내부 전용
-`WEBMANAGER_ADDR`)를 하나의 80번 포트로 합쳐주는 nginx 설정입니다 — 80번 포트에
+code-server(`/`, loopback `127.0.0.1:8080`)와 webmanager(`/manager`, loopback
+`127.0.0.1:81`)를 하나의 80번 포트로 합쳐주는 nginx 설정입니다 — 80번 포트에
 직접 바인딩하는 유일한 프로그램입니다. `/manager` prefix는 여기서 벗겨져서
 webmanager는 지금처럼 `/api/...`를 그대로 받습니다. access/error 로그는 nginx
 자신의 stdout/stderr로 나가서 다른 프로그램들과 동일하게 supervisord가 파일로
-캡처합니다(`vector`가 그 파일을 다시 tail). tailscale의 자동 loopback 포워딩
-경로(`127.0.0.1`로 들어온 요청)만 따로 거부하는 조건(`NGINX_BLOCK_LOOPBACK`,
-기본 켜짐 — router가 code-docker를 향해 publish하는 경로는 아니지만, router가
-사용자 대신 tailnet peer로부터 받은 트래픽이 우회 경로로 들어올 가능성에 대한
-방어 차원으로 유지)과, `ALLOWED_HOSTS`로 조절하는 Host 헤더 화이트리스트도 이
-파일에 있습니다. `/tailscale/`·`/dev-proxy/`·`/exports/` 위치는 더 이상 여기서
+캡처합니다(`vector`가 그 파일을 다시 tail). 두 upstream은 로그인이 없어서
+loopback에만 열려 있고 이 nginx가 유일한 진입로입니다. `ALLOWED_HOSTS`로 조절하는
+Host 헤더 화이트리스트도 이 파일에 있습니다. `/tailscale/`·`/dev-proxy/`·`/exports/` 위치는 더 이상 여기서
 router로 프록시되지 않습니다 — router가 host:80을 직접 종단하도록 바뀌면서
 (router-docker의 [`config/nginx/`](https://github.com/qwreey/router-docker/tree/HEAD/config/nginx)) 이 파일에서는 빠졌고, webmanager의 Tailscale/Dev Proxy
 탭도 이제 router 자신의 `/router/` 경로로 직접 호출합니다. 자세한 내용은
@@ -309,7 +306,7 @@ access_log 상세도는 `docker-compose.yml`의 `NGINX_LOG_LEVEL`로 조절합�
 
 ### `nginx-error.*.html` (code-server 준비 중 페이지)
 
-`location /`(code-server 프록시)에서 upstream(`private:8080`)에 연결할 수
+`location /`(code-server 프록시)에서 upstream(`127.0.0.1:8080`)에 연결할 수
 없어 502/503/504가 나면, nginx의 기본 에러 페이지 대신 이 파일을 대신
 보여줍니다 — 컨테이너가 막 시작했거나 code-server가 재시작 중이라 아직
 포트가 열리지 않은, 실제로는 에러가 아닌 흔한 상황을 사용자에게 "곧

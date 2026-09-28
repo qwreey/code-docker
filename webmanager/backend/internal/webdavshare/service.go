@@ -9,7 +9,6 @@ import (
 	"errors"
 	"log"
 	"mime"
-	"net"
 	"net/http"
 	"path"
 	"strings"
@@ -355,17 +354,9 @@ func (s *Service) authenticate(clientKey, username, password string) (ok bool, r
 	return true, false
 }
 
-// clientKey derives the rate-limiter key from the connection's remote
-// address. Deliberately not X-Forwarded-For: that header is client-supplied
-// and would let an attacker reset their own backoff at will (see
-// authgate.Gate.TryUnlock's own warning about forgeable keys).
-func clientKey(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
-}
+// clientKey is authgate.ClientKey, shared with the unlock endpoints so both
+// agree on who a caller is.
+func clientKey(r *http.Request) string { return authgate.ClientKey(r) }
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	st := s.Status()

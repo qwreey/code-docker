@@ -143,7 +143,7 @@ skips that container's own loop, and `docker-compose.yml` also maps it onto
 `code-docker-netinit-docker`'s own `NETINIT_DOCKER_ENABLED` so that agent stops planting
 routes too (its DOCKER-USER half stays on, being unrelated to whether the netgate is
 enabled) — it does not undo the compose topology itself (see
-`example-env`'s own comments on both). `ALLOWED_HOSTS`/`NGINX_BLOCK_LOOPBACK`/
+`example-env`'s own comments on both). `ALLOWED_HOSTS`/
 `TRUSTED_PROXIES`/`NGINX_LOG_LEVEL` are genuinely shared between code-docker's and router's
 own nginx (both read the same `.env` values), so they stay in code-docker's own
 `example-env` rather than router-docker's own `example-env.router`.
