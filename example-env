@@ -292,6 +292,11 @@
 # the key.
 #CS_DISABLE_PROXY="1"
 
+# code-server 버전 고정. 비워두면(기본) 컨테이너가 뜰 때마다(1시간에 한 번까지)
+# 최신 릴리스로 자동 업데이트합니다. 새 버전이 문제를 일으킬 때 "4.109.2"처럼
+# 정확한 버전을 적어 묶어두세요. 다운로드가 실패하면 설치된 버전이 그대로 유지됩니다.
+#CODE_SERVER_VERSION=""
+
 # code-docker's built-in webmanager extension for code-server: webmanager
 # terminal sessions (and any other webmanager tab) as editor tabs and in the
 # bottom panel's "webmanager" tab. Installed automatically and kept at this

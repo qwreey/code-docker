@@ -14,7 +14,7 @@ ADD https://github.com/qwreey/router-docker-client.git#main:dns-local /
 # AUTOINSTALL_REF (and AUTOINSTALL_SOURCE for a local dev/ checkout) - keep this
 # default equal to the one there.
 FROM scratch AS code-server-autoinstall
-ARG AUTOINSTALL_REF=v0.1.0
+ARG AUTOINSTALL_REF=v0.1.1
 ADD https://github.com/qwreey/code-server-autoinstall.git#${AUTOINSTALL_REF} /
 
 FROM docker:latest AS docker-bin
