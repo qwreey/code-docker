@@ -108,7 +108,7 @@ async function rememberVncTargets(list) {
 function normalizeState(s) {
   s = s || {}
   const out = { section: typeof s.section === 'string' ? s.section : 'terminal' }
-  for (const k of ['session', 'cwd', 'command', 'query']) {
+  for (const k of ['session', 'cwd', 'command', 'query', 'created']) {
     if (typeof s[k] === 'string' && s[k]) out[k] = s[k]
   }
   if (typeof s.pinned === 'boolean') out.pinned = s.pinned

@@ -684,6 +684,7 @@ export function Terminal({
   embedSession,
   embedCwd,
   embedCommand,
+  embedCreated,
 }: {
   initialOpen?: { cwd?: string; label?: string; command?: string; session?: string } | null
   onInitialOpenConsumed?: () => void
@@ -714,6 +715,10 @@ export function Terminal({
   embedSession?: string | null
   embedCwd?: string
   embedCommand?: string
+  // The createdAt of the session a restored view last showed. A session
+  // keeps it across a rename, so it's how the view finds its session again
+  // when another client renamed it while this view wasn't running.
+  embedCreated?: string
 } = {}) {
   const embedded = embedSession !== undefined
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -812,6 +817,34 @@ export function Terminal({
   const [activeSession, setActiveSession] = useState<string>(() => embedSession || HOME_TAB_ID)
   // Embed only: the session this view shows ended (its shell exited).
   const [sessionEnded, setSessionEnded] = useState(false)
+  // Embed only: a restored view checks its session name against the live
+  // list before connecting. Connecting first would be wrong exactly when it
+  // matters - a session renamed elsewhere while this view was down (browser
+  // closed, a restored tab not opened yet) no longer has the saved name, so
+  // the handshake would create an empty shell under it, next to the real,
+  // renamed one. Found by embedCreated, the session is followed instead.
+  const [embedResolving, setEmbedResolving] = useState(() => Boolean(embedSession && embedCreated))
+  useEffect(() => {
+    if (!embedResolving) return
+    let cancelled = false
+    void api
+      .poll<TerminalSessionInfo[]>('/terminal/sessions')
+      .then((list) => {
+        if (cancelled || list.some((s) => s.name === embedSession)) return
+        const moved = list.find((s) => s.createdAt === embedCreated)
+        if (moved) setActiveSession(moved.name)
+      })
+      .catch(() => {
+        // Unknown - connect under the saved name, as before this check.
+      })
+      .finally(() => {
+        if (!cancelled) setEmbedResolving(false)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // Read by the foreground/focus handler, which would otherwise see a plain
   // 'disconnected' state behind the ended card and reconnect - i.e. quietly
   // start a new shell under the card the moment the view got focus.
@@ -2838,6 +2871,7 @@ export function Terminal({
     const term = termRef.current
     const fitAddon = fitAddonRef.current
     if (!term || !fitAddon) return
+    if (embedResolving) return
 
     if (activeSession === HOME_TAB_ID) {
       // Home tab is active, not a real session (the last real tab may have
@@ -3012,6 +3046,7 @@ export function Terminal({
     gateLocked,
     setLockedOutState,
     embedded,
+    embedResolving,
   ])
 
   const selectSession = useCallback(
@@ -3076,6 +3111,9 @@ export function Terminal({
       session: activeSession === HOME_TAB_ID ? null : activeSession,
       cwd: embedCwdRef.current,
       pinned: activeInfo?.pinned,
+      // Only once known: reporting it unset would wipe the saved one before
+      // the first session list arrives, and that's the one a reload needs.
+      ...(activeInfo ? { created: activeInfo.createdAt } : {}),
     })
   }, [embedded, activeSession, activeInfo])
 

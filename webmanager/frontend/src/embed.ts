@@ -26,6 +26,7 @@ export const embedParams = {
   session: params.get('session'),
   cwd: params.get('cwd') || undefined,
   command: params.get('cmd') || undefined,
+  created: params.get('created') || undefined,
   theme: params.get('theme') === 'light' ? 'light' : params.get('theme') === 'dark' ? 'dark' : null,
 } as const
 
@@ -54,9 +55,9 @@ export function onHostMessage(listener: (msg: HostMessage) => void) {
 // Query keys that only mean something to the embed itself, and so never
 // belong in the path reported back (which is also what "Open in Browser"
 // opens).
-const EMBED_ONLY_KEYS = ['embed', 'theme', 'cwd', 'cmd']
+const EMBED_ONLY_KEYS = ['embed', 'theme', 'cwd', 'cmd', 'created']
 
-type EmbedState = { session?: string | null; cwd?: string; pinned?: boolean }
+type EmbedState = { session?: string | null; cwd?: string; pinned?: boolean; created?: string }
 let extraState: EmbedState = {}
 let lastSent = ''
 
@@ -81,6 +82,8 @@ export function reportEmbedState(extra?: EmbedState) {
     session: extraState.session ?? undefined,
     cwd: extraState.cwd,
     pinned: extraState.pinned,
+    // Left out rather than sent empty, so it never clears a saved one.
+    ...(extraState.created ? { created: extraState.created } : {}),
   }
   const key = JSON.stringify(msg)
   if (key === lastSent) return

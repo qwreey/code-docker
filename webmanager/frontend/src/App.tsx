@@ -436,6 +436,7 @@ function App() {
                 embedSession={EMBED ? embedParams.session : undefined}
                 embedCwd={EMBED ? embedParams.cwd : undefined}
                 embedCommand={EMBED ? embedParams.command : undefined}
+                embedCreated={EMBED ? embedParams.created : undefined}
                 restoreSession={restoreTerminalSession}
                 onRestoreSessionConsumed={() => setRestoreTerminalSession(null)}
                 onActiveSessionChange={handleActiveSessionChange}

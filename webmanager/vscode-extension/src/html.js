@@ -17,6 +17,9 @@ function buildPath(state) {
   if (section === 'terminal') {
     if (state.session) params.set('session', state.session)
     if (state.cwd) params.set('cwd', state.cwd)
+    // The session's createdAt: lets the view find it again under a new
+    // name if it was renamed elsewhere meanwhile (see Terminal.tsx).
+    if (state.created) params.set('created', state.created)
     if (state.command) params.set('cmd', state.command)
   } else if (state.query) {
     for (const [k, v] of new URLSearchParams(state.query)) params.set(k, v)

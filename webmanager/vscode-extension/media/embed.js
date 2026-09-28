@@ -39,6 +39,7 @@
     const q = new URLSearchParams()
     if (state.session) q.set('session', state.session)
     if (state.cwd) q.set('cwd', state.cwd)
+    if (state.created) q.set('created', state.created)
     const qs = q.toString()
     return 'terminal' + (qs ? `?${qs}` : '')
   }
