@@ -39,6 +39,10 @@ const previewMaxLen = 200
 // could change — see claude-plan.md's format-drift warnings.
 var safeIdentifier = regexp.MustCompile(`^[^/\\]+$`)
 
+// resumableSessionID is the stricter shape ListSessions requires of a
+// session id, since the id ends up in a shell command line (see there).
+var resumableSessionID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
 // SessionInfo is one entry in the session list — cheap metadata only, no
 // full-file parse (see previewScanLines).
 type SessionInfo struct {
@@ -83,6 +87,14 @@ func ListSessions(configDir string) ([]SessionInfo, error) {
 				continue
 			}
 			sessionID := strings.TrimSuffix(f.Name(), ".jsonl")
+			// The frontend types `claude --resume <id>` into a real shell
+			// (termsession's InitialCommand), so an id is only listed when
+			// it can't be anything but a word there - Claude Code's own are
+			// UUIDs. A file named `x; curl ...|sh.jsonl` would otherwise run
+			// on the next "터미널에서 이어하기" click.
+			if !resumableSessionID.MatchString(sessionID) {
+				continue
+			}
 			info, err := f.Info()
 			if err != nil {
 				continue
