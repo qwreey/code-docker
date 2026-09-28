@@ -664,6 +664,16 @@ async function onMessage(host, m) {
       log(`view ${describe(host)}: webmanager never reported ready`)
       break
     case 'state': {
+      // A report still in flight from the page closeSlot just replaced: it
+      // describes what's gone, so it must not retitle the slot or re-save its
+      // binding. The first report of anything else (term1's Home) means that
+      // page is gone for good, and the same session may be opened there again.
+      const closed = host.closedState
+      if (closed) {
+        const r = normalizeState(m)
+        if (closed.section === r.section && closed.session === r.session && closed.query === r.query) break
+        host.closedState = null
+      }
       host.state = normalizeState({ ...host.state, ...m })
       // The initial command ran when the session was created. Keeping it
       // would re-run it on a later recreate (the backend only uses it on
@@ -675,13 +685,7 @@ async function onMessage(host, m) {
       // A slot remembers what it shows so a refresh restores it - but only
       // something worth restoring: the terminal Home (no session) isn't.
       if (host.kind === 'slot' && (host.state.section !== 'terminal' || host.state.session)) {
-        const closed = host.closedState
-        const sameAsClosed =
-          closed && closed.section === host.state.section && closed.session === host.state.session && closed.query === host.state.query
-        if (!sameAsClosed) {
-          host.closedState = null
-          await saveBinding(host.id, host.state)
-        }
+        await saveBinding(host.id, host.state)
       }
       break
     }
