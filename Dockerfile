@@ -1,18 +1,19 @@
-# qwreey/router-docker-client subdirectories, fetched at build time (floating #main
-# ref, see that repo's own CLAUDE.md). Each is its own stage so a BuildKit named context
-# of the same name replaces it - docker-compose.yml's build.additional_contexts does
+# qwreey/router-docker-client subdirectories, fetched at build time and pinned to its
+# release tag (ROUTER_CLIENT_REF - keep this default equal to docker-compose.yml's;
+# dev-bump-router-client.sh moves every consumer's pin at once). Each is its own stage
+# so a BuildKit named context of the same name replaces it - docker-compose.yml's build.additional_contexts does
 # that from ROUTER_CLIENT_SOURCE, to build against a local dev/ checkout. A plain ADD
 # of a local path couldn't: it would have to sit inside this build context, and dev/
 # is .dockerignore'd on purpose. A bare `docker build .` gets these defaults.
 FROM scratch AS netshare
-ADD https://github.com/qwreey/router-docker-client.git#main:netshare /
+ARG ROUTER_CLIENT_REF=v0.1.0
+ADD https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF}:netshare /
 FROM scratch AS dns-local
-ADD https://github.com/qwreey/router-docker-client.git#main:dns-local /
-# code-server-autoinstall, same mechanism but pinned to a release tag rather than
-# floating: it installs and patches code-server itself, so an unreviewed upstream
-# commit breaking it means a container that doesn't come up. docker-compose.yml passes
-# AUTOINSTALL_REF (and AUTOINSTALL_SOURCE for a local dev/ checkout) - keep this
-# default equal to the one there.
+ARG ROUTER_CLIENT_REF=v0.1.0
+ADD https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF}:dns-local /
+# code-server-autoinstall, same mechanism and also pinned to a release tag.
+# docker-compose.yml passes AUTOINSTALL_REF (and AUTOINSTALL_SOURCE for a local dev/
+# checkout) - keep this default equal to the one there.
 FROM scratch AS code-server-autoinstall
 ARG AUTOINSTALL_REF=v0.1.1
 ADD https://github.com/qwreey/code-server-autoinstall.git#${AUTOINSTALL_REF} /

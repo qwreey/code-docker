@@ -41,20 +41,19 @@
 # netinit-docker 이미지의 build context를 덮어씁니다. 기본값은
 # qwreey/router-docker-client의 원격 git URL이라 보통 건드릴 일이 없고, 로컬
 # 체크아웃에서 빌드해 시험할 때만 씁니다(예:
-# NETINIT_DOCKER_CONTEXT=/path/to/router-docker-client/netinit-docker). 원격 git
-# context라 업스트림 변경은 다음 `docker compose build` 때 반영됩니다(`up -d`만으로는
-# 이미 있는 이미지를 다시 빌드하지 않습니다).
+# NETINIT_DOCKER_CONTEXT=/path/to/router-docker-client/netinit-docker).
 #NETINIT_DOCKER_CONTEXT=""
 
 # qwreey/router-docker-client(netshare, dns-local, netinit-docker)를 어디서
 # 가져올지 정하는 *접두사*입니다. 기본값은 원격 git URL이고, 로컬 체크아웃으로
 # 개발할 때만 경로를 `/`로 끝나게 적습니다 - 뒤에 하위 디렉터리 이름이 그대로
-# 붙습니다. script/dev-clone.sh가 dev/에 clone한 뒤 이 줄을 출력해 줍니다. 위
+# 붙습니다. ./dev-clone.sh가 dev/에 clone한 뒤 이 줄을 출력해 줍니다. 위
 # NETINIT_DOCKER_CONTEXT가 설정돼 있으면 netinit-docker만은 그쪽이 우선합니다.
 #ROUTER_CLIENT_SOURCE="./dev/router-docker-client/"
 
-# 코어 의존물(router-docker, dind-authz-docker, code-server-autoinstall)의 버전
-# 핀입니다 - 각 저장소를 원격에서 직접 가져오는 태그입니다. 기본값은
+# 코어 의존물(router-docker, dind-authz-docker, code-server-autoinstall,
+# router-docker-client)의 버전 핀입니다 - 각 저장소를 원격에서 직접 가져오는
+# 태그입니다. 기본값은
 # docker-compose.yml에 있고(보통 비워두면 됩니다), code-docker를 업데이트하면
 # 검증된 태그로 같이 올라갑니다. 다른 태그나 브랜치(`main`)를 시험할 때만 적으세요 -
 # 브랜치로 두면 새 커밋은 `docker compose build` 때마다 다시 받아 옵니다(`up -d`만으로는
@@ -63,9 +62,14 @@
 #ROUTER_REF=""        # qwreey/router-docker (compose include)
 #DIND_REF=""          # qwreey/dind-authz-docker (code-docker-dind 빌드)
 #AUTOINSTALL_REF=""   # qwreey/code-server-autoinstall (code-server 설치/패치)
+#ROUTER_CLIENT_REF="" # qwreey/router-docker-client (netshare/dns-local/netinit-docker)
+# ROUTER_CLIENT_REF는 code-docker 자신의 빌드에만 적용됩니다. builds/의 사이드
+# 프로젝트는 각자 Dockerfile에 같은 태그를 핀해 두고, ./dev-bump-router-client.sh가
+# 전부 한 번에 올립니다.
 
-# 위 셋을 로컬 체크아웃으로 바꿔 끼웁니다 - 개발할 때만. ./dev-clone.sh가 dev/에
-# 받아두고 이 줄들을 출력해 줍니다. 설정하면 해당 *_REF는 무시됩니다.
+# 위 핀들을 로컬 체크아웃으로 바꿔 끼웁니다 - 개발할 때만. ./dev-clone.sh가 dev/에
+# 받아두고 이 줄들을 출력해 줍니다. 설정하면 해당 *_REF는 무시됩니다
+# (ROUTER_CLIENT_REF는 위 ROUTER_CLIENT_SOURCE가 대신합니다).
 #ROUTER_INCLUDE="./dev/router-docker/docker-compose.router.yml"
 #DIND_CONTEXT="./dev/dind-authz-docker"
 #AUTOINSTALL_SOURCE="./dev/code-server-autoinstall"
