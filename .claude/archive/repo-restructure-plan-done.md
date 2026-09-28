@@ -139,3 +139,28 @@ netshare 절 — floating `#main`인데 Docker가 fetch를 캐시해서 rename�
 8. **문서 스윕** — 루트 `CLAUDE.md`(submodule 서술 다수), `docs/index.md:8`,
    `migrate.sh:39`, `example-env`. 이 레포는 문서-구현 불일치를 실제로 겪은 적이
    있으므로(메모리의 docs-vs-impl audit) 마지막에 전용 스윕을 한 번 돌린다.
+
+## 결과 (2026-09-28 완료)
+
+계획대로 수행. 계획과 달라진 점 / 실행 중 발견한 것:
+
+- **router는 커밋 sha로 핀할 수 없다.** Compose 5.5의 원격 `include:`는 `#<sha>`를 주면
+  `~/.cache/docker-compose/<sha>/`에 빈 repo만 만들고 `stat ... no such file`로 실패하며,
+  그 빈 디렉터리가 남아 같은 sha는 계속 실패한다. 태그/브랜치만 된다. 그래서 전부 태그
+  (`v0.1.0`)로 통일. 빌드 컨텍스트(`#<sha>`)는 sha도 된다.
+- `ADD $ARG` 대신 **`FROM scratch AS <name>` + `ADD <git url>` 스테이지**를 두고, compose
+  `build.additional_contexts`의 같은 이름 named context로 덮어쓰는 방식을 채택. 로컬 경로가
+  빌드 컨텍스트 안에 있을 필요가 없어서 `dev/`를 `.dockerignore`할 수 있고, bare
+  `docker build .`도 기본값으로 그대로 된다 (실측).
+- 기본 태그는 `docker-compose.yml`에만 두고 스크립트는 `ootb-lib.sh`의 `compose_default`로
+  읽는다. `ootb.sh`는 `.env.router` 템플릿을 태그 기준 GitHub raw에서 받는다.
+- 형제 provider는 `dev/`가 아니라 배포와 같은 `builds/<name>`에 둔다 (`dev/`는 코어
+  의존물 전용).
+- **router submodule 핀 `59f9ec8`은 GitHub에 push된 적 없는 로컬 커밋이었다** — 즉 그
+  동안 `--recurse-submodules` clone이 router에서 `not our ref`로 실패하는 상태였다.
+  `.git/modules/router`에서 복구해 router-docker `v0.1.0`에 포함시킴.
+- `git pull`은 제거된 submodule 체크아웃을 untracked로 남긴다(실측) →
+  `migrate-continue.sh` 1-1단계가 변경/미push 커밋이 없을 때만 지운다.
+
+커밋: code-docker 82875f0, 78201fc, 12ff5e1, 2a08a9b / router-docker `v0.1.0` /
+dind-authz-docker `v0.1.0` / code-server-autoinstall `v0.1.0` / envmigrate `v0.1.0`.
