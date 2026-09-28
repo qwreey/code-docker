@@ -444,3 +444,5 @@ code-docker와 함께 만지는 형제 repo들은 이 체크아웃 안으로 받
 - `dev/<name>` — 빌드가 평소엔 원격 git 참조로 가져오는 코어 의존물의 로컬 체크아웃: `router-docker-client`, `router-docker`, `dind-authz-docker`, `code-server-autoinstall`, `envmigrate`(전부 예전엔 이 저장소의 submodule이었습니다). `.env`에 `ROUTER_CLIENT_SOURCE="./dev/router-docker-client/"`를 넣으면 netshare/dns-local/netinit-docker가, `ROUTER_INCLUDE`/`DIND_CONTEXT`/`AUTOINSTALL_SOURCE`를 넣으면 router-docker/dind-authz-docker/code-server-autoinstall가 그 체크아웃에서 빌드됩니다(`example-env` 참고). `envmigrate`는 Go 모듈이라 `.env`가 아니라 `go.work`로 바꿔 끼웁니다 - `./dev-clone.sh`가 정확한 명령을 출력해 줍니다.
 
 스크립트는 `.env`와 `extra-include.yml`을 직접 고치지 않고 넣을 줄만 출력합니다. pull은 fast-forward만 하고, 커밋 안 된 변경이 있거나 upstream이 없는 브랜치는 이유를 출력하고 건너뜁니다. clone은 fetch는 https(키 없이도 받아지도록), push는 ssh로 가도록 pushurl을 따로 잡아둡니다 - `DEV_CLONE_GIT_BASE`/`DEV_CLONE_PUSH_BASE`로 각각 바꿀 수 있고, `DEV_CLONE_PUSH_BASE=""`면 pushurl을 따로 두지 않습니다.
+
+`router-docker-client`는 code-docker뿐 아니라 `builds/`의 사이드 프로젝트들과 dind-authz-docker도 각자 Dockerfile에 태그로 핀해 둡니다. 그 저장소에 새 태그를 push한 뒤 `./dev-bump-router-client.sh vX.Y.Z`를 실행하면 받아둔 모든 소비처의 핀이 한 번에 바뀝니다(`--commit`을 붙이면 저장소마다 커밋까지, push는 직접).
