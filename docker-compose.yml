@@ -31,7 +31,7 @@
 # local checkout instead (dev/router-docker, see dev-clone.sh and example-env).
 include:
   - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}
-  - path: "${ROUTER_INCLUDE:-https://github.com/qwreey/router-docker.git#${ROUTER_REF:-v0.1.0}:docker-compose.router.yml}"
+  - path: "${ROUTER_INCLUDE:-https://github.com/qwreey/router-docker.git#${ROUTER_REF:-v0.1.1}:docker-compose.router.yml}"
 
 networks:
   code-docker-internal:
