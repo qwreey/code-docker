@@ -1,41 +1,36 @@
 # code-docker 컨테이너 자체의 런타임 설정입니다. webmanager(관리자 패널) 설정은
 # .env.webmanager로 별도 관리됩니다 - example-env.webmanager 참고.
 #
-# 이 파일을 .env 로 복사한 뒤, 필요한 값만 주석을 풀어 사용하세요. 전부
-# docker-compose.yml에 합리적인 기본값이 있으므로 대부분은 건드릴 필요가 없습니다.
+# 이 파일을 .env 로 복사한 뒤 필요한 값만 주석을 풀어 쓰세요. 전부
+# docker-compose.yml에 합리적인 기본값이 있어 대부분은 건드릴 필요가 없습니다.
 #
 #   cp example-env .env
 #
 # 값을 바꾼 뒤에는 `docker compose up -d`로 컨테이너를 재생성해야 반영됩니다
-# (`docker compose restart`로는 환경변수 변경이 적용되지 않습니다). 이 파일이
-# 아예 없어도 정상 동작합니다(전부 기본값으로 실행).
-# code-docker 자체의 env 포맷은 webmanager와 달리 자주 바뀌지 않으므로, 이
-# 파일엔 .env.webmanager 같은 버전 관리/마이그레이션 도구가 없습니다 - 새 키가
-# 생기거나 없어져도 항상 기본값으로 안전하게 떨어집니다.
+# (`restart`로는 환경변수 변경이 적용되지 않습니다). 이 파일이 없어도 정상
+# 동작합니다(전부 기본값). code-docker 자체의 env 포맷은 webmanager와 달리 자주
+# 바뀌지 않으므로, 이 파일엔 .env.webmanager 같은 마이그레이션 도구가 없습니다 -
+# 새 키가 생기거나 없어져도 항상 기본값으로 안전하게 떨어집니다.
+
+# 아래 PREFIX/BUILD_CONTEXT/EXTRA_INCLUDE 셋은 컨테이너 안 환경변수가 아니라
+# docker-compose.yml 자체(이름 짓기/build.context/include:)에만 쓰입니다.
 
 # 여러 code-docker 인스턴스를 한 호스트에서 띄울 때 container_name/네트워크
-# 이름이 겹치지 않도록 붙이는 접두사입니다 (예: "foo" -> "foocode-docker",
-# "foocode-docker-internal", ...). 다른 값들과 달리 컨테이너 안 환경변수가
-# 아니라 docker-compose.yml 자체의 이름 짓기에만 쓰입니다.
+# 이름이 겹치지 않도록 붙이는 접두사입니다(예: "foo" -> "foocode-docker", ...).
 #PREFIX=""
 
 # docker-compose.yml을 레포지토리 바깥(예: ~/code-docker/)으로 복사해 쓰는
-# 경우의 빌드 컨텍스트 경로입니다. PREFIX와 마찬가지로 컨테이너 안 환경변수가
-# 아니라 build.context에만 쓰입니다. 기본값 "."은 이 파일이 레포지토리 바로
-# 안에 있다고 가정합니다 - README의 기본 사용법처럼 레포를 builds/code-docker
-# 로 클론했다면 docker-compose.yml을 직접 고치는 대신 여기서
-# BUILD_CONTEXT="builds/code-docker" 로 지정하세요.
+# 경우의 빌드 컨텍스트 경로입니다. 기본값 "."은 이 파일이 레포지토리 바로 안에
+# 있다고 가정합니다 - 레포를 builds/code-docker로 클론했다면 docker-compose.yml을
+# 직접 고치는 대신 여기서 BUILD_CONTEXT="builds/code-docker"로 지정하세요.
 #BUILD_CONTEXT="."
 
-# docker-compose.yml 최상위에 추가로 include할 Compose 파일 경로입니다. PREFIX/
-# BUILD_CONTEXT와 마찬가지로 컨테이너 안 환경변수가 아니라 docker-compose.yml
-# 자신의 include: 키에만 쓰입니다. 기본값 "empty-extra-include.yml"은 아무 것도
-# 안 하는 0바이트 빈 파일(레포에 커밋되어 있음)이라, 이 값을 안 건드리면 지금까지와
-# 완전히 동일하게 동작합니다. 로컬에서 다른 프로젝트(예: builds/ 아래 별도로
-# 클론한 프로젝트)를 이 프로젝트와 함께 띄우고 싶을 때만, 버전관리 대상이 아닌
-# 자신만의 extra-include.yml을 만들고 여기서 그 경로를 가리키세요 - 원본
-# docker-compose.yml은 전혀 건드리지 않아도 되므로 `git pull`과 절대 충돌하지
-# 않습니다. 구체적인 예시는 docs/tips/roblox-studio.md 참고.
+# docker-compose.yml 최상위에 추가로 include할 Compose 파일 경로입니다. 기본값
+# "empty-extra-include.yml"은 아무 것도 안 하는 0바이트 빈 파일(레포에 커밋되어
+# 있음)이라 안 건드리면 지금까지와 동일하게 동작합니다. 다른 프로젝트를 함께
+# 띄우고 싶을 때만, 버전관리 대상이 아닌 자신만의 extra-include.yml을 만들고
+# 여기서 그 경로를 가리키세요 - 원본은 건드리지 않으므로 `git pull`과 충돌하지
+# 않습니다. 예시는 docs/tips/roblox-studio.md 참고.
 #EXTRA_INCLUDE="empty-extra-include.yml"
 
 # EXTRA_INCLUDE로 붙인 프로젝트가 자기만의 `internal: true` 네트워크에 router를 끌어들일
@@ -43,24 +38,23 @@
 # `netinit.provider`/`netinit.exempt-forward: "true"` 라벨을 답니다 -
 # docs/tips/roblox-studio.md 참고.
 
-# netinit-docker(구 netfilter-fix) 이미지의 build context를 덮어씁니다. 기본값은
-# qwreey/router-docker-client의 원격 git URL이라 보통 건드릴 일이 없고, 그 도구를
-# 로컬 체크아웃에서 빌드해 시험할 때만 씁니다 (예:
+# netinit-docker 이미지의 build context를 덮어씁니다. 기본값은
+# qwreey/router-docker-client의 원격 git URL이라 보통 건드릴 일이 없고, 로컬
+# 체크아웃에서 빌드해 시험할 때만 씁니다(예:
 # NETINIT_DOCKER_CONTEXT=/path/to/router-docker-client/netinit-docker). 원격 git
-# context는 Docker가 캐시하므로, 업스트림이 바뀐 걸 반영하려면 --no-cache 재빌드가
-# 필요할 수 있습니다 - CLAUDE.md의 netshare 절 참고.
+# context는 Docker가 캐시하므로, 업스트림 변경을 반영하려면 --no-cache 재빌드가
+# 필요할 수 있습니다.
 #NETINIT_DOCKER_CONTEXT=""
 
-# qwreey/router-docker-client(netshare, dns-local, netinit-docker)를 어디서 가져올지
-# 정하는 *접두사*입니다. 기본값은 원격 git URL(`...router-docker-client.git#main:`)이고,
-# 로컬 체크아웃으로 개발할 때만 경로를 `/`로 끝나게 적습니다 - 뒤에 하위 디렉터리
-# 이름이 그대로 붙습니다. script/dev-clone.sh가 dev/에 clone한 뒤 이 줄을 출력해
-# 줍니다. 위 NETINIT_DOCKER_CONTEXT가 설정돼 있으면 netinit-docker만은 그쪽이
-# 우선합니다.
+# qwreey/router-docker-client(netshare, dns-local, netinit-docker)를 어디서
+# 가져올지 정하는 *접두사*입니다. 기본값은 원격 git URL이고, 로컬 체크아웃으로
+# 개발할 때만 경로를 `/`로 끝나게 적습니다 - 뒤에 하위 디렉터리 이름이 그대로
+# 붙습니다. script/dev-clone.sh가 dev/에 clone한 뒤 이 줄을 출력해 줍니다. 위
+# NETINIT_DOCKER_CONTEXT가 설정돼 있으면 netinit-docker만은 그쪽이 우선합니다.
 #ROUTER_CLIENT_SOURCE="./dev/router-docker-client/"
 
-# 코어 의존물의 버전 핀. 예전엔 git submodule이 커밋을 고정해 줬는데, 이제는 각
-# 저장소를 원격에서 직접 가져오므로 그 고정을 이 태그들이 대신합니다. 기본값은
+# 코어 의존물(router-docker, dind-authz-docker, code-server-autoinstall)의 버전
+# 핀입니다 - 각 저장소를 원격에서 직접 가져오는 태그입니다. 기본값은
 # docker-compose.yml에 있고(보통 비워두면 됩니다), code-docker를 업데이트하면
 # 검증된 태그로 같이 올라갑니다. 다른 태그나 브랜치(`main`)를 시험할 때만 적으세요 -
 # 브랜치로 두면 Docker/Compose가 받은 걸 캐시하므로, 새 커밋을 반영하려면
@@ -76,23 +70,18 @@
 #DIND_CONTEXT="./dev/dind-authz-docker"
 #AUTOINSTALL_SOURCE="./dev/code-server-autoinstall"
 
-# code-docker-internal/external 두 네트워크의 enable_ipv6를 한 번에
-# 켭니다. PREFIX/BUILD_CONTEXT와 마찬가지로 컨테이너 안 환경변수가 아니라
-# docker-compose.yml의 네트워크 정의에만 쓰입니다. 도커 엔진 자체의 ipv6
-# 지원(daemon.json의 ipv6/fixed-cidr-v6 등)이 먼저 켜져 있어야 의미가
-# 있습니다 - 엔진 지원 없이 이 값만 켜면 네트워크 생성이 실패합니다.
+# code-docker-internal/external 두 네트워크의 enable_ipv6를 한 번에 켭니다.
+# PREFIX/BUILD_CONTEXT와 마찬가지로 docker-compose.yml의 네트워크 정의에만
+# 쓰이고, 컨테이너 안 환경변수는 아닙니다. 도커 엔진 자체의 ipv6 지원
+# (daemon.json의 ipv6/fixed-cidr-v6 등)이 먼저 켜져 있어야 의미가 있습니다 - 엔진
+# 지원 없이 이 값만 켜면 네트워크 생성이 실패합니다.
 #
-# 이 값을 켜면 netgate(router-docker의 config/netgate/firewall.default.sh,
-# https://github.com/qwreey/router-docker)가 IPv6이
-# 실제로 붙어있는 걸 감지해 ip6tables로 고정 차단 세트(fc00::/7 ULA,
-# fe80::/10 link-local, ::1/128 loopback) + outbound: 안의 v6 CIDR 항목만
-# 미러링합니다 - forwards:/bandwidth:는 v6으로 미러링되지 않고,
-# config.default.yaml 자체도 아직 v4 CIDR만 지원합니다. ip6tables가 없거나
-# 규칙 적용이 실패하면 `docker compose logs`에 반복되는 큰 경고 블록이
-# 뜹니다(조용히 넘어가지 않음). 자세한 커버리지는
-# router-docker의 docs/egress-netgate.md
-# (https://github.com/qwreey/router-docker/blob/HEAD/docs/egress-netgate.md)의
-# "IPv6" 절 참고. 가장 단순하고 안전한
+# 켜면 netgate(router-docker)가 IPv6이 붙어있는 걸 감지해 ip6tables로 고정 차단
+# 세트(fc00::/7 ULA, fe80::/10 link-local, ::1/128 loopback) + outbound: 안의 v6
+# CIDR 항목만 미러링합니다 - forwards:/bandwidth:는 미러링되지 않고,
+# config.default.yaml도 아직 v4 CIDR만 지원합니다. ip6tables가 없거나 규칙 적용이
+# 실패하면 `docker compose logs`에 큰 경고 블록이 반복해서 뜹니다(조용히 넘어가지
+# 않음). 커버리지는 docs/egress-netgate.md의 "IPv6" 절 참고. 가장 단순하고 안전한
 # 기본값은 여전히 이 값을 켜지 않는 것입니다.
 #ENABLE_IPV6="false"
 
@@ -100,122 +89,98 @@
 #PWA_NAME="code-docker"
 #PWA_SHORT_NAME="code-docker"
 
-# code-server 자체 manifest.json의 display 필드를 덮어씁니다
-# (code-server-autoinstall의 start.sh에 있는 apply_pwa_metadata_patch가 PWA_NAME/
-# PWA_SHORT_NAME/PWA_ICON_PREFIX와 똑같은 방식으로, 설치된 code-server의
-# manifest 라우트에 직접 patch합니다). code-server 업스트림의 원본 manifest는
-# "fullscreen"으로 고정되어 있지만, code-docker는 기본값을 "standalone"으로
-# 바꿔서 patch합니다 - Termux/Termix 등 일반적인 개발용 앱들이 보통 풀스크린으로
-# 뜨지 않는 것과 같은 이유이기도 하고, 일부 Android PWA 셸에서는 진짜
-# "fullscreen"일 때 시스템 상태바(시계 포함)와 code-server 자체 상단 메뉴까지
-# 함께 숨겨져서 위에서 아래로 쓸어내려 상태바를 꺼내야만 메뉴가 같이 나타나는
-# 문제도 있기 때문입니다. 진짜 풀스크린을 원한다면 이 값을 "fullscreen"으로
-# 켜서 opt-in 하세요. 브라우저는 "홈 화면에 추가" 하는 그 순간에만 manifest를
-# 읽으므로, 이미 설치된 앱이 있다면 값을 바꿔도 소급 적용되지 않습니다 -
-# 삭제 후 다시 추가해야 새 값이 반영됩니다.
+# code-server 자체 manifest.json의 display 필드를 덮어씁니다(start.sh의
+# apply_pwa_metadata_patch가 PWA_NAME/PWA_SHORT_NAME과 같은 방식으로 patch).
+# 업스트림 원본은 "fullscreen"으로 고정되어 있지만, code-docker는 기본값을
+# "standalone"으로 바꿔 patch합니다 - 일부 Android PWA 셸은 진짜 "fullscreen"일 때
+# 시스템 상태바(시계 포함)와 code-server 상단 메뉴까지 함께 숨겨져서, 쓸어내려
+# 상태바를 꺼내야만 메뉴가 같이 나타나는 문제가 있기 때문입니다. 진짜 풀스크린을
+# 원하면 "fullscreen"으로 opt-in 하세요. 브라우저는 "홈 화면에 추가" 하는 순간에만
+# manifest를 읽으므로, 이미 설치된 앱은 값을 바꿔도 소급 적용되지 않습니다 - 삭제
+# 후 다시 추가해야 반영됩니다.
 #PWA_DISPLAY_MODE="fullscreen"
 
 # 호스트에 마운트할 볼륨 경로. 기본은 저장소 안 ./data/code, ./data/sshd,
-# ./data/dind 등 - 개발용으로 받아두는 소스 체크아웃(dev/dind-authz-docker/,
-# dev/router-docker/, ...)과 헷갈리지 않도록
-# 런타임 데이터는 전부 data/ 아래 모아둡니다. 다른 위치(다른 디스크, 여러
-# 인스턴스 간 공유 등)를 쓰고 싶을 때만 바꾸세요.
+# ./data/dind 등 - 개발용 소스 체크아웃(dev/dind-authz-docker/, dev/router-docker/,
+# ...)과 헷갈리지 않도록 런타임 데이터는 전부 data/ 아래 모아둡니다. 다른
+# 위치(다른 디스크, 여러 인스턴스 간 공유 등)를 쓰고 싶을 때만 바꾸세요.
 #DIND_VOLUME="./data/dind"
 #HOME_VOLUME="./data/code"
 #SSHD_VOLUME="./data/sshd"
 #ROUTER_VOLUME="./data/router"
 
 # dind-authz(아래 DIND_TARGET 참고)의 실시간 conf.d 정책 디렉토리입니다. 반드시
-# code-docker(HOME_VOLUME/`/code`)와 다른 경로여야 합니다 - code-docker 자신이
-# 이 정책을 고칠 수 있으면 dind-authz를 켜는 의미가 없어집니다. 도커 호스트
-# 자체에 파일시스템 접근 권한이 있는 사람만 이 디렉토리를 건드릴 수 있어야
-# 합니다.
+# code-docker(HOME_VOLUME/`/code`)와 다른 경로여야 합니다 - code-docker 자신이 이
+# 정책을 고칠 수 있으면 dind-authz를 켜는 의미가 없어집니다. 도커 호스트 자체에
+# 파일시스템 접근 권한이 있는 사람만 이 디렉토리를 건드릴 수 있어야 합니다.
 #DIND_AUTHZ_VOLUME="./data/dind-authz"
 
-# Timezone for all processes in the container (glibc reads this
-# directly via tzdata, already installed - no /etc/localtime symlink
-# needed). Empty means UTC. e.g. "Asia/Seoul". Named CODE_TZ, not TZ -
-# script/entrypoint.sh re-exports it as the real TZ once the container starts
-# (see docker-compose.yml's own comment): keeping the .env-side name off TZ
-# means your own shell's TZ (if it happens to have one exported) can never
-# silently outrank this value the way Compose's ${VAR} substitution otherwise
-# would.
+# Timezone for all processes (glibc reads this directly via tzdata, already
+# installed - no /etc/localtime symlink needed). Empty means UTC, e.g. "Asia/Seoul".
+# Named CODE_TZ, not TZ - entrypoint.sh re-exports it as the real TZ once the
+# container starts: keeping the .env-side name off TZ means your own shell's TZ (if
+# exported) can never silently outrank this the way Compose's ${VAR} otherwise would.
 #CODE_TZ=""
 
-# Locale for all processes (glibc LANG format, e.g. "ko_KR.UTF-8"). Same
-# CODE_-prefixed/entrypoint-re-exported deal as CODE_TZ above. Left unset -
-# the base image already behaves reasonably (C.UTF-8) without it. Anything
-# beyond C.UTF-8 needs locale-gen at build time (see build.*.sh override),
-# which this image doesn't do by default.
+# Locale (glibc LANG format, e.g. "ko_KR.UTF-8"). Same CODE_-prefixed/
+# entrypoint-re-exported deal as CODE_TZ. Left unset - the base image already
+# behaves reasonably (C.UTF-8). Anything beyond that needs locale-gen at build time
+# (see build.*.sh override), which this image doesn't do by default.
 #CODE_LANG=""
 
-# Add docker in docker host. Uses the internal-only alias (not the plain
-# "code-docker-dind" service name) - dind only actually listens on its
-# code-docker-internal IP, and if you ever restore code-docker-external on
-# code-docker (see NETGATE_ENABLED above) the bare service name becomes
-# ambiguous again (registered in both networks' DNS zones). Only change
-# this if you want code-docker to talk to a different (or external) docker
-# daemon instead of the bundled dind sidecar.
+# Uses the internal-only "dind" alias, not the plain "code-docker-dind" service
+# name - dind only listens on its code-docker-internal IP, and if
+# code-docker-external is ever restored on code-docker (see NETGATE_ENABLED) the
+# bare service name becomes ambiguous (registered in both networks' DNS zones).
+# Only change this to talk to a different (or external) docker daemon.
 #DOCKER_HOST="tcp://dind:2375"
 
 # dind가 실제로 빌드/실행할 Dockerfile 스테이지입니다.
-#   dind        - 보호 없음 (예전 기본 동작 그대로)
-#   dind-authz  - 기본값. dind가 만드는 컨테이너에 privileged, 허용 목록 밖
-#     CapAdd, seccomp/apparmor 비활성화, pid/network/ipc/cgroupns=host, 디바이스
-#     패스스루, /code 밖 bind mount 소스를 거부하는 authz 플러그인을 내장.
-#     자세한 설계는 dind-authz-docker의 .claude/dind-authz-plan.md
-#     (https://github.com/qwreey/dind-authz-docker/blob/HEAD/.claude/dind-authz-plan.md) 참고.
-#   dind-authz-remap - dind-authz에 더해 userns-remap까지 적용 (dind가 만드는
-#     컨테이너의 root가 호스트에서는 비특권 UID로 매핑). 기본값 아님 - LXC 등
-#     중첩 가상화 호스트와 궁합이 안 좋을 수 있고, /code 아래 bind mount
-#     쓰기가 기본적으로 막힙니다(named volume을 쓰거나 대상 디렉토리를
-#     `docker exec code-docker-dind chown -R 165536:165536 <path>`로 미리
-#     소유권을 옮겨야 함) - docs/tips/dind.md의 "추가 경화" 절 참고.
+#   dind        - 보호 없음
+#   dind-authz  - 기본값. dind가 만드는 컨테이너에 privileged, 허용 목록 밖 CapAdd,
+#     seccomp/apparmor 비활성화, pid/network/ipc/cgroupns=host, 디바이스 패스스루,
+#     /code 밖 bind mount 소스를 거부하는 authz 플러그인을 내장. 설계는
+#     dind-authz-docker의 .claude/dind-authz-plan.md 참고.
+#   dind-authz-remap - dind-authz에 더해 userns-remap까지 적용(컨테이너의 root가
+#     호스트에서는 비특권 UID로 매핑). 기본값 아님 - LXC 등 중첩 가상화 호스트와
+#     궁합이 안 좋을 수 있고, /code 아래 bind mount 쓰기가 기본적으로 막힙니다
+#     (named volume을 쓰거나 대상 디렉토리 소유권을 미리 옮겨야 함) -
+#     docs/tips/dind.md의 "추가 경화" 절 참고.
 #DIND_TARGET="dind-authz"
 
-# code-docker/code-docker-dind/code-docker-router 각 컨테이너의 CPU/메모리 상한입니다.
-# 컨테이너 안 프로세스(빌드, 에이전트, 혹은 dind 안에서 띄운 중첩 컨테이너)가
-# 호스트 자원을 무제한으로 소비하는 걸 막기 위한 것입니다 - docker-compose.yml의
-# deploy.resources.limits로 반영되며, docker compose는 swarm이 아니어도 이 값을
-# 그대로 `docker run --cpus/--memory`에 적용합니다.
+# code-docker/code-docker-dind/code-docker-router 각 컨테이너의 CPU/메모리
+# 상한입니다 - 컨테이너 안 프로세스가 호스트 자원을 무제한 소비하는 걸 막기 위한
+# 것으로, docker-compose.yml의 deploy.resources.limits로 반영됩니다.
 #
-# 기본값은 전부 "0"이고, Docker/Compose는 0을 "제한 없음"으로 취급합니다(직접
-# 확인: 값이 0이면 docker-compose.yml의 deploy.resources.limits 블록 자체가
-# 비워져서 나가고, `docker inspect`로 봐도 Memory=0/NanoCpus=0으로 - 지금까지와
-# 동일하게 무제한으로 동작합니다). 즉 이 파일을 안 건드리면 기존 동작이 전혀
-# 바뀌지 않고, 필요할 때만 아래처럼 값을 채우면 됩니다.
-#
-# CPU는 코어 개수(소수점 가능, 예: "2", "0.5"), 메모리는 단위 접미사 포함
-# 문자열(예: "4g", "512m")입니다. 예를 들어 code-docker를 4코어/4GB로 제한하려면:
+# 기본값은 전부 "0" = 제한 없음(0이면 deploy.resources.limits 블록 자체가
+# 비워져서 나갑니다). CPU는 코어 개수(소수점 가능), 메모리는 단위 접미사 포함
+# 문자열입니다. 예: code-docker를 4코어/4GB로 제한하려면
 #   CODE_CPU_LIMIT="4"
 #   CODE_MEM_LIMIT="4g"
 #CODE_CPU_LIMIT="0"
 #CODE_MEM_LIMIT="0"
 # 중첩 컨테이너(redis, postgres 등)를 포함해 dind 데몬 전체가 공유하는 상한입니다 -
-# dind 안에서 띄운 컨테이너 하나하나가 아니라 dind 자체의 cgroup에 적용됩니다.
+# dind 안 컨테이너 하나하나가 아니라 dind 자체의 cgroup에 적용됩니다.
 #DIND_CPU_LIMIT="0"
 #DIND_MEM_LIMIT="0"
-# router는 host 80번 포트를 직접 받는 인터넷 대면 컨테이너이므로, 외부에서의
-# 플러딩/DoS가 호스트 자원까지 잠식하지 않도록 하려면 이 값도 같이 설정하세요.
+# router는 host 80번 포트를 직접 받는 인터넷 대면 컨테이너이므로, 외부
+# 플러딩/DoS가 호스트 자원까지 잠식하지 않도록 이 값도 같이 설정하세요.
 #ROUTER_CPU_LIMIT="0"
 #ROUTER_MEM_LIMIT="0"
 
-# tailscale, Dev Proxy 노출 정책, router-manager 자체 비밀번호, tinyauth
-# 등 router 전용 기능 설정은 router-docker의 example-env.router로 옮겨졌습니다 -
-# router가 더 이상 submodule이 아니라 태그로 고정된 원격 참조라 이 체크아웃 안에는
-# 없고, `ootb.sh`가 핀된 태그 기준으로 받아 .env.router로 저장해줍니다(위 "코어
-# 의존물의 버전 핀" 참고) - 이 파일과 별도로 `router-manager
-# --env-migrate`로 마이그레이션됩니다. 여기 남은 ALLOWED_HOSTS류는
-# code-docker와 값을 공유하기 때문에 그대로 남아있습니다.
+# tailscale, Dev Proxy 노출 정책, router-manager 자체 비밀번호, tinyauth 등
+# router 전용 기능 설정은 router-docker의 example-env.router로 옮겨졌습니다 - router가
+# 태그로 고정된 원격 참조라 이 체크아웃 안에는 없고, `ootb.sh`가 핀된 태그 기준으로
+# 받아 .env.router로 저장해줍니다(위 "코어 의존물의 버전 핀" 참고) - 이 파일과
+# 별도로 `router-manager --env-migrate`로 마이그레이션됩니다. 여기 남은
+# ALLOWED_HOSTS류는 code-docker와 값을 공유하기 때문에 그대로 남아있습니다.
 
-# Dev Proxy's internal Caddy instance runs on router (see router-docker's own
-# .claude/functional-router-plan.md's "Dev Proxy Caddy도 router로
-# 이관", dev/router-docker/.claude/functional-router-plan.md locally) - only router itself reads these, code-docker's nginx doesn't proxy
-# to Caddy at all (router's own nginx does, over a unix socket, regardless
-# of CADDY_ADAPTER_PORT - see docs/dev-proxy.md). CADDY_ADAPTER_PORT has no
-# default - leave it unset to keep caddy-adapter unix-socket-only, or set
-# it to also bind a TCP port (docs/dev-proxy.md's direct-publish
-# alternative; you'd then need to add `ports:` for it yourself too).
+# Dev Proxy's internal Caddy instance runs on router - only router itself reads
+# these, code-docker's nginx never proxies to Caddy (router's own nginx does, over a
+# unix socket, regardless of CADDY_ADAPTER_PORT - see docs/dev-proxy.md).
+# CADDY_ADAPTER_PORT has no default - leave it unset to keep caddy-adapter
+# unix-socket-only, or set it to also bind a TCP port (docs/dev-proxy.md's
+# direct-publish alternative; you'd then need to add `ports:` for it yourself too).
 #CADDY_ADAPTER_ENABLED="true"
 #CADDY_ADAPTER_PORT=
 
@@ -231,45 +196,35 @@
 #   all - log every request, combined format (the old behavior).
 #NGINX_LOG_LEVEL="errors"
 
-# code-server's actual bind address, default "127.0.0.1:8080" - loopback,
-# because the in-container nginx is the only thing meant to reach it
-# (code-server has no login). code-runner.default.sh passes this as a
-# --bind-addr CLI arg, which code-server treats as overriding whatever's in
-# config.yaml, so this env var, not that file, is the supported way to change
-# it. nginx's upstream follows this value automatically
-# (nginx-service.default.sh).
+# code-server's actual bind address, default "127.0.0.1:8080" - loopback, because
+# the in-container nginx is the only thing meant to reach it (code-server has no
+# login). code-runner.default.sh passes this as a --bind-addr CLI arg, overriding
+# config.yaml, so this env var is the supported way to change it; nginx's upstream
+# follows it automatically (nginx-service.default.sh).
 #CODE_SERVER_BIND_ADDR="127.0.0.1:8080"
 
-# code-server's own port-proxy routes (/proxy/<port>/, /absproxy/<port>/ and
-# the *.<proxy-domain> variants) are DISABLED by default - that default is
-# set by code-server-autoinstall's start.sh (CS_DISABLE_PROXY is
-# code-server's own env var; it just defaults it to 1 when unset), not by
-# code-docker, which only passes this value through to it.
+# code-server's own port-proxy routes (/proxy/<port>/, /absproxy/<port>/, and the
+# *.<proxy-domain> variants) are DISABLED by default - set by
+# code-server-autoinstall's start.sh (CS_DISABLE_PROXY is code-server's own env var,
+# defaulted to 1), not by code-docker, which just passes this value through.
 #
-# Those routes proxy to *any* port listening inside this container, guarded
-# by nothing but code-server's own auth - which here is `auth: none` (see
-# docs/security-login.md). Left on, anything that can reach code-server can
-# reach every port inside the container, including the ones VS Code's PORTS
-# tab auto-forwards as soon as a dev server starts listening. Expose what
-# you actually want reachable through router's Dev Proxy / App Routes
-# instead (router-docker's own docs/dev-proxy.md, docs/app-routes.md -
-# https://github.com/qwreey/router-docker/blob/HEAD/docs/), which have
-# their own exposure policy and auth.
+# Those routes proxy to *any* port listening inside this container, guarded by
+# nothing but code-server's own auth - `auth: none` here (docs/security-login.md).
+# Left on, anything that can reach code-server can reach every port inside the
+# container, including whatever VS Code's PORTS tab auto-forwards. Expose what you
+# actually want through router's Dev Proxy / App Routes instead (docs/dev-proxy.md,
+# docs/app-routes.md), which have their own exposure policy and auth.
 #
-# Set 0 (or anything code-server doesn't read as truthy - it matches
-# /^(1|true)$/) to restore upstream code-server behavior, proxy enabled.
-# Note this can only be changed here, not in code-config.*.yaml: code-server
-# reads any boolean key present in that file as true, so `disable-proxy:
-# false` there would still disable it.
+# Set 0 (anything not matching /^(1|true)$/) to restore upstream behavior. Can only
+# be changed here, not in code-config.*.yaml: code-server reads any boolean key
+# present there as true, so `disable-proxy: false` there would still disable it.
 #
-# This gates the proxy ROUTES only. VS Code's workbench still auto-detects
-# and forwards ports, so the PORTS tab and its notifications keep showing up
-# - they just can't be reached. That half is the `remote.autoForwardPorts`
-# workbench setting, which code-docker seeds as false via
-# config/code/settings.default.json (docs/build-customization.md). If this
-# container was first started before that default existed, its settings.json
-# already exists and won't be touched - the startup log says so and names
-# the key.
+# Gates the proxy ROUTES only - VS Code's workbench still auto-detects and forwards
+# ports, so the PORTS tab keeps showing up, just unreachable. That half is the
+# `remote.autoForwardPorts` workbench setting, seeded false via
+# config/code/settings.default.json - a container started before that default
+# existed already has a settings.json and won't have it touched (the startup log
+# says so and names the key).
 #CS_DISABLE_PROXY="1"
 
 # code-server 버전 고정. 비워두면(기본) 컨테이너가 뜰 때마다(1시간에 한 번까지)
@@ -285,154 +240,118 @@
 # Needs code-server over HTTPS (or localhost); see docs/webmanager.md.
 #CODE_WEBMANAGER_EXTENSION="true"
 
-# Comma-separated allowlist of Host header values the in-container nginx
-# will accept on port 80 (e.g. "code.yaeji.moe" or "code.yaeji.moe,
-# 192.168.1.50"), no scheme/port. Empty (default) disables the check
-# entirely - current behavior, any Host is accepted.
+# Comma-separated allowlist of Host header values the in-container nginx will
+# accept on port 80 (e.g. "code.yaeji.moe" or "code.yaeji.moe, 192.168.1.50"), no
+# scheme/port. Empty (default) disables the check, any Host accepted.
 #
-# This is a best-effort backstop against incidentally reaching this
-# container's directly-published port 80 without going through your
-# intended reverse proxy (e.g. an internet scanner hitting the host IP
-# directly) - it is NOT spoof-proof, since Host is a client-controlled
-# header a deliberate attacker who already knows your domain can just set
-# themselves.
+# Best-effort backstop against incidentally reaching this container's
+# directly-published port 80 without going through your intended reverse proxy
+# (e.g. an internet scanner hitting the host IP directly) - NOT spoof-proof, since
+# Host is a client-controlled header an attacker who knows your domain can set.
 #ALLOWED_HOSTS=""
 
-# webmanager의 File share(WebDAV) 전용 nginx 리스너 포트. 기본 82.
-#
-# 이 포트에서는 /webdav 외의 모든 경로가 404입니다. router vhost로 공유에
-# 전용 호스트네임을 주기 위해 존재합니다:
+# webmanager의 File share(WebDAV) 전용 nginx 리스너 포트. 기본 82. 이 포트에서는
+# /webdav 외 모든 경로가 404입니다. router vhost로 공유에 전용 호스트네임을 주기
+# 위해 존재합니다:
 #
 #   ROUTER_VHOST_WEBDAV="dav.example.com=code-docker:82"
 #
 # vhost의 upstream은 경로 없는 host[:port]라서, 포트 80을 가리키면 그
-# 호스트네임에 code-server까지 같이 노출됩니다. 그래서 별도 포트입니다.
-# 이 컨테이너는 호스트 포트를 하나도 게시하지 않으므로(docker-compose.yml)
-# 이 포트는 code-docker-internal 안에서만 닿습니다. 공유 자체가 기본 꺼짐이라
-# webmanager의 File share 탭에서 켜기 전까지는 계속 404만 돌려줍니다.
-# 자세한 건 docs/tips/webdav.md.
+# 호스트네임에 code-server까지 같이 노출됩니다 - 그래서 별도 포트입니다. 이
+# 컨테이너는 호스트 포트를 게시하지 않으므로 이 포트는 code-docker-internal
+# 안에서만 닿습니다. 공유 자체가 기본 꺼짐이라 webmanager의 File share 탭에서
+# 켜기 전까지는 404만 돌려줍니다. 자세한 건 docs/tips/webdav.md.
 #NGINX_WEBDAV_PORT="82"
 
-# Comma-separated IP/CIDR list of upstream reverse proxies (e.g. your
-# external Caddy's container/host IP) whose X-Forwarded-For header nginx
-# should trust to determine the real client IP - otherwise $remote_addr
-# (used in access logs and anything downstream that reads it) is just the
-# proxy's own IP. Empty (default) disables this - current behavior
-# unchanged.
+# Comma-separated IP/CIDR list of upstream reverse proxies (e.g. your external
+# Caddy's container/host IP) whose X-Forwarded-For header nginx should trust to
+# determine the real client IP - otherwise $remote_addr is just the proxy's own
+# IP. Empty (default) disables this.
 #TRUSTED_PROXIES=""
 
-# vector's own internal diagnostic log level (its startup/healthcheck/
-# file-watch chatter - "Loading configs", "Vector has started",
-# "Starting file server", "Loaded checkpoint data", etc). Doesn't
-# touch the actual log pipeline data it carries (other programs'
-# re-emitted stdout, /code/.local/share/code-docker/vector/logs/*.jsonl) -
-# see vector.default.toml for that. "warn" mirrors nginx's own
-# `error_log ... warn;` above. Use "error" for even quieter, or
-# "info"/"debug" to restore the old chatter.
+# vector's own internal diagnostic log level (startup/healthcheck/file-watch
+# chatter). Doesn't touch the actual log pipeline data it carries (other programs'
+# re-emitted stdout, /code/.local/share/code-docker/vector/logs/*.jsonl) - see
+# vector.default.toml for that. "warn" mirrors nginx's own `error_log ... warn;`
+# above; "error" for quieter, "info"/"debug" for more chatter.
 #VECTOR_LOG_LEVEL="warn"
 
-# Path `webmanager --env-migrate`/the startup version-mismatch check read
-# the current example-env.webmanager template from. Left unset to use the
-# image's own copy. Deliberately not settable via .env.webmanager itself -
-# that file is what gets migrated using this template, so pointing to it
-# from inside would be self-referential (this top-level .env is a
-# different file, so setting it here is fine).
-# If you run multiple instances and want to enforce your own org policy
-# (e.g. #!important-forced keys), bind-mount a custom template over this
-# path instead of changing it - add this under docker-compose.yml's
-# `volumes:` section for the code-docker service:
+# Path `webmanager --env-migrate`/the startup version-mismatch check reads the
+# current example-env.webmanager template from. Left unset to use the image's own
+# copy. Not settable via .env.webmanager itself - that file is what gets migrated
+# using this template, so pointing to it from inside would be self-referential.
+# To enforce your own org policy (e.g. #!important-forced keys) across multiple
+# instances, bind-mount a custom template over this path instead - add under
+# docker-compose.yml's code-docker `volumes:`:
 #   - ./custom-example-env.webmanager:/etc/code-docker/webmanager/example-env.webmanager:ro
 #WEBMANAGER_ENV_TEMPLATE_PATH="/etc/code-docker/webmanager/example-env.webmanager"
 
-# 바로 위 WEBMANAGER_ENV_TEMPLATE_PATH와 완전히 같은 패턴이지만
-# router-manager(`router` 컨테이너)의 example-env.router 쪽입니다 -
-# `router-manager --env-migrate`/시작 시 버전 불일치 검사가 여기서 최신
-# example-env.router 템플릿을 읽습니다. 마찬가지로 .env.router
-# 자신에는 설정할 수 없습니다(자기 자신을 마이그레이션할 템플릿을 자기
-# 안에서 가리키면 자기참조가 되므로) - 이 값은 저장소 루트의 이 파일(.env)에서만
-# 설정합니다. 조직 커스텀 템플릿을 강제하고 싶다면 이 경로에 볼륨을
-# 바인드 마운트하세요 - docker-compose.yml의 code-docker-router 서비스
-# `volumes:`에 아래처럼 추가:
+# 바로 위 WEBMANAGER_ENV_TEMPLATE_PATH와 같은 패턴이지만 router-manager의
+# example-env.router 쪽입니다. 마찬가지로 .env.router 자신에는 설정할 수
+# 없습니다(자기참조가 되므로) - 이 값은 이 파일(.env)에서만 설정합니다. 조직 커스텀
+# 템플릿을 강제하려면 이 경로에 볼륨을 바인드 마운트하세요 -
+# docker-compose.yml의 code-docker-router `volumes:`에 아래처럼 추가:
 #   - ./custom-example-env.router:/etc/router/example-env.router:ro
 #ROUTER_ENV_TEMPLATE_PATH="/etc/router/example-env.router"
 
-# 아웃바운드 네트워크 격리(egress lockdown) 관련 설정입니다. 자세한 설계는
-# .claude/backlog/egress-netgate-plan.md, 사용자 문서는 docs/egress-netgate.md
-# 참고. code-docker/dind는 code-docker-external에 더 이상 직접 붙지 않고,
-# code-docker-netinit-docker(호스트측 라벨 기반 에이전트, .claude/backlog/
-# netinit-docker-plan.md 참고. 및 dind 자신)가 계속 심어주는 기본 라우트를 통해
-# code-docker-router 서비스(실제 필터링/포트포워딩을 담당)를 거쳐서만 나갈 수
-# 있습니다.
+# 아웃바운드 네트워크 격리(egress lockdown) 설정입니다. 사용자 문서
+# docs/egress-netgate.md, 설계 배경 .claude/archive/egress-netgate-plan-done.md 참고.
+# code-docker/dind는 code-docker-external에 직접 붙지 않고, netinit-docker(호스트측
+# 라벨 기반 에이전트, .claude/archive/netinit-docker-plan-done.md 참고) 및 dind
+# 자신이 심어주는 기본 라우트를 통해서만 code-docker-router를 거쳐 나갑니다.
 #
-# "false"로 끄면 dind의 라우팅 루프, code-docker의 entrypoint 대기 가드(정확히는
-# 아래 NETINIT_WAIT의 기본값이 이 값을 따라갑니다),
-# code-docker-router 자신의 방화벽(CIDR 차단/인바운드 포트포워딩) 적용 루프가
-# 아무것도 안 하고 idle 상태가 됩니다(기존 TAILSCALE_ENABLED와 같은 패턴) -
-# router 컨테이너 자체나 DNS/tailscale/Dev Proxy/tinyauth 같은 다른 기능은
-# 계속 정상 동작합니다. code-docker-netinit-docker도 여기 포함됩니다 -
-# docker-compose.yml이 이 값을 그 컨테이너의 NETINIT_DOCKER_ENABLED로
-# 넘겨주기 때문입니다(netinit-docker는 router-docker-client의 범용 도구라 env
-# 이름이 자기 자신을 가리키고, 사용자 스위치 하나에 그걸 매핑하는 건
-# code-docker의 compose 파일입니다). 단 거기서 꺼지는 건 라우트 심기 절반뿐이고
-# DOCKER-USER 예외는 계속 유지됩니다 - 그건 netgate가 켜져 있는지와 무관하게
-# Docker 자신의 internal 네트워크 하드닝을 되돌리는 별개 작업입니다. 이건 이
-# 기능의 "동작"만 끄는 것이지 networks:의 code-docker-external 제거 자체나
-# ports:의 위치(code-docker가 아니라 code-docker-router에 있음)를 되돌리지는
-# 않습니다. Compose는 네트워크 attachment/포트 퍼블리시 여부를 런타임
-# 환경변수로 조건부 처리할 수 없어서, 완전히 예전(제한 없음) 토폴로지로
-# 되돌리려면 docker-compose.yml의 code-docker / code-docker-dind 두 서비스의
-# networks:에 `code-docker-external: {}`를 직접 다시 추가하고, code-docker의
-# ports:도 복구해야 합니다(`- 80:80`, `- 22:22`) - dind-authz를 완전히 끄고
-# 싶을 때 DIND_TARGET=dind로 명시적으로 바꾸는 것과 같은 성격의, 의도적으로
-# 눈에 띄는 수동 작업입니다. docs/egress-netgate.md의 "당장 인터넷이
-# 필요하다면" 절에 정확한 절차가 있습니다.
+# "false"로 끄면 dind의 라우팅 루프, code-docker의 entrypoint 대기 가드(아래
+# NETINIT_WAIT의 기본값도 이 값을 따라갑니다), router 자신의 방화벽 적용 루프,
+# netinit-docker의 NETINIT_DOCKER_ENABLED(docker-compose.yml이 이 값을 그대로
+# 넘겨줍니다)가 전부 idle 상태가 됩니다 - router 컨테이너 자체나
+# DNS/tailscale/Dev Proxy/tinyauth 등 다른 기능은 정상 동작합니다. DOCKER-USER
+# 예외는 이와 무관하게 계속 유지됩니다.
+#
+# networks:의 code-docker-external 제거나 ports:의 위치(code-docker-router에
+# 있음)는 되돌리지 않습니다 - Compose는 네트워크/포트 설정을 런타임 환경변수로
+# 조건화할 수 없으므로, 완전히 예전 토폴로지로 되돌리려면 docker-compose.yml에서
+# code-docker/code-docker-dind의 networks:에 `code-docker-external: {}`를 직접
+# 추가하고 code-docker의 ports:도 복구해야 합니다(`- 80:80`, `- 22:22`) - 정확한
+# 절차는 docs/egress-netgate.md의 "당장 인터넷이 필요하다면" 절 참고.
 #NETGATE_ENABLED="true"
 
-# code-docker가 "바깥에서 누가 내 기본 라우트를 심어줄 때까지" 기다릴지 여부와
-# 그 타임아웃(초)입니다. code-docker-netinit-docker는 컨테이너가 이미 뜬 뒤에야
-# 동작할 수 있으므로(호스트측 에이전트가 SandboxKey로 netns에 들어가는 구조),
-# 그 사이 code-docker가 라우트 없이 네트워크를 쓰는 창을 막기 위한 게이트입니다.
-# 타임아웃되면 non-zero로 종료해 restart: unless-stopped가 다시 시도하게 합니다
-# (라우트 없이 계속 돌지 않는 fail-closed).
+# code-docker가 "바깥에서 누가 내 기본 라우트를 심어줄 때까지" 기다릴지 여부와 그
+# 타임아웃(초)입니다. netinit-docker는 컨테이너가 이미 뜬 뒤에야 동작할 수 있으므로
+# (호스트측 에이전트가 SandboxKey로 netns에 들어가는 구조), 그 사이 code-docker가
+# 라우트 없이 네트워크를 쓰는 창을 막는 게이트입니다. 타임아웃되면 non-zero로
+# 종료해 restart: unless-stopped가 다시 시도하게 합니다(fail-closed).
 #
-# 이름이 NETGATE_* 가 아니라 NETINIT_* 인 이유: 이 동작의 주인은 범용 도구인
-# netinit-docker(router-docker-client)이고, roblox-studio-docker 등 다른
-# 클라이언트도 이미 같은 이름 쌍을 씁니다(env 이름은 구현자가 아니라 소유자를
-# 따른다는 기존 원칙). NETGATE_ENABLED는 "이 배포가 router를 거쳐 나가는가"라는
-# code-docker 자신의 스위치로 남습니다.
+# 이름이 NETGATE_*가 아니라 NETINIT_*인 이유: 이 동작의 주인은 범용 도구인
+# netinit-docker이고, roblox-studio-docker 등 다른 클라이언트도 같은 이름 쌍을
+# 씁니다(env 이름은 구현자가 아니라 소유자를 따릅니다). NETGATE_ENABLED는 "이
+# 배포가 router를 거쳐 나가는가"라는 code-docker 자신의 스위치로 남습니다.
 #
-# 기본값은 NETGATE_ENABLED를 그대로 따라갑니다 - 즉 아무것도 설정하지 않으면
-# 기다리고, NETGATE_ENABLED="false"만 설정해도 예전처럼 이 대기까지 같이
-# 꺼집니다. 둘을 각각 설정할 필요는 없고, netgate는 켜둔 채 대기만 끄고 싶은
-# (라우트를 다른 방법으로 심는) 특수한 경우에만 NETINIT_WAIT="false"를 씁니다.
+# 기본값은 NETGATE_ENABLED를 따라갑니다 - 아무것도 설정하지 않으면 기다리고,
+# NETGATE_ENABLED="false"만 설정해도 이 대기까지 같이 꺼집니다. netgate는 켜둔 채
+# 대기만 끄고 싶은 특수한 경우에만 NETINIT_WAIT="false"를 따로 씁니다.
 #NETINIT_WAIT=""
 #NETINIT_WAIT_TIMEOUT="60"
 
 # code-docker/code-docker-dind가 라우터를 찾을 때 쓰는 호스트네임입니다
 # (entrypoint.sh/dind-entrypoint.sh가 이 값으로 getent hosts를 호출).
-# code-docker-netinit-docker는 이 값을 쓰지 않습니다 - `netinit.gateway`
-# 라벨이 컨테이너 이름을 직접 받습니다(.claude/backlog/netinit-docker-plan.md
-# 참고). code-docker-router 서비스
-# 자신의 code-docker-internal 별칭도 이 값을 그대로 씁니다 - docker-compose.yml
-# 한 곳에서 같은 변수를 참조하므로 둘이 어긋날 일은 없습니다. PREFIX가 이미
-# 네트워크 자체를 인스턴스별로 분리해주므로(각 인스턴스가 별도
-# code-docker-internal을 가짐) 여러 인스턴스를 한 호스트에 띄우는 것만으로는
+# code-docker-netinit-docker는 이 값을 쓰지 않습니다 - `netinit.gateway` 라벨이
+# 컨테이너 이름을 직접 받습니다. code-docker-router 서비스 자신의
+# code-docker-internal 별칭도 이 값을 그대로 씁니다 - docker-compose.yml 한
+# 곳에서 같은 변수를 참조하므로 둘이 어긋날 일은 없습니다. PREFIX가 이미 네트워크
+# 자체를 인스턴스별로 분리해주므로 여러 인스턴스를 한 호스트에 띄우는 것만으로는
 # 바꿀 필요가 없습니다 - docker-compose.yml을 직접 손대지 않고 라우터 별칭
 # 이름을 다른 값으로 바꾸고 싶을 때만 설정하세요.
 #ROUTER_HOSTNAME="router"
 
-# router의 internal-source deny(/exports/ 의 ROUTER_NGINX_DENY_INTERNAL_EXPORTS,
-# router-manager 관리 API의 ROUTER_NGINX_DENY_INTERNAL_MANAGER)가 참조하는,
-# "울타리 안쪽" 네트워크의 CIDR입니다. 기본적으로 비워두면 router가 자기 라우팅
-# 테이블에서 직접 감지합니다(nginx-service.default.sh의 detect_internal_subnets)
-# - 기본 경로가 걸린 인터페이스(code-docker-external)를 제외한 **모든** 연결
-# 네트워크가 대상이므로, EXTRA_INCLUDE로 붙은 sibling 프로젝트의 네트워크까지
-# 자동으로 포함됩니다. code-docker-internal은 docker-compose.yml에 subnet이
-# 고정되어 있지 않고 Docker가 매번 자동 할당하므로(여러 PREFIX 인스턴스를 한
-# 호스트에 띄워도 서로 CIDR이 충돌하지 않도록), 감지가 곧 실제 값입니다. 직접
-# 설정해야 하는 경우는 그 전제가 깨지는 드문 상황뿐이며, 여러 개면 쉼표로
-# 구분합니다. router 시작 로그의 "internal-source deny covers:" 줄로 실제
-# 적용된 목록을 확인할 수 있습니다.
+# router의 internal-source deny(/exports/, router-manager 관리 API)가 참조하는
+# "울타리 안쪽" 네트워크의 CIDR입니다. 비워두면 router가 자기 라우팅 테이블에서
+# 직접 감지합니다(nginx-service.default.sh의 detect_internal_subnets) - 기본
+# 경로가 걸린 인터페이스(code-docker-external)를 제외한 **모든** 연결 네트워크가
+# 대상이므로 EXTRA_INCLUDE로 붙은 sibling 프로젝트의 네트워크도 자동 포함됩니다.
+# code-docker-internal은 subnet이 고정되어 있지 않고 Docker가 매번 자동
+# 할당하므로, 감지가 곧 실제 값입니다. 직접 설정해야 하는 경우는 그 전제가 깨지는
+# 드문 상황뿐이며, 여러 개면 쉼표로 구분합니다. router 시작 로그의
+# "internal-source deny covers:" 줄로 실제 적용된 목록을 확인할 수 있습니다.
 #ROUTER_INTERNAL_SUBNET=""
 
 # code-docker-router가 호스트에 퍼블리시하는 80번 포트의 바인딩 주소/포트입니다

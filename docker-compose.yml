@@ -1,34 +1,26 @@
-# Optional extra Compose file, included as-is into this project - lets a locally
-# cloned sibling project (e.g. builds/roblox-studio-docker, cloned the same way
-# builds/code-docker itself is per docs/index.md) attach its own services to
-# code-docker-internal/code-docker-router etc. without ever touching this file, so
-# `git pull` on this repo never conflicts with that local customization. Defaults to
-# empty-extra-include.yml, an intentionally-committed 0-byte file that's a total no-op
-# when included (confirmed by direct testing) - but Compose resolves `include: path:`
-# relative to wherever THIS file actually lives at runtime, not to this git repo, so in
-# the recommended split-directory deploy (docs/index.md: clone into builds/code-docker/,
-# copy this file out one level) that 0-byte file being committed in the repo is NOT
-# enough on its own - `docker compose` fails outright (even `config`, not just
-# `build`/`up`) unless empty-extra-include.yml also physically exists next to wherever
-# THIS docker-compose.yml was copied to. docs/index.md's setup steps include a `touch
-# empty-extra-include.yml` for exactly this reason - if that step is ever missing there,
-# that's a bug, not something this comment alone fixes. To actually use the mechanism:
-# create your own `extra-include.yml` (left out of version control - see .gitignore)
-# containing `include:\n  - path: builds/<your-project>/<its-own-integration-file>.yml`,
-# then set `EXTRA_INCLUDE=extra-include.yml` in `.env`. See
-# docs/tips/roblox-studio.md for the concrete roblox-studio-docker case this was built
-# for and verified against (2026-08-18).
+# Optional extra Compose file for a locally cloned sibling project (e.g.
+# builds/roblox-studio-docker) to attach its own services to
+# code-docker-internal/code-docker-router without ever touching this file. Defaults to
+# empty-extra-include.yml, a committed 0-byte no-op file. Compose resolves `include:
+# path:` relative to wherever THIS file lives at runtime, not to this git repo - in the
+# split-directory deploy (docs/index.md) empty-extra-include.yml must also physically
+# exist next to the copied docker-compose.yml, hence docs/index.md's `touch
+# empty-extra-include.yml` setup step.
 #
-# The second entry below is NOT the same mechanism, despite using the same `include:`
-# keyword - router is core, always-present topology (like NETGATE_ENABLED, it has a
-# behavioral opt-out but the service itself never goes away), not an optional sibling, so
-# it is always included rather than routed through EXTRA_INCLUDE. It is a *remote*
-# include of qwreey/router-docker pinned to a release tag (ROUTER_REF): Compose clones
-# it into ~/.cache/docker-compose/<commit sha>/ and resolves the fragment's own relative
-# paths (its `context: .`) from there. It must be a tag or branch, not a commit sha -
-# measured on Compose 5.5: a sha ref leaves an empty cache dir behind and fails with
-# `stat ... no such file`, for that sha from then on. ROUTER_INCLUDE points it at a
-# local checkout instead (dev/router-docker, see dev-clone.sh and example-env).
+# To use it: create your own `extra-include.yml` (gitignored) containing
+# `include:\n  - path: builds/<your-project>/<its-own-integration-file>.yml`, then set
+# `EXTRA_INCLUDE=extra-include.yml` in `.env`. See docs/tips/roblox-studio.md.
+#
+# The second entry below is NOT the same mechanism despite the shared `include:`
+# keyword - router is core, always-present topology (a behavioral opt-out via
+# NETGATE_ENABLED, but the service never goes away), so it's always included rather
+# than routed through EXTRA_INCLUDE. It's a *remote* include of qwreey/router-docker
+# pinned to a release tag (ROUTER_REF): Compose clones it into
+# ~/.cache/docker-compose/<commit sha>/ and resolves the fragment's relative paths
+# from there. Must be a tag or branch, not a commit sha - a sha ref leaves an empty
+# cache dir behind and fails with `stat ... no such file` from then on.
+# ROUTER_INCLUDE points it at a local checkout instead (dev/router-docker, see
+# dev-clone.sh and example-env).
 include:
   - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}
   - path: "${ROUTER_INCLUDE:-https://github.com/qwreey/router-docker.git#${ROUTER_REF:-v0.1.1}:docker-compose.router.yml}"
@@ -40,35 +32,27 @@ networks:
     # Read by code-docker-netinit-docker (see that service below). The gateway is
     # declared here, on the network, rather than on each workload: a container's
     # default route goes out whichever of its networks names a gateway, so a
-    # multi-network workload needs no per-container wiring, and a network that names
-    # no gateway (a VNC-only or otherwise isolated one) can never become an egress
-    # path just by having a workload attached to it. `netinit.gateway` takes a
-    # container name only - a raw IP is refused on purpose, since accepting arbitrary
-    # gateways would let one line here point a workload at a LAN gateway and hand the
-    # agents this whole design fences in a route to RFC1918.
+    # multi-network workload needs no per-container wiring, and a network that names no
+    # gateway can never become an egress path just by having a workload attached to it.
+    # `netinit.gateway` takes a container name only - a raw IP is refused on purpose,
+    # since accepting one would let a single line here point a workload at a LAN gateway
+    # and hand the agents this design fences in a route to RFC1918.
     labels:
       netinit.provider: "${PREFIX:-}code-docker-netinit-docker"
       netinit.gateway: "${PREFIX:-}code-docker-router"
-      # Replaces the old NETFILTER_FIX_INTERNAL_NETWORK env var - the DOCKER-USER
-      # exemption is a property of the network, so it is declared on the network.
       netinit.exempt-forward: "true"
     # Requires ipv6 support enabled in the docker engine daemon.json - see
     # example-env before enabling.
     enable_ipv6: ${ENABLE_IPV6:-false}
-    # Deliberately left on Docker's usual auto-assigned subnet (no ipam.config
-    # pin) - a hardcoded subnet here used to collide across multiple PREFIX
-    # instances on one host (each got its own network by name, but they all
-    # wanted the same fixed CIDR). router's own nginx needs this network's
-    # CIDR for its /exports/ internal-source deny (see ROUTER_INTERNAL_SUBNET
-    # below and router-docker's own .claude/router-nginx-hardening-plan.md,
-    # dev/router-docker/.claude/router-nginx-hardening-plan.md locally), but it now
-    # detects it live from its own routing table at startup instead of
-    # relying on a value pinned here - see nginx-service.default.sh's
-    # detect_internal_subnets - which, since 2026-09-14, denies EVERY network
-    # router is attached to other than the default-route one, so a sibling
-    # project's own networks (EXTRA_INCLUDE) are covered automatically. Set
-    # ROUTER_INTERNAL_SUBNET explicitly (comma-separated) only if that
-    # detection ever needs overriding.
+    # Deliberately left on Docker's usual auto-assigned subnet (no ipam.config pin) - a
+    # hardcoded subnet here collides across multiple PREFIX instances on one host, since
+    # they'd all want the same fixed CIDR. router's own nginx needs this network's CIDR
+    # for its /exports/ internal-source deny (see ROUTER_INTERNAL_SUBNET below); it
+    # detects the CIDR live from its own routing table at startup instead
+    # (nginx-service.default.sh's detect_internal_subnets), denying every network it's
+    # attached to other than the default-route one, so a sibling project's own networks
+    # (EXTRA_INCLUDE) are covered automatically. Set ROUTER_INTERNAL_SUBNET explicitly
+    # (comma-separated) only if that detection ever needs overriding.
   code-docker-external:
     name: "${PREFIX:-}code-docker-external"
     internal: false
@@ -78,13 +62,10 @@ services:
   code-docker:
     container_name: "${PREFIX:-}code-docker"
     hostname: code-docker
-    # Opt in to code-docker-netinit-docker (see that service, and the
-    # netinit.gateway label on code-docker-internal above). This replaces the
-    # old code-docker-netinit sidecar; the capability separation is unchanged
-    # - code-docker still never gets NET_ADMIN, the route is planted from
-    # outside its netns. script/entrypoint.sh already blocks until that route
-    # exists before starting supervisord, which is what keeps the agent from
-    # running during the window before the provider has acted.
+    # Opt in to code-docker-netinit-docker (see that service, and the netinit.gateway
+    # label on code-docker-internal above) for its default route. code-docker never
+    # gets NET_ADMIN of its own - the route is planted from outside its netns.
+    # script/entrypoint.sh blocks until that route exists before starting supervisord.
     labels:
       netinit.provider: "${PREFIX:-}code-docker-netinit-docker"
     build:
@@ -97,7 +78,7 @@ services:
       # own comment on why these are named contexts, not ADD). ROUTER_CLIENT_SOURCE is a
       # *prefix* - the git URL ending in `#main:` by default, a local checkout path
       # ending in `/` for development (script/dev-clone.sh prints the line) - so one
-      # variable covers every subdirectory, netinit-docker's build below included.
+      # variable covers every subdirectory, including netinit-docker's build below.
       additional_contexts:
         netshare: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#main:}netshare"
         dns-local: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#main:}dns-local"
@@ -112,18 +93,17 @@ services:
       # so we work around this by using the host network only at build time.
       network: host
     restart: unless-stopped
-    # What each of these does, its default, and how to override it all live
-    # in example-env (copy it to .env) - kept terse here to avoid
-    # documenting the same variable in two places.
+    # What each of these does, its default, and how to override it lives in
+    # example-env (copy it to .env) - kept terse here to avoid documenting the same
+    # variable twice.
     environment:
       PWA_NAME: "${PWA_NAME:-code-docker}"
       PWA_SHORT_NAME: "${PWA_SHORT_NAME:-code-docker}"
       PWA_DISPLAY_MODE: "${PWA_DISPLAY_MODE:-}"
-      # Named CODE_TZ/CODE_LANG here, not the bare TZ/LANG a shell would usually
-      # export - Compose's ${VAR:-default} substitution prefers a variable already
-      # exported in the shell invoking `docker compose` over the same-named value in
-      # .env, so a plain `TZ: "${TZ:-}"` here silently ignored .env's TZ/LANG on any
-      # host whose login shell already sets them (most do). script/entrypoint.sh
+      # Named CODE_TZ/CODE_LANG, not the bare TZ/LANG a shell would export - Compose's
+      # ${VAR:-default} prefers a variable already exported in the invoking shell over
+      # the same-named value in .env, so a plain `TZ: "${TZ:-}"` here would silently
+      # ignore .env's TZ on any host whose login shell already sets it. entrypoint.sh
       # re-exports these under the real TZ/LANG names for every process it starts.
       CODE_TZ: "${CODE_TZ:-}"
       CODE_LANG: "${CODE_LANG:-}"
@@ -145,77 +125,58 @@ services:
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
       WEBMANAGER_ENV_TEMPLATE_PATH: "${WEBMANAGER_ENV_TEMPLATE_PATH:-/etc/code-docker/webmanager/example-env.webmanager}"
-      # Egress lockdown (see .claude/backlog/egress-netgate-plan.md) - "false"
-      # turns the whole router/netgate behaviour off (entrypoint.sh's DNS
-      # bootstrap here, dind's own routing loop, netinit-docker's route
-      # planting). Does NOT restore code-docker-external/ports below - those
-      # are static compose topology and can't be conditioned on a runtime env
-      # var, see example-env.
+      # Egress lockdown - see example-env's own NETGATE_ENABLED entry for what this
+      # does. "false" does NOT restore code-docker-external/ports below - those are
+      # static compose topology and can't be conditioned on a runtime env var.
       NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
-      # netinit-docker's own name for "wait for an outside agent to plant my
-      # default route before starting the real workload" - the same pair
-      # roblox-studio-docker uses, since env names follow the owner of the
-      # behaviour (see entrypoint.sh's own comment). Passed through empty
-      # rather than defaulted here: entrypoint.sh falls back to
-      # NETGATE_ENABLED for it, so the existing single opt-out still works.
+      # netinit-docker's own name for "wait for an outside agent to plant my default
+      # route before starting the real workload" (see example-env). Passed through empty
+      # rather than defaulted here: entrypoint.sh falls back to NETGATE_ENABLED when
+      # unset, so the single documented opt-out still works.
       NETINIT_WAIT: "${NETINIT_WAIT:-}"
       NETINIT_WAIT_TIMEOUT: "${NETINIT_WAIT_TIMEOUT:-}"
-      # Hostname entrypoint.sh/resolv-writer resolve to find router - must
-      # match the alias on code-docker-router's own networks: block below.
-      # See example-env before overriding.
+      # Hostname entrypoint.sh resolves to find router - must match the alias on
+      # code-docker-router's own networks: block below. See example-env before
+      # overriding.
       ROUTER_HOSTNAME: "${ROUTER_HOSTNAME:-router}"
-    # Resource-exhaustion guard: a process inside code-docker (or an agent
-    # running in it) can otherwise consume unbounded host CPU/RAM. Both
-    # default to "0", which Docker/Compose treat as "no limit" (confirmed:
-    # `docker inspect` shows Memory=0/NanoCpus=0 for an unset limit, and
-    # Compose actually drops an all-zero deploy.resources.limits block
-    # entirely rather than passing 0 through) - so the out-of-the-box
-    # behavior is unchanged from before this existed. Set CODE_CPU_LIMIT/
-    # CODE_MEM_LIMIT in .env to actually cap it - see example-env.
+    # Resource-exhaustion guard: a process inside code-docker (or an agent running in
+    # it) can otherwise consume unbounded host CPU/RAM. Both default to "0" (no limit -
+    # Compose drops an all-zero deploy.resources.limits block entirely). Set
+    # CODE_CPU_LIMIT/CODE_MEM_LIMIT in .env to actually cap it - see example-env.
     deploy:
       resources:
         limits:
           cpus: "${CODE_CPU_LIMIT:-0}"
           memory: "${CODE_MEM_LIMIT:-0}"
-    # webmanager(admin panel, port 81) settings all live in .env.webmanager,
-    # not here - copy example-env.webmanager to .env.webmanager and uncomment
-    # only what you need (every value already has a sane default). See the
-    # webmanager section of README.md for what each tab does.
+    # webmanager (admin panel, port 81) settings all live in .env.webmanager, not here -
+    # copy example-env.webmanager to .env.webmanager and uncomment only what you need.
     env_file:
       - path: .env.webmanager
         required: false
     networks:
-      # code-docker-external deliberately NOT attached here anymore (see
-      # .claude/backlog/egress-netgate-plan.md's "정정" section) - code-docker
-      # must have no interface with a route to the internet of its own, or
-      # the default route planted below wouldn't be a real chokepoint (an
-      # agent could just... use the other interface). All outbound now
-      # transits the code-docker-router service (below) via the route
-      # code-docker-netinit-docker continuously (re)plants in this netns
-      # from outside it.
+      # code-docker-external deliberately NOT attached here - code-docker must have no
+      # interface with a route to the internet of its own, or the default route planted
+      # below wouldn't be a real chokepoint (an agent could just use the other
+      # interface). All outbound transits the code-docker-router service (below) via
+      # the route code-docker-netinit-docker continuously (re)plants in this netns from
+      # outside it.
       code-docker-internal: {}
-    # ports: block left entirely commented out on purpose - Compose rejects
-    # a `ports:` key with zero array items, so the key itself has to go too,
-    # not just its entries.
+    # ports: block left entirely commented out on purpose - Compose rejects a `ports:`
+    # key with zero array items, so the key itself has to go too, not just its entries.
     #
     # ports:
-    #   code-docker is no longer attached to code-docker-external (see the
-    #   networks: comment above), so publishing a host port directly on
-    #   this service doesn't work anymore - Compose docs: networks with
-    #   internal: true "are created without any connection to the host's
-    #   network interfaces". Port 80 lives on the code-docker-router
-    #   service instead now, which terminates it directly via its own
-    #   nginx and reverse-proxies everything but /exports/ and /router/
-    #   back to code-docker:80 (see router-docker's own
-    #   .claude/router-nginx-hardening-plan.md
-    #   and router's own ports: comment below). This container has NO
-    #   published port of its own and is unreachable from the host except
-    #   through that hop.
+    #   code-docker is no longer attached to code-docker-external (see the networks:
+    #   comment above), so publishing a host port directly on this service doesn't work
+    #   - internal: true networks are created without any connection to the host's
+    #   network interfaces. Port 80 lives on the code-docker-router service instead,
+    #   which terminates it via its own nginx and reverse-proxies everything but
+    #   /exports/ and /router/ back to code-docker:80. This container has NO published
+    #   port of its own and is unreachable from the host except through that hop.
     #   - 22:22
-    #   webmanager no longer needs its own published port - it's reachable at
-    #   /manager on port 80 above (nginx strips the prefix internally).
-    #   Uncomment this (and set WEBMANAGER_ADDR=:81 in .env.webmanager) only
-    #   if you want to bypass nginx and reach it directly on its own port.
+    #   webmanager no longer needs its own published port - it's reachable at /manager
+    #   on port 80 above (nginx strips the prefix internally). Uncomment this (and set
+    #   WEBMANAGER_ADDR=:81 in .env.webmanager) only to bypass nginx and reach it
+    #   directly on its own port.
     #   - 81:81
     volumes:
       - "${HOME_VOLUME:-./data/code}:/code"
@@ -243,85 +204,70 @@ services:
     #  - video
     #  - render
 
-  # The code-docker-netinit sidecar that used to live here is gone - its job moved
-  # to code-docker-netinit-docker (below), a host-side label-driven agent. Reason:
-  # `network_mode: "service:code-docker"` made Compose pin the sidecar to
-  # code-docker's *container ID* at create time, so any recreate of code-docker (a
-  # rebuild, or just a change to a network it is attached to) left the sidecar
-  # permanently unable to start - "No such container: <old-id>" retried forever by
-  # restart: unless-stopped - while code-docker itself stayed Up with no default
-  # route and no other visible symptom. Observed for real twice on 2026-08-25, once
-  # on roblox-studio and once here. netinit-docker holds no container reference at
-  # all (it re-resolves each SandboxKey every cycle), so that class of failure is
-  # gone. Full write-up: .claude/backlog/netinit-docker-plan.md.
-  #
-  # code-docker still gets no NET_ADMIN of its own - that was, and remains, the
-  # entire point. The upstream `netinit` sidecar itself is NOT retired; it stays in
-  # qwreey/router-docker-client as the engine-agnostic variant (k8s and friends),
-  # where this Docker-specific agent isn't an option.
+  # The code-docker-netinit sidecar that used to live here is gone - `network_mode:
+  # "service:code-docker"` pinned it to code-docker's container ID at create time, so
+  # any recreate of code-docker orphaned it silently (it stayed Up with no default
+  # route and no other symptom). Its job moved to code-docker-netinit-docker below, a
+  # host-side agent that re-resolves its target every cycle instead of holding a
+  # reference. See .claude/archive/netinit-docker-plan-done.md. code-docker still gets
+  # no NET_ADMIN of its own - that remains the point. The upstream `netinit` sidecar
+  # itself is NOT retired; it stays in qwreey/router-docker-client as the
+  # engine-agnostic variant (k8s and friends), where this Docker-specific agent isn't
+  # an option.
 
-  # Create docker in docker daemon. for creating dev dockers (redis, postgres, ...)
-  # WARNING: this daemon is privileged and has no auth/TLS on its socket.
-  # Anyone who can reach it can create privileged containers and effectively
-  # gain root on the host. dind-entrypoint.sh binds it to code-docker-internal
-  # only, and (egress-netgate-plan.md) it's not attached to
-  # code-docker-external anymore either - it manages its own default route
-  # toward code-docker-router (formerly code-docker-netgate) from inside itself -
-  # being privileged already, it needs neither the old netinit sidecar nor
-  # netinit-docker to do that, and its own loop is not container-ID pinned so it
-  # never had the orphaning failure those notes describe. Still, treat
-  # code-docker-internal itself as fully trusted.
+  # Create docker in docker daemon, for dev containers (redis, postgres, ...). WARNING:
+  # this daemon is privileged and has no auth/TLS on its socket - anyone who can reach
+  # it can create privileged containers and gain root on the host. dind-entrypoint.sh
+  # binds it to code-docker-internal only; it's not attached to code-docker-external
+  # either, and manages its own default route toward code-docker-router from inside
+  # itself - being privileged already, it needs neither a sidecar nor netinit-docker for
+  # that, and its own loop isn't container-ID pinned, so it never had the orphaning
+  # failure above. Still, treat code-docker-internal itself as fully trusted.
   code-docker-dind:
     container_name: "${PREFIX:-}code-docker-dind"
     hostname: code-docker-dind
     build:
-      # qwreey/dind-authz-docker, built straight from its git repo pinned to a
-      # release tag (DIND_REF) - it used to be a submodule at code-dind/. See
-      # that repo's own CLAUDE.md. DIND_CONTEXT points it at a local checkout
-      # (dev/dind-authz-docker, see dev-clone.sh and example-env).
+      # qwreey/dind-authz-docker, built from its git repo pinned to a release tag
+      # (DIND_REF) - used to be a submodule at code-dind/, see that repo's own
+      # CLAUDE.md. DIND_CONTEXT points it at a local checkout (dev/dind-authz-docker,
+      # see dev-clone.sh and example-env).
       context: "${DIND_CONTEXT:-https://github.com/qwreey/dind-authz-docker.git#${DIND_REF:-v0.1.2}}"
       # Same netshare override as code-docker's own build above - replaces the
       # Dockerfile's `FROM scratch AS netshare` stage.
       additional_contexts:
         netshare: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#main:}netshare"
       network: host
-      # dind (no protection) | dind-authz (default - denies
-      # privileged/dangerous-cap/host-namespace/out-of-/code-mount container
-      # creation) | dind-authz-remap (dind-authz + userns-remap - not the
-      # default, see docs/tips/dind.md's "추가 경화" section before opting in:
-      # LXC-hosted Docker compatibility concerns, and /code bind-mount writes
-      # need extra chown/named-volume handling). A build-stage choice rather
-      # than a runtime toggle so an unwanted stage's code/config isn't even
-      # present in the image - see dind-authz-docker's own .claude/dind-authz-plan.md
-      # for why (dev/dind-authz-docker/.claude/dind-authz-plan.md locally, after
-      # ./dev-clone.sh).
+      # dind (no protection) | dind-authz (default - denies privileged/dangerous-cap/
+      # host-namespace/out-of-/code-mount container creation) | dind-authz-remap
+      # (dind-authz + userns-remap - not the default, see docs/tips/dind.md's "추가
+      # 경화" section before opting in: LXC-hosted Docker compatibility concerns, and
+      # /code bind-mount writes need extra chown/named-volume handling). A build-stage
+      # choice rather than a runtime toggle so an unwanted stage's code/config isn't
+      # even present in the image - see dind-authz-docker's own
+      # .claude/dind-authz-plan.md for why.
       target: "${DIND_TARGET:-dind-authz}"
     privileged: true
     restart: unless-stopped
     environment:
       DOCKER_TLS_CERTDIR: ""
-      # Egress lockdown (see .claude/backlog/egress-netgate-plan.md) -
-      # dind-entrypoint.sh's own default-route loop, same opt-out as
-      # code-docker's NETGATE_ENABLED above. Does NOT restore
-      # code-docker-external below - static compose topology, see
-      # example-env.
+      # Egress lockdown - dind-entrypoint.sh's own default-route loop, same opt-out as
+      # code-docker's NETGATE_ENABLED above. Does NOT restore code-docker-external
+      # below - static compose topology, see example-env.
       NETGATE_ENABLED: "${NETGATE_ENABLED:-true}"
-      # Must match the alias on code-docker-router's own networks: block
-      # below - see example-env before overriding.
+      # Must match the alias on code-docker-router's own networks: block below - see
+      # example-env before overriding.
       ROUTER_HOSTNAME: "${ROUTER_HOSTNAME:-router}"
-    # dind plants its own default route and /etc/resolv.conf from inside
-    # itself (see dind-authz-docker's own script/dind-entrypoint.sh,
-    # dev/dind-authz-docker/script/dind-entrypoint.sh locally) - and used to do it
-    # silently, so a container that never found router still reported `Up`
-    # forever with nothing but one wait_until timeout in its log. Surface that
-    # state as `unhealthy` instead: dockerd actually answering, plus a fresh
-    # heartbeat file from that entrypoint's own upkeep loop (absent = no
-    # route/DNS, stale = the loop died), skipped when the netgate is off since
-    # then nothing is supposed to plant a route at all. The heartbeat exists
-    # so this check never runs a name lookup itself - `getent hosts` blocks
-    # for the whole resolver timeout precisely when router is missing, which
-    # reported an opaque "health check exceeded timeout" instead of the real
-    # failure. $$ (not $) so Compose leaves the expansion to the container.
+    # dind plants its own default route and /etc/resolv.conf from inside itself (see
+    # dind-authz-docker's own script/dind-entrypoint.sh) - and used to do it silently,
+    # so a container that never found router still reported `Up` forever with nothing
+    # but one wait_until timeout in its log. Surface that state as `unhealthy` instead:
+    # dockerd actually answering, plus a fresh heartbeat file from that entrypoint's own
+    # upkeep loop (absent = no route/DNS, stale = the loop died), skipped when the
+    # netgate is off. The heartbeat exists so this check never runs a name lookup
+    # itself - `getent hosts` blocks for the whole resolver timeout precisely when
+    # router is missing, which reported an opaque "health check exceeded timeout"
+    # instead of the real failure. $$ (not $) so Compose leaves the expansion to the
+    # container.
     healthcheck:
       test:
         - CMD-SHELL
@@ -333,11 +279,9 @@ services:
       # cold boot where router comes up second.
       start_period: 90s
       retries: 3
-    # Same resource-exhaustion guard as code-docker's own deploy: block
-    # above - matters even more here, since containers created *inside*
-    # dind (e.g. a stray `docker run` loop) share this one cgroup and
-    # would otherwise have no ceiling at all. Default "0" (unlimited) -
-    # see CODE_CPU_LIMIT's comment above and example-env.
+    # Same resource-exhaustion guard as code-docker's own deploy: block above - matters
+    # more here, since containers created *inside* dind share this one cgroup and would
+    # otherwise have no ceiling at all. Default "0" (unlimited) - see example-env.
     deploy:
       resources:
         limits:
@@ -346,99 +290,75 @@ services:
     volumes:
       # Persist pulled images/containers across restarts
       - "${DIND_VOLUME:-./data/dind}:/var/lib/docker"
-      # Same host path as code-docker's own /code (HOME_VOLUME) - DinD
-      # resolves bind-mount sources against ITS OWN filesystem, not the
-      # client's, so a project's `./data:/data`-style compose volume only
-      # works (and only round-trips through the dind-authz /code-only
-      # allow-list) if dind can see /code at the same absolute path.
+      # Same host path as code-docker's own /code (HOME_VOLUME) - DinD resolves
+      # bind-mount sources against ITS OWN filesystem, not the client's, so a project's
+      # `./data:/data`-style compose volume only works (and only round-trips through
+      # the dind-authz /code-only allow-list) if dind can see /code at the same
+      # absolute path.
       - "${HOME_VOLUME:-./data/code}:/code"
-      # dind-authz's live, host-editable conf.d directory (dind-authz stage
-      # only - harmless no-op mount on the plain dind stage, nothing reads
-      # it there). Deliberately NOT mounted into code-docker anywhere, by
-      # any path - code-docker must never be able to edit the policy that
-      # constrains what it can ask dind to create. Only someone with direct
-      # access to the docker host's filesystem can edit this.
+      # dind-authz's live, host-editable conf.d directory (dind-authz stage only -
+      # harmless no-op mount on the plain dind stage). Deliberately NOT mounted into
+      # code-docker anywhere - code-docker must never be able to edit the policy that
+      # constrains what it can ask dind to create. Only someone with direct access to
+      # the docker host's filesystem can edit this.
       - "${DIND_AUTHZ_VOLUME:-./data/dind-authz}:/etc/dind-authz.d"
     networks:
-      # code-docker-external deliberately NOT attached here either
-      # (egress-netgate-plan.md - same reasoning as code-docker's own
-      # networks: comment above). `docker pull` etc. now goes through
-      # code-docker-router via the route dind-entrypoint.sh's own loop keeps
-      # planting here - dind does this from inside itself (it is privileged
-      # already), unlike code-docker, whose route is planted from outside by
-      # code-docker-netinit-docker.
+      # code-docker-external deliberately NOT attached here either - same reasoning as
+      # code-docker's own networks: comment above. `docker pull` etc. goes through
+      # code-docker-router via the route dind-entrypoint.sh's own loop keeps planting
+      # here - dind does this from inside itself (it is privileged already), unlike
+      # code-docker, whose route is planted from outside by code-docker-netinit-docker.
       code-docker-internal:
-        # Extra name that only resolves on this network, so code-docker
-        # can reach this daemon unambiguously - see DOCKER_HOST above.
+        # Extra name that only resolves on this network, so code-docker can reach this
+        # daemon unambiguously - see DOCKER_HOST above.
         aliases:
           - dind
     command: ["--log-level=warn"]
-    # Same reasoning as code-docker's own logging: block above - dockerd's
-    # own stdout carries potentially high-volume daemon logging, so this is
-    # if anything more important here than for the other services.
+    # Same reasoning as code-docker's own logging: block above - dockerd's own stdout
+    # carries potentially high-volume daemon logging, so this matters more here.
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-  # Newer Docker Engine builds install a DOCKER-INTERNAL nftables chain for
-  # any `internal: true` network (code-docker-internal above) that
-  # unconditionally drops FORWARD-path packets leaving that network's
-  # bridge whose destination isn't inside the bridge's own subnet - this
-  # blocks router's whole egress design below (router is deliberately
-  # bridged across code-docker-internal/code-docker-external to forward
-  # + filter traffic) at the host level, regardless of what router's own
-  # iptables does internally. See docs/egress-netgate.md's "Docker의
-  # DOCKER-INTERNAL 강제 격리" section for the full story and how this was
-  # diagnosed. Keeping that host-level DOCKER-USER exemption in sync is one
-  # of this container's two jobs - DOCKER-USER is the chain Docker reserves
-  # for exactly this kind of override, always evaluated before
-  # DOCKER-FORWARD/DOCKER-INTERNAL. The other job is planting each opted-in
-  # container's default route from out here (which is why the service is no
-  # longer called netfilter-fix): see netinit-docker.sh's own header, and
-  # .claude/backlog/netinit-docker-plan.md for the design and the incident
-  # that prompted it.
+  # Newer Docker Engine builds install a DOCKER-INTERNAL nftables chain for any
+  # `internal: true` network (code-docker-internal above) that drops FORWARD-path
+  # packets leaving that network's bridge whose destination isn't inside the bridge's
+  # own subnet - this blocks router's whole egress design below at the host level
+  # regardless of what router's own iptables does. See docs/egress-netgate.md's
+  # "Docker의 DOCKER-INTERNAL 강제 격리" section. Keeping a host-level DOCKER-USER
+  # exemption in sync (the chain Docker reserves for exactly this override, evaluated
+  # before DOCKER-FORWARD/DOCKER-INTERNAL) is one of this container's two jobs; the
+  # other is planting each opted-in container's default route from out here (why the
+  # service is no longer called netfilter-fix) - see netinit-docker.sh's own header
+  # and .claude/archive/netinit-docker-plan-done.md.
   #
-  # network_mode: host (no networks: attachment at all - it never joins
-  # code-docker-internal/external) + NET_ADMIN + a docker.sock mount are all
-  # required just to reach the host's own netfilter tables at all (a
-  # container's NET_ADMIN alone only grants admin rights within its OWN
-  # netns). Note the socket is mounted :ro but that is NOT a mitigation -
-  # read-only applies to the inode, not to what may be written over the
-  # socket, and a :ro-mounted docker.sock still serves container-create calls
-  # (verified 2026-08-25). Treat this service as root-on-host equivalent:
-  # it is a materially bigger trust tier than any other
-  # service here except code-docker-dind, which already runs privileged
-  # with an unauthenticated Docker socket of its own (see that service's
-  # own comment above) - anyone who could already reach dind gets
-  # host-kernel-equivalent access, so this doesn't introduce a new class of
-  # risk on top of what's already accepted. Deliberately its own minimal
-  # image (qwreey/router-docker-client's netinit-docker/, see build.context
-  # below) rather than added onto an existing service, so this trust tier
-  # stays scoped to one tiny single-purpose container instead of expanding
-  # code-docker/router's own.
+  # network_mode: host (no networks: attachment) + NET_ADMIN + a docker.sock mount are
+  # all required just to reach the host's own netfilter tables (NET_ADMIN alone only
+  # grants rights within a container's own netns). The socket is mounted :ro but that
+  # is NOT a mitigation - read-only restricts the inode, not what may be written over
+  # the socket, and a :ro-mounted docker.sock still serves container-create calls.
+  # Treat this service as root-on-host equivalent - the same trust tier as
+  # code-docker-dind, which already runs privileged with an unauthenticated Docker
+  # socket of its own, so this doesn't introduce a new class of risk. Its own minimal
+  # image (see build.context below) keeps that trust tier scoped to one tiny
+  # single-purpose container instead of expanding code-docker/router's own.
   #
-  # Tied to `docker compose down`/`up` on purpose instead of a host-level
-  # systemd unit: the exemption's lifetime matches this container's (it
-  # deletes its own rule on SIGTERM, see router-docker-client's
-  # netinit-docker/netinit-docker.sh), and running it as a compose service means a
-  # multi-instance (PREFIX) deployment gets one of these automatically per
-  # instance with no separate per-PREFIX systemd unit to remember to
-  # install.
+  # Tied to `docker compose down`/`up` rather than a host-level systemd unit: the
+  # exemption's lifetime matches this container's (it deletes its own rule on
+  # SIGTERM), and a multi-instance (PREFIX) deployment gets one automatically per
+  # instance with no separate systemd unit to install.
   code-docker-netinit-docker:
     container_name: "${PREFIX:-}code-docker-netinit-docker"
     build:
       # netinit-docker is qwreey/router-docker-client's own subdirectory, built
-      # directly from its git repo - Compose's native remote-git build context,
-      # not a local checkout/submodule, on a floating #main ref (deliberately
-      # unpinned; see that repo's own CLAUDE.md, and note Docker CACHES this
-      # fetch, so picking up an upstream change can need --no-cache).
-      # ROUTER_CLIENT_SOURCE (shared with code-docker's own build above) or the
-      # more specific NETINIT_DOCKER_CONTEXT overrides it to build from a local
-      # checkout - see example-env. This service used to be called
-      # code-docker-netfilter-fix, back when the DOCKER-USER exemption was all it
-      # did - see that script's own header for the second job it grew.
+      # directly from its git repo - Compose's native remote-git build context, not a
+      # local checkout/submodule, on a floating #main ref (deliberately unpinned; note
+      # Docker CACHES this fetch, so picking up an upstream change can need
+      # --no-cache). ROUTER_CLIENT_SOURCE (shared with code-docker's own build above)
+      # or the more specific NETINIT_DOCKER_CONTEXT overrides it to build from a local
+      # checkout - see example-env.
       context: "${NETINIT_DOCKER_CONTEXT:-${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#main:}netinit-docker}"
       network: host
     network_mode: host
@@ -446,10 +366,8 @@ services:
       - NET_ADMIN
       # setns() into a target container's netns, so netinit-docker can plant that
       # container's default route from out here instead of the target needing
-      # NET_ADMIN of its own. Note this does NOT raise this service's trust ceiling:
-      # the docker.sock below already makes it root-on-host equivalent (mounting a
-      # socket :ro restricts the inode, not what may be written over the socket - a
-      # :ro-mounted docker.sock still serves container-create calls). It widens the
+      # NET_ADMIN of its own. Does NOT raise this service's trust ceiling: the
+      # docker.sock below already makes it root-on-host equivalent. It widens the
       # blast radius of a bug in that script, which is why the script is kept small.
       - SYS_ADMIN
     volumes:
@@ -458,12 +376,11 @@ services:
       # nsenter's into it using the SandboxKey path docker inspect reports - hence
       # mounting it at the identical path rather than somewhere tidier.
       #
-      # rslave is MANDATORY, not stylistic: every entry under this directory is
-      # itself a bind mount, so with Docker's default rprivate propagation any
-      # container created AFTER this service starts appears here as an empty 0-byte
-      # file and nsenter fails with "setns(): can't reassociate to namespace 'net':
-      # Invalid argument". Verified both ways on 2026-08-25 - see
-      # .claude/backlog/netinit-docker-plan.md.
+      # rslave is MANDATORY, not stylistic: every entry under this directory is itself
+      # a bind mount, so with Docker's default rprivate propagation any container
+      # created AFTER this service starts appears here as an empty 0-byte file and
+      # nsenter fails with "setns(): can't reassociate to namespace 'net': Invalid
+      # argument".
       - /var/run/docker/netns:/var/run/docker/netns:ro,rslave
     environment:
       # Which agent owns a given container/network - targets opt in by carrying a
@@ -471,12 +388,9 @@ services:
       # file). Matching is fail-closed: an unlabelled container is never touched, so
       # two PREFIXed deployments on one host can't claim each other's containers.
       NETINIT_DOCKER_PROVIDER_ID: "${PREFIX:-}code-docker-netinit-docker"
-      # Keeps NETGATE_ENABLED working as the single behavioural opt-out it is documented
-      # to be (example-env). The tool's own variable is namespaced to the tool, and this
-      # line is what maps code-docker's user-facing name onto it - the same relationship
-      # the old code-docker-netinit sidecar had, where NETGATE_ENABLED made it idle
-      # without touching routes. Only the route half is gated: the DOCKER-USER exemption
-      # never depended on the netgate being enabled and stays on either way.
+      # Maps code-docker's user-facing NETGATE_ENABLED (example-env) onto
+      # netinit-docker's own tool-namespaced variable. Only the route-planting half is
+      # gated - the DOCKER-USER exemption above stays on either way.
       NETINIT_DOCKER_ENABLED: "${NETGATE_ENABLED:-true}"
     restart: unless-stopped
     logging:
@@ -485,72 +399,46 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # router - the network-boundary container for code-docker. Started as
-  # Phase 2 of egress-netgate-plan.md's outbound lockdown (service used to
-  # be named code-docker-netgate): the actual filtering/forwarding
-  # chokepoint every workload's default route points at: code-docker-netinit-docker
-  # (above) plants it for the containers that opt in by label, and dind's own
-  # loop does the same for itself. netinit-docker resolves this container by
-  # name off the `netinit.gateway` label on code-docker-internal, while dind
-  # still resolves it through the `router` alias. DNS-level
-  # content-blocklist (dnsmasq), RFC1918/CIDR FORWARD filtering, and inbound
-  # port-forwarding (DNAT) all live in this one container - see
-  # docs/egress-netgate.md for the full design/reasoning, and CLAUDE.md's
-  # "egress lockdown (netgate)" section for the short version.
+  # router - the network-boundary container for code-docker: the filtering/forwarding
+  # chokepoint every workload's default route points at. code-docker-netinit-docker
+  # (above) plants it for containers that opt in by label, off the `netinit.gateway`
+  # label on code-docker-internal; dind resolves it through the `router` alias
+  # instead. DNS-level content-blocklist, RFC1918/CIDR FORWARD filtering, and inbound
+  # port-forwarding (DNAT) all live in this one container - see docs/egress-netgate.md
+  # and CLAUDE.md's "egress lockdown (netgate)" section.
   #
   # The service itself is defined in router-docker's own docker-compose.router.yml
-  # (see the `router` include below, now a remote Compose include pinned by
-  # ROUTER_REF), not here - router-docker is its own standalone
-  # project (qwreey/router-docker), brought in as a tag-pinned remote reference
-  # (was a git submodule at router/ until 2026-09-28), and code-
-  # docker only supplies the fields whose relative paths (env_file, volumes'
-  # bind-mount source) need to resolve against THIS file's own location
-  # rather than the fragment's - see each field's own comment below. This
-  # merges onto the code-docker-router service the fragment defines, same
-  # technique already proven for EXTRA_INCLUDE overlays (see
-  # .claude/archive/roblox-studio-vnc-isolation-plan-done.md) - a file
-  # doesn't need to originally define a service to add fields to it.
-  # Confirmed via `docker compose config` that this merge (fragment fields +
-  # these two) resolves to the exact same service as the old fully-inline
-  # definition.
+  # (the remote include above, pinned by ROUTER_REF), not here - router-docker is its
+  # own standalone project, and code-docker only supplies the fields whose relative
+  # paths (env_file, volumes' bind-mount source) need to resolve against THIS file's
+  # own location rather than the fragment's - a file doesn't need to originally define
+  # a service to add fields to it.
   code-docker-router:
-    # router's own feature-specific settings (tailscale, Dev Proxy exposure
-    # policy, router-manager's own admin-API password, tinyauth, /exports/
-    # allowlists) all live in .env.router, not here - router is no longer a
-    # submodule, so its example-env.router template isn't in this checkout;
-    # ootb.sh's fetch_router_env_template (ootb-lib.sh) fetches it for the
-    # pinned ROUTER_REF tag (or from next to a local ROUTER_INCLUDE checkout)
-    # into .env.router for you. Uncomment only what you need there (every
-    # value already has a sane default), same pattern as
-    # code-docker's own .env.webmanager below/above. Migrated the same way
-    # too (`router-manager --env-migrate`, see router-docker's own
-    # example-env.router's own doc comment).
+    # router's own feature-specific settings (tailscale, Dev Proxy exposure policy,
+    # router-manager's own admin-API password, tinyauth, /exports/ allowlists) all live
+    # in .env.router, not here - router is a remote reference, so its
+    # example-env.router template isn't in this checkout; ootb.sh's
+    # fetch_router_env_template (ootb-lib.sh) fetches it for the pinned ROUTER_REF tag
+    # (or from next to a local ROUTER_INCLUDE checkout) into .env.router for you.
+    # Uncomment only what you need there (every value already has a sane default),
+    # same pattern as code-docker's own .env.webmanager below/above. Migrated the same
+    # way too (`router-manager --env-migrate`).
     #
-    # Deliberately flat (".env.router", not nested under a router-owned
-    # path) - env_file
-    # paths are relative to wherever the file that DECLARES them lives, and
-    # this one's declared here (not in router-docker's own docker-compose.router.yml) so
-    # it stays relative to THIS file - which in the recommended
-    # split-directory deploy (docs/index.md: clone into builds/code-docker/,
-    # copy docker-compose.yml out one level) is a different directory than
-    # any router-docker checkout - and required: false means a missing file there
-    # is never reported, so nesting it under a router-owned path would silently never
-    # be read. Flat and colocated with .env/.env.webmanager instead: nothing
-    # under builds/ needs touching to set a router value, matching how those
-    # two are already handled.
+    # Deliberately flat (".env.router", not nested under a router-owned path) -
+    # env_file paths are relative to wherever the file that DECLARES them lives, and
+    # this one's declared here (not in router-docker's own docker-compose.router.yml)
+    # so it stays relative to THIS file - which in the split-directory deploy
+    # (docs/index.md) is a different directory than any router-docker checkout - and
+    # required: false means a missing file there is never reported, so nesting it
+    # under a router-owned path would silently never be read.
     env_file:
       - path: .env.router
         required: false
     volumes:
-      # Persistent state for router's own features (tailscale login
-      # state/config.yaml, caddy-adapter's managed/custom Caddyfile
-      # fragments) - router has no /code volume of its own (that's
-      # code-docker's), so this is its equivalent. Declared here rather than
-      # in router-docker's own docker-compose.router.yml because a relative
-      # `./data/router` needs to resolve against wherever THIS file sits
-      # (data/ deliberately lives outside the source checkout, independent
-      # of BUILD_CONTEXT - see root CLAUDE.md's "Build (Dockerfile)"
-      # section) - `docker compose config` confirmed declaring it in the
-      # fragment instead resolves it against the remote include's own cache
-      # location, which is wrong.
+      # Persistent state for router's own features (tailscale login state/config.yaml,
+      # caddy-adapter's managed/custom Caddyfile fragments) - router has no /code
+      # volume of its own (that's code-docker's), so this is its equivalent. Declared
+      # here rather than in router-docker's own docker-compose.router.yml because a
+      # relative `./data/router` needs to resolve against wherever THIS file sits, not
+      # the remote include's own cache location.
       - "${ROUTER_VOLUME:-./data/router}:/var/lib/code-docker-router"

@@ -19,30 +19,23 @@ ADD https://github.com/qwreey/code-server-autoinstall.git#${AUTOINSTALL_REF} /
 
 FROM docker:latest AS docker-bin
 
-# code-docker-dind (dind-authz-docker's own Dockerfile) has moved out to its own
-# standalone repo, same pattern as router-docker - see root CLAUDE.md's
-# "docker-compose topology" section and dind-authz-docker's own CLAUDE.md (both were
-# git submodules, at code-dind/ and router/ respectively, until 2026-09-28).
-# code-docker-netinit-docker (formerly code-docker-netfilter-fix; the old
-# code-docker-netinit sidecar is gone entirely, see CLAUDE.md) went a step
-# further: it's not even a local directory, tag-pinned or otherwise - it builds directly
-# from qwreey/router-docker-client's own repo (see docker-compose.yml's build.context for
-# that service). docker-compose.yml's code-docker-dind service builds directly from
-# qwreey/dind-authz-docker as a remote build context by default too (DIND_CONTEXT
-# overrides it to a local dev/dind-authz-docker checkout).
+# code-docker-dind (dind-authz-docker's own Dockerfile) and router-docker are their
+# own standalone repos, not local directories - see root CLAUDE.md's
+# "docker-compose topology" section and dind-authz-docker's own CLAUDE.md.
+# code-docker-netinit-docker builds directly from qwreey/router-docker-client's own
+# repo (see docker-compose.yml's build.context for that service), and
+# code-docker-dind builds from qwreey/dind-authz-docker as a remote build context by
+# default too (DIND_CONTEXT overrides it to a local dev/dind-authz-docker checkout).
 
-# webmanager/frontend no longer imports @code-docker/router-frontend
-# (2026-08-08 decoupling - see .claude/backlog/router-frontend-decouple-plan.md
-# and router-docker's own .claude/net-auth-expansion-plan.md's item 6,
-# dev/router-docker/.claude/net-auth-expansion-plan.md locally): router's tabs are
-# now embedded as an iframe into router's own /router/ page
-# (components/RouterEmbed/RouterFrame.tsx) instead of being rendered as
-# same-origin React components, and the couple of generic UI primitives
-# (ErrorBanner/Sheet/Skeleton) that used to live only in router-docker's own frontend/
-# are hand-copied into webmanager/frontend/src/components/common/ now. This
-# stage still runs from the repo-root npm workspace (root package.json's
-# `workspaces:` still lists both frontends), but no longer needs to COPY
-# router-docker's frontend/ at all - webmanager/frontend builds standalone.
+# router's tabs are embedded as an iframe into its own /router/ page
+# (components/RouterEmbed/RouterFrame.tsx) rather than rendered as same-origin React
+# components, so webmanager/frontend no longer imports @code-docker/router-frontend
+# (see .claude/archive/router-frontend-decouple-plan-done.md) - the couple of
+# generic UI primitives (ErrorBanner/Sheet/Skeleton) it used are hand-copied into
+# webmanager/frontend/src/components/common/ instead. This stage still runs from the
+# repo-root npm workspace (root package.json's `workspaces:` lists both frontends),
+# but no longer COPYs router-docker's frontend/ - webmanager/frontend builds
+# standalone.
 FROM node:24-alpine AS webmanager-frontend
 WORKDIR /src
 COPY package.json package-lock.json ./
@@ -106,10 +99,10 @@ COPY example-env.webmanager /etc/code-docker/webmanager/example-env.webmanager
 COPY --from=code-extension /out/ /etc/code-docker/code/extensions/
 
 # Log directories for per-program rotated log files (read by vector).
-# tailscaled/tailscale-forward/tailscale-status/caddy-adapter moved to
-# router (see .claude/backlog/functional-router-plan.md) - no longer
-# programs in this image. dns-local replaced the old resolv-writer program -
-# see .claude/backlog/dns-local-servfail-fix.md.
+# tailscaled/tailscale-forward/tailscale-status/caddy-adapter are router's
+# programs, not this image's (see dev/router-docker/.claude/functional-router-plan.md
+# locally). dns-local replaced the old resolv-writer program - see
+# .claude/archive/dns-local-servfail-fix-done.md.
 RUN mkdir -p /var/log/code /var/log/sshd /var/log/webmanager /var/log/nginx \
     /var/log/dns-local
 
@@ -123,12 +116,11 @@ RUN mkdir -p /etc/code-docker/supervisord
 # Copy config & static files
 # netshare/dns-local: see the stages at the top of this file.
 COPY --from=netshare --chown=root:root . /etc/code-docker/netshare
-# dns-local moved out to that same repo on 2026-08-27 - it was never
-# code-docker-specific (roblox-studio-docker hit the identical bug), so the
-# script lives there and config/dns-local/dns-local.default.sh is now just
-# the thin wrapper that supplies this image's own paths/defaults. Installed
-# beside netshare rather than into /etc/code-docker/dns-local/, which is
-# where the COPY below puts config/dns-local/'s own git-tracked files.
+# dns-local lives in router-docker-client too (never code-docker-specific -
+# roblox-studio-docker hit the identical bug); config/dns-local/dns-local.default.sh
+# is just the thin wrapper supplying this image's own paths/defaults. Installed
+# beside netshare rather than into /etc/code-docker/dns-local/, which is where the
+# COPY below puts config/dns-local/'s own git-tracked files.
 COPY --from=dns-local --chown=root:root . /etc/code-docker/router-client/dns-local
 COPY --chown=root:root \
     config script/entrypoint.sh /etc/code-docker/
