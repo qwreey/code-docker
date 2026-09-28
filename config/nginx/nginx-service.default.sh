@@ -18,20 +18,36 @@ case "${NGINX_LOG_LEVEL:-errors}" in
         ;;
 esac
 
-# ALLOWED_HOSTS (docker-compose.yml, comma-separated, empty by default)
-# becomes nginx.*.conf's `map $host $code_docker_host_allowed { ... }` body.
-# Empty means "allow every Host" (current behavior, unchanged) - non-empty
-# means "default 0" (deny) plus one `"host" 1;` line per entry.
+# The value is pasted into an nginx map, so an entry must be a plain token (no
+# quote, `;`, brace or space); anything else is skipped, loudly.
+valid_host_token() {
+    local host_re='^[][A-Za-z0-9_.*:-]+$'
+    [[ "$1" =~ $host_re ]] && return 0
+    echo "nginx-service: ALLOWED_HOSTS entry '$1' is not a plain host - skipping it" >&2
+    return 1
+}
+
+# ALLOWED_HOSTS (comma-separated) becomes the `map $host $code_docker_host_allowed`
+# body. Hosts nobody outside can point at an arbitrary address are always
+# allowed: localhost, IP literals, single-label names (what internal hops such as
+# router -> code-docker send) and tailnet MagicDNS names. Any other name - a real
+# domain - must be listed. That is what defeats DNS rebinding: the attack needs
+# the browser to send the attacker's own domain as Host, which is never one of
+# these. An empty ALLOWED_HOSTS therefore means "local access only", not "any
+# Host".
+map_body='default 0;
+    "localhost" 1;
+    "~^[0-9.]+$" 1;
+    "~^\[?[0-9A-Fa-f:.]+\]?$" 1;
+    "~^[^.]+$" 1;
+    "~\.ts\.net$" 1;'
 if [ -n "${ALLOWED_HOSTS:-}" ]; then
-    map_body="default 0;"
     IFS=',' read -ra allowed_hosts <<< "$ALLOWED_HOSTS"
     for host in "${allowed_hosts[@]}"; do
         host="$(echo "$host" | xargs)"
-        [ -n "$host" ] && map_body="$map_body
+        [ -n "$host" ] && valid_host_token "$host" && map_body="$map_body
     \"$host\" 1;"
     done
-else
-    map_body="default 1;"
 fi
 export NGINX_ALLOWED_HOSTS_MAP="$map_body"
 

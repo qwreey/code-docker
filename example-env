@@ -244,14 +244,18 @@
 # Needs code-server over HTTPS (or localhost); see docs/webmanager.md.
 #CODE_WEBMANAGER_EXTENSION="true"
 
-# Comma-separated allowlist of Host header values the in-container nginx will
-# accept on port 80 (e.g. "code.yaeji.moe" or "code.yaeji.moe, 192.168.1.50"), no
-# scheme/port. Empty (default) disables the check, any Host accepted.
+# 도메인으로 접속한다면 그 호스트 이름을 여기 적으세요(콤마구분, scheme/port 없이 -
+# 예: "code.yaeji.moe"). router와 code-docker의 nginx가 모두 이 값으로 Host 헤더를
+# 검사합니다.
 #
-# Best-effort backstop against incidentally reaching this container's
-# directly-published port 80 without going through your intended reverse proxy
-# (e.g. an internet scanner hitting the host IP directly) - NOT spoof-proof, since
-# Host is a client-controlled header an attacker who knows your domain can set.
+# - 항상 허용: localhost, IP 주소, 점 없는 한 단어 이름(code-docker처럼 내부 홉이 쓰는
+#   이름), tailnet MagicDNS 이름(*.ts.net).
+# - 그 밖의 도메인 이름은 여기 적은 것만 허용되고, 나머지는 403입니다. 그래서 비워두면
+#   "아무 Host나 허용"이 아니라 "로컬 전용"입니다.
+# - 목적은 DNS rebinding 방어입니다. 공격자 페이지가 자기 도메인을 이 호스트 IP로 다시
+#   가리키게 해도, 브라우저가 보내는 Host는 공격자 도메인이라 걸립니다.
+# - Host는 클라이언트가 정하는 헤더이므로 도메인을 아는 공격자의 직접 요청까지 막지는
+#   못합니다. 그건 인증의 몫입니다.
 #ALLOWED_HOSTS=""
 
 # webmanager의 File share(WebDAV) 전용 nginx 리스너 포트. 기본 82. 이 포트에서는

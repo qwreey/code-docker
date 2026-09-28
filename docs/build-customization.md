@@ -284,7 +284,7 @@ webmanager는 지금처럼 `/api/...`를 그대로 받습니다. access/error �
 자신의 stdout/stderr로 나가서 다른 프로그램들과 동일하게 supervisord가 파일로
 캡처합니다(`vector`가 그 파일을 다시 tail). 두 upstream은 로그인이 없어서
 loopback에만 열려 있고 이 nginx가 유일한 진입로입니다. `ALLOWED_HOSTS`로 조절하는
-Host 헤더 화이트리스트도 이 파일에 있습니다. `/tailscale/`·`/dev-proxy/`·`/exports/` 위치는 더 이상 여기서
+Host 헤더 화이트리스트도 이 파일에 있습니다(비워두면 로컬 전용 - `example-env` 참고). `/tailscale/`·`/dev-proxy/`·`/exports/` 위치는 더 이상 여기서
 router로 프록시되지 않습니다 — router가 host:80을 직접 종단하도록 바뀌면서
 (router-docker의 [`config/nginx/`](https://github.com/qwreey/router-docker/tree/HEAD/config/nginx)) 이 파일에서는 빠졌고, webmanager의 Tailscale/Dev Proxy
 탭도 이제 router 자신의 `/router/` 경로로 직접 호출합니다. 자세한 내용은

@@ -110,10 +110,11 @@ prompt_set .env ROUTER_CPU_LIMIT "code-docker-router CPU 제한 (비우면 무�
 prompt_set .env ROUTER_MEM_LIMIT "code-docker-router 메모리 제한 (비우면 무제한)"
 
 section "호스트 바인딩 / 리버스 프록시" \
-  .env:ROUTER_HTTP_BIND .env:ROUTER_HTTP_PORT .env:TRUSTED_PROXIES
+  .env:ROUTER_HTTP_BIND .env:ROUTER_HTTP_PORT .env:TRUSTED_PROXIES .env:ALLOWED_HOSTS
 prompt_set .env ROUTER_HTTP_BIND "router가 바인딩할 호스트 IP (비우면 0.0.0.0)"
 prompt_set .env ROUTER_HTTP_PORT "router가 쓸 호스트 포트 (비우면 80 - 이미 다른 프로세스가 쓰고 있으면 바꾸세요)"
 prompt_set .env TRUSTED_PROXIES "신뢰할 리버스 프록시 IP/CIDR 목록 (콤마구분, 비우면 비활성)"
+prompt_set .env ALLOWED_HOSTS "도메인으로 접속한다면 그 호스트 이름 (콤마구분, 예: code.example.com - 비우면 localhost/IP 주소/tailnet 이름으로만 접속 가능)"
 
 section "PWA (브라우저 설치 앱 이름)" \
   .env:PWA_NAME .env:PWA_SHORT_NAME .env:PWA_DISPLAY_MODE
