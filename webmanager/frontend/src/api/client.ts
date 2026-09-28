@@ -125,6 +125,7 @@ async function request<T>(
   init?: RequestInit,
   retried = false,
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  prompt = true,
 ): Promise<T> {
   const controller = new AbortController()
   const timeoutId = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : undefined
@@ -171,7 +172,16 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    if (res.status === 401 && !retried && unlockPrompter && !isUnlockPath(path) && !promptSuppressed(init)) {
+    // A poll that finds the gate locked is how a view learns the unlock ran
+    // out - nothing else tells it (an expiry happens server-side, silently).
+    // Telling this page's own status consumers lets RequiresUnlock put its
+    // card back and the sidebar show 잠김, instead of the tab quietly erroring
+    // under a stale "unlocked" state. Not broadcast: every other view polls
+    // for itself, and a relay per 401 per view would only add traffic.
+    if (res.status === 401 && !prompt && !isUnlockPath(path)) {
+      authStatusListeners.forEach((cb) => cb())
+    }
+    if (res.status === 401 && prompt && !retried && unlockPrompter && !isUnlockPath(path) && !promptSuppressed(init)) {
       let unlocked = false
       try {
         await unlockPrompter()
@@ -215,6 +225,12 @@ function withJsonBody(body?: unknown): RequestInit {
 // that constant's doc comment.
 export const api = {
   get: <T>(path: string, timeoutMs?: number) => request<T>(path, undefined, false, timeoutMs),
+  // A GET made on a timer rather than by the user: a 401 just throws instead
+  // of popping the password prompt. The view doing the polling already has
+  // its own lock UI (RequiresUnlock's card, the Terminal's locked-out
+  // overlay), and a poll that also prompts put a second "잠금 해제 필요"
+  // on top of it the moment the gate locked.
+  poll: <T>(path: string, timeoutMs?: number) => request<T>(path, undefined, false, timeoutMs, false),
   post: <T>(path: string, body?: unknown, timeoutMs?: number) =>
     request<T>(path, { method: 'POST', ...withJsonBody(body) }, false, timeoutMs),
   put: <T>(path: string, body?: unknown, timeoutMs?: number) =>

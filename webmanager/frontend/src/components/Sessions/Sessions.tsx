@@ -66,8 +66,10 @@ export function Sessions() {
     loadingRef.current = true
     try {
       const [list, names] = await Promise.all([
-        api.get<OpenSession[]>('/sessions'),
-        api.get<BrowserNames>('/sessions/browsers'),
+        // api.poll: this runs on a timer, and the tab sits inside
+        // RequiresUnlock, which brings its own card back when these 401.
+        api.poll<OpenSession[]>('/sessions'),
+        api.poll<BrowserNames>('/sessions/browsers'),
       ])
       setSessions(list)
       setBrowserNames(names)

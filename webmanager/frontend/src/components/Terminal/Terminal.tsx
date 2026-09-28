@@ -896,9 +896,12 @@ export function Terminal({
   // The last list refreshSessions saw, by name - only read to recognize a
   // rename made somewhere else (see refreshSessions).
   const lastSessionsRef = useRef<TerminalSessionInfo[]>([])
+  // Never prompts (api.poll): it runs every few seconds, and when the gate
+  // locks this tab already says so itself - the locked-out overlay below,
+  // or RequiresUnlock's card around the whole tab.
   const refreshSessions = useCallback(async () => {
     try {
-      const data = await api.get<TerminalSessionInfo[]>('/terminal/sessions')
+      const data = await api.poll<TerminalSessionInfo[]>('/terminal/sessions')
       // Follow a rename made by another client (another browser tab, the
       // code-server widget) on the session this one is showing. Nothing
       // tells this client about it - the backend re-keys the same session

@@ -166,7 +166,9 @@ export function Logs() {
     pollingRef.current = true
     try {
       const newest = current[0].timestamp
-      const data = await api.get<LogEntriesResponse>(`/logs/entries?${buildParams(undefined, newest).toString()}`)
+      // Live-refresh tick, not a user action: never prompts (api.poll) -
+      // RequiresUnlock around this tab shows its own card if it 401s.
+      const data = await api.poll<LogEntriesResponse>(`/logs/entries?${buildParams(undefined, newest).toString()}`)
       const fresh = data.entries.filter((e) => e.timestamp > newest)
       if (fresh.length > 0) {
         setEntries((prev) => {

@@ -45,7 +45,13 @@ export default function ProjectTerminalSessions({
     async (withSkeleton: boolean) => {
       if (withSkeleton) setLoading(true)
       try {
-        const res = await api.get<TerminalSessionInfo[]>('/terminal/sessions')
+        // The periodic ticks don't prompt (api.poll): the dialog was unlocked
+        // when it opened, and a lock that lands meanwhile shouldn't throw a
+        // password modal over it every few seconds - it shows as this panel's
+        // error instead. The first load still may.
+        const res = withSkeleton
+          ? await api.get<TerminalSessionInfo[]>('/terminal/sessions')
+          : await api.poll<TerminalSessionInfo[]>('/terminal/sessions')
         setSessions(res.filter((s) => s.cwd && isUnderProjectPath(s.cwd, path)))
         setError(null)
       } catch (e) {
