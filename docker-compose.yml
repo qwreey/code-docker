@@ -294,7 +294,7 @@ services:
       # release tag (DIND_REF) - it used to be a submodule at code-dind/. See
       # that repo's own CLAUDE.md. DIND_CONTEXT points it at a local checkout
       # (dev/dind-authz-docker, see dev-clone.sh and example-env).
-      context: "${DIND_CONTEXT:-https://github.com/qwreey/dind-authz-docker.git#${DIND_REF:-v0.1.0}}"
+      context: "${DIND_CONTEXT:-https://github.com/qwreey/dind-authz-docker.git#${DIND_REF:-v0.1.1}}"
       # Same netshare override as code-docker's own build above - replaces the
       # Dockerfile's `FROM scratch AS netshare` stage.
       additional_contexts:
