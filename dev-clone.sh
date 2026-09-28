@@ -34,6 +34,7 @@ REPOS=(
   "builds code-docker-chrome"
   "builds roblox-studio-docker"
   "builds code-docker-trilium"
+  "builds code-docker-firecrawl"
   "dev router-docker-client"
   "dev router-docker"
   "dev dind-authz-docker"

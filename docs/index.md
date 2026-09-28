@@ -262,6 +262,10 @@ vscord 확장으로 Discord Rich Presence를 연동하고, ssh 소켓 포워딩�
 
 자세한 내용은 [tips/trilium.md](tips/trilium.md)를 확인하세요.
 
+## Firecrawl 연동 (에이전트용 웹 수집 도구)
+
+`EXTRA_INCLUDE` 훅으로 [code-docker-firecrawl](https://github.com/qwreey/code-docker-firecrawl)을 붙이면, code-docker 안의 에이전트가 `$FIRECRAWL_API_URL`/`$FIRECRAWL_TOKEN`으로 페이지를 markdown으로 긁거나(JS 렌더링 포함) 사이트를 크롤링할 수 있습니다. 컨테이너 하나(AIO)이고, 공격자가 고른 URL을 따라가는 도구라서 dind 안이 아니라 router로만 나가는 전용 망에 격리돼 있습니다 — 그 망에서는 code-docker, dind, router 앞문 어디에도 닿지 않습니다. 설정과 설계는 그 저장소의 README/CLAUDE.md를 확인하세요.
+
 ## router (네트워크 경계 컨테이너)
 
 code-docker보다 신뢰 수준이 높은 별도 컨테이너(`code-docker-router`)가 code-docker의
