@@ -27,8 +27,8 @@ interface RouterFrameProps {
   tab: 'dev-proxy' | 'app-routes' | 'vnc' | 'tailscale' | 'dns' | 'net' | 'tinyauth' | 'settings'
   // Extra query parameters for the initial load only (e.g. VNC's ?target=).
   params?: Record<string, string>
-  // Messages the embedded page sends about itself (router/frontend's
-  // embedTheme.ts notifyEmbedParent), other than the 'ready' handled here.
+  // Messages the embedded page sends about itself (router-docker's own
+  // frontend/src/embedTheme.ts notifyEmbedParent), other than the 'ready' handled here.
   onEmbedMessage?: (data: Record<string, unknown>) => void
 }
 
@@ -67,7 +67,7 @@ function RouterIframe({ host, tab, params, onEmbedMessage }: RouterFrameProps & 
   })
 
   // src is only computed once per (host, tab) - the initial ?theme= just
-  // avoids a flash on first paint (see router/frontend/src/embedTheme.ts);
+  // avoids a flash on first paint (see router-docker's own frontend/src/embedTheme.ts);
   // live theme changes go through postMessage below instead of reloading
   // the iframe by changing its src.
   const [src] = useState(() => {
@@ -79,7 +79,7 @@ function RouterIframe({ host, tab, params, onEmbedMessage }: RouterFrameProps & 
     // router-manager alone, so user-registered app content stays off
     // router-manager's own origin). Without this the embedded tab would
     // have no way to know the shared origin at all and could only refuse
-    // to render a viewer - see router/frontend's own useViewerOrigin.ts.
+    // to render a viewer - see router-docker's own frontend/src/components/Vnc/useViewerOrigin.ts.
     // Harmless for every other tab, which simply never reads it.
     const origin = encodeURIComponent(window.location.origin)
     const extra = params ? new URLSearchParams(params).toString() : ''
@@ -92,7 +92,7 @@ function RouterIframe({ host, tab, params, onEmbedMessage }: RouterFrameProps & 
     return () => clearTimeout(hardCap)
   }, [])
 
-  // The precise signal (router/frontend/src/embedTheme.ts's
+  // The precise signal (router-docker's own frontend/src/embedTheme.ts's
   // notifyEmbedReady, sent once its App has actually mounted/painted) - the
   // onLoad+200ms/3s-hard-cap timers above stay as fallbacks for older
   // builds or if this message never arrives, but this is what normally

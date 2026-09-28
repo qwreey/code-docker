@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
 // Plain fetch, not the shared api/client.ts machinery - this is a single
-// unauthenticated read (GET /api/auth/status - see router/backend/
-// handlers_auth.go's authStatusResponse.trustedHosts) with no gated-retry
+// unauthenticated read (GET /api/auth/status - see router-docker's own
+// backend/handlers_auth.go's authStatusResponse.trustedHosts) with no gated-retry
 // concerns of its own. null = still loading (RouterFrame shows a skeleton
 // until this resolves, so it never has to guess).
 export function useRouterTrustedHosts(): string[] | null {

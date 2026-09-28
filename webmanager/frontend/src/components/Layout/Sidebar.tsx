@@ -6,7 +6,7 @@ import './Layout.css'
 // SectionId/SECTIONS (see SidebarContainer.tsx, which owns that mapping).
 // Kept ID-string-generic on purpose: this component was pulled apart from a
 // webmanager-only implementation on 2026-08-08 so it could be hand-copied
-// into router/frontend's own SPA too (same tab-count-growing problem, see
+// into router-docker's own frontend/'s own SPA too (same tab-count-growing problem, see
 // root CLAUDE.md's "사이드바 공유" note) without either side needing to
 // depend on the other's types.
 export interface SidebarItem {

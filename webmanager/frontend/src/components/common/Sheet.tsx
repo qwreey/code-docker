@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import './Sheet.css'
 
-// Ported from router/frontend/src/components/common/Sheet.tsx (see
+// Ported from router-docker's own frontend/src/components/common/Sheet.tsx (see
 // ErrorBanner.tsx's doc comment on why this is a hand-kept duplicate).
 export function Sheet({
   open,

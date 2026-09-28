@@ -5,7 +5,7 @@
 mkdir -p ~/code-docker # 데이터와 빌드 파일을 담을 공간을 생성
 cd ~/code-docker
 mkdir builds # 빌드용 레포지토리 복사
-git clone --recurse-submodules https://github.com/qwreey/code-docker.git builds/code-docker
+git clone https://github.com/qwreey/code-docker.git builds/code-docker
 ```
 
 ## ootb.sh로 한 번에 설치하기
@@ -63,7 +63,7 @@ touch empty-extra-include.yml # docker-compose.yml의 include: 대상 - 없으�
 만약 빌드에 성공했다면 `docker compose up -d` 를 수행하세요.
 잘 구동된다면 성공입니다!
 > Note: 시스템 패키지 업데이트를 위해 주기적으로 build 와 up 을 다시 수행해주세요.
-> Note: code-docker 업데이트를 수행하려면 `git -C builds/code-docker pull origin main --recurse-submodules` 를 수행하세요 - 아래 "업데이트하기" 절이 이 과정 전체를 대신 해줍니다.
+> Note: code-docker 업데이트를 수행하려면 `git -C builds/code-docker pull origin main` 를 수행하세요 - 아래 "업데이트하기" 절이 이 과정 전체를 대신 해줍니다.
 
 ## 업데이트하기
 
@@ -306,9 +306,9 @@ cp example-env .env
   ```sh
   cp example-env.webmanager .env.webmanager
   ```
-- **router**(네트워크 경계 컨테이너, `.env.router`) - tailscale, Dev Proxy/App Routes 노출 정책, router-manager 자체 비밀번호(`ROUTER_MANAGER_AUTH_PASSWORD_HASH`), 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`, `ROUTER_APP_ORIGIN`, 아래 "router" 절 참고), tinyauth(로그인 화면 호스트네임 `TINYAUTH_HOSTS` 포함) 등. 자세한 내용은 [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고. 템플릿 파일 자체는 `router/example-env.router`에 있지만, 복사한 결과물은 `router/` 안이 아니라 `.env`/`.env.webmanager`와 같은 위치(`docker-compose.yml` 옆)에 `.env.router`로 둡니다 - `builds/code-docker`에 클론해 쓰는 배포 구조에서는 `router/` 안에 두면 컨테이너에 전달되지 않습니다.
+- **router**(네트워크 경계 컨테이너, `.env.router`) - tailscale, Dev Proxy/App Routes 노출 정책, router-manager 자체 비밀번호(`ROUTER_MANAGER_AUTH_PASSWORD_HASH`), 전용 관리 도메인(`ROUTER_MANAGER_HOSTS`, `ROUTER_APP_ORIGIN`, 아래 "router" 절 참고), tinyauth(로그인 화면 호스트네임 `TINYAUTH_HOSTS` 포함) 등. 자세한 내용은 [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고. 템플릿 파일(`example-env.router`)은 router-docker 저장소 쪽에 있고 이 체크아웃 안에는 없습니다 - router가 더 이상 submodule이 아니라 태그로 고정된 원격 참조이기 때문입니다(`docker-compose.yml`의 `ROUTER_REF`). `ootb.sh`를 실행하면 핀된 태그 기준으로 자동으로 받아 `.env`/`.env.webmanager`와 같은 위치(`docker-compose.yml` 옆, `router/` 안이 아님)에 `.env.router`로 써줍니다 - 수동으로 받으려면:
   ```sh
-  cp router/example-env.router .env.router
+  curl -fsSL "https://raw.githubusercontent.com/qwreey/router-docker/v0.1.0/example-env.router" -o .env.router
   ```
 
 ## 여러 code-docker 인스턴스 사용
@@ -412,12 +412,11 @@ webmanager 자체 비밀번호 게이트를 켜는 방법과, 이미지를 업�
 - **webmanager**: `webmanager.*.sh`, `example-env.webmanager`(런타임 환경변수 템플릿, 저장소 루트)
 - **기타**: `supervisord.*.conf`, `supervisord/*.conf`(빌드 타임에 이미지로 들어가는 사용자 서비스 — 런타임에 재빌드 없이 추가하려면 [직접 만든 서비스를 supervisord에 올리기](#직접-만든-서비스를-supervisord에-올리기-재빌드-없이) 쪽을 쓰세요), `supervisor-metadata.*.yaml`(webmanager의 Supervisor 탭이 읽지만 프로그램 폴더 밖에 있는 전역 메타데이터), `user-init.*.sh`, `sshd-service.*.sh`, `dns-local.*.sh`(strict-order dnsmasq로 로컬 DNS 리졸버 실행, [build-customization.md](build-customization.md) 참고), `code-patch.*.sh`, `code-patch/`, `code-extensions.*.sh`(내장 webmanager 확장을 이미지의 빌드로 매 시작 동기화, [build-customization.md](build-customization.md) 참고), `vector-service.*.sh`(`VECTOR_LOG_LEVEL`로 vector 자체 진단 로그 상세도 조절), `vector.*.toml`, `nginx-service.*.sh`, `nginx.*.conf`(code-server `/` + webmanager `/manager` 단일 origin 라우팅, `NGINX_LOG_LEVEL`로 access_log 상세도 조절 — `/tailscale/`·`/dev-proxy/`·`/exports/`는 이제 router 자신의 nginx가 직접 종단합니다, [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고), `nginx-error.*.html`(code-server가 아직 안 떴을 때 502 대신 보여주는 자동 재시도 페이지)
 
-router 컨테이너(`router/` 서브모듈, 별도 레포 [qwreey/router-docker](https://github.com/qwreey/router-docker)) 자체의 override 파일 목록은 [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md)를
-확인하세요 — `router/config/netgate/`, `router/config/tailscale/`,
-`router/config/caddy-adapter/`에 나뉘어 있습니다. router 전용 기능
+router 컨테이너(별도 레포 [qwreey/router-docker](https://github.com/qwreey/router-docker) - 태그로 고정된 원격 참조로 붙습니다, `router/` submodule이던 시절은 2026-09-28에 끝났습니다) 자체의 override 파일 목록은 [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md)를
+확인하세요 — [`config/netgate/`](https://github.com/qwreey/router-docker/tree/HEAD/config/netgate), [`config/tailscale/`](https://github.com/qwreey/router-docker/tree/HEAD/config/tailscale),
+[`config/caddy-adapter/`](https://github.com/qwreey/router-docker/tree/HEAD/config/caddy-adapter)에 나뉘어 있습니다. router 전용 기능
 환경변수(tailscale/Dev Proxy/router-manager 자체 비밀번호/tinyauth)는
-`router/example-env.router`(런타임 템플릿, `.env.router`로 복사해
-사용 - `router/` 안이 아니라 `docker-compose.yml` 옆) — webmanager와 같은 `--env-migrate` 마이그레이션 도구를 공유합니다,
+router-docker 저장소의 `example-env.router`(런타임 템플릿 - 이 체크아웃 안에는 없고, `ootb.sh`가 핀된 태그 기준으로 받아와 `.env.router`로 저장합니다, 위 "환경 변수 설정 (.env)" 절 참고) — webmanager와 같은 `--env-migrate` 마이그레이션 도구를 공유합니다,
 자세한 내용은 [router.md#router-환경변수-마이그레이션](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md#router-환경변수-마이그레이션) 참고.
 
 # 코드 서버 패치
@@ -438,6 +437,6 @@ code-docker와 함께 만지는 형제 repo들은 이 체크아웃 안으로 받
 ```
 
 - `builds/<name>` — `EXTRA_INCLUDE`로 스택에 붙는 provider(chrome, roblox-studio, trilium, firecrawl). 실제 배포에서 `ootb-extra.sh`가 clone하는 경로와 같아서, 스크립트가 출력해 주는 `extra-include.yml`이 배포의 것과 그대로 같습니다.
-- `dev/<name>` — 빌드가 평소엔 원격 git에서 가져오는 코어 의존물의 로컬 체크아웃. 지금은 router-docker-client이고, `.env`에 `ROUTER_CLIENT_SOURCE="./dev/router-docker-client/"`를 넣으면 netshare/dns-local/netinit-docker가 그 체크아웃에서 빌드됩니다.
+- `dev/<name>` — 빌드가 평소엔 원격 git 참조로 가져오는 코어 의존물의 로컬 체크아웃: `router-docker-client`, `router-docker`, `dind-authz-docker`, `code-server-autoinstall`, `envmigrate`(전부 예전엔 이 저장소의 submodule이었습니다). `.env`에 `ROUTER_CLIENT_SOURCE="./dev/router-docker-client/"`를 넣으면 netshare/dns-local/netinit-docker가, `ROUTER_INCLUDE`/`DIND_CONTEXT`/`AUTOINSTALL_SOURCE`를 넣으면 router-docker/dind-authz-docker/code-server-autoinstall가 그 체크아웃에서 빌드됩니다(`example-env` 참고). `envmigrate`는 Go 모듈이라 `.env`가 아니라 `go.work`로 바꿔 끼웁니다 - `./dev-clone.sh`가 정확한 명령을 출력해 줍니다.
 
-스크립트는 `.env`와 `extra-include.yml`을 직접 고치지 않고 넣을 줄만 출력합니다. pull은 fast-forward만 하고, 커밋 안 된 변경이 있거나 upstream이 없는 브랜치는 이유를 출력하고 건너뜁니다. clone URL은 기본이 https이고, push까지 할 거라면 `DEV_CLONE_GIT_BASE=git@github.com:qwreey/ ./dev-clone.sh`로 받으세요.
+스크립트는 `.env`와 `extra-include.yml`을 직접 고치지 않고 넣을 줄만 출력합니다. pull은 fast-forward만 하고, 커밋 안 된 변경이 있거나 upstream이 없는 브랜치는 이유를 출력하고 건너뜁니다. clone은 fetch는 https(키 없이도 받아지도록), push는 ssh로 가도록 pushurl을 따로 잡아둡니다 - `DEV_CLONE_GIT_BASE`/`DEV_CLONE_PUSH_BASE`로 각각 바꿀 수 있고, `DEV_CLONE_PUSH_BASE=""`면 pushurl을 따로 두지 않습니다.

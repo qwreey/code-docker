@@ -19,26 +19,30 @@ ADD https://github.com/qwreey/code-server-autoinstall.git#${AUTOINSTALL_REF} /
 
 FROM docker:latest AS docker-bin
 
-# code-docker-dind (code-dind/Dockerfile) has moved out to its own subtree, same pattern
-# as router/ - see root CLAUDE.md's "docker-compose topology" section and
-# code-dind/CLAUDE.md. code-docker-netinit-docker (formerly code-docker-netfilter-fix;
-# the old code-docker-netinit sidecar is gone entirely, see CLAUDE.md) went a step
-# further: it's not even a local directory anymore, it builds directly from
-# qwreey/router-docker-client's own repo (see docker-compose.yml's build.context for that
-# service). docker-compose.yml's code-docker-dind service still builds from code-dind/ as
-# its own local context.
+# code-docker-dind (dind-authz-docker's own Dockerfile) has moved out to its own
+# standalone repo, same pattern as router-docker - see root CLAUDE.md's
+# "docker-compose topology" section and dind-authz-docker's own CLAUDE.md (both were
+# git submodules, at code-dind/ and router/ respectively, until 2026-09-28).
+# code-docker-netinit-docker (formerly code-docker-netfilter-fix; the old
+# code-docker-netinit sidecar is gone entirely, see CLAUDE.md) went a step
+# further: it's not even a local directory, tag-pinned or otherwise - it builds directly
+# from qwreey/router-docker-client's own repo (see docker-compose.yml's build.context for
+# that service). docker-compose.yml's code-docker-dind service builds directly from
+# qwreey/dind-authz-docker as a remote build context by default too (DIND_CONTEXT
+# overrides it to a local dev/dind-authz-docker checkout).
 
 # webmanager/frontend no longer imports @code-docker/router-frontend
 # (2026-08-08 decoupling - see .claude/backlog/router-frontend-decouple-plan.md
-# and router/.claude/net-auth-expansion-plan.md's item 6): router's tabs are
+# and router-docker's own .claude/net-auth-expansion-plan.md's item 6,
+# dev/router-docker/.claude/net-auth-expansion-plan.md locally): router's tabs are
 # now embedded as an iframe into router's own /router/ page
 # (components/RouterEmbed/RouterFrame.tsx) instead of being rendered as
 # same-origin React components, and the couple of generic UI primitives
-# (ErrorBanner/Sheet/Skeleton) that used to live only in router/frontend are
-# hand-copied into webmanager/frontend/src/components/common/ now. This
+# (ErrorBanner/Sheet/Skeleton) that used to live only in router-docker's own frontend/
+# are hand-copied into webmanager/frontend/src/components/common/ now. This
 # stage still runs from the repo-root npm workspace (root package.json's
 # `workspaces:` still lists both frontends), but no longer needs to COPY
-# router/frontend/ at all - webmanager/frontend builds standalone.
+# router-docker's frontend/ at all - webmanager/frontend builds standalone.
 FROM node:24-alpine AS webmanager-frontend
 WORKDIR /src
 COPY package.json package-lock.json ./

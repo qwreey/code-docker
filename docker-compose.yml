@@ -60,7 +60,8 @@ networks:
     # instances on one host (each got its own network by name, but they all
     # wanted the same fixed CIDR). router's own nginx needs this network's
     # CIDR for its /exports/ internal-source deny (see ROUTER_INTERNAL_SUBNET
-    # below and router/.claude/router-nginx-hardening-plan.md), but it now
+    # below and router-docker's own .claude/router-nginx-hardening-plan.md,
+    # dev/router-docker/.claude/router-nginx-hardening-plan.md locally), but it now
     # detects it live from its own routing table at startup instead of
     # relying on a value pinned here - see nginx-service.default.sh's
     # detect_internal_subnets - which, since 2026-09-14, denies EVERY network
@@ -197,7 +198,8 @@ services:
         # address (a dedicated non-loopback IP, see docs/tailscale.md) -
         # historically this existed so code-docker's own tailscaled could
         # publish these ports without an automatic loopback-exposure
-        # workaround. Phase 4 of router/.claude/functional-router-plan.md's migration is
+        # workaround. Phase 4 of router-docker's own .claude/functional-router-plan.md's
+        # migration (dev/router-docker/.claude/functional-router-plan.md locally) is
         # now complete (see docs/router.md's "보안" section) - code-docker
         # runs no tailscaled at all anymore, so that original reasoning no
         # longer applies. Left as the default anyway since it still works
@@ -219,7 +221,8 @@ services:
     #   network interfaces". Port 80 lives on the code-docker-router
     #   service instead now, which terminates it directly via its own
     #   nginx and reverse-proxies everything but /exports/ and /router/
-    #   back to code-docker:80 (see router/.claude/router-nginx-hardening-plan.md
+    #   back to code-docker:80 (see router-docker's own
+    #   .claude/router-nginx-hardening-plan.md
     #   and router's own ports: comment below). This container has NO
     #   published port of its own and is unreachable from the host except
     #   through that hop.
@@ -304,7 +307,9 @@ services:
       # LXC-hosted Docker compatibility concerns, and /code bind-mount writes
       # need extra chown/named-volume handling). A build-stage choice rather
       # than a runtime toggle so an unwanted stage's code/config isn't even
-      # present in the image - see code-dind/.claude/dind-authz-plan.md for why.
+      # present in the image - see dind-authz-docker's own .claude/dind-authz-plan.md
+      # for why (dev/dind-authz-docker/.claude/dind-authz-plan.md locally, after
+      # ./dev-clone.sh).
       target: "${DIND_TARGET:-dind-authz}"
     privileged: true
     restart: unless-stopped
@@ -320,7 +325,8 @@ services:
       # below - see example-env before overriding.
       ROUTER_HOSTNAME: "${ROUTER_HOSTNAME:-router}"
     # dind plants its own default route and /etc/resolv.conf from inside
-    # itself (see code-dind/script/dind-entrypoint.sh) - and used to do it
+    # itself (see dind-authz-docker's own script/dind-entrypoint.sh,
+    # dev/dind-authz-docker/script/dind-entrypoint.sh locally) - and used to do it
     # silently, so a container that never found router still reported `Up`
     # forever with nothing but one wait_until timeout in its log. Surface that
     # state as `unhealthy` instead: dockerd actually answering, plus a fresh
@@ -507,9 +513,11 @@ services:
   # docs/egress-netgate.md for the full design/reasoning, and CLAUDE.md's
   # "egress lockdown (netgate)" section for the short version.
   #
-  # The service itself is defined in router/docker-compose.router.yml (see
-  # the `router` include below), not here - router/ is its own standalone
-  # project (qwreey/router-docker), brought in as a git submodule, and code-
+  # The service itself is defined in router-docker's own docker-compose.router.yml
+  # (see the `router` include below, now a remote Compose include pinned by
+  # ROUTER_REF), not here - router-docker is its own standalone
+  # project (qwreey/router-docker), brought in as a tag-pinned remote reference
+  # (was a git submodule at router/ until 2026-09-28), and code-
   # docker only supplies the fields whose relative paths (env_file, volumes'
   # bind-mount source) need to resolve against THIS file's own location
   # rather than the fragment's - see each field's own comment below. This
@@ -523,22 +531,25 @@ services:
   code-docker-router:
     # router's own feature-specific settings (tailscale, Dev Proxy exposure
     # policy, router-manager's own admin-API password, tinyauth, /exports/
-    # allowlists) all live in .env.router, not here - copy
-    # router/example-env.router to .env.router and uncomment only what you
-    # need (every value already has a sane default), same pattern as
+    # allowlists) all live in .env.router, not here - router is no longer a
+    # submodule, so its example-env.router template isn't in this checkout;
+    # ootb.sh's fetch_router_env_template (ootb-lib.sh) fetches it for the
+    # pinned ROUTER_REF tag (or from next to a local ROUTER_INCLUDE checkout)
+    # into .env.router for you. Uncomment only what you need there (every
+    # value already has a sane default), same pattern as
     # code-docker's own .env.webmanager below/above. Migrated the same way
-    # too (`router-manager --env-migrate`, see router/example-env.router's
-    # own doc comment).
+    # too (`router-manager --env-migrate`, see router-docker's own
+    # example-env.router's own doc comment).
     #
-    # Deliberately NOT "router/.env.router" (what you'd naively write given
-    # the template file it's copied from lives under router/) - env_file
+    # Deliberately flat (".env.router", not nested under a router-owned
+    # path) - env_file
     # paths are relative to wherever the file that DECLARES them lives, and
-    # this one's declared here (not in router/docker-compose.router.yml) so
+    # this one's declared here (not in router-docker's own docker-compose.router.yml) so
     # it stays relative to THIS file - which in the recommended
     # split-directory deploy (docs/index.md: clone into builds/code-docker/,
     # copy docker-compose.yml out one level) is a different directory than
-    # the router/ subtree - and required: false means a missing file there
-    # is never reported, so a "router/.env.router" path would silently never
+    # any router-docker checkout - and required: false means a missing file there
+    # is never reported, so nesting it under a router-owned path would silently never
     # be read. Flat and colocated with .env/.env.webmanager instead: nothing
     # under builds/ needs touching to set a router value, matching how those
     # two are already handled.
@@ -550,10 +561,11 @@ services:
       # state/config.yaml, caddy-adapter's managed/custom Caddyfile
       # fragments) - router has no /code volume of its own (that's
       # code-docker's), so this is its equivalent. Declared here rather than
-      # in router/docker-compose.router.yml because a relative
+      # in router-docker's own docker-compose.router.yml because a relative
       # `./data/router` needs to resolve against wherever THIS file sits
       # (data/ deliberately lives outside the source checkout, independent
       # of BUILD_CONTEXT - see root CLAUDE.md's "Build (Dockerfile)"
       # section) - `docker compose config` confirmed declaring it in the
-      # fragment instead resolves to router/data/router, which is wrong.
+      # fragment instead resolves it against the remote include's own cache
+      # location, which is wrong.
       - "${ROUTER_VOLUME:-./data/router}:/var/lib/code-docker-router"

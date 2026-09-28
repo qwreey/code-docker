@@ -21,7 +21,7 @@ import (
 // index.html back with a text/html Content-Type instead. Files under
 // assets/ are Vite's hashed, content-addressed bundle output (a changed
 // file always gets a new filename), so those are safe to cache
-// indefinitely. Keep in sync with router/backend/static.go, which this was
+// indefinitely. Keep in sync with router-docker's own backend/static.go, which this was
 // ported from (in the other direction, for this fix).
 func staticHandler(dir string) http.Handler {
 	fileServer := http.FileServer(http.Dir(dir))

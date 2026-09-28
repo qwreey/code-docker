@@ -56,7 +56,7 @@ code.yaeji.moe {
 
 ### 사이드 프로젝트에 자기 도메인을 준 경우
 
-router의 vhost(`ROUTER_VHOST_*`, [router/docs/vhost.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/vhost.md))로 붙인 앱은
+router의 vhost(`ROUTER_VHOST_*`, [router-docker의 docs/vhost.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/vhost.md))로 붙인 앱은
 **자기 서버 블록이 따로** 필요합니다. code-server와 같은 origin이 아니므로 위 블록의 예외
 경로가 적용되지 않고, 그 앱의 매니페스트/아이콘 경로도 그 앱마다 다릅니다.
 
@@ -64,7 +64,7 @@ router의 vhost(`ROUTER_VHOST_*`, [router/docs/vhost.md](https://github.com/qwre
 note.yaeji.moe {
   # Trilium의 PWA 경로는 이 둘뿐입니다 - 서비스워커가 없습니다.
   # /_pwa-icon.png는 router가 PWA 아이콘을 갈아끼울 때 쓰는 고정 경로입니다
-  # (ROUTER_VHOST_PWA_ICON_*, router/docs/vhost.md). 안 바꿨다면 그 앱
+  # (ROUTER_VHOST_PWA_ICON_*, router-docker의 docs/vhost.md). 안 바꿨다면 그 앱
   # 자신의 아이콘 경로 - Trilium이면 /icon.png - 를 대신 넣으세요.
   @not_pwa_public {
     not path /manifest.webmanifest /_pwa-icon.png

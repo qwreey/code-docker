@@ -102,14 +102,17 @@
 # 지원(daemon.json의 ipv6/fixed-cidr-v6 등)이 먼저 켜져 있어야 의미가
 # 있습니다 - 엔진 지원 없이 이 값만 켜면 네트워크 생성이 실패합니다.
 #
-# 이 값을 켜면 netgate(router/config/netgate/firewall.default.sh)가 IPv6이
+# 이 값을 켜면 netgate(router-docker의 config/netgate/firewall.default.sh,
+# https://github.com/qwreey/router-docker)가 IPv6이
 # 실제로 붙어있는 걸 감지해 ip6tables로 고정 차단 세트(fc00::/7 ULA,
 # fe80::/10 link-local, ::1/128 loopback) + outbound: 안의 v6 CIDR 항목만
 # 미러링합니다 - forwards:/bandwidth:는 v6으로 미러링되지 않고,
 # config.default.yaml 자체도 아직 v4 CIDR만 지원합니다. ip6tables가 없거나
 # 규칙 적용이 실패하면 `docker compose logs`에 반복되는 큰 경고 블록이
 # 뜹니다(조용히 넘어가지 않음). 자세한 커버리지는
-# router/docs/egress-netgate.md의 "IPv6" 절 참고. 가장 단순하고 안전한
+# router-docker의 docs/egress-netgate.md
+# (https://github.com/qwreey/router-docker/blob/HEAD/docs/egress-netgate.md)의
+# "IPv6" 절 참고. 가장 단순하고 안전한
 # 기본값은 여전히 이 값을 켜지 않는 것입니다.
 #ENABLE_IPV6="false"
 
@@ -118,7 +121,7 @@
 #PWA_SHORT_NAME="code-docker"
 
 # code-server 자체 manifest.json의 display 필드를 덮어씁니다
-# (code-server-autoinstall/start.sh의 apply_pwa_metadata_patch가 PWA_NAME/
+# (code-server-autoinstall의 start.sh에 있는 apply_pwa_metadata_patch가 PWA_NAME/
 # PWA_SHORT_NAME/PWA_ICON_PREFIX와 똑같은 방식으로, 설치된 code-server의
 # manifest 라우트에 직접 patch합니다). code-server 업스트림의 원본 manifest는
 # "fullscreen"으로 고정되어 있지만, code-docker는 기본값을 "standalone"으로
@@ -133,7 +136,8 @@
 #PWA_DISPLAY_MODE="fullscreen"
 
 # 호스트에 마운트할 볼륨 경로. 기본은 저장소 안 ./data/code, ./data/sshd,
-# ./data/dind 등 - 소스 디렉토리(code-dind/, router/, ...)와 헷갈리지 않도록
+# ./data/dind 등 - 개발용으로 받아두는 소스 체크아웃(dev/dind-authz-docker/,
+# dev/router-docker/, ...)과 헷갈리지 않도록
 # 런타임 데이터는 전부 data/ 아래 모아둡니다. 다른 위치(다른 디스크, 여러
 # 인스턴스 간 공유 등)를 쓰고 싶을 때만 바꾸세요.
 #DIND_VOLUME="./data/dind"
@@ -179,7 +183,8 @@
 #   dind-authz  - 기본값. dind가 만드는 컨테이너에 privileged, 허용 목록 밖
 #     CapAdd, seccomp/apparmor 비활성화, pid/network/ipc/cgroupns=host, 디바이스
 #     패스스루, /code 밖 bind mount 소스를 거부하는 authz 플러그인을 내장.
-#     자세한 설계는 code-dind/.claude/dind-authz-plan.md 참고.
+#     자세한 설계는 dind-authz-docker의 .claude/dind-authz-plan.md
+#     (https://github.com/qwreey/dind-authz-docker/blob/HEAD/.claude/dind-authz-plan.md) 참고.
 #   dind-authz-remap - dind-authz에 더해 userns-remap까지 적용 (dind가 만드는
 #     컨테이너의 root가 호스트에서는 비특권 UID로 매핑). 기본값 아님 - LXC 등
 #     중첩 가상화 호스트와 궁합이 안 좋을 수 있고, /code 아래 bind mount
@@ -216,14 +221,16 @@
 #ROUTER_MEM_LIMIT="0"
 
 # tailscale, Dev Proxy 노출 정책, router-manager 자체 비밀번호, tinyauth
-# 등 router 전용 기능 설정은 router/example-env.router로 옮겨졌습니다(복사해서
-# router/.env.router로 쓰세요) - 이 파일과 별도로 `router-manager
+# 등 router 전용 기능 설정은 router-docker의 example-env.router로 옮겨졌습니다 -
+# router가 더 이상 submodule이 아니라 태그로 고정된 원격 참조라 이 체크아웃 안에는
+# 없고, `ootb.sh`가 핀된 태그 기준으로 받아 .env.router로 저장해줍니다(위 "코어
+# 의존물의 버전 핀" 참고) - 이 파일과 별도로 `router-manager
 # --env-migrate`로 마이그레이션됩니다. 여기 남은 ALLOWED_HOSTS류는
 # code-docker와 값을 공유하기 때문에 그대로 남아있습니다.
 
-# Dev Proxy's internal Caddy instance runs on router (see
-# router/.claude/functional-router-plan.md's "Dev Proxy Caddy도 router로
-# 이관") - only router itself reads these, code-docker's nginx doesn't proxy
+# Dev Proxy's internal Caddy instance runs on router (see router-docker's own
+# .claude/functional-router-plan.md's "Dev Proxy Caddy도 router로
+# 이관", dev/router-docker/.claude/functional-router-plan.md locally) - only router itself reads these, code-docker's nginx doesn't proxy
 # to Caddy at all (router's own nginx does, over a unix socket, regardless
 # of CADDY_ADAPTER_PORT - see docs/dev-proxy.md). CADDY_ADAPTER_PORT has no
 # default - leave it unset to keep caddy-adapter unix-socket-only, or set
@@ -269,7 +276,8 @@
 # reach every port inside the container, including the ones VS Code's PORTS
 # tab auto-forwards as soon as a dev server starts listening. Expose what
 # you actually want reachable through router's Dev Proxy / App Routes
-# instead (router/docs/dev-proxy.md, router/docs/app-routes.md), which have
+# instead (router-docker's own docs/dev-proxy.md, docs/app-routes.md -
+# https://github.com/qwreey/router-docker/blob/HEAD/docs/), which have
 # their own exposure policy and auth.
 #
 # Set 0 (or anything code-server doesn't read as truthy - it matches
@@ -366,9 +374,9 @@
 #WEBMANAGER_ENV_TEMPLATE_PATH="/etc/code-docker/webmanager/example-env.webmanager"
 
 # 바로 위 WEBMANAGER_ENV_TEMPLATE_PATH와 완전히 같은 패턴이지만
-# router-manager(`router` 컨테이너)의 router/example-env.router 쪽입니다 -
+# router-manager(`router` 컨테이너)의 example-env.router 쪽입니다 -
 # `router-manager --env-migrate`/시작 시 버전 불일치 검사가 여기서 최신
-# router/example-env.router 템플릿을 읽습니다. 마찬가지로 router/.env.router
+# example-env.router 템플릿을 읽습니다. 마찬가지로 .env.router
 # 자신에는 설정할 수 없습니다(자기 자신을 마이그레이션할 템플릿을 자기
 # 안에서 가리키면 자기참조가 되므로) - 이 값은 저장소 루트의 이 파일(.env)에서만
 # 설정합니다. 조직 커스텀 템플릿을 강제하고 싶다면 이 경로에 볼륨을

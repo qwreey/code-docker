@@ -19,7 +19,7 @@ function setIgnored() {
   }
 }
 
-// Hand-ported from router/frontend/src/components/common/RouterAuthSetupBanner.tsx
+// Hand-ported from router-docker's own frontend/src/components/common/RouterAuthSetupBanner.tsx
 // (same reasoning as ErrorBanner/Sheet/Skeleton - see that component's own
 // doc comment) rather than re-adding the @code-docker/router-frontend
 // dependency the 2026-08-08 decoupling removed. This nag used to be mounted

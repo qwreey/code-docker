@@ -41,16 +41,18 @@ webmanager's own feature: each always `<iframe>`-embeds router's own
 `/router/` page (`components/RouterEmbed/RouterFrame.tsx`), pointed at the
 same-origin `/router/` path by default or, when `ROUTER_MANAGER_HOSTS` is
 configured, a cross-origin `<iframe>` into that dedicated domain instead (see
-`router/docs/router.md`'s "보안: 공유 origin과 전용 도메인") — both cases are an
+router-docker's own `docs/router.md`'s "보안: 공유 origin과 전용 도메인" —
+`dev/router-docker/docs/router.md` locally, after `./dev-clone.sh`) — both cases are an
 iframe, there is no same-origin direct-render fallback anymore. As of the
-2026-08-08 decoupling (`router/CLAUDE.md`, `.claude/archive/router-frontend-decouple-plan-done.md`)
+2026-08-08 decoupling (router-docker's own `CLAUDE.md`, `.claude/archive/router-frontend-decouple-plan-done.md`)
 webmanager's frontend has zero `@code-docker/router-frontend` dependency at
 all — the handful of generic UI primitives it still needs (`ErrorBanner`/
 `Sheet`/`Skeleton`) are hand-duplicated locally instead of imported from that
 package. webmanager's own `internal/tailscale` backend
 package (config CRUD, status,
-login) was fully deleted when tailscale moved to the `router/` container —
-see `router/CLAUDE.md` and `router/docs/router.md#tailscale` for the current
+login) was fully deleted when tailscale moved to the router container
+(router-docker, was the `router/` submodule until 2026-09-28) —
+see router-docker's own `CLAUDE.md` and `docs/router.md#tailscale` for the current
 design. Logs (real vector-backed data, time-range filter + cursor
 pagination, sticky filters with an internally-scrolling table, live mode that
 appends instead of replacing), a "작업 관리자" (Task Manager) tab — renamed
@@ -307,9 +309,11 @@ shimmer placeholder (`components/common/Skeleton.tsx`) that cross-fades
 into the real content via the same utility instead of snapping — see
 "First-load skeleton" under Ground rules below for the pattern to follow
 when adding a new tab. A `.env.webmanager` migration tool
-(`webmanager --env-migrate`, `backend/envmigratecmd.go` calling the
-`github.com/qwreey/envmigrate` submodule (root `envmigrate/`, not an
-`internal/` package) — see
+(`webmanager --env-migrate`, `backend/envmigratecmd.go` calling
+`github.com/qwreey/envmigrate` — an ordinary tagged Go module dependency, not an
+`internal/` package (was a repo-root `envmigrate/` submodule until 2026-09-28;
+local development against an unreleased change goes through an uncommitted
+`go.work`, see root `CLAUDE.md`'s "Development checkout layout")) — see
 `.claude/archive/env-migration-plan-done.md`): reconciles a user's file
 against the image's current `example-env.webmanager`, archiving removed keys
 into a `#~` section and preserving both the user's actively-set values and
@@ -376,10 +380,10 @@ a log line rather than silently, and the array is deliberately **not**
 capped at the four entries browsers actually draw: that cap is the
 reader's presentation detail, and enforcing it here would be webmanager
 deciding a configured shortcut doesn't exist. code-server-autoinstall's
-vendored manifest route itself is never touched by `manifestpatch` — but `code-server-autoinstall/start.sh`'s
+vendored manifest route itself is never touched by `manifestpatch` — but code-server-autoinstall's own `start.sh`'s
 own `apply_pwa_metadata_patch()` does patch it directly (a `sed` against the
-*installed* code-server, gitignored inside that submodule, not anything
-checked in), the same way it already handles `PWA_NAME`/`PWA_SHORT_NAME`/
+*installed* code-server, gitignored inside that dependency's own checkout, not anything
+checked in here), the same way it already handles `PWA_NAME`/`PWA_SHORT_NAME`/
 `PWA_ICON_PREFIX`: a `PWA_DISPLAY_MODE` env var (root `example-env`, same
 unprefixed tier as those three — it configures code-server's own manifest,
 not anything webmanager-specific) overrides code-server's hardcoded
@@ -422,9 +426,10 @@ Tailscale tab entry above) for expose CRUD (structured route editor + raw
 Routes works the same way. webmanager's own `internal/
 devproxy` package, the `caddy-adapter` supervisord program, and
 `internal/authgate`'s `forward_auth`/`/manager/dev-auth` wiring described in
-that archive doc were all deleted — Caddy now lives on the `router`
-container and per-expose auth goes through tinyauth instead (see
-`router/CLAUDE.md` and `router/docs/dev-proxy.md`). `internal/authgate` here is
+that archive doc were all deleted — Caddy now lives on the router
+container (router-docker, was the `router/` submodule until 2026-09-28)
+and per-expose auth goes through tinyauth instead (see
+router-docker's own `CLAUDE.md` and `docs/dev-proxy.md`, `dev/router-docker/` locally). `internal/authgate` here is
 back to gating only webmanager's own write-gate (10 min TTL), with no
 second forward-auth TTL to carry. A
 per-project git status panel (`.claude/qa-request/project-git-status-plan-done.md`,

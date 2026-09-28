@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import './common.css'
 
-// Ported from router/frontend/src/components/common/ErrorBanner.tsx (was
+// Ported from router-docker's own frontend/src/components/common/ErrorBanner.tsx (was
 // imported from @code-docker/router-frontend until 2026-08-08's decoupling
 // - see .claude/backlog/router-frontend-decouple-plan.md). Kept as a
 // deliberate duplicate rather than a shared package - the two frontends

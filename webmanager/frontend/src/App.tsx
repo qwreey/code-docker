@@ -82,11 +82,11 @@ const IFRAME_SECTIONS = new Set<SectionId>([
   'router-settings',
 ])
 
-// Splits pathname into {root, section} the same way router/frontend's own
+// Splits pathname into {root, section} the same way router-docker's own frontend/'s own
 // App.tsx does (see its splitPath doc comment for the full reasoning) - only
 // looks at the last path segment, so this works unmodified whether the
 // build's absolute `/manager/` base or dev's `/` base is in effect. Kept as
-// a near-duplicate rather than a shared util since router/frontend and
+// a near-duplicate rather than a shared util since router-docker's own frontend/ and
 // webmanager are separate Vite apps with genuinely different Tab/SectionId
 // types - see root CLAUDE.md's "sidebar reuse" note on why a shared UI
 // package would need real work, not just moving this one function.
@@ -151,7 +151,7 @@ function App() {
 
   // The VNC tab's frame stays mounted once visited, hidden while another
   // tab shows, so leaving VNC doesn't disconnect its viewers - only closing
-  // a viewer's own tab does (router/frontend's Vnc.tsx). display:none is
+  // a viewer's own tab does (router-docker's own frontend/'s Vnc.tsx). display:none is
   // safe for a remote-resize viewer thanks to router's noVNC patch (no 0x0
   // desktop request); coming back finds it at the same size.
   const [vncVisited, setVncVisited] = useState(active === 'vnc')
@@ -164,7 +164,7 @@ function App() {
   )
   // Only for the frame's first load. Inside code-server each target is its
   // own editor tab (the extension owns the tabs), so router is told to show
-  // just this view's target, or the list - see router/frontend's Vnc.tsx
+  // just this view's target, or the list - see router-docker's own frontend/'s Vnc.tsx
   // HOST_MODE.
   const [vncInitialParams] = useState(() => {
     const params: Record<string, string> = {}

@@ -145,7 +145,7 @@ sshd 를 설정하고 실행합니다. 기본적으로 `/etc/ssh`는 적절한 �
 
 tailscale 관련 override 파일(`tailscale-service.*.sh`, `tailscale-forward.*.sh`,
 `tailscale-publish.*.sh`, `tailscale-config.*.yaml`)은 이제 code-docker가 아니라
-**router** 컨테이너(`router/config/tailscale/`)에 있습니다 — 같은 override 패턴이지만
+**router** 컨테이너(router-docker의 [`config/tailscale/`](https://github.com/qwreey/router-docker/tree/HEAD/config/tailscale))에 있습니다 — 같은 override 패턴이지만
 재빌드 대상이 `code-docker-router` 서비스입니다. 자세한 내용은 [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md)를
 확인하세요.
 
@@ -289,7 +289,7 @@ webmanager는 지금처럼 `/api/...`를 그대로 받습니다. access/error �
 방어 차원으로 유지)과, `ALLOWED_HOSTS`로 조절하는 Host 헤더 화이트리스트도 이
 파일에 있습니다. `/tailscale/`·`/dev-proxy/`·`/exports/` 위치는 더 이상 여기서
 router로 프록시되지 않습니다 — router가 host:80을 직접 종단하도록 바뀌면서
-(`router/config/nginx/`) 이 파일에서는 빠졌고, webmanager의 Tailscale/Dev Proxy
+(router-docker의 [`config/nginx/`](https://github.com/qwreey/router-docker/tree/HEAD/config/nginx)) 이 파일에서는 빠졌고, webmanager의 Tailscale/Dev Proxy
 탭도 이제 router 자신의 `/router/` 경로로 직접 호출합니다. 자세한 내용은
 [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고. `TRUSTED_PROXIES`(외부 리버스 프록시의 IP/CIDR를 알려주면 `$remote_addr`가
 그 프록시의 X-Forwarded-For를 신뢰해서 실제 클라이언트 IP로 채워짐, 기본 빈 값)도
