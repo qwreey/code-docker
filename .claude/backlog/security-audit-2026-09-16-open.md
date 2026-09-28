@@ -26,107 +26,19 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
 - (관련) router 앞문이 형제 격리망에서 열려 있던 문제 — router-docker `v0.1.1`.
   F34는 이것과 범위가 다르다(외부망 최초 구동 레이스).
 
+- 2026-09-29, router-docker `v0.1.2` (code-docker `ROUTER_REF` bump):
+  - F34 첫 비밀번호 설정에 컨테이너 로그의 1회용 setup 토큰 요구 (`4a8dbca`)
+  - F07 netgate 규칙을 `iptables-restore --noflush`로 원자 교체, F20 v4 고정 차단
+    (loopback/link-local/0.0.0.0/8) + RFC1918 block 삭제 PUT 거부 (`11ec7eb`)
+  - F17 forwards/tailscale publish에 targetguard 허용목록, dind:2375/2376 전면 거부,
+    F35 루프백 판정을 IP 파싱으로 (`63d3d82`)
+  - F18 관리용 GET 전부 게이트 뒤로 (`df70c22`)
+  - F21 실측(tinyauth v5.1.3는 부모 도메인 쿠키) 후 Caddy/nginx가 대상 홉에서
+    `tinyauth-*` 쿠키 제거 (`8be0932`)
+  - F22 nginx에 들어가는 env 값 검증 (`ef69358`)
+  - F03 빈 `ALLOWED_HOSTS` = 로컬 전용, migrate가 물어봄 (router `981ecfb`, code-docker 같은 날)
+
 ---
-
-## F07 [Medium] router-docker - netgate 방화벽 30초 주기 재적용이 원자적이지 않음
-
-- **저장소/위치**: `router-docker`, `config/netgate/firewall.default.sh`의 `apply_rules()`/
-  `ensure_chain()` — 여전히 `iptables -F`로 체인을 비운 뒤 규칙을 하나씩 다시 삽입.
-- **문제**: 체인이 비어 있는 짧은 시간 동안 FORWARD의 기본 ACCEPT 정책이 적용되어
-  RFC1918/메타데이터 IP로 나가는 패킷이 새는 레이스 윈도우가 30초마다 반복된다.
-- **방향**: 임시 체인을 만들어 규칙을 채운 뒤 점프 타깃을 원자적으로 교체하거나
-  `iptables-restore --noflush` 사용.
-
-## F20 [Medium] router-docker - `ReplaceOutbound`에 IPv4 최소 차단선이 없음
-
-- **저장소/위치**: `router-docker`, `backend/internal/netgate/config.go`의
-  `ReplaceOutbound()`(228행 부근) — CIDR/액션 형식만 검사하고 전체 교체를 그대로 저장.
-- **문제**: `PUT /api/netgate/outbound []`로 RFC1918/loopback 차단 전체를 지울 수 있다.
-  v6는 `firewall.default.sh`의 `apply_rules_v6`가 고정 차단 세트를 config와 무관하게
-  항상 적용하지만 v4엔 이 backstop이 없다.
-- **방향**: v6처럼 v4용 고정 차단 세트를 코드에 박거나, RFC1918 블록을 없애거나 허용
-  규칙보다 아래로 내리는 교체 요청을 거부.
-
-## F17 [Medium] router-docker - netgate forwards / tailscale publish가 targetguard 허용목록을 안 거침
-
-- **저장소/위치**: `router-docker`, `backend/internal/netgate/config.go`의 `validateHost()`
-  (문자셋 정규식뿐), `backend/internal/tailscale/config.go:73`(`SelfHosts`만 검사, 전체
-  allowlist는 미적용). `devproxy`/`approutes`만 `targetguard.Validate()`를 통과함.
-- **문제**: `POST /api/netgate/forwards {"targetHost":"router","targetPort":81}`로
-  router 자신의 관리 포트에 self-SSRF성 DNAT을 꽂을 수 있고, tailscale publish를
-  `target_host: dind`로 만들면 인증·TLS 없는 dind 도커 소켓이 tailnet 전체에 노출된다.
-  09-07 리뷰 이후 두 API 모두 비밀번호 게이트 뒤에 있어 원격 공격은 아니지만,
-  "운영자가 한 번 실수하면 호스트 루트"로 이어지는 안전장치 누락.
-- **방향**: 두 경로 모두 `targetguard.Validate`/`WithExtraHosts`를 통과시킨다.
-
-## F35 [Low-Medium] router-docker - `targetguard.SelfHosts`가 루프백 대역을 문자열로만 비교
-
-- **저장소/위치**: `router-docker`, `backend/internal/targetguard/targetguard.go`의
-  `SelfHosts` 맵(`localhost`/`127.0.0.1`/`::1`/`router`/`forward`만 정확히 일치).
-- **문제**: `127.0.0.2`, `0.0.0.0`, 10진수/IPv4-mapped 표기 등은 걸러지지 않는다. 다만
-  이 경로가 실제로 쓰이려면 `*_ALLOW_EXTERNAL_TARGETS=true`(명시적으로 "디버그 전용"
-  이라고 문서화된 옵션)가 켜져 있어야 하므로 기본 배포에서는 도달 불가.
-- **방향**: `net.ParseIP` 기반으로 `IsLoopback()`/`IsUnspecified()` 등을 검사하도록 교체.
-
-## F18 [Medium] router-docker - 인증 없는 GET들이 내부 토폴로지/접속자 PII를 노출
-
-- **저장소/위치**: `router-docker`, `backend/main.go` — `GET /api/dev-proxy/exposes`,
-  `GET /api/app-routes/apps`, `GET /api/vnc/targets/{name}/clients`,
-  `GET /api/dns/blocklist-sources`, `GET /api/dns/custom-hosts`, `GET /api/dns/resolver`,
-  `GET /api/netgate/outbound`, `GET /api/netgate/forwards`, `GET /api/netgate/bandwidth` —
-  전부 `gate.RequirePassword` 없이 등록되어 있음. `GET /api/tailscale/status`만 09-07
-  리뷰에서 게이트 뒤로 옮겨졌다.
-- **문제**: 특히 `/api/vnc/targets/{name}/clients`는 인프라 정보가 아니라 현재 보고 있는
-  사람의 실제 IP+User-Agent(PII)다.
-- **방향**: `tailscale/status`를 막은 기준("운영자의 사설 네트워크/이용자 정보를
-  서술한다")을 다른 GET에도 적용해 재검토, VNC 접속자 목록은 반드시 게이트 뒤로.
-
-## F21 [Medium, 일부 UNCLEAR] router-docker - tinyauth 세션 쿠키가 vhost/exports/app 대상에 그대로 전달
-
-- **저장소/위치**: `router-docker`, `config/nginx/nginx.default.conf`의 3단 쿠키 제거
-  맵(120-156행) — `router_manager_unlock` 하나만 벗긴다. tinyauth 쿠키를 벗기는 코드는
-  파일 전체에 0건.
-- **문제**: tinyauth가 업스트림 기본값(`auth.subdomainsenabled`)대로 부모 도메인 전체에
-  쿠키를 스코프한다면, `ROUTER_VHOST_*`로 붙인 저신뢰 백엔드가 살아있는 tinyauth 세션
-  쿠키를 원본 그대로 받는다.
-- **UNCLEAR**: 실제 vendored tinyauth 바이너리가 내려주는 `Set-Cookie`의 `Domain` 값을
-  확인해야 결론난다(호스트 단위 스코프면 무해). 실행 중인 인스턴스에서 응답 헤더 한 줄만
-  보면 됨.
-- **방향**: 스코프가 부모 도메인이면 `/exports/`·`/app/`·모든 vhost 블록에서 tinyauth
-  쿠키도 동일하게 벗긴다.
-
-## F22 [Low] router-docker - 일부 환경변수가 nginx 지시어에 검증 없이 삽입됨
-
-- **저장소/위치**: `router-docker`, `config/nginx/nginx-service.default.sh` —
-  `ROUTER_MANAGER_HOSTS`(185-196행)/`TINYAUTH_HOSTS`(276-285행)는 `xargs`로 트림만
-  하고 문자셋 검사가 없다. `ROUTER_VHOST_*`는 이미 `^[A-Za-z0-9_.*-]+$`로 검증하는
-  것과 대비됨. `ALLOWED_HOSTS`/`TRUSTED_PROXIES`/`ROUTER_INTERNAL_SUBNET`도 동일.
-- **문제**: 전부 운영자만 쓰는 `.env` 값이라 실질 긴급도는 낮지만, `;`나 `}`가 들어가면
-  nginx 지시어/블록 밖으로 나갈 수 있다.
-- **방향**: 공용 `validate_nginx_token()` 함수 하나로 통일해 vhost 쪽 검증을 재사용.
-
-## F34 [High, 창 좁음] router-docker - `/api/auth/setup`을 외부에서 먼저 호출해 관리자 비밀번호를 선점할 수 있음
-
-- **저장소/위치**: `router-docker`, `backend/handlers_auth.go`의 `handleAuthSetup()` —
-  설계상 `gate.RequirePassword`에 걸리지 않는다(비밀번호가 없을 때만 열려야 부트스트랩이
-  되므로).
-- **문제**: 2026-09-14 수정(C2/H2, 커밋 `354cd6d`)은 **`code-docker-internal` 등 내부
-  네트워크에서** 이 API에 닿는 경로를 막았고, `/api/auth/setup` 자체는 fail-closed 게이트
-  범위 밖에 의도적으로 남아 있다. 2026-09-28의 816b5ac(front-door guard)도 "router가
-  게이트웨이/VNC 중계로 붙은 다른 망"만 막을 뿐, 정상적인 외부 이용자와 똑같은 인터페이스
-  (`code-docker-external`, 즉 `ROUTER_HTTP_BIND:-0.0.0.0`로 열린 host:80)를 통한 접근은
-  막지 않는다. 즉 **인터넷에 호스트 80번이 열려 있고 관리자 비밀번호를 아직 설정하지
-  않은 최초 구동 시점에는, 정당한 소유자보다 먼저 외부 공격자가 `/router/api/auth/setup`을
-  호출해 비밀번호를 선점할 수 있는 창이 남아 있다.** `ootb.sh`가 빌드 직후 이 질문을
-  기본값 `y`로 물어보게 바뀌어 창이 좁아지긴 했지만(`ootb-lib.sh`의
-  `prompt_router_manager_password`), 사용자가 건너뛰거나 `docker compose up`을 먼저
-  실행하면 여전히 열려 있다.
-- **09-07 리뷰와의 관계**: 그 리뷰의 C2는 "내부 워크로드의 자기 탈출"을 다뤘고 이미
-  고쳐졌다. 이건 "외부 인터넷 이용자의 최초 구동 레이스"로 범위가 다르며 그 수정으로
-  닫히지 않았다.
-- **방향**: 콘솔/로그에 1회용 setup 토큰을 찍어 그 값을 알아야만 `/api/auth/setup`이
-  통과하게 하거나, 비밀번호 미설정 상태에서는 `/router/`를 외부망에서 아예 503으로
-  막고 로컬/loopback에서만 설정 가능하게 한다.
 
 ## F23 [Medium, 기능 버그] webmanager - 위젯 팝아웃의 세션 해제 경합
 
@@ -140,19 +52,6 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
 - **방향**: `load` 핸들러에서 `frame.contentWindow.location.href === released`인지
   확인하거나, 해제된 페이지가 `postMessage`로 준비 완료를 알리게 한다.
 
-## F03 [Medium] webmanager/router - 빈 `ALLOWED_HOSTS` + WebSocket Origin==Host 검사만으로는 DNS Rebinding을 못 막음
-
-- **저장소/위치**: `config/nginx/nginx-service.default.sh`(`ALLOWED_HOSTS` 기본 빈 값 →
-  임의 Host 헤더 수락), `webmanager/backend/handlers_terminal.go:89,388`과
-  `router-docker/backend/handlers_vnc.go:403`의 `websocket.Accept(w, r, nil)`(Origin이
-  Host와 일치하는지만 검사).
-- **문제**: 짧은 TTL DNS로 Origin/Host를 동시에 공격자 도메인으로 맞추는 리바인딩
-  공격이 이론적으로 가능하다. 다만 authgate/router-manager 게이트가 설정돼 있으면
-  세션 쿠키가 없어 여전히 막힌다 — 실제 영향은 F01/F34(인증 미설정 배포)과 결합할 때
-  커진다.
-- **방향**: `ALLOWED_HOSTS`를 배포 시 필수로 채우도록 유도하거나 기본값에
-  localhost/인스턴스 IP를 포함, WebSocket 핸드셰이크에 Host 화이트리스트 검사 추가.
-
 ## F16 [Medium] code-docker - `.env*` 파일이 644 + migrate 백업이 무한정 append
 
 - **저장소/위치**: code-docker 루트 `.env`/`.env.router`/`.env.webmanager`(전부 644
@@ -165,6 +64,11 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
   타임스탬프 이름으로.
 
 ## F27 [High] code-docker - CI가 전혀 없음
+
+- **결정(2026-09-29)**: 혼자 main에 바로 커밋하는 흐름이라 push 후에 도는 GitHub Actions는
+  막는 게 없다. 대신 `./dev-check.sh`(go test/gofmt/bash -n/compose config, 옵션으로 깨끗한
+  worktree에서) + CLAUDE.md Commands에 명시 + `dev-clone.sh`가 까는 pre-push 훅. 등급도
+  이 상황에선 Low.
 
 - **저장소/위치**: 루트 및 `dev/router-docker`, `dev/dind-authz-docker`,
   `dev/code-server-autoinstall`, webmanager 어디에도 `.github/workflows` 없음(재확인).
