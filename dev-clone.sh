@@ -19,13 +19,15 @@
 # pull은 --ff-only이고, 작업 중인 변경이 있거나 upstream이 없는 브랜치면 건드리지
 # 않고 그 이유를 출력합니다.
 #
-# DEV_CLONE_GIT_BASE로 clone URL 접두사를 바꿀 수 있습니다 (기본: https - 키 없이도
-# 받아지게). push까지 할 거라면 DEV_CLONE_GIT_BASE=git@github.com:qwreey/ 로.
+# fetch는 https(키 없이도 받아지게), push는 ssh로 가도록 clone할 때 pushurl을 따로
+# 잡아둡니다. DEV_CLONE_GIT_BASE / DEV_CLONE_PUSH_BASE로 각각 바꿀 수 있고,
+# DEV_CLONE_PUSH_BASE=""이면 pushurl을 따로 두지 않습니다.
 set -u
 
 cd "$(dirname "$0")" || exit 1
 
 GIT_BASE="${DEV_CLONE_GIT_BASE:-https://github.com/qwreey/}"
+PUSH_BASE="${DEV_CLONE_PUSH_BASE-git@github.com:qwreey/}"
 
 # <디렉터리> <repo 이름>
 REPOS=(
@@ -33,6 +35,10 @@ REPOS=(
   "builds roblox-studio-docker"
   "builds code-docker-trilium"
   "dev router-docker-client"
+  "dev router-docker"
+  "dev dind-authz-docker"
+  "dev code-server-autoinstall"
+  "dev envmigrate"
 )
 
 failed=0
@@ -47,6 +53,8 @@ sync_repo() {
     if ! git clone --recurse-submodules "$GIT_BASE$name.git" "$path"; then
       warn "clone 실패 ($GIT_BASE$name.git)"
       failed=1
+    elif [ -n "$PUSH_BASE" ]; then
+      git -C "$path" remote set-url --push origin "$PUSH_BASE$name.git"
     fi
     return
   fi
@@ -78,8 +86,11 @@ sync_repo() {
   fi
   [ -f "$path/.gitmodules" ] && git -C "$path" submodule update --init --recursive --quiet
   after=$(git -C "$path" rev-parse HEAD)
+  local ahead
+  ahead=$(git -C "$path" rev-list --count '@{u}..HEAD')
   if [ "$before" = "$after" ]; then
     printf '%s: 최신\n' "$path"
+    [ "$ahead" -gt 0 ] && warn "push 안 된 커밋 ${ahead}개"
   else
     printf '%s: %s커밋 받음 (%s..%s)\n' "$path" \
       "$(git -C "$path" rev-list --count "$before..$after")" \
@@ -101,9 +112,22 @@ done
 # --- .env / extra-include.yml에 넣을 줄 안내 ---------------------------------
 
 echo
-if [ -d dev/router-docker-client ]; then
-  echo "# .env - router-docker-client를 로컬 체크아웃에서 빌드 (example-env 참고)"
-  echo 'ROUTER_CLIENT_SOURCE="./dev/router-docker-client/"'
+env_lines=()
+[ -d dev/router-docker-client ] && env_lines+=('ROUTER_CLIENT_SOURCE="./dev/router-docker-client/"')
+[ -d dev/router-docker ] && env_lines+=('ROUTER_INCLUDE="./dev/router-docker/docker-compose.router.yml"')
+[ -d dev/dind-authz-docker ] && env_lines+=('DIND_CONTEXT="./dev/dind-authz-docker"')
+[ -d dev/code-server-autoinstall ] && env_lines+=('AUTOINSTALL_SOURCE="./dev/code-server-autoinstall"')
+if [ ${#env_lines[@]} -gt 0 ]; then
+  echo "# .env - 코어 의존물을 dev/ 로컬 체크아웃에서 빌드 (example-env 참고)."
+  echo "# 고치는 것만 넣으세요 - 넣은 것은 태그 핀 대신 체크아웃의 현재 상태로 빌드됩니다."
+  printf '%s\n' "${env_lines[@]}"
+  echo
+fi
+if [ -d dev/envmigrate ]; then
+  echo "# envmigrate는 Go 모듈이라 .env가 아니라 go.work로 바꿔 끼웁니다 (커밋하지 말 것):"
+  echo "#   cd webmanager/backend && go work init . ../../dev/envmigrate"
+  echo "#   cd dev/router-docker/backend && go work init . ../../envmigrate"
+  echo "# 도커 빌드는 go.work를 안 쓰므로, 태그를 올리고 go get으로 bump해야 반영됩니다."
   echo
 fi
 

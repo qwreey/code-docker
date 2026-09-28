@@ -4,19 +4,18 @@ data/
 .gitmodules
 README.md
 docker-compose.yml
-code-server-autoinstall/bin/
-code-server-autoinstall/code-server/
-code-server-autoinstall/extensions/
-code-server-autoinstall/patch/
-code-server-autoinstall/user-data/
-code-server-autoinstall/.gitignore
-code-server-autoinstall/installed-version
-code-server-autoinstall/last-check
-code-server-autoinstall/config.yaml
-code-server-autoinstall/.git/
 node_modules
 webmanager/frontend/node_modules
 webmanager/frontend/dist
 webmanager/backend/webmanager
 builds/
 dev/
+# Former submodule checkouts. They're fetched by tag now, but an existing
+# deployment's builds/code-docker can still have these directories on disk after
+# the pull that removed them; keep them out of the build context either way.
+router/
+code-dind/
+code-server-autoinstall/
+envmigrate/
+**/go.work
+**/go.work.sum

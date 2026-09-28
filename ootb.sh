@@ -43,7 +43,7 @@ cp "$SCRIPT_DIR/empty-extra-include.yml" "$TARGET_DIR/empty-extra-include.yml"
 echo "  - 갱신: $TARGET_DIR/empty-extra-include.yml"
 copy_if_missing "$SCRIPT_DIR/example-env" "$TARGET_DIR/.env"
 copy_if_missing "$SCRIPT_DIR/example-env.webmanager" "$TARGET_DIR/.env.webmanager"
-copy_if_missing "$SCRIPT_DIR/router/example-env.router" "$TARGET_DIR/.env.router"
+fetch_router_env_template "$TARGET_DIR/docker-compose.yml" "$TARGET_DIR/.env" "$TARGET_DIR/.env.router" || exit 1
 echo
 
 REL_BUILD_CONTEXT="$(realpath --relative-to="$TARGET_DIR" "$SCRIPT_DIR")"

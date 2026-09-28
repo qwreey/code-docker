@@ -84,6 +84,50 @@ get_env_var() {
   printf '%s' "$val"
 }
 
+# docker-compose.yml에 `${KEY:-기본값}`으로 박혀 있는 기본값을 꺼냅니다. 코어
+# 의존물의 핀(ROUTER_REF 등)은 docker-compose.yml 한 곳에만 두고, 스크립트는
+# 거기서 읽어서 쓰게 하려고 - 스크립트에 태그를 또 적어두면 핀을 올릴 때 한쪽만
+# 바뀌는 일이 생깁니다.
+compose_default() {
+  file=$1 key=$2
+  sed -n 's/.*\${'"$key"':-\([^}]*\)}.*/\1/p' "$file" | head -1
+}
+
+# router-docker 저장소의 example-env.router를 받아 dst로 씁니다(이미 있으면 그대로
+# 둠). router는 이제 submodule이 아니라 원격 compose include라서 이 체크아웃 안에
+# 파일이 없습니다 - .env의 ROUTER_INCLUDE(로컬 체크아웃)가 있으면 그 옆 파일을,
+# 아니면 ROUTER_REF(없으면 docker-compose.yml의 기본 태그)의 파일을 GitHub에서
+# 받습니다. 실패하면 어디서 받으려 했는지와 직접 하는 방법을 출력합니다.
+fetch_router_env_template() {
+  compose=$1 env=$2 dst=$3
+  if [ -e "$dst" ]; then
+    echo "  - 이미 존재: $dst (건너뜀)"
+    return 0
+  fi
+  include=$(get_env_var "$env" ROUTER_INCLUDE)
+  if [ -n "$include" ]; then
+    case $include in /*) ;; *) include="$(dirname "$compose")/$include" ;; esac
+    src="$(dirname "$include")/example-env.router"
+    if cp "$src" "$dst"; then
+      echo "  - 생성: $dst ($src 에서)"
+      return 0
+    fi
+    echo "  ! $src 를 복사하지 못했습니다 (.env의 ROUTER_INCLUDE 기준)"
+    return 1
+  fi
+  ref=$(get_env_var "$env" ROUTER_REF)
+  [ -n "$ref" ] || ref=$(compose_default "$compose" ROUTER_REF)
+  url="https://raw.githubusercontent.com/qwreey/router-docker/$ref/example-env.router"
+  if curl -fsSL "$url" -o "$dst.tmp" && mv "$dst.tmp" "$dst"; then
+    echo "  - 생성: $dst (router-docker $ref)"
+    return 0
+  fi
+  rm -f "$dst.tmp"
+  echo "  ! router-docker $ref 의 example-env.router를 받지 못했습니다: $url"
+  echo "    직접 받아서 $dst 로 저장한 뒤 다시 실행하세요."
+  return 1
+}
+
 # --- 사이드 프로젝트 매니페스트(ootb-manifest.env) --------------------------
 # 매니페스트를 읽어 code-docker 쪽 env에 반영하는 로직은 두 곳에서 씁니다:
 # ootb-extra.sh(처음 연동할 때)와 migrate-continue.sh(이미 연동된 프로젝트를

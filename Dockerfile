@@ -1,3 +1,22 @@
+# qwreey/router-docker-client subdirectories, fetched at build time (floating #main
+# ref, see that repo's own CLAUDE.md). Each is its own stage so a BuildKit named context
+# of the same name replaces it - docker-compose.yml's build.additional_contexts does
+# that from ROUTER_CLIENT_SOURCE, to build against a local dev/ checkout. A plain ADD
+# of a local path couldn't: it would have to sit inside this build context, and dev/
+# is .dockerignore'd on purpose. A bare `docker build .` gets these defaults.
+FROM scratch AS netshare
+ADD https://github.com/qwreey/router-docker-client.git#main:netshare /
+FROM scratch AS dns-local
+ADD https://github.com/qwreey/router-docker-client.git#main:dns-local /
+# code-server-autoinstall, same mechanism but pinned to a release tag rather than
+# floating: it installs and patches code-server itself, so an unreviewed upstream
+# commit breaking it means a container that doesn't come up. docker-compose.yml passes
+# AUTOINSTALL_REF (and AUTOINSTALL_SOURCE for a local dev/ checkout) - keep this
+# default equal to the one there.
+FROM scratch AS code-server-autoinstall
+ARG AUTOINSTALL_REF=v0.1.0
+ADD https://github.com/qwreey/code-server-autoinstall.git#${AUTOINSTALL_REF} /
+
 FROM docker:latest AS docker-bin
 
 # code-docker-dind (code-dind/Dockerfile) has moved out to its own subtree, same pattern
@@ -29,14 +48,10 @@ COPY webmanager/frontend/ webmanager/frontend/
 RUN npm run build --workspace webmanager/frontend
 
 FROM golang:1.25-alpine AS webmanager-backend
-# WORKDIR mirrors the real repo's relative layout (not just /src) so
-# webmanager/backend/go.mod's `replace code-docker/envmigrate =>
-# ../../envmigrate` resolves the same way here as it does on a developer's
-# own checkout - see envmigrate/'s own doc comment for why this package is
-# a repo-root module shared with router/backend instead of living under
-# webmanager/backend/internal.
+# github.com/qwreey/envmigrate (shared with router-docker) is an ordinary tagged
+# module now, downloaded by `go mod download` like any other dependency - it used
+# to be a repo-root submodule wired in with a `replace` directive.
 WORKDIR /src/webmanager/backend
-COPY envmigrate/ /src/envmigrate/
 COPY webmanager/backend/go.mod webmanager/backend/go.sum ./
 RUN go mod download
 COPY webmanager/backend/ ./
@@ -102,13 +117,7 @@ RUN mkdir -p /var/log/code /var/log/sshd /var/log/webmanager /var/log/nginx \
 RUN mkdir -p /etc/code-docker/supervisord
 
 # Copy config & static files
-# netshare is qwreey/router-docker-client's own subdirectory now - fetched at build time
-# (floating #main ref, see that repo's own CLAUDE.md), not a local checkout. It arrives
-# as a BuildKit named context (build.additional_contexts in docker-compose.yml) rather
-# than `ADD <git url>`, so ROUTER_CLIENT_SOURCE can swap in a local dev/ checkout: a
-# plain ADD of a local path would have to sit inside this build context, and dev/ is
-# .dockerignore'd on purpose. Side effect: a bare `docker build` without compose needs
-# `--build-context netshare=... --build-context dns-local=...` passed by hand.
+# netshare/dns-local: see the stages at the top of this file.
 COPY --from=netshare --chown=root:root . /etc/code-docker/netshare
 # dns-local moved out to that same repo on 2026-08-27 - it was never
 # code-docker-specific (roblox-studio-docker hit the identical bug), so the
@@ -122,7 +131,7 @@ COPY --chown=root:root \
     script/user-init.sh script/get-user-shell.sh script/sshd-service.sh \
     script/webmanager.sh script/dns-local.sh \
     script/vector-service.sh script/nginx-service.sh /etc/code-docker/
-COPY --chown=root:root code-server-autoinstall/*.sh \
+COPY --from=code-server-autoinstall --chown=root:root /*.sh \
     /etc/code-docker/code-server-autoinstall/
 COPY --chown=root:root bin /usr/local/bin/
 

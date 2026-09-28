@@ -79,6 +79,23 @@
 # 우선합니다.
 #ROUTER_CLIENT_SOURCE="./dev/router-docker-client/"
 
+# 코어 의존물의 버전 핀. 예전엔 git submodule이 커밋을 고정해 줬는데, 이제는 각
+# 저장소를 원격에서 직접 가져오므로 그 고정을 이 태그들이 대신합니다. 기본값은
+# docker-compose.yml에 있고(보통 비워두면 됩니다), code-docker를 업데이트하면
+# 검증된 태그로 같이 올라갑니다. 다른 태그나 브랜치(`main`)를 시험할 때만 적으세요 -
+# 브랜치로 두면 Docker/Compose가 받은 걸 캐시하므로, 새 커밋을 반영하려면
+# `--no-cache` 재빌드가 필요할 수 있습니다. router는 커밋 sha로는 안 됩니다(태그나
+# 브랜치만 - docker-compose.yml의 include 주석 참고).
+#ROUTER_REF=""        # qwreey/router-docker (compose include)
+#DIND_REF=""          # qwreey/dind-authz-docker (code-docker-dind 빌드)
+#AUTOINSTALL_REF=""   # qwreey/code-server-autoinstall (code-server 설치/패치)
+
+# 위 셋을 로컬 체크아웃으로 바꿔 끼웁니다 - 개발할 때만. ./dev-clone.sh가 dev/에
+# 받아두고 이 줄들을 출력해 줍니다. 설정하면 해당 *_REF는 무시됩니다.
+#ROUTER_INCLUDE="./dev/router-docker/docker-compose.router.yml"
+#DIND_CONTEXT="./dev/dind-authz-docker"
+#AUTOINSTALL_SOURCE="./dev/code-server-autoinstall"
+
 # code-docker-internal/external 두 네트워크의 enable_ipv6를 한 번에
 # 켭니다. PREFIX/BUILD_CONTEXT와 마찬가지로 컨테이너 안 환경변수가 아니라
 # docker-compose.yml의 네트워크 정의에만 쓰입니다. 도커 엔진 자체의 ipv6

@@ -22,13 +22,16 @@
 # The second entry below is NOT the same mechanism, despite using the same `include:`
 # keyword - router is core, always-present topology (like NETGATE_ENABLED, it has a
 # behavioral opt-out but the service itself never goes away), not an optional sibling, so
-# it gets its own fixed path rather than being routed through EXTRA_INCLUDE. It still
-# needs the same ${BUILD_CONTEXT:-.} indirection as every other subtree's build.context
-# for the same split-directory-deploy reason - router/ itself doesn't move even when
-# docker-compose.yml is copied out one level, only the include path pointing at it does.
+# it is always included rather than routed through EXTRA_INCLUDE. It is a *remote*
+# include of qwreey/router-docker pinned to a release tag (ROUTER_REF): Compose clones
+# it into ~/.cache/docker-compose/<commit sha>/ and resolves the fragment's own relative
+# paths (its `context: .`) from there. It must be a tag or branch, not a commit sha -
+# measured on Compose 5.5: a sha ref leaves an empty cache dir behind and fails with
+# `stat ... no such file`, for that sha from then on. ROUTER_INCLUDE points it at a
+# local checkout instead (dev/router-docker, see dev-clone.sh and example-env).
 include:
   - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}
-  - path: ${BUILD_CONTEXT:-.}/router/docker-compose.router.yml
+  - path: "${ROUTER_INCLUDE:-https://github.com/qwreey/router-docker.git#${ROUTER_REF:-v0.1.0}:docker-compose.router.yml}"
 
 networks:
   code-docker-internal:
@@ -97,6 +100,13 @@ services:
       additional_contexts:
         netshare: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#main:}netshare"
         dns-local: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#main:}dns-local"
+        # Pinned (see the Dockerfile's own stage comment); AUTOINSTALL_SOURCE replaces
+        # it with a local checkout. The build arg only matters for the stage's own
+        # fallback ADD, which this context overrides - passed anyway so the two can't
+        # disagree about which tag an image was built from.
+        code-server-autoinstall: "${AUTOINSTALL_SOURCE:-https://github.com/qwreey/code-server-autoinstall.git#${AUTOINSTALL_REF:-v0.1.0}}"
+      args:
+        AUTOINSTALL_REF: "${AUTOINSTALL_REF:-v0.1.0}"
       # Name resolution can fail if the host uses something like Tailscale,
       # so we work around this by using the host network only at build time.
       network: host
@@ -277,15 +287,15 @@ services:
     container_name: "${PREFIX:-}code-docker-dind"
     hostname: code-docker-dind
     build:
-      # code-dind/ is its own self-contained subtree (own Dockerfile), same
-      # pattern as router/ - see code-dind/CLAUDE.md. Named "code-dind", not
-      # "dind", so it can't collide with the DIND_VOLUME/DIND_AUTHZ_VOLUME
-      # runtime data directories below (./data/dind, ./data/dind-authz by
-      # default - every runtime data dir lives under repo-root data/ now,
-      # separate from every source subtree, see CLAUDE.md's "docker-compose
-      # topology").
-      # Set BUILD_CONTEXT in .env instead of editing this file.
-      context: "${BUILD_CONTEXT:-.}/code-dind"
+      # qwreey/dind-authz-docker, built straight from its git repo pinned to a
+      # release tag (DIND_REF) - it used to be a submodule at code-dind/. See
+      # that repo's own CLAUDE.md. DIND_CONTEXT points it at a local checkout
+      # (dev/dind-authz-docker, see dev-clone.sh and example-env).
+      context: "${DIND_CONTEXT:-https://github.com/qwreey/dind-authz-docker.git#${DIND_REF:-v0.1.0}}"
+      # Same netshare override as code-docker's own build above - replaces the
+      # Dockerfile's `FROM scratch AS netshare` stage.
+      additional_contexts:
+        netshare: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#main:}netshare"
       network: host
       # dind (no protection) | dind-authz (default - denies
       # privileged/dangerous-cap/host-namespace/out-of-/code-mount container
