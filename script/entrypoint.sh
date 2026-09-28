@@ -89,7 +89,7 @@ export LANG="${CODE_LANG:-}"
 # .claude/archive/home-structure-plan.md). Not exec'd - this must return so
 # supervisord can start next; a failure here trips `set -e` above and kills
 # the container instead of continuing in a half-migrated state.
-/etc/code-docker/user-init.sh
+/etc/code-docker/override exec user-init/user-init.default.sh
 
 # Run supervisord
 mkdir -p /code/.local
@@ -120,8 +120,4 @@ for unit in /code/.local/share/code-docker/supervisord/*.conf; do
     done
 done
 
-if [ -e /etc/code-docker/supervisord.override.conf ]; then
-    exec /sbin/supervisord -n -c /etc/code-docker/supervisord.override.conf --user root
-else
-    exec /sbin/supervisord -n -c /etc/code-docker/supervisord.default.conf --user root
-fi
+exec /sbin/supervisord -n -c "$(/etc/code-docker/override path supervisord.default.conf)" --user root

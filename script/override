@@ -1,0 +1,38 @@
+#!/bin/bash
+# override - the one place the default/override pattern (CLAUDE.md, "The
+# override pattern") is decided. Given a git-tracked file's path under
+# /etc/code-docker, e.g. code/code-service.default.sh (or shell/shell.default,
+# no extension), it picks the gitignored sibling with "default" swapped for
+# "override" if that exists, else the default itself.
+#
+#   override path <dir/name.default.ext>          print the chosen path
+#   override exec <dir/name.default.ext> [args]   exec it
+#
+# Every supervisord program, the entrypoint and the build step go through
+# this instead of each carrying its own copy of the same if/else - the
+# pattern git hooks already use with hook-dispatch.
+set -e
+
+mode="${1:-}"
+rel="${2:-}"
+case "$rel" in
+    *.default) over="${rel%.default}.override" ;;
+    *.default.*) over="${rel/.default./.override.}" ;;
+    *)
+        echo "override: '$rel' is not a <name>.default[.ext] path under /etc/code-docker" >&2
+        exit 2
+        ;;
+esac
+shift 2
+
+chosen="/etc/code-docker/$over"
+[ -e "$chosen" ] || chosen="/etc/code-docker/$rel"
+
+case "$mode" in
+    path) printf '%s\n' "$chosen" ;;
+    exec) exec "$chosen" "$@" ;;
+    *)
+        echo "override: unknown mode '$mode' (path|exec)" >&2
+        exit 2
+        ;;
+esac

@@ -88,9 +88,9 @@ RUN --mount=type=cache,target=/home/makepkg \
     /etc/code-docker/install-yay.sh
 
 # Run build script
-COPY --chown=root:root script/build.sh /etc/code-docker/
+COPY --chown=root:root script/override /etc/code-docker/
 COPY --chown=root:root config/build /etc/code-docker/build
-RUN --mount=type=cache,target=/var/cache/pacman /etc/code-docker/build.sh
+RUN --mount=type=cache,target=/var/cache/pacman /etc/code-docker/override exec build/build.default.sh
 
 # Copy dind docker cli
 COPY --from=docker-bin /usr/local/bin/docker /usr/bin/docker
@@ -131,10 +131,7 @@ COPY --from=netshare --chown=root:root . /etc/code-docker/netshare
 # where the COPY below puts config/dns-local/'s own git-tracked files.
 COPY --from=dns-local --chown=root:root . /etc/code-docker/router-client/dns-local
 COPY --chown=root:root \
-    config script/entrypoint.sh script/code-service.sh \
-    script/user-init.sh script/get-user-shell.sh script/sshd-service.sh \
-    script/webmanager.sh script/dns-local.sh \
-    script/vector-service.sh script/nginx-service.sh /etc/code-docker/
+    config script/entrypoint.sh /etc/code-docker/
 COPY --from=code-server-autoinstall --chown=root:root /*.sh \
     /etc/code-docker/code-server-autoinstall/
 COPY --chown=root:root bin /usr/local/bin/
@@ -166,7 +163,7 @@ RUN cd /etc/code-docker/git/hooks && \
 COPY --chown=root:root config/shell/completions/attach.fish /etc/fish/completions/attach.fish
 
 # Setup user shell and home
-RUN chsh root --shell $(/etc/code-docker/get-user-shell.sh) &&\
+RUN chsh root --shell "$(cat "$(/etc/code-docker/override path shell/shell.default)")" &&\
     sed -E 's|^(root:[^:]*:[^:]*:[^:]*:[^:]*:)/root(:[^:]*)$|\1/code\2|' -i /etc/passwd &&\
     mv /etc/ssh /etc/default
 

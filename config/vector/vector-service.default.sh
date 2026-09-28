@@ -3,10 +3,7 @@ set -e
 
 mkdir -p /code/.local/share/code-docker/vector/state /code/.local/share/code-docker/vector/logs
 
-vector_config=/etc/code-docker/vector/vector.default.toml
-if [ -e /etc/code-docker/vector/vector.override.toml ]; then
-    vector_config=/etc/code-docker/vector/vector.override.toml
-fi
+vector_config="$(/etc/code-docker/override path vector/vector.default.toml)"
 
 # VECTOR_LOG_LEVEL (docker-compose.yml) controls vector's own internal
 # diagnostic verbosity (startup/healthcheck/file-watch chatter on its
