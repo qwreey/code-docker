@@ -354,9 +354,9 @@ services:
     build:
       # netinit-docker is qwreey/router-docker-client's own subdirectory, built
       # directly from its git repo - Compose's native remote-git build context, not a
-      # local checkout/submodule, on a floating #main ref (deliberately unpinned; note
-      # Docker CACHES this fetch, so picking up an upstream change can need
-      # --no-cache). ROUTER_CLIENT_SOURCE (shared with code-docker's own build above)
+      # local checkout/submodule, on a floating #main ref (deliberately unpinned; an
+      # upstream change lands on the next `docker compose build`, since `up -d` never
+      # rebuilds an existing image). ROUTER_CLIENT_SOURCE (shared with code-docker's own build above)
       # or the more specific NETINIT_DOCKER_CONTEXT overrides it to build from a local
       # checkout - see example-env.
       context: "${NETINIT_DOCKER_CONTEXT:-${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#main:}netinit-docker}"

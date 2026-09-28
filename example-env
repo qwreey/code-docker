@@ -42,8 +42,8 @@
 # qwreey/router-docker-client의 원격 git URL이라 보통 건드릴 일이 없고, 로컬
 # 체크아웃에서 빌드해 시험할 때만 씁니다(예:
 # NETINIT_DOCKER_CONTEXT=/path/to/router-docker-client/netinit-docker). 원격 git
-# context는 Docker가 캐시하므로, 업스트림 변경을 반영하려면 --no-cache 재빌드가
-# 필요할 수 있습니다.
+# context라 업스트림 변경은 다음 `docker compose build` 때 반영됩니다(`up -d`만으로는
+# 이미 있는 이미지를 다시 빌드하지 않습니다).
 #NETINIT_DOCKER_CONTEXT=""
 
 # qwreey/router-docker-client(netshare, dns-local, netinit-docker)를 어디서
@@ -57,8 +57,8 @@
 # 핀입니다 - 각 저장소를 원격에서 직접 가져오는 태그입니다. 기본값은
 # docker-compose.yml에 있고(보통 비워두면 됩니다), code-docker를 업데이트하면
 # 검증된 태그로 같이 올라갑니다. 다른 태그나 브랜치(`main`)를 시험할 때만 적으세요 -
-# 브랜치로 두면 Docker/Compose가 받은 걸 캐시하므로, 새 커밋을 반영하려면
-# `--no-cache` 재빌드가 필요할 수 있습니다. router는 커밋 sha로는 안 됩니다(태그나
+# 브랜치로 두면 새 커밋은 `docker compose build` 때마다 다시 받아 옵니다(`up -d`만으로는
+# 재빌드하지 않음). router는 커밋 sha로는 안 됩니다(태그나
 # 브랜치만 - docker-compose.yml의 include 주석 참고).
 #ROUTER_REF=""        # qwreey/router-docker (compose include)
 #DIND_REF=""          # qwreey/dind-authz-docker (code-docker-dind 빌드)
