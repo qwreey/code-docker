@@ -113,7 +113,10 @@ mkdir -p /code/.local/share/code-docker/supervisord
 for unit in /code/.local/share/code-docker/supervisord/*.conf; do
     [ -e "$unit" ] || continue
     sed -n 's/^\[program:\([^]]*\)\].*/\1/p' "$unit" | while read -r program; do
-        [ -n "$program" ] && mkdir -p "/var/log/$program"
+        case "$program" in
+            ''|*/*|.*) echo "entrypoint: skipping log dir for [program:$program] in $unit - not a plain name" ;;
+            *) mkdir -p "/var/log/$program" ;;
+        esac
     done
 done
 

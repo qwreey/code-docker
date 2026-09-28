@@ -237,8 +237,13 @@ func GenerateCSS(fonts []Font) string {
 	return b.String()
 }
 
-// cssEscape escapes a single-quote inside a font-family name so it can't
-// break out of the CSS string literal it's interpolated into above.
+// cssEscape escapes a font-family name for the single-quoted CSS string
+// it's interpolated into above. Backslashes too: escaping only the quote
+// let a name ending in a backslash escape the closing quote itself and run
+// on into the rest of the rule. Newlines end a CSS string outright, so
+// they're written as CSS escapes too.
+var cssEscaper = strings.NewReplacer("\\", "\\\\", "'", "\\'", "\n", "\\a ", "\r", "\\d ")
+
 func cssEscape(s string) string {
-	return strings.ReplaceAll(s, "'", "\\'")
+	return cssEscaper.Replace(s)
 }
