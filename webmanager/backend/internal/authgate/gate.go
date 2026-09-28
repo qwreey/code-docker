@@ -71,13 +71,21 @@ const refreshThreshold = sessionTTL / 2
 // see New) plus an HMAC secret used to sign/verify self-describing unlock
 // tokens. There is deliberately no server-side session store — a token
 // carries its own issue time (HMAC-signed so it can't be forged), checked
-// against sessionTTL in tokenAge.
+// against sessionTTL in tokenAge. The one piece of server state is the
+// revoked list (see Revoke), which only ever holds sessions that were
+// explicitly locked and haven't expired yet.
 type Gate struct {
 	hash   string
 	secret []byte
 
 	attemptsMu sync.Mutex
 	attempts   map[string]*attemptState
+
+	// session id -> when that session would have expired anyway, after
+	// which the entry is dropped. Bounded by how many locks can happen in
+	// maxSessionLifetime, each of which needs a valid session to begin with.
+	revokedMu sync.Mutex
+	revoked   map[string]time.Time
 }
 
 // New creates a Gate. An empty hash means the gate is disabled: Configured
@@ -95,7 +103,7 @@ func New(hash string) *Gate {
 		// unforgeable tokens at all — nothing downstream would work either.
 		panic("authgate: failed to generate HMAC secret: " + err.Error())
 	}
-	return &Gate{hash: hash, secret: secret, attempts: map[string]*attemptState{}}
+	return &Gate{hash: hash, secret: secret, attempts: map[string]*attemptState{}, revoked: map[string]time.Time{}}
 }
 
 // rateLimited reports whether key is currently locked out, and for how much
@@ -158,16 +166,30 @@ func (g *Gate) issueToken() string {
 }
 
 // mintToken builds a token of the form "<b64(payload)>.<b64(hmac)>", where
-// payload is "<origin-unix>:<refreshed-unix>" — origin is when the user
+// payload is "<origin-unix>:<refreshed-unix>:<session-id>" — origin is when the user
 // actually typed the password (fixed for the life of the session, bounded
 // by maxSessionLifetime) and refreshed is when the token was last slid
 // forward (bounded by sessionTTL). Both are signed, so neither can be
 // tampered with. There's no stored session state; verification is entirely
-// self-contained (see tokenTimes).
+// self-contained (see tokenTimes). The session id is random per unlock and
+// carried through every refresh, so Revoke can end one session - including
+// any copy of its cookie - without touching another browser's.
 func (g *Gate) mintToken(origin, refreshed time.Time) string {
-	payload := strconv.FormatInt(origin.Unix(), 10) + ":" + strconv.FormatInt(refreshed.Unix(), 10)
+	return g.mintSession(origin, refreshed, newSessionID())
+}
+
+func (g *Gate) mintSession(origin, refreshed time.Time, sid string) string {
+	payload := strconv.FormatInt(origin.Unix(), 10) + ":" + strconv.FormatInt(refreshed.Unix(), 10) + ":" + sid
 	sig := g.sign([]byte(payload))
 	return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
+func newSessionID() string {
+	b := make([]byte, 12)
+	if _, err := rand.Read(b); err != nil {
+		panic("authgate: failed to generate session id: " + err.Error())
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
 }
 
 func (g *Gate) sign(payload []byte) []byte {
@@ -188,43 +210,54 @@ func (g *Gate) sign(payload []byte) []byte {
 // issued by an older build keep working across an upgrade instead of
 // forcing everyone to re-enter the password once.
 func (g *Gate) tokenTimes(r *http.Request) (origin, refreshed time.Time, ok bool) {
+	origin, refreshed, _, ok = g.parseToken(r)
+	return origin, refreshed, ok
+}
+
+// parseToken is tokenTimes plus the session id ("" for a token minted before
+// ids existed). A revoked session fails here, like a bad signature.
+func (g *Gate) parseToken(r *http.Request) (origin, refreshed time.Time, sid string, ok bool) {
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
-		return time.Time{}, time.Time{}, false
+		return time.Time{}, time.Time{}, "", false
 	}
 	parts := strings.SplitN(cookie.Value, ".", 2)
 	if len(parts) != 2 {
-		return time.Time{}, time.Time{}, false
+		return time.Time{}, time.Time{}, "", false
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
-		return time.Time{}, time.Time{}, false
+		return time.Time{}, time.Time{}, "", false
 	}
 	givenSig, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return time.Time{}, time.Time{}, false
+		return time.Time{}, time.Time{}, "", false
 	}
 	if !hmac.Equal(givenSig, g.sign(payload)) {
-		return time.Time{}, time.Time{}, false
+		return time.Time{}, time.Time{}, "", false
 	}
-	originStr, refreshedStr, found := strings.Cut(string(payload), ":")
-	if !found {
-		refreshedStr = originStr
+	originStr, rest, found := strings.Cut(string(payload), ":")
+	refreshedStr := originStr
+	if found {
+		refreshedStr, sid, _ = strings.Cut(rest, ":")
 	}
 	originUnix, err := strconv.ParseInt(originStr, 10, 64)
 	if err != nil {
-		return time.Time{}, time.Time{}, false
+		return time.Time{}, time.Time{}, "", false
 	}
 	refreshedUnix, err := strconv.ParseInt(refreshedStr, 10, 64)
 	if err != nil {
-		return time.Time{}, time.Time{}, false
+		return time.Time{}, time.Time{}, "", false
 	}
 	origin, refreshed = time.Unix(originUnix, 0), time.Unix(refreshedUnix, 0)
 	now := time.Now()
 	if origin.After(now) || refreshed.After(now) || refreshed.Before(origin) {
-		return time.Time{}, time.Time{}, false
+		return time.Time{}, time.Time{}, "", false
 	}
-	return origin, refreshed, true
+	if sid != "" && g.isRevoked(sid) {
+		return time.Time{}, time.Time{}, "", false
+	}
+	return origin, refreshed, sid, true
 }
 
 // Unlocked reports whether the request carries a currently-valid unlock
@@ -348,8 +381,38 @@ func (g *Gate) SetCookie(w http.ResponseWriter, r *http.Request, token string) {
 	})
 }
 
-// ClearCookie expires the unlock cookie on w - "lock now" for this browser.
-// The token itself stays valid until it expires; it's just no longer sent.
+// Revoke ends the session r's cookie belongs to, server-side: that token and
+// every copy or refresh of it stop working, not just this browser's cookie.
+// Other sessions (another browser, a phone) are untouched. A no-op without a
+// valid token - there is nothing of the caller's to end.
+func (g *Gate) Revoke(r *http.Request) {
+	if g == nil {
+		return
+	}
+	origin, _, sid, ok := g.parseToken(r)
+	if !ok || sid == "" {
+		return
+	}
+	now := time.Now()
+	g.revokedMu.Lock()
+	defer g.revokedMu.Unlock()
+	for id, until := range g.revoked {
+		if !now.Before(until) {
+			delete(g.revoked, id)
+		}
+	}
+	g.revoked[sid] = origin.Add(maxSessionLifetime)
+}
+
+func (g *Gate) isRevoked(sid string) bool {
+	g.revokedMu.Lock()
+	defer g.revokedMu.Unlock()
+	_, ok := g.revoked[sid]
+	return ok
+}
+
+// ClearCookie expires the unlock cookie on w. On its own that only stops
+// this browser sending it - "lock now" pairs it with Revoke.
 func (g *Gate) ClearCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
@@ -411,7 +474,7 @@ func (g *Gate) RequirePassword(next http.Handler) http.Handler {
 // has already validated the token, and only before next.ServeHTTP — the
 // response headers are gone once the handler starts writing.
 func (g *Gate) refreshCookie(w http.ResponseWriter, r *http.Request) {
-	origin, refreshed, ok := g.tokenTimes(r)
+	origin, refreshed, sid, ok := g.parseToken(r)
 	if !ok {
 		return
 	}
@@ -419,7 +482,10 @@ func (g *Gate) refreshCookie(w http.ResponseWriter, r *http.Request) {
 	if now.Sub(refreshed) < refreshThreshold {
 		return
 	}
-	g.SetCookie(w, r, g.mintToken(origin, now))
+	if sid == "" {
+		sid = newSessionID()
+	}
+	g.SetCookie(w, r, g.mintSession(origin, now, sid))
 }
 
 func writeUnauthorized(w http.ResponseWriter) {

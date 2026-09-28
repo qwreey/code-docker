@@ -147,3 +147,44 @@ func TestRefreshCannotOutliveMaxSessionLifetime(t *testing.T) {
 		t.Fatalf("expiry %v ignores maxSessionLifetime", remaining)
 	}
 }
+
+func TestRevokeEndsOnlyThatSession(t *testing.T) {
+	g := New("dummy-hash")
+	now := time.Now()
+	withCookie := func(token string) *http.Request {
+		r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
+		r.AddCookie(&http.Cookie{Name: CookieName, Value: token})
+		return r
+	}
+
+	mine := g.mintToken(now.Add(-time.Hour), now.Add(-sessionTTL+time.Minute))
+	other := g.mintToken(now, now)
+
+	// A refresh keeps the session id, so it's the same session as the copy
+	// an attacker might hold of the older cookie.
+	rec := httptest.NewRecorder()
+	g.RequirePassword(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).ServeHTTP(rec, withCookie(mine))
+	cookies := rec.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("expected a refreshed cookie, got %d", len(cookies))
+	}
+	refreshed := cookies[0].Value
+	if refreshed == mine {
+		t.Fatal("refresh returned the same token")
+	}
+
+	g.Revoke(withCookie(refreshed))
+
+	for name, token := range map[string]string{"old copy": mine, "refreshed": refreshed} {
+		if g.Unlocked(withCookie(token)) {
+			t.Errorf("%s: still unlocked after Revoke", name)
+		}
+	}
+	if !g.Unlocked(withCookie(other)) {
+		t.Error("another session was revoked too")
+	}
+	// A fresh unlock after locking is a new session.
+	if !g.Unlocked(withCookie(g.issueToken())) {
+		t.Error("a new unlock after Revoke doesn't work")
+	}
+}

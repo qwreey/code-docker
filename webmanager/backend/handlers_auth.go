@@ -69,10 +69,12 @@ func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// POST /api/auth/lock - drops this browser's unlock cookie, so the next gated
-// request prompts again (and a fingerprint unlock can be tried for real).
-// Ungated: it can only ever take access away from its own caller.
+// POST /api/auth/lock - ends this browser's unlock session server-side and
+// drops its cookie, so the next gated request prompts again (and a
+// fingerprint unlock can be tried for real). A copied cookie stops working
+// too. Ungated: it can only ever take access away from its own caller.
 func (s *Server) handleAuthLock(w http.ResponseWriter, r *http.Request) {
+	s.gate.Revoke(r)
 	s.gate.ClearCookie(w, r)
 	w.WriteHeader(http.StatusNoContent)
 }
