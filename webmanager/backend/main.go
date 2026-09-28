@@ -501,9 +501,17 @@ func main() {
 	// an SSO redirect, which is also why it must be excluded from the outer
 	// forward-auth to be usable at all. Fail-closed: with no password
 	// configured it answers 404 and never touches the filesystem.
+	//
+	// CrossOriginProtection wraps everything, WebDAV included: webmanager has
+	// no login of its own by default, so without it any page the owner's
+	// browser opened could POST to these APIs (terminal, files, git config)
+	// as the owner - the outer forward-auth cookie rides along. It refuses
+	// non-GET/HEAD/OPTIONS requests a browser marks cross-origin
+	// (Sec-Fetch-Site, else Origin vs Host); requests with neither header -
+	// WebDAV clients, the code-server extension host, curl - pass untouched.
 	httpServer := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: webdavRouter(s.webdav, limitRequestBody(mux)),
+		Handler: http.NewCrossOriginProtection().Handler(webdavRouter(s.webdav, limitRequestBody(mux))),
 	}
 
 	// Shared cancel-on-shutdown context for every long-lived background
