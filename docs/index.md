@@ -5,7 +5,7 @@
 mkdir -p ~/code-docker # 데이터와 빌드 파일을 담을 공간을 생성
 cd ~/code-docker
 mkdir builds # 빌드용 레포지토리 복사
-git clone https://github.com/qwreey/code-docker.git builds/code-docker
+git clone -b main https://github.com/qwreey/code-docker.git builds/code-docker
 ```
 
 ## ootb.sh로 한 번에 설치하기
