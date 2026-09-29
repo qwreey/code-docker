@@ -53,3 +53,22 @@
   v0.1.5로 빌드돼 있음). 비밀번호 잠금이 필요하면 `--hash-password`로 임시 설정 후 원복.
 - Chrome 종료: `pgrep -f '[r]emote-debugging-port=9333' | xargs -r kill`
   (`pkill -f`는 자기 셸까지 죽임).
+
+## 결과 (2026-09-29, 전부 CDP 실측)
+
+1. `3d86f11` - Home에서 고른 세션은 확장에 묻고(`open-session`), 이미 다른 뷰에 있으면 그쪽으로
+   포커스. 실측 중 원래 있던 버그 하나 더: 에디터 탭을 닫으면 `onDidDispose`의 `forgetTitle`이
+   폐기된 패널의 `title`을 읽다 `Webview is disposed`로 던져 `detach`가 안 돌았고, 그 세션을
+   다시 열면 죽은 패널을 reveal하며 조용히 실패했다(exthost 로그로 확인).
+   `89e6a12` - 탭을 닫은 직후 새로고침하면 VS Code가 닫기 전 레이아웃으로 그 탭을 되살린다
+   (상태 없이 빈 Home으로, 또는 슬롯이 이미 보여 주는 세션으로). serializer가 닫는다.
+2. `453d2dd` - 탭 아이콘은 이미지로 그려져 `currentColor`가 검정. light/dark 쌍.
+3. `2729564` - 회귀였다: `173d176`의 포커스 시 크기 되찾기를 `2ab4c9b`의 소켓별 중복 제거가
+   막음. 포그라운드에선 강제 전송(같은 크기면 커널이 SIGWINCH 안 보냄), 임베드는 확장이
+   `onDidChangeWindowState`를 `foreground`로 전달. headless는 창 포커스를 모델링 안 해서
+   top 문서의 `hasFocus`를 덮어쓰고 blur/focus를 보내 흉내 냄.
+4. `c39a5ef` - `webmanager.newTerminalInPanel`, 터미널 슬롯 제목 줄 `+`.
+5. `08e84dd` - WS `pin=1`(생성 시에만), 사용자가 푼 세션은 `unpinned=1`로 재생성 시 유지.
+
+code-review 후속: `15649c0`. 열린 질문: 기본 고정이라 탭·칸을 닫아도 세션이 남고 고정 세션은
+닫기 버튼이 숨겨져 쌓일 수 있음 - 닫을 때 고정 해제/종료 여부는 오너 결정 대기.
