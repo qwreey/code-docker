@@ -30,6 +30,37 @@ export function requestUnlock(): Promise<void> {
   return unlockPrompter()
 }
 
+// RequiresUnlock's inline card is a password prompt of its own. While one is
+// on screen, UnlockModalHost keeps its modal hidden and sends the user to
+// the card instead: otherwise the two stacked, with the card stuck behind
+// the modal's backdrop (e.g. the Terminal's lock overlay opened the modal,
+// then the next poll's 401 swapped the Terminal for the card underneath).
+// Each entry focuses its own card.
+const inlineGates = new Set<() => void>()
+const inlineGateListeners = new Set<() => void>()
+
+export function registerInlineGate(focus: () => void): () => void {
+  inlineGates.add(focus)
+  inlineGateListeners.forEach((cb) => cb())
+  return () => {
+    inlineGates.delete(focus)
+    inlineGateListeners.forEach((cb) => cb())
+  }
+}
+
+export function subscribeInlineGates(cb: () => void): () => void {
+  inlineGateListeners.add(cb)
+  return () => inlineGateListeners.delete(cb)
+}
+
+export function inlineGateVisible(): boolean {
+  return inlineGates.size > 0
+}
+
+export function focusInlineGate() {
+  ;[...inlineGates].at(-1)?.()
+}
+
 // The unlock endpoint itself is excluded from the retry dance below — a
 // wrong-password 401 from it must surface directly to its own form instead
 // of re-triggering the prompter (which could otherwise recurse).

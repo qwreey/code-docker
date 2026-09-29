@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { api, ApiError, onAuthStatusChange, setUnlockPrompter } from '../../api/client'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react'
+import {
+  api,
+  ApiError,
+  focusInlineGate,
+  inlineGateVisible,
+  onAuthStatusChange,
+  setUnlockPrompter,
+  subscribeInlineGates,
+} from '../../api/client'
 import { ErrorBanner } from './ErrorBanner'
 import { useAuthStatus } from './useAuthStatus'
 import { WebAuthnUnlockButton } from './WebAuthn'
@@ -26,13 +34,25 @@ export function UnlockModalHost() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const waitersRef = useRef<PendingUnlock[]>([])
   const { status } = useAuthStatus()
+  // An inline RequiresUnlock card is already asking for the password: the
+  // modal stays hidden (its waiters keep waiting, and resolve through the
+  // auth-status effect below once the card unlocks) and focus goes to the
+  // card. See registerInlineGate in api/client.ts.
+  const inlineGate = useSyncExternalStore(subscribeInlineGates, inlineGateVisible)
 
   const prompt = useCallback(() => {
     return new Promise<void>((resolve, reject) => {
       waitersRef.current.push({ resolve, reject })
       setOpen(true)
+      if (inlineGateVisible()) focusInlineGate()
     })
   }, [])
+
+  // The card can also appear while the modal is already up (a poll's 401
+  // swapping a tab for the card) - hand the prompt over to it.
+  useEffect(() => {
+    if (open && inlineGate) focusInlineGate()
+  }, [open, inlineGate])
 
   useEffect(() => {
     setUnlockPrompter(prompt)
@@ -105,7 +125,7 @@ export function UnlockModalHost() {
     }
   }
 
-  if (!open) return null
+  if (!open || inlineGate) return null
 
   return (
     <div className="unlock-modal-backdrop" onClick={handleCancel}>

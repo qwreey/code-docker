@@ -1,5 +1,5 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
-import { api, ApiError } from '../../api/client'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { api, ApiError, registerInlineGate } from '../../api/client'
 import { ErrorBanner } from './ErrorBanner'
 import { Skeleton } from './Skeleton'
 import { useAuthStatus } from './useAuthStatus'
@@ -19,6 +19,14 @@ export function RequiresUnlock({ children }: { children: ReactNode }) {
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const showCard = !loadError && !!status && status.required && !status.unlocked
+
+  // While the card is up it is the password prompt - see registerInlineGate.
+  useEffect(() => {
+    if (!showCard) return
+    return registerInlineGate(() => inputRef.current?.focus())
+  }, [showCard])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -63,6 +71,7 @@ export function RequiresUnlock({ children }: { children: ReactNode }) {
             <label htmlFor="unlock-password">비밀번호</label>
             <input
               id="unlock-password"
+              ref={inputRef}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
