@@ -73,7 +73,9 @@ let lastSent = ''
 // dropped.
 export function reportEmbedState(extra?: EmbedState) {
   if (!EMBED) return
-  if (extra) extraState = { ...extraState, ...extra }
+  // A different session starts from scratch: the last one's pin/createdAt
+  // aren't this one's, and its own may not be known yet.
+  if (extra) extraState = extra.session !== extraState.session ? { ...extra } : { ...extraState, ...extra }
   const segments = window.location.pathname.split('/')
   const section = segments[segments.length - 1] || 'supervisor'
   const query = new URLSearchParams(window.location.search)

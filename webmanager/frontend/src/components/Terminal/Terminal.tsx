@@ -1345,10 +1345,18 @@ export function Terminal({
   // than betting entirely on one.
   useEffect(() => {
     if (activeSession === HOME_TAB_ID) return
+    let lastForeground = 0
     const onForeground = () => {
+      // Embedded, one return can arrive twice (this frame's own focus and
+      // the extension's `foreground`); a second reconnect() would tear down
+      // the first attempt.
+      const now = Date.now()
+      if (now - lastForeground < 500) return
+      lastForeground = now
       fitIfVisible()
       const term = termRef.current
-      if (term && containerRef.current?.clientWidth) sendSize(term.cols, term.rows, 'foreground')
+      const box = containerRef.current
+      if (term && box && box.clientWidth && box.clientHeight) sendSize(term.cols, term.rows, 'foreground')
       if (stateRef.current === 'disconnected' && autoReconnectEnabledRef.current && !sessionEndedRef.current) reconnect()
     }
     const onVisibilityChange = () => {
@@ -3287,8 +3295,12 @@ export function Terminal({
     if (!embedded) return
     return onHostMessage((msg) => {
       if (msg.type === 'focus') termRef.current?.focus()
-      if (msg.type === 'select-session') selectSession(msg.session)
-      if (activeSession === HOME_TAB_ID) return
+      if (activeSession === HOME_TAB_ID) {
+        // Only while still on Home: the answer to an open-session may land
+        // after the view has moved on to something else.
+        if (msg.type === 'select-session') selectSession(msg.session)
+        return
+      }
       if (msg.type === 'pin') void togglePin(activeSession, msg.pinned)
       if (msg.type === 'rename') void renameSession(activeSession, msg.name)
     })

@@ -181,7 +181,7 @@ function recordId(state) {
 }
 
 function recordTitle(host) {
-  const entry = { id: recordId(host.state), title: host.title }
+  const entry = host.record
   const list = panelTitles()
   if (list.some((e) => e.id === entry.id && e.title === entry.title)) return
   ctx.workspaceState.update(PANEL_TITLES_KEY, [...list, entry])
@@ -189,14 +189,14 @@ function recordTitle(host) {
 
 // Only drops the pair once no open panel shows it any more; a pair left
 // behind by a tab closed while unresolved just makes matching more
-// cautious, and activate() prunes pairs no tab carries. Reads host.title,
-// not panel.title: this also runs from onDidDispose, where the panel's
-// getters throw.
+// cautious, and activate() prunes pairs no tab carries. Works from
+// host.record - the pair as last recorded - rather than host.state (already
+// replaced by the time a title changes) or panel.title (throws once the
+// panel is disposed, and this also runs from onDidDispose).
 function forgetTitle(host) {
-  const id = recordId(host.state)
-  const title = host.title
+  const { id, title } = host.record
   for (const h of hosts) {
-    if (h !== host && h.kind === 'panel' && recordId(h.state) === id && h.title === title) return
+    if (h !== host && h.kind === 'panel' && h.record && h.record.id === id && h.record.title === title) return
   }
   ctx.workspaceState.update(
     PANEL_TITLES_KEY,
@@ -209,9 +209,10 @@ function updateTitle(host) {
   const title = titleOf(host.state)
   if (host.kind === 'panel') {
     const shown = host.state.pinned ? `📌 ${title}` : title
-    if (host.title !== undefined && host.title !== shown) forgetTitle(host)
+    const id = recordId(host.state)
+    if (host.record && (host.record.id !== id || host.record.title !== shown)) forgetTitle(host)
     host.panel.title = shown
-    host.title = shown
+    host.record = { id, title: shown }
     recordTitle(host)
   } else {
     host.view.title = title
@@ -295,7 +296,7 @@ function unresolvedTabsFor(state) {
   const title = titleOf(state)
   const titles = [title, `📌 ${title}`]
   for (const h of hosts) {
-    if (h.kind === 'panel' && titles.includes(h.title)) return []
+    if (h.kind === 'panel' && h.record && titles.includes(h.record.title)) return []
   }
   const ids = new Set(panelTitles().filter((e) => titles.includes(e.title)).map((e) => e.id))
   if (ids.size !== 1 || !ids.has(recordId(state))) return []
@@ -335,7 +336,7 @@ function setupPanel(panel, state) {
   })
   panel.onDidDispose(() => {
     detach(host)
-    forgetTitle(host)
+    if (host.record) forgetTitle(host)
     if (activePanelHost === host) setActivePanel(null)
   })
   return host
@@ -551,6 +552,13 @@ async function openTerminalFromEmbed(m) {
     await openState({ section: 'terminal', session: m.session }, vscode.ViewColumn.Beside)
     return
   }
+  const cwd = typeof m.cwd === 'string' && m.cwd.startsWith('/') ? m.cwd : undefined
+  await openState(await newSessionAt(cwd, m), vscode.ViewColumn.Beside)
+}
+
+// A not-yet-taken name for a new session in cwd, from the view's label or
+// the folder name, with its initial command.
+async function newSessionAt(cwd, m) {
   let names = []
   try {
     names = await S.fetchSessionNames()
@@ -558,17 +566,13 @@ async function openTerminalFromEmbed(m) {
     // name collision just becomes a join instead of a new session - the
     // cwd/command are then ignored, same as the Terminal tab's own "+"
   }
-  const cwd = typeof m.cwd === 'string' && m.cwd.startsWith('/') ? m.cwd : undefined
   const base = (typeof m.label === 'string' && m.label) || S.folderBase(cwd) || '세션'
-  await openState(
-    {
-      section: 'terminal',
-      session: S.uniqueName(base, names),
-      cwd,
-      command: typeof m.command === 'string' ? m.command : undefined,
-    },
-    vscode.ViewColumn.Beside,
-  )
+  return {
+    section: 'terminal',
+    session: S.uniqueName(base, names),
+    cwd,
+    command: typeof m.command === 'string' ? m.command : undefined,
+  }
 }
 
 // A new session, started where VS Code's own new terminal would: the one
@@ -586,19 +590,7 @@ async function newSessionState(m = {}) {
     if (!pick) return undefined
     cwd = pick.cwd
   }
-  let names = []
-  try {
-    names = await S.fetchSessionNames()
-  } catch {
-    // a collision just joins that session instead
-  }
-  const base = (typeof m.label === 'string' && m.label) || S.folderBase(cwd) || '세션'
-  return {
-    section: 'terminal',
-    session: S.uniqueName(base, names),
-    cwd,
-    command: typeof m.command === 'string' ? m.command : undefined,
-  }
+  return newSessionAt(cwd, m)
 }
 
 // The Terminal Home's "+" (or a profile without a cwd) inside a view: the
@@ -701,7 +693,10 @@ async function onMessage(host, m) {
         if (closed.section === r.section && closed.session === r.session && closed.query === r.query) break
         host.closedState = null
       }
-      host.state = normalizeState({ ...host.state, ...m })
+      // What belongs to the session shown before (its pin, createdAt) must
+      // not carry over to another one, whose report may not know them yet.
+      const prev = m.session === host.state.session ? host.state : { ...host.state, pinned: undefined, created: undefined }
+      host.state = normalizeState({ ...prev, ...m })
       // The initial command ran when the session was created. Keeping it
       // would re-run it on a later recreate (the backend only uses it on
       // creation) - a resumed `claude --resume` that ended would come back

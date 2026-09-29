@@ -101,9 +101,11 @@ func (s *Server) handleTerminal(w http.ResponseWriter, r *http.Request) {
 	// behavior can't regress from M2 changes.
 	if name := r.URL.Query().Get("session"); name != "" {
 		// cwd/cmd/pin are only meaningful the moment this name is first created
-		// (see termsession.Registry.GetOrCreate) — a plain tab-switch
-		// reconnect to an already-running session just omits them and they
-		// no-op here too, since GetOrCreate ignores opts on that path.
+		// (see termsession.Registry.GetOrCreate), which ignores them on a
+		// reattach. Clients do send them on reattaches too: an embedded view
+		// sends cwd and pin=1 on every connect, so that a session gone since
+		// (idle GC, restart) comes back as it was - honoring pin on a reattach
+		// would re-pin a session the user unpinned.
 		opts := termsession.CreateOptions{
 			Cwd:            r.URL.Query().Get("cwd"),
 			InitialCommand: r.URL.Query().Get("cmd"),
