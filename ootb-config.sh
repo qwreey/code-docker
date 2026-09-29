@@ -93,6 +93,11 @@ prompt_bool() {
   esac
 }
 
+# 필수 설정(ALLOWED_HOSTS 등)은 섹션 밖에서 먼저 묻습니다 - ootb-lib.sh의
+# ask_required_settings 참고. migrate(RECONFIGURE=1)는 이 스크립트를 부르기 전에
+# 자기가 이미 물었으므로 여기서는 신규 설치일 때만.
+[ "${RECONFIGURE:-0}" = "1" ] || ask_required_settings "$TARGET_DIR"
+
 section "기본" .env:PREFIX .env:CODE_TZ .env:CODE_LANG
 prompt_set .env PREFIX "여러 인스턴스를 한 호스트에 띄울 때 붙일 접두사 (PREFIX)"
 prompt_set .env CODE_TZ "타임존 (예: Asia/Seoul, 비우면 UTC)"
@@ -127,11 +132,10 @@ prompt_set .env ROUTER_CPU_LIMIT "code-docker-router CPU 제한 (비우면 무�
 prompt_set .env ROUTER_MEM_LIMIT "code-docker-router 메모리 제한 (비우면 무제한)"
 
 section "호스트 바인딩 / 리버스 프록시" \
-  .env:ROUTER_HTTP_BIND .env:ROUTER_HTTP_PORT .env:TRUSTED_PROXIES .env:ALLOWED_HOSTS
+  .env:ROUTER_HTTP_BIND .env:ROUTER_HTTP_PORT .env:TRUSTED_PROXIES
 prompt_set .env ROUTER_HTTP_BIND "router가 바인딩할 호스트 IP (비우면 0.0.0.0)"
 prompt_set .env ROUTER_HTTP_PORT "router가 쓸 호스트 포트 (비우면 80 - 이미 다른 프로세스가 쓰고 있으면 바꾸세요)"
 prompt_set .env TRUSTED_PROXIES "신뢰할 리버스 프록시 IP/CIDR 목록 (콤마구분, 비우면 비활성)"
-prompt_set .env ALLOWED_HOSTS "도메인으로 접속한다면 그 호스트 이름 (콤마구분, 예: code.example.com - 비우면 localhost/IP 주소/tailnet 이름으로만 접속 가능)"
 
 section "PWA (브라우저 설치 앱 이름)" \
   .env:PWA_NAME .env:PWA_SHORT_NAME .env:PWA_DISPLAY_MODE

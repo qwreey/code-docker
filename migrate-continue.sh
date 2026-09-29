@@ -214,24 +214,9 @@ if [ "$built" = "1" ]; then
   echo
 fi
 
-# ALLOWED_HOSTS가 비어 있던 배포는 예전엔 "아무 Host나 허용"이었지만, 이제는
-# localhost/IP 주소/tailnet 이름만 허용하고 도메인 이름은 403입니다(DNS rebinding
-# 방어, example-env 참고). 도메인으로 쓰던 배포가 migrate 직후 조용히 403이 되지
-# 않도록, 아래 "설정 재검토"를 건너뛰더라도 비어 있으면 여기서 한 번 묻습니다.
-if [ -z "$(get_env_var "$TARGET_DIR/.env" ALLOWED_HOSTS)" ]; then
-  echo "=== 4-2. 접속 호스트 이름 (ALLOWED_HOSTS) ==="
-  echo "ALLOWED_HOSTS가 비어 있습니다. 이제 비어 있으면 도메인 이름으로 들어오는 요청은"
-  echo "403입니다(localhost, IP 주소, 한 단어 이름, *.ts.net만 허용)."
-  printf "도메인으로 접속한다면 그 호스트 이름 (콤마구분, 예: code.example.com, Enter=로컬 전용): "
-  read -r _allowed_hosts
-  if [ -n "$_allowed_hosts" ]; then
-    set_env_var "$TARGET_DIR/.env" ALLOWED_HOSTS "\"$_allowed_hosts\""
-    echo "  - ALLOWED_HOSTS=\"$_allowed_hosts\""
-  else
-    echo "  - 비워 둡니다 (로컬 전용). 나중에 .env의 ALLOWED_HOSTS로 바꿀 수 있습니다."
-  fi
-  echo
-fi
+# 필수 설정은 5단계(재검토, 기본값 "아니오")에 숨기지 않고 매번 묻습니다 - ootb-lib.sh의
+# ask_required_settings 참고. 7단계 up -d보다 먼저여야 새 값으로 뜹니다.
+ask_required_settings "$TARGET_DIR"
 
 echo "=== 5. 설정 재검토 ==="
 if confirm "설정값을 다시 검토할까요? (PREFIX/CODE_TZ/리소스 제한/ROUTER_HTTP_BIND 등)" n; then

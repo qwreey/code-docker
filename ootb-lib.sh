@@ -337,6 +337,63 @@ prompt_router_manager_password() {
   fi
 }
 
+# --- 필수 설정 ------------------------------------------------------------
+# 비워 두거나 Enter로 넘기면 서비스가 조용히 안 되는 값들입니다. ootb-config.sh의
+# 섹션(migrate에선 "바꿀까요? [y/N]" 뒤에 숨음)이 아니라 여기서 신규 설치와 migrate
+# 양쪽이 매번 묻습니다 - 선택 설정 사이에 섞여 있으면 Enter 한 번으로 넘어가 배포가
+# 깨집니다(실제로 ALLOWED_HOSTS가 그랬음). 새 필수 값은 여기에 함수를 하나 더 추가하세요.
+ask_required_settings() {
+  _ars_dir=$1
+  echo "=== 필수 설정 ==="
+  ask_allowed_hosts "$_ars_dir"
+  echo
+}
+
+# ALLOWED_HOSTS - 도메인으로 접속하는 배포에서 비어 있으면 그 도메인이 전부 403입니다.
+# 값이 있으면 보여주고 Enter로 유지할 수 있지만, 비어 있으면 Enter로는 넘어가지
+# 않습니다: 도메인을 적거나, 정말 로컬 전용이면 local이라고 적어야 합니다.
+ask_allowed_hosts() {
+  _aah_env="$1/.env"
+  _aah_cur="$(get_env_var "$_aah_env" ALLOWED_HOSTS)"
+  echo "ALLOWED_HOSTS - 도메인으로 접속한다면 그 호스트 이름(콤마구분, 예: code.example.com)."
+  echo "  여기 없는 도메인은 403입니다. localhost, IP 주소, 점 없는 이름, *.ts.net은 항상 허용."
+  echo "  scheme(https://), 경로, 포트, 와일드카드(*)는 쓸 수 없습니다 - 이름을 하나씩 적으세요."
+  while :; do
+    if [ -n "$_aah_cur" ]; then
+      printf '  현재: %s
+  Enter=유지, 새 값 입력=교체: ' "$_aah_cur"
+    else
+      printf '  현재 비어 있음(로컬 전용). 호스트 이름을 입력하거나, 로컬 전용이면 local: '
+    fi
+    read -r _aah_in
+    _aah_in="$(printf '%s' "$_aah_in" | tr -d '[:space:]')"
+    if [ -z "$_aah_in" ]; then
+      if [ -n "$_aah_cur" ]; then
+        echo "  - 유지: $_aah_cur"
+        return 0
+      fi
+      echo "  ! 비어 있으면 넘어갈 수 없습니다. 도메인으로 접속하지 않는다면 local을 입력하세요."
+      continue
+    fi
+    if [ "$_aah_in" = "local" ]; then
+      set_env_var "$_aah_env" ALLOWED_HOSTS '""'
+      echo "  - 로컬 전용으로 둡니다. 도메인 요청은 403 안내 페이지를 받습니다."
+      return 0
+    fi
+    _aah_bad=""
+    for _aah_h in $(printf '%s' "$_aah_in" | tr ',' ' '); do
+      printf '%s' "$_aah_h" | grep -qE '^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$' || _aah_bad="$_aah_bad $_aah_h"
+    done
+    if [ -n "$_aah_bad" ]; then
+      echo "  ! 호스트 이름만 적을 수 있습니다:$_aah_bad"
+      continue
+    fi
+    set_env_var "$_aah_env" ALLOWED_HOSTS "\"$_aah_in\""
+    echo "  - ALLOWED_HOSTS=\"$_aah_in\""
+    return 0
+  done
+}
+
 gen_secret() {
   # 32바이트 랜덤을 hex 64자로. openssl이 없는 최소 환경을 위한 폴백 포함.
   if command -v openssl >/dev/null 2>&1; then
