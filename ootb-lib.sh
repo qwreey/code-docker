@@ -67,13 +67,38 @@ set_env_var() {
   # <raw_value>에 argon2 해시처럼 sed 치환 특수문자($, &, |, \)가 그대로
   # 들어있을 수 있어서 - awk -v로 넘긴 값은 정규식/백레퍼런스로 재해석되지
   # 않고 문자열 그대로 print된다.
+  # 임시 파일은 umask 077로 만들어서, 해시가 든 내용이 잠깐이라도 644로 디스크에
+  # 있는 순간이 없게 합니다(mv가 그 권한째로 원본을 대체).
   file=$1 key=$2 value=$3
   touch "$file"
-  awk -v k="$key" -v v="$value" '
+  (umask 077; awk -v k="$key" -v v="$value" '
     $0 ~ "^#?" k "=" { print k "=" v; done=1; next }
     { print }
     END { if (!done) print k "=" v }
-  ' "$file" > "$file.ootb.tmp" && mv "$file.ootb.tmp" "$file"
+  ' "$file" > "$file.ootb.tmp") && mv "$file.ootb.tmp" "$file"
+  secure_env_file "$file"
+}
+
+# .env* 파일에는 argon2id 비밀번호 해시(WEBMANAGER_AUTH_PASSWORD_HASH,
+# ROUTER_MANAGER_AUTH_PASSWORD_HASH, WEBMANAGER_WEBDAV_PASSWORD_HASH)와 API 키가
+# 들어가므로 소유자만 읽게 합니다. docker compose는 그 파일을 소유자 권한으로
+# 읽으니 600이어도 동작에는 영향이 없습니다.
+secure_env_file() {
+  [ -e "$1" ] && chmod 600 "$1"
+}
+
+# backup_env_file <file> - <file>.bak.<시각>으로 사본을 만들고(600), 같은 파일의
+# 백업은 최근 5개만 남깁니다. 예전처럼 한 .bak에 매번 이어붙이면 그 시점의 해시가
+# 전부 무한정 쌓입니다. 만든 백업 경로를 출력합니다.
+backup_env_file() {
+  _bef_dst="$1.bak.$(date +%Y%m%d-%H%M%S)"
+  (umask 077; cp "$1" "$_bef_dst") || return 1
+  secure_env_file "$_bef_dst"
+  # 이름의 시각이 사전순 = 시간순이라 정렬해서 앞쪽(오래된 것)을 지웁니다.
+  ls -1 "$1".bak.* 2>/dev/null | sort | head -n -5 | while IFS= read -r _bef_old; do
+    rm -f "$_bef_old"
+  done
+  printf '%s' "$_bef_dst"
 }
 
 get_env_var() {

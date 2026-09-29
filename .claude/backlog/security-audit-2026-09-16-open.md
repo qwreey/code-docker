@@ -37,6 +37,9 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
     `tinyauth-*` 쿠키 제거 (`8be0932`)
   - F22 nginx에 들어가는 env 값 검증 (`ef69358`)
   - F03 빈 `ALLOWED_HOSTS` = 로컬 전용, migrate가 물어봄 (router `981ecfb`, code-docker 같은 날)
+- 2026-09-29, code-docker:
+  - F16 `.env*`를 600으로(`set_env_var`/ootb 생성 직후/migrate가 기존 배포도 조임),
+    migrate 백업은 `<file>.bak.<시각>` 최근 5개(`ootb-lib.sh` `backup_env_file`)
 
 ---
 
@@ -51,17 +54,6 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
   버그가 재현된다.
 - **방향**: `load` 핸들러에서 `frame.contentWindow.location.href === released`인지
   확인하거나, 해제된 페이지가 `postMessage`로 준비 완료를 알리게 한다.
-
-## F16 [Medium] code-docker - `.env*` 파일이 644 + migrate 백업이 무한정 append
-
-- **저장소/위치**: code-docker 루트 `.env`/`.env.router`/`.env.webmanager`(전부 644
-  확인됨), `migrate-continue.sh:165`(`cat ... >> ... .bak`).
-- **문제**: `WEBMANAGER_AUTH_PASSWORD_HASH`/`ROUTER_MANAGER_AUTH_PASSWORD_HASH`/
-  `WEBMANAGER_WEBDAV_PASSWORD_HASH`(argon2id) 파일이 world-readable. `migrate.sh`를
-  돌릴 때마다 같은 `.bak`에 그 시점 해시를 포함한 전체 사본이 계속 쌓인다(자르거나
-  로테이트 안 됨).
-- **방향**: `set_env_var`가 파일을 만든 직후 `chmod 600`(`.bak` 포함), 백업은 `>` 또는
-  타임스탬프 이름으로.
 
 ## F27 [High] code-docker - CI가 전혀 없음
 

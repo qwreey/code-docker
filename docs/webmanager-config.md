@@ -69,14 +69,18 @@ curl -s https://<code-server 주소>/manifest.json | jq .shortcuts
 기존 `.env.webmanager`를 최신 구조에 맞게 재구성하는 `--env-migrate` 서브커맨드가
 있습니다:
 
+`migrate.sh`가 이 과정을 대신 해주므로(백업은 `.env.webmanager.bak.<시각>`, 최근 5개만
+보관) 보통은 직접 돌릴 일이 없습니다. 손으로 할 때는:
+
 ```sh
-cat .env.webmanager >> .env.webmanager.bak && docker compose exec -T code-docker \
+(umask 077; cp .env.webmanager ".env.webmanager.bak.$(date +%Y%m%d-%H%M%S)" \
+  && docker compose exec -T code-docker \
   /etc/code-docker/webmanager/webmanager --env-migrate < .env.webmanager > .env.webmanager.new \
-  && mv .env.webmanager.new .env.webmanager
+  && mv .env.webmanager.new .env.webmanager)
 ```
 
-(`>>`로 백업 파일에 매번 이어붙이는 이유: 별도 명령으로 나누면 백업을 깜빡하기 쉽고, 이렇게
-`&&`로 묶어두면 실행할 때마다 과거 내용이 `.env.webmanager.bak`에 계속 누적되어 남습니다.
+(`umask 077`은 백업과 새 파일을 소유자 전용으로 만들기 위해서입니다 - 둘 다 비밀번호 해시가
+들어 있습니다. 백업을 `&&`로 묶어두는 이유는 별도 명령으로 나누면 깜빡하기 쉬워서입니다.
 예전에 안내하던 `cat f | tee -a f.bak | ... > f` 한 줄 파이프라인은 **쓰지 마세요** — 셸이
 파이프라인의 모든 단계를 동시에 띄우기 때문에 마지막 `> f`가 `cat`이 읽기 전에 파일을 비울 수
 있고, 그러면 빈 입력이 백업에도 붙고 결과는 비밀번호 해시가 빠진 빈 템플릿이 됩니다. 위 형태는

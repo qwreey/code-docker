@@ -4,6 +4,9 @@
 .env
 .env.webmanager
 .env.router
+# Timestamped backups migrate.sh keeps (ootb-lib.sh backup_env_file) - they hold
+# password hashes too.
+.env*.bak*
 # User-local EXTRA_INCLUDE target (see docker-compose.yml's include: comment) - not
 # empty-extra-include.yml, which IS committed (the intentional no-op default).
 extra-include.yml

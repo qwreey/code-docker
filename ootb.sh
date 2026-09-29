@@ -44,6 +44,9 @@ echo "  - 갱신: $TARGET_DIR/empty-extra-include.yml"
 copy_if_missing "$SCRIPT_DIR/example-env" "$TARGET_DIR/.env"
 copy_if_missing "$SCRIPT_DIR/example-env.webmanager" "$TARGET_DIR/.env.webmanager"
 fetch_router_env_template "$TARGET_DIR/docker-compose.yml" "$TARGET_DIR/.env" "$TARGET_DIR/.env.router" || exit 1
+for f in .env .env.webmanager .env.router; do
+  secure_env_file "$TARGET_DIR/$f"
+done
 echo
 
 REL_BUILD_CONTEXT="$(realpath --relative-to="$TARGET_DIR" "$SCRIPT_DIR")"

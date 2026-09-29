@@ -63,6 +63,25 @@ if [ ${#leftover[@]} -gt 0 ]; then
   echo
 fi
 
+# .env*와 그 백업에는 비밀번호 해시가 들어갑니다(ootb-lib.sh secure_env_file 참고).
+# 예전 ootb/migrate는 644로 만들었고, 옛 migrate는 한 .bak에 매번 이어붙였으므로
+# 이미 배포된 곳의 파일도 여기서 조입니다. 바꾼 게 있을 때만 말합니다.
+tightened=()
+for f in .env .env.webmanager .env.router .env.webmanager.bak .env.router.bak "$TARGET_DIR"/.env*.bak.*; do
+  case $f in /*) ;; *) f="$TARGET_DIR/$f" ;; esac
+  [ -f "$f" ] || continue
+  [ "$(stat -c %a "$f")" = "600" ] && continue
+  secure_env_file "$f" && tightened+=("$(basename "$f")")
+done
+if [ ${#tightened[@]} -gt 0 ]; then
+  echo "=== 1-2. env 파일 권한 ==="
+  echo "  - 비밀번호 해시가 들어 있어 소유자 전용(600)으로 바꿨습니다: ${tightened[*]}"
+  for f in .env.webmanager.bak .env.router.bak; do
+    [ -f "$TARGET_DIR/$f" ] && echo "  - $f 는 옛 migrate가 매번 이어붙인 누적 백업입니다(이제는 $f.<시각>으로 최근 5개만 남김). 필요 없으면 지워도 됩니다."
+  done
+  echo
+fi
+
 if [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
   echo "=== 2. docker-compose.yml 갱신 확인 ==="
   if diff -q <(git -C "$SCRIPT_DIR" show "$OLD_HEAD:docker-compose.yml") "$TARGET_DIR/docker-compose.yml" >/dev/null 2>&1; then
@@ -166,11 +185,14 @@ if [ "$built" = "1" ]; then
 
     [ -f "$TARGET_DIR/$file" ] || continue
     if confirm "$file 을 최신 스키마로 마이그레이션할까요?" y; then
-      cat "$TARGET_DIR/$file" >> "$TARGET_DIR/$file.bak"
+      if ! backup="$(backup_env_file "$TARGET_DIR/$file")"; then
+        echo "  ! $file 백업을 만들지 못해 마이그레이션을 건너뜁니다."
+        continue
+      fi
       new="$(docker compose run --rm -T --entrypoint "$bin" "$service" --env-migrate < "$TARGET_DIR/$file")"
       if [ -n "$new" ]; then
         printf '%s' "$new" > "$TARGET_DIR/$file"
-        echo "  - $file 마이그레이션 완료 (백업: $file.bak)"
+        echo "  - $file 마이그레이션 완료 (백업: $(basename "$backup"), 최근 5개만 보관)"
       else
         echo "  ! $file 마이그레이션 실패 - 기존 파일 그대로 둡니다."
       fi
