@@ -870,8 +870,9 @@ export function Terminal({
   const [profilesError, setProfilesError] = useState<string | null>(null)
   // Item 8: a close request (tab bar X, or Home tab's session list X) goes
   // through requestClose below first, which shows this instead of closing
-  // immediately when the session's shell has a foreground child process.
-  const [closeConfirm, setCloseConfirm] = useState<{ name: string } | null>(null)
+  // immediately when the session's shell has a foreground child process -
+  // or is pinned, which only Home offers to close (see TerminalHome.tsx).
+  const [closeConfirm, setCloseConfirm] = useState<{ name: string; pinned: boolean; running: boolean } | null>(null)
   const [closeConfirmBusy, setCloseConfirmBusy] = useState(false)
   // Carries cwd/command from addSession(opts) through to the WS-connect
   // effect below, keyed by the session name they belong to — a ref (not
@@ -3350,23 +3351,21 @@ export function Terminal({
   const requestClose = useCallback(
     async (name: string) => {
       const session = sessions.find((s) => s.name === name)
-      if (!session || !session.pid) {
-        closeSession(name)
-        return
-      }
-      try {
-        const processes = await api.get<ProcessInfo[]>('/processes')
-        const [root] = buildProcessTree(processes, session.pid)
-        if (root && root.children.length > 0) {
-          setCloseConfirm({ name })
-          return
+      const pinned = !!session?.pinned
+      let running = false
+      if (session?.pid) {
+        try {
+          const processes = await api.get<ProcessInfo[]>('/processes')
+          const [root] = buildProcessTree(processes, session.pid)
+          running = !!root && root.children.length > 0
+        } catch {
+          // best-effort - if the process list itself can't be fetched, fall
+          // back to closing directly rather than blocking the user on a
+          // check that can't be answered
         }
-      } catch {
-        // best-effort - if the process list itself can't be fetched, fall
-        // back to closing directly rather than blocking the user on a
-        // check that can't be answered
       }
-      closeSession(name)
+      if (pinned || running) setCloseConfirm({ name, pinned, running })
+      else closeSession(name)
     },
     [sessions, closeSession],
   )
@@ -3723,10 +3722,17 @@ export function Terminal({
         busy={closeConfirmBusy}
         busyLabel="닫는 중..."
       >
-        <p>
-          <strong>{closeConfirm?.name}</strong> 세션에서 프로그램이 실행 중인 것으로 보입니다. 지금 닫으면 강제
-          종료됩니다.
-        </p>
+        {closeConfirm?.pinned && (
+          <p>
+            <strong>{closeConfirm.name}</strong> 세션은 고정되어 있습니다. 닫으면 셸이 종료됩니다.
+          </p>
+        )}
+        {closeConfirm?.running && (
+          <p>
+            <strong>{closeConfirm.name}</strong> 세션에서 프로그램이 실행 중인 것으로 보입니다. 지금 닫으면 강제
+            종료됩니다.
+          </p>
+        )}
       </ConfirmDialog>
     </section>
   )

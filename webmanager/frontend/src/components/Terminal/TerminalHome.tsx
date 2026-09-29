@@ -160,21 +160,19 @@ export function TerminalHome({
                   >
                     {s.pinned ? <Pin size={14} /> : <PinOff size={14} />}
                   </button>
-                  {/* Hidden entirely once pinned, same rule as the tab bar
-                      (TerminalTabs.tsx item 3) - pinning means "can't be
-                      closed from the UI" everywhere a session can be closed
-                      from, not just the tab bar. */}
-                  {!s.pinned && (
-                    <button
-                      type="button"
-                      className="terminal-home-icon-btn"
-                      onClick={() => onCloseSession(s.name)}
-                      title="세션 종료"
-                      aria-label={`${s.name} 세션 종료`}
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
+                  {/* Unlike the tab bar, Home offers to close a pinned
+                      session too (behind a confirm, see requestClose): it's
+                      where every session is listed, and code-server's widget
+                      pins each one it creates, so they'd otherwise pile up. */}
+                  <button
+                    type="button"
+                    className="terminal-home-icon-btn"
+                    onClick={() => onCloseSession(s.name)}
+                    title="세션 종료"
+                    aria-label={`${s.name} 세션 종료`}
+                  >
+                    <X size={14} />
+                  </button>
                 </li>
               )
             })}
