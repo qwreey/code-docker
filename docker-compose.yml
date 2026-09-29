@@ -23,7 +23,7 @@
 # dev-clone.sh and example-env).
 include:
   - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}
-  - path: "${ROUTER_INCLUDE:-https://github.com/qwreey/router-docker.git#${ROUTER_REF:-v0.1.2}:docker-compose.router.yml}"
+  - path: "${ROUTER_INCLUDE:-https://github.com/qwreey/router-docker.git#${ROUTER_REF:-v0.1.3}:docker-compose.router.yml}"
 
 networks:
   code-docker-internal:

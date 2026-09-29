@@ -40,13 +40,11 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
 - 2026-09-29, code-docker:
   - F16 `.env*`를 600으로(`set_env_var`/ootb 생성 직후/migrate가 기존 배포도 조임),
     migrate 백업은 `<file>.bak.<시각>` 최근 5개(`ootb-lib.sh` `backup_env_file`)
-  - F28 code-docker/router에 supervisord 상태 healthcheck (router는 router-docker
-    커밋만, 태그+`ROUTER_REF` bump 전까지 배포엔 안 들어감)
+  - F28 code-docker/router에 supervisord 상태 healthcheck (router는 router-docker `v0.1.3`)
   - F31 문서(docs/index.md) + `ootb-config.sh`가 PREFIX 설정 + 기본 볼륨 경로일 때 경고
     (기본 경로는 안 바꿈 - 기존 배포가 빈 볼륨으로 뜸)
   - F26 묶음 전부: router VNC 브리지 32개 상한(`cd2c8a0`), vhostpwa manifest 1 MiB
-    (`0679303`), DNS 대소문자 정규화(`d4f657e`), embedTheme 부모 창/출처 검사(`ec07373`) -
-    router-docker 커밋만, 태그 전. webmanager 업로드 `[]`, CLAUDE.md makepkg 트레이드오프,
+    (`0679303`), DNS 대소문자 정규화(`d4f657e`), embedTheme 부모 창/출처 검사(`ec07373`) - router-docker `v0.1.3`. webmanager 업로드 `[]`, CLAUDE.md makepkg 트레이드오프,
     `.dockerignore` `.env*`/`*.bak*` - code-docker.
   - F27 대체: `./dev-check.sh`(+`--clean[=rev]`), `dev-clone.sh`가 pre-push 훅 설치,
     CLAUDE.md Commands. router `tinyauthusers/store.go` gofmt도 정리(`27b38cd`)
