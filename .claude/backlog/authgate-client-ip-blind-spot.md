@@ -1,5 +1,9 @@
 # authgate의 per-IP 백오프가 클라이언트를 구분하지 못한다 (router / webmanager 둘 다)
 
+> 2026-09-29 확인: 해결된 것으로 보임 - router는 `handlers_auth.go` `rateLimitKey`(2026-09-07 H2,
+> 유닉스 소켓이면 X-Real-IP), webmanager는 감사 F11(`d1f747e`, loopback 바인드 + `authgate.ClientKey`).
+> 재확인 후 `.claude/archive/`로 옮길 후보.
+
 발견 2026-09-06, VNC 연결 클라이언트 기능을 만들다가 곁가지로 확인됨. **고치지 않았고,
 별개 결정이라 여기에 남긴다.**
 
