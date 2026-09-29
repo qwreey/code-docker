@@ -50,28 +50,9 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
     `.dockerignore` `.env*`/`*.bak*` - code-docker.
   - F27 대체: `./dev-check.sh`(+`--clean[=rev]`), `dev-clone.sh`가 pre-push 훅 설치,
     CLAUDE.md Commands. router `tinyauthusers/store.go` gofmt도 정리(`27b38cd`)
+  - F25 qwreey-fish `c33d083`: fisher/플러그인은 커밋, mise는 릴리스+sha256, mise 도구는
+    버전으로 고정, 범프는 그쪽 `scripts/bump-pins.sh`(upstream diff 검토) + `test-setup.sh`.
+    code-docker는 `./dev-bump-qwreey-fish.sh`로 옮기고 `--self`로 qwreey-fish 자신도 고정.
   - F23 위젯 팝아웃이 세션을 쥔 문서가 실제로 사라진 `load`에서만 새 탭을 이동
 
 ---
-
-## F25 [Low] code-docker - qwreey-fish SHA 핀 이후에도 fisher/mise.run이 여전히 unpinned root curl\|sh
-
-- **저장소/위치**: `config/user-init/user-init.default.sh` 12-23행 주석이 스스로 인정 —
-  SHA+sha256으로 핀된 `qs_setup.fish`가 다시 fisher 설치 스크립트를 `curl | source`하고
-  floating 브랜치 플러그인을 `fisher install`, `curl https://mise.run | sh`를 실행.
-- **문제**: 전부 미핀, 전부 root, 새 `/code` 볼륨마다 반복. "curl-pipe 문제는 고쳤다"로
-  기억이 굳을 위험(qwreey-fish 핀만 보이고 이건 안 보임).
-- **방향**: 최소한 이 backlog 항목으로 존재를 남긴다(요청받은 조치). 실제 고정은
-  qwreey-fish 핀과 같은 방식(SHA+체크섬)을 fisher/mise.run에도 적용하거나, mise는
-  자체 버전 핀 메커니즘이 있으니 그걸 쓰도록 전환.
-- **막힌 점(2026-09-29 확인)**: code-docker 쪽만으로는 고정이 안 된다. 핀된
-  `qs_setup.fish`(706b314, main과 동일)가
-  - fisher: `command --query fisher`로 확인하는데 fisher는 함수라 항상 거짓 →
-    미리 핀된 fisher.fish를 깔아둬도 무조건 `curl main | source`.
-  - mise: 바이너리가 있으면 `self-update`(최신), 실패하면 `curl mise.run | sh`로
-    넘어감 → 미리 핀된 바이너리를 깔아도 최신으로 올리거나 결국 curl.
-  → qwreey-fish에 (1) `functions -q fisher`, (2) 이미 있으면 설치/업데이트 건너뛰기를
-  넣고 새 SHA로 bump한 뒤, user-init이 핀된 fisher.fish(SHA+sha256)와 mise 릴리스
-  바이너리(버전+sha256)를 먼저 깔아야 한다. qwreey-fish는 이 체크아웃에 없음(외부
-  저장소 push 필요 - 오너 확인 대기). 남는 미핀: `fisher install`의 플러그인들, mise
-  도구 레지스트리.

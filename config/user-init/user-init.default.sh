@@ -8,23 +8,15 @@ UMBRELLA="/code/.local/share/code-docker"
 VERSION_FILE="$UMBRELLA/migration-version"
 LEGACY_VERSION_FILE="/code/.installed"
 
-# qwreey-fish's qs_setup.fish, pinned (security-review H4 fix, 2026-09-14) -
-# this used to be `curl <floating main branch> | source`, run as root before
-# supervisord starts, once per fresh /code volume, with no checksum at all.
-# It's the same repo/owner as this one so the trust tier doesn't change, but
-# a single compromised GitHub account/token would otherwise turn into a
-# root RCE on every freshly-provisioned volume from that moment on. Bump
-# BOTH values together, only after actually reviewing the diff at the new
-# SHA - don't just copy the latest `main` blindly:
-#   git ls-remote https://github.com/qwreey/qwreey-fish.git main   # -> new SHA
-#   curl -sL "https://raw.githubusercontent.com/qwreey/qwreey-fish/<new SHA>/functions/qs_setup.fish" | sha256sum   # -> new hash
-# Note qs_setup.fish itself, once running, goes on to `curl | source`
-# jorgebucaran/fisher's own installer and `fisher install` a handful of
-# floating (unpinned-branch) plugins, and pipes `curl https://mise.run | sh`
-# for mise - none of that is pinned by this fix; out of scope here (fisher
-# plugin pinning would be a qwreey-fish-side change, not code-docker's).
-QWREEY_FISH_QS_SETUP_SHA="706b314b009a8a547fbc40213d30bc73cb6a8a5b"
-QWREEY_FISH_QS_SETUP_SHA256="f5e733ebd7ed4d8b9b1f093eb3daf712facee0f307ab47d81af185fda4a4d6ec"
+# qwreey-fish's qs_setup.fish, pinned by commit and sha256 - it runs as root,
+# once per fresh /code volume, so a floating branch would turn one compromised
+# GitHub account into a root RCE on every new volume. That file pins
+# everything it installs in turn (fisher and its plugins by commit, mise by
+# release + sha256, mise tools by version), and --self below makes it
+# install qwreey-fish itself at this same commit. Bump both values with
+# ./dev-bump-qwreey-fish.sh, which shows the diff to review first.
+QWREEY_FISH_QS_SETUP_SHA="c33d0836c940b36707566a870ec1888dc7c9296a"
+QWREEY_FISH_QS_SETUP_SHA256="444e5dfa82f93e35ccad5cb0a45fe443bd468141b7fc368afbc43f0f4b220d1e"
 
 mkdir -p "$UMBRELLA"
 
@@ -38,15 +30,10 @@ fi
 
 # First time init migration
 if [ ! -e "$VERSION_FILE" ]; then
-    # qs_setup's fisher installs can leave fish's $status non-zero even when
-    # everything installed fine - some third-party plugins pulled in here
-    # (e.g. puffer-fish, autopair.fish) start their conf.d hook with
-    # `status is-interactive || exit`, a correct guard that no-ops key
-    # bindings in a non-interactive shell, but which fish -c below still
-    # sees as this call's own non-zero exit status. Don't let that trip
+    # qs_setup exits non-zero when any of its steps failed (each one says
+    # why on stderr, which lands in this program's log). Don't let that trip
     # set -e and crash-loop the whole container on every boot - log it and
-    # move on, since the actual install (visible above in the logs either
-    # way) already happened.
+    # move on; the shell setup is a nicety, and a partial one still works.
     QS_SETUP_URL="https://raw.githubusercontent.com/qwreey/qwreey-fish/${QWREEY_FISH_QS_SETUP_SHA}/functions/qs_setup.fish"
     QS_SETUP_TMP="$(mktemp)"
     # Guarded with if/else, not `|| true` - a download or hash-mismatch
@@ -62,10 +49,10 @@ if [ ! -e "$VERSION_FILE" ]; then
     if curl -sL "$QS_SETUP_URL" -o "$QS_SETUP_TMP"; then
         QS_SETUP_ACTUAL_SHA256="$(sha256sum "$QS_SETUP_TMP" | awk '{ print $1 }')"
         if [ "$QS_SETUP_ACTUAL_SHA256" = "$QWREEY_FISH_QS_SETUP_SHA256" ]; then
-            fish -c "source '$QS_SETUP_TMP' && qs_setup" < /dev/null \
-                || echo "user-init: qs_setup exited non-zero (see comment above) - continuing anyway" >&2
+            fish -c "source '$QS_SETUP_TMP' && qs_setup --self qwreey/qwreey-fish@$QWREEY_FISH_QS_SETUP_SHA" < /dev/null \
+                || echo "user-init: qs_setup reported a failed step (see its output above) - continuing anyway" >&2
         else
-            echo "user-init: WARNING - qs_setup.fish checksum mismatch (expected $QWREEY_FISH_QS_SETUP_SHA256, got $QS_SETUP_ACTUAL_SHA256) - refusing to source it. Skipping qwreey-fish shell setup (fish will keep its stock config); this is a non-essential nicety, not a core service, so the container boots normally otherwise. Bump QWREEY_FISH_QS_SETUP_SHA/QWREEY_FISH_QS_SETUP_SHA256 at the top of this script once you've reviewed the new content." >&2
+            echo "user-init: WARNING - qs_setup.fish checksum mismatch (expected $QWREEY_FISH_QS_SETUP_SHA256, got $QS_SETUP_ACTUAL_SHA256) - refusing to source it. Skipping qwreey-fish shell setup (fish will keep its stock config); this is a non-essential nicety, not a core service, so the container boots normally otherwise. Bump QWREEY_FISH_QS_SETUP_SHA/_SHA256 with ./dev-bump-qwreey-fish.sh, which shows the diff to review." >&2
         fi
     else
         echo "user-init: WARNING - failed to download qs_setup.fish from qwreey-fish@${QWREEY_FISH_QS_SETUP_SHA} (network issue?) - skipping qwreey-fish shell setup. This is non-essential; core services are unaffected." >&2
