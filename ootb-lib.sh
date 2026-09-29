@@ -359,7 +359,7 @@ ask_allowed_hosts() {
   echo "  여기 없는 도메인은 403입니다. localhost, IP 주소, 점 없는 이름, *.ts.net은 항상 허용."
   echo "  scheme(https://), 경로, 포트, 와일드카드(*)는 쓸 수 없습니다 - 이름을 하나씩 적으세요."
   echo "  ROUTER_MANAGER_HOSTS/TINYAUTH_HOSTS/vhost 이름은 따로 매칭되므로 넣지 않아도 됩니다."
-  echo "  Dev Proxy(/exports/)로 들어오는 이름은 여기와 ALLOWED_EXPORT_HOSTS 둘 다에 필요합니다."
+  echo "  Dev Proxy 이름도 필요 없습니다 - Dev Proxy에 등록한 이름에만 응답합니다."
   while :; do
     if [ -n "$_aah_cur" ]; then
       printf '  현재: %s

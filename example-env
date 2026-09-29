@@ -254,8 +254,9 @@
 # - 그 밖의 도메인 이름은 여기 적은 것만 허용되고, 나머지는 403입니다. 그래서 비워두면
 #   "아무 Host나 허용"이 아니라 "로컬 전용"입니다.
 # - router의 ROUTER_MANAGER_HOSTS/TINYAUTH_HOSTS/vhost(VHOST_*) 이름은 각자 자기 server
-#   블록에서 이름 그대로만 매칭되므로 여기 넣지 않아도 됩니다. Dev Proxy(/exports/)로
-#   들어오는 이름은 여기와 ALLOWED_EXPORT_HOSTS 둘 다에 있어야 합니다.
+#   블록에서 이름 그대로만 매칭되므로 여기 넣지 않아도 됩니다. Dev Proxy(/exports/)
+#   이름도 마찬가지입니다 - Dev Proxy는 런타임에 등록한 이름에만 응답하고, 그 목록이
+#   곧 허용 목록입니다(더 좁히려면 .env.router의 ALLOWED_EXPORT_HOSTS).
 # - 목적은 DNS rebinding 방어입니다. 공격자 페이지가 자기 도메인을 이 호스트 IP로 다시
 #   가리키게 해도, 브라우저가 보내는 Host는 공격자 도메인이라 걸립니다.
 # - Host는 클라이언트가 정하는 헤더이므로 도메인을 아는 공격자의 직접 요청까지 막지는
