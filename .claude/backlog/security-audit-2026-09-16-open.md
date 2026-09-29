@@ -40,6 +40,8 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
 - 2026-09-29, code-docker:
   - F16 `.env*`를 600으로(`set_env_var`/ootb 생성 직후/migrate가 기존 배포도 조임),
     migrate 백업은 `<file>.bak.<시각>` 최근 5개(`ootb-lib.sh` `backup_env_file`)
+  - F28 code-docker/router에 supervisord 상태 healthcheck (router는 router-docker
+    커밋만, 태그+`ROUTER_REF` bump 전까지 배포엔 안 들어감)
   - F23 위젯 팝아웃이 세션을 쥔 문서가 실제로 사라진 `load`에서만 새 탭을 이동
 
 ---
@@ -58,16 +60,6 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
   방법이 없다(`README.md`/`CLAUDE.md`의 Commands 절 어디에도 `go test`가 없음).
 - **방향**: `go test` 3개 모듈 + `gofmt -l` + `docker compose config` + `bash -n
   script/*.sh config/**/*.sh`를 도는 GitHub Actions 워크플로 하나.
-
-## F28 [High] code-docker - 본체(code-docker/router)에 healthcheck가 없음
-
-- **저장소/위치**: 루트 `docker-compose.yml` — `healthcheck:`가 `code-docker-dind`
-  서비스 한 곳에만 있음(재확인, 340행). `code-docker`/`code-docker-router`/
-  `code-docker-netinit-docker`는 없음.
-- **문제**: code-server, webmanager, nginx, sshd, dns-local이 supervisord 안에서
-  전부 죽어도 `docker compose ps`는 `Up`으로 보인다.
-- **방향**: `code-docker`에 `supervisorctl status`가 전 프로그램 RUNNING인지 보는
-  healthcheck 추가. dind가 이미 가진 패턴을 참고.
 
 ## F31 [Medium] code-docker - 볼륨 기본 경로에 `PREFIX`가 없어 다중 인스턴스가 데이터를 공유함
 

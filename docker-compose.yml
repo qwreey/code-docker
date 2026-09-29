@@ -149,6 +149,22 @@ services:
         limits:
           cpus: "${CODE_CPU_LIMIT:-0}"
           memory: "${CODE_MEM_LIMIT:-0}"
+    # Every service here runs under supervisord, which keeps the container `Up` even
+    # when code-server/webmanager/nginx/sshd have all died. Healthy = every program is
+    # RUNNING, or STOPPED (only ever on purpose: `supervisorctl stop` or
+    # autostart=false); BACKOFF/FATAL/EXITED, or supervisord not answering at all,
+    # is unhealthy. This includes on-volume units, since a crash-looping one is worth
+    # surfacing too. start_period covers entrypoint.sh's netinit wait and
+    # user-init.sh, both of which run before supervisord exists. $$ (not $) so
+    # Compose leaves awk's fields alone.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "supervisorctl status | awk '$$2 != \"RUNNING\" && $$2 != \"STOPPED\" { bad = 1; print } END { exit bad || NR == 0 }'"
+      interval: 30s
+      timeout: 10s
+      start_period: 180s
+      retries: 3
     # webmanager (admin panel, port 81) settings all live in .env.webmanager, not here -
     # copy example-env.webmanager to .env.webmanager and uncomment only what you need.
     env_file:
