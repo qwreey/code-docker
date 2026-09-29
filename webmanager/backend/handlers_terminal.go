@@ -222,6 +222,9 @@ func parseTerminalDimension(raw string) uint16 {
 	return uint16(n)
 }
 
+// repaintNudgeGap is how long nudgeRepaint holds the smaller size.
+const repaintNudgeGap = 100 * time.Millisecond
+
 // nudgeRepaint resizes the PTY one row down and straight back, to make the
 // foreground application redraw its whole screen.
 //
@@ -234,6 +237,13 @@ func parseTerminalDimension(raw string) uint16 {
 // reattaching at the size it left gets no signal at all, which is exactly
 // the common case, and exactly when users were nudging the browser window
 // by hand to un-garble the display.
+//
+// The two sizes are held apart by repaintNudgeGap: an application that
+// coalesces SIGWINCHes and reads the size once they settle sees an instant
+// shrink-and-restore as no change at all. Claude Code does exactly that -
+// measured against a PTY, it redraws nothing for a back-to-back pair and
+// its full screen for any gap from 30ms up - and its input box is what a
+// replay garbles.
 func nudgeRepaint(sess *termsession.Session, size attachSize, logLabel string) {
 	if !size.known() || size.Rows < 2 {
 		return
@@ -242,6 +252,7 @@ func nudgeRepaint(sess *termsession.Session, size attachSize, logLabel string) {
 		log.Printf("terminal: session %q: repaint nudge failed: %v", logLabel, err)
 		return
 	}
+	time.Sleep(repaintNudgeGap)
 	if err := sess.Resize(size.Cols, size.Rows); err != nil {
 		log.Printf("terminal: session %q: repaint nudge restore failed: %v", logLabel, err)
 	}
