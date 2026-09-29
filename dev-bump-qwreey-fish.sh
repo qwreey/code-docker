@@ -91,9 +91,8 @@ sed -i \
 git --no-pager diff -- "$TARGET"
 
 echo
-echo "이미 쓰던 /code 볼륨에는 적용되지 않습니다(qs_setup은 새 볼륨에서 한 번만). 기존 볼륨을"
-echo "이 커밋으로 옮기려면 컨테이너 안 fish에서 (qs_update는 핀이 아니라 main으로 갑니다):"
-echo "  curl -fsSL $url | source; and qs_setup --self $REPO@$new"
+echo "이미 쓰던 /code 볼륨도 다음 이미지 빌드 + 재시작 때 user-init이 이 커밋으로 옮깁니다"
+echo "(볼륨에 기록된 적용 커밋과 핀이 다르면 qs_setup을 다시 실행 - $TARGET 참고)."
 if [ $commit = 1 ]; then
   git add "$TARGET"
   git commit -q -m "Bump qwreey-fish to ${new:0:12}" && git log --oneline -1
