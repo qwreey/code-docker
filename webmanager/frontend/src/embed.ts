@@ -32,6 +32,7 @@ export const embedParams = {
 
 export type HostMessage =
   | { type: 'focus' }
+  | { type: 'foreground' }
   | { type: 'theme'; theme: 'light' | 'dark' }
   | { type: 'pin'; pinned: boolean }
   | { type: 'rename'; name: string }

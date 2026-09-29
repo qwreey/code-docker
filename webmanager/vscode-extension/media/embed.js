@@ -221,6 +221,7 @@
       case 'open-webauthn':
       case 'lock':
       case 'select-session':
+      case 'foreground':
         toEmbed(data)
         break
       case 'theme-pref':

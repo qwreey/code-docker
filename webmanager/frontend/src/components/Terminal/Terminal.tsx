@@ -1321,7 +1321,10 @@ export function Terminal({
   // back to the laptop after using the same session on a phone would
   // otherwise leave the terminal stuck at the phone's dimensions.
   // Deliberately one message on the focus transition, not polling while
-  // focused — one resize is all it takes to win.
+  // focused — one resize is all it takes to win. Sent even when this socket
+  // already sent the same size (sendResize would drop it): what changed is
+  // the PTY, not this terminal. An unchanged size costs nothing - the kernel
+  // sends no SIGWINCH for a TIOCSWINSZ that matches.
   //
   // This is also auto-reconnect's fast path: waiting out a scheduled
   // backoff after a phone was simply backgrounded and foregrounded again
@@ -1337,7 +1340,8 @@ export function Terminal({
     if (activeSession === HOME_TAB_ID) return
     const onForeground = () => {
       fitIfVisible()
-      sendResize()
+      const term = termRef.current
+      if (term && containerRef.current?.clientWidth) sendSize(term.cols, term.rows, 'foreground')
       if (stateRef.current === 'disconnected' && autoReconnectEnabledRef.current && !sessionEndedRef.current) reconnect()
     }
     const onVisibilityChange = () => {
@@ -1345,11 +1349,15 @@ export function Terminal({
     }
     window.addEventListener('focus', onForeground)
     document.addEventListener('visibilitychange', onVisibilityChange)
+    // Embedded, code-server's window coming back doesn't focus this frame
+    // unless the terminal was what had focus; the extension says so instead.
+    const offHost = embedded ? onHostMessage((msg) => msg.type === 'foreground' && onForeground()) : undefined
     return () => {
       window.removeEventListener('focus', onForeground)
       document.removeEventListener('visibilitychange', onVisibilityChange)
+      offHost?.()
     }
-  }, [activeSession, fitIfVisible, sendResize, reconnect])
+  }, [activeSession, fitIfVisible, sendSize, reconnect, embedded])
 
   // keepFocus is what every control-bar button (TerminalControls.tsx) goes
   // through after its action, and it deliberately never *opens* the

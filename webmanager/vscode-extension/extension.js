@@ -999,6 +999,18 @@ function activate(context) {
     if (SLOT_IDS.includes(id)) setSlotContext(id, true)
   }
 
+  // The window coming back to the front: a visible terminal re-claims its
+  // PTY size (another client may have resized the session meanwhile). A
+  // view only hears this itself when focus was inside it.
+  context.subscriptions.push(
+    vscode.window.onDidChangeWindowState((s) => {
+      if (!s.focused) return
+      for (const h of hosts) {
+        if (h.kind === 'panel' ? h.panel.visible : h.view.visible) h.webview.postMessage({ type: 'foreground' })
+      }
+    }),
+  )
+
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('webmanager.theme')) {
