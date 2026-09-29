@@ -98,6 +98,23 @@ prompt_set .env PREFIX "여러 인스턴스를 한 호스트에 띄울 때 붙�
 prompt_set .env CODE_TZ "타임존 (예: Asia/Seoul, 비우면 UTC)"
 prompt_set .env CODE_LANG "로케일 (glibc LANG 형식, 예: ko_KR.UTF-8, 비우면 C.UTF-8 - build.*.sh에서 locale-gen 안 하면 C.UTF-8 외 값은 적용 안 됨)"
 
+# PREFIX는 컨테이너/네트워크 이름만 나눕니다. *_VOLUME 기본값(./data/...)은
+# docker-compose.yml이 있는 디렉터리 기준이라, 같은 디렉터리에서 두 번째 인스턴스를
+# 띄우면 /code·SSH 호스트키·dind 저장소·router 상태를 조용히 공유합니다(docs/index.md
+# "여러 code-docker 인스턴스 사용"). 기본 경로 자체는 바꾸지 않습니다 - 이미 배포된 곳의 데이터가 새
+# 경로로 옮겨가지 않은 채 빈 볼륨으로 뜨게 되므로. 섹션을 건너뛰어도 보이게 밖에 둡니다.
+if [ -n "$(get_env_var "$TARGET_DIR/.env" PREFIX)" ]; then
+  _pfx_defaults=()
+  for _pfx_v in HOME_VOLUME SSHD_VOLUME DIND_VOLUME DIND_AUTHZ_VOLUME ROUTER_VOLUME; do
+    [ -z "$(get_env_var "$TARGET_DIR/.env" "$_pfx_v")" ] && _pfx_defaults+=("$_pfx_v")
+  done
+  if [ ${#_pfx_defaults[@]} -gt 0 ]; then
+    echo "  ! PREFIX가 설정돼 있지만 ${_pfx_defaults[*]} 는 기본 경로(./data/...)입니다."
+    echo "    인스턴스마다 디렉터리가 따로면 괜찮고, 같은 디렉터리에서 둘을 띄운다면"
+    echo "    데이터를 공유하게 되니 .env에서 이 경로들을 인스턴스별로 지정하세요."
+  fi
+fi
+
 section "리소스 제한" \
   .env:CODE_CPU_LIMIT .env:CODE_MEM_LIMIT \
   .env:DIND_CPU_LIMIT .env:DIND_MEM_LIMIT \

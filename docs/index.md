@@ -319,6 +319,8 @@ cp example-env .env
 
 여러 인스턴스 구동 시 container_name 이 겹칠 수 있습니다. `.env`에 `PREFIX`를 적절히 설정해주면 해결됩니다 (기본적으로 `${PREFIX:-}`를 붙여서 `docker-compose.yml`을 제공합니다). 단, `PREFIX`는 컨테이너/네트워크 이름만 분리해줄 뿐, host의 80번 포트는 인스턴스마다 여전히 하나뿐인 `code-docker-router`가 그대로 바인딩합니다 - 두 번째 인스턴스를 같은 호스트에 띄우려면 `example-env`의 `ROUTER_HTTP_PORT`(기본 `80`)를 인스턴스마다 다른 값으로 설정해야 포트 충돌 없이 뜹니다(특정 호스트 IP에만 바인딩하고 싶다면 `ROUTER_HTTP_BIND`도 함께).
 
+`PREFIX`는 데이터 경로도 나누지 않습니다. `HOME_VOLUME`/`SSHD_VOLUME`/`DIND_VOLUME`/`DIND_AUTHZ_VOLUME`/`ROUTER_VOLUME`의 기본값(`./data/...`)은 `docker-compose.yml`이 있는 디렉터리 기준이라, **인스턴스마다 디렉터리(와 `.env`)를 따로 두는 것**이 가장 간단합니다. 한 디렉터리에서 `--env-file` 등으로 두 인스턴스를 띄우면 `/code`, SSH 호스트키, dind 저장소, dind-authz 정책, router 상태를 조용히 공유하며 서로 망가뜨리니, 그때는 위 경로를 인스턴스마다 다르게 지정하세요(사이드 프로젝트의 `./data/...`도 마찬가지). `ootb-config.sh`는 `PREFIX`가 있는데 이 경로들이 기본값이면 경고합니다.
+
 ## tailscale 연결
 
 router 컨테이너(code-docker 자신이 아님, [router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고)가 고유한

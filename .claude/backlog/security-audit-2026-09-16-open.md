@@ -42,6 +42,8 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
     migrate 백업은 `<file>.bak.<시각>` 최근 5개(`ootb-lib.sh` `backup_env_file`)
   - F28 code-docker/router에 supervisord 상태 healthcheck (router는 router-docker
     커밋만, 태그+`ROUTER_REF` bump 전까지 배포엔 안 들어감)
+  - F31 문서(docs/index.md) + `ootb-config.sh`가 PREFIX 설정 + 기본 볼륨 경로일 때 경고
+    (기본 경로는 안 바꿈 - 기존 배포가 빈 볼륨으로 뜸)
   - F23 위젯 팝아웃이 세션을 쥔 문서가 실제로 사라진 `load`에서만 새 탭을 이동
 
 ---
@@ -60,17 +62,6 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
   방법이 없다(`README.md`/`CLAUDE.md`의 Commands 절 어디에도 `go test`가 없음).
 - **방향**: `go test` 3개 모듈 + `gofmt -l` + `docker compose config` + `bash -n
   script/*.sh config/**/*.sh`를 도는 GitHub Actions 워크플로 하나.
-
-## F31 [Medium] code-docker - 볼륨 기본 경로에 `PREFIX`가 없어 다중 인스턴스가 데이터를 공유함
-
-- **저장소/위치**: 루트 `docker-compose.yml`의 `HOME_VOLUME`/`SSHD_VOLUME`/
-  `DIND_VOLUME`/`DIND_AUTHZ_VOLUME`/`ROUTER_VOLUME` 기본값(`./data/code` 등, 재확인,
-  `PREFIX` 미포함).
-- **문제**: 컨테이너 이름/네트워크는 `PREFIX`로 분리되는데 이 경로들은 아니다. 문서를
-  따라 한 디렉터리에서 `PREFIX`만 바꿔 두 인스턴스를 띄우면 `/code`, SSH 호스트키,
-  dind 저장소, dind-authz 정책, router 상태를 조용히 공유하며 서로 망가뜨린다.
-- **방향**: 기본값을 `./data/${PREFIX}code` 식으로 바꾸거나 최소한 문서에
-  "인스턴스마다 별도 디렉터리 필요"를 명시.
 
 ## F25 [Low] code-docker - qwreey-fish SHA 핀 이후에도 fisher/mise.run이 여전히 unpinned root curl\|sh
 
