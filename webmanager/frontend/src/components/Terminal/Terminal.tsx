@@ -98,6 +98,9 @@ function resolveFontFamily(selected: string): string {
 // explicitly set before now) so an already-open terminal doesn't visibly
 // jump the first time this ships.
 const FONT_SIZE_STORAGE_KEY = 'webmanager.terminal.fontSize'
+
+// How long the first connect waits for the terminal font (see fontReady).
+const FONT_READY_TIMEOUT_MS = 2000
 const FONT_SIZE_DEFAULT = 15
 const FONT_SIZE_MIN = 8
 const FONT_SIZE_MAX = 32
@@ -1072,6 +1075,7 @@ export function Terminal({
     if (termRef.current) {
       termRef.current.options.fontFamily = resolveFontFamily(effectiveSettings.fontFamily)
       fitIfVisible()
+      sendResizeRef.current?.()
     }
   }, [effectiveSettings.fontFamily, fitIfVisible])
 
@@ -1105,6 +1109,69 @@ export function Terminal({
     if (ws && sentSizes.get(ws) === `${term.cols}x${term.rows}`) return
     sendSize(term.cols, term.rows, 'resize')
   }, [sendSize])
+  // For the font effect above, which is declared before sendResize exists.
+  const sendResizeRef = useRef(sendResize)
+  sendResizeRef.current = sendResize
+
+  // xterm measures the cell size only when the font option changes, not
+  // when the webfont behind an unchanged option finishes loading. A font
+  // selected while its file was still downloading (a large CJK .ttf takes a
+  // while) was therefore measured with the fallback's metrics and kept them:
+  // the grid stayed too many columns wide for the glyphs actually drawn.
+  // Setting the option to something else and back forces the re-measure.
+  const remeasureFont = useCallback(() => {
+    const term = termRef.current
+    if (!term) return
+    const family = term.options.fontFamily
+    term.options.fontFamily = family === DEFAULT_MONO_STACK ? 'monospace' : DEFAULT_MONO_STACK
+    term.options.fontFamily = family
+    fitIfVisible()
+  }, [fitIfVisible])
+
+  // The connect effect puts the PTY size on the URL, and the size depends on
+  // the font. Connecting before the user's font was known (settings still
+  // loading - every remount, e.g. right after unlocking) or loaded (webfont
+  // still downloading) attached at the fallback font's size and resized a
+  // moment later: two SIGWINCHes during the reattach replay, which left Ink
+  // apps like Claude Code drawn for the wrong width until the next manual
+  // resize. So the first connect waits for both, bounded, since a font that
+  // never arrives must not keep the terminal from connecting at all.
+  const [fontReady, setFontReady] = useState(false)
+  const settingsSettled = settings !== null || settingsError !== null
+  useEffect(() => {
+    if (fontReady || !settingsSettled) return
+    let cancelled = false
+    const ready = () => {
+      if (!cancelled) setFontReady(true)
+    }
+    const family = effectiveSettings.fontFamily
+    if (!family) {
+      ready()
+      return
+    }
+    const timeout = new Promise((resolve) => window.setTimeout(resolve, FONT_READY_TIMEOUT_MS))
+    const loaded = () => {
+      if (cancelled) return
+      remeasureFont()
+      ready()
+    }
+    Promise.race([document.fonts.load(`${fontSize}px '${family}'`), timeout]).then(loaded, loaded)
+    return () => {
+      cancelled = true
+    }
+  }, [fontReady, settingsSettled, effectiveSettings.fontFamily, fontSize, remeasureFont])
+
+  // A font that arrives after that timeout (or any later webfont load)
+  // changes the cell size without the container resizing, so the
+  // ResizeObserver never sees it.
+  useEffect(() => {
+    const onFontsLoaded = () => {
+      remeasureFont()
+      sendResize()
+    }
+    document.fonts.addEventListener('loadingdone', onFontsLoaded)
+    return () => document.fonts.removeEventListener('loadingdone', onFontsLoaded)
+  }, [remeasureFont, sendResize])
 
   // Apply the zoom (font size) level live — same "initial value at creation,
   // then kept in sync by its own effect" shape as theme/fontFamily above.
@@ -2872,6 +2939,7 @@ export function Terminal({
     const fitAddon = fitAddonRef.current
     if (!term || !fitAddon) return
     if (embedResolving) return
+    if (!fontReady) return
 
     if (activeSession === HOME_TAB_ID) {
       // Home tab is active, not a real session (the last real tab may have
@@ -3047,6 +3115,7 @@ export function Terminal({
     setLockedOutState,
     embedded,
     embedResolving,
+    fontReady,
   ])
 
   const selectSession = useCallback(
