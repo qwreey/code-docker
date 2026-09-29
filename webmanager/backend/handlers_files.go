@@ -230,7 +230,8 @@ func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var dir string
-	var results []files.UploadResult
+	// Non-nil so an upload with no file parts still encodes as [] rather than null.
+	results := []files.UploadResult{}
 
 	for {
 		part, perr := mr.NextPart()
