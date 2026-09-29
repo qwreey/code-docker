@@ -32,7 +32,15 @@
     2026.9.2_0/` 에서 확인. Bitwarden을 끄고 재시험한 것은 아님(미검증) — 그래도 문구 출처와
     `self === top` 로직이 정확히 일치.
 
-- **수정 방향**: (1) 임베드 모드에서는 `enrollWebAuthn`(`webauthn.ts:206-226`)의 `create()`를
+- **수정됨 (2026-09-29)**: `webauthn.ts` `createCredential` - 프레임 안 `create()`가
+  `sameOriginWithAncestors`로 거부되면 같은 출처인 최상위 창(code-server)의
+  `navigator.credentials.create`로 한 번 재시도. 교차 realm 오류라 `outcomeOf`는 이름으로 판별.
+  그래도 실패하면 `WebAuthn.tsx`가 "확장이 막았다 - 새 탭에서 등록" 안내. CDP 실측(확장 없는
+  새 프로필 + 가상 인증기): 확장 없이 위젯 등록 성공(원인이 확장임을 재확인), Bitwarden의
+  `self === top` 거부를 모든 프레임에 흉내 내 주입한 상태에서 프레임 거부 1회 → 최상위 재시도
+  1회로 등록 성공, 이어서 지문 시험/잠금/지문 해제까지 위젯 안에서 통과. 실제 Bitwarden +
+  실기기는 오너 확인 필요.
+- **(당시) 수정 방향**: (1) 임베드 모드에서는 `enrollWebAuthn`(`webauthn.ts:206-226`)의 `create()`를
   최상위 창에서 실행한다 — 체인 전체가 same-origin이라(검증됨) `window.top.navigator.
   credentials.create(...)`를 직접 부르거나, `embed.ts`의 `postToHost`/`embed.js` 릴레이 대신
   code-patch 스크립트(`config/code/code-patch/`, 최상위 창에 주입됨)가 메시지를 받아 실행 후

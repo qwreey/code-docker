@@ -123,7 +123,10 @@ export type WebAuthnOutcome = 'ok' | 'cancelled' | 'password-required' | 'rate-l
 // on this device" alike - browsers deliberately don't tell them apart. All
 // of them just mean: fall back to the password, offer to try again.
 function outcomeOf(err: unknown): WebAuthnOutcome {
-  if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')) return 'cancelled'
+  // By name, not instanceof DOMException: an error from the top window's
+  // credentials API (see createCredential) belongs to that window's realm.
+  const name = (err as { name?: unknown } | null)?.name
+  if (name === 'NotAllowedError' || name === 'AbortError') return 'cancelled'
   if (err instanceof ApiError && err.status === 409) return 'password-required'
   if (err instanceof ApiError && err.status === 429) return 'rate-limited'
   // Nothing enrolled for this host any more (deleted from another device):
@@ -200,6 +203,31 @@ export function defaultDeviceLabel(): string {
   return [os, browser].filter(Boolean).join(' ') || '이 기기'
 }
 
+// A password manager extension that takes over WebAuthn (Bitwarden, seen
+// live) can refuse to create a credential in any frame that isn't the top
+// window - same-origin or not - with "Invalid 'sameOriginWithAncestors'
+// value". Inside the code-server widget this page is always a frame, so
+// enrolling there failed. The top window is code-server on this same origin,
+// so the same call made through its navigator is the top-level request such
+// an extension accepts. Only a retry: without one, the frame's own call
+// works (it is what the webview iframe's permissions policy allows).
+async function createCredential(options: CredentialCreationOptions): Promise<Credential | null> {
+  try {
+    return await navigator.credentials.create(options)
+  } catch (err) {
+    const message = (err as { message?: unknown } | null)?.message
+    if (typeof message !== 'string' || !message.includes('sameOriginWithAncestors')) throw err
+    let top: CredentialsContainer | null = null
+    try {
+      if (window.top && window.top !== window) top = window.top.navigator.credentials
+    } catch {
+      // Cross-origin top window - nothing to retry through.
+    }
+    if (!top) throw err
+    return await top.create(options)
+  }
+}
+
 // Enrolls this device. Needs the password (see the backend's register/begin
 // for why a cookie isn't enough) - the enrollment offer passes the one that
 // was just typed.
@@ -207,7 +235,7 @@ export async function enrollWebAuthn(password: string, label: string): Promise<{
   try {
     const begin = await api.post<BeginResponse<JsonCreationOptions>>('/auth/webauthn/register/begin', { password, label })
     const pk = begin.options.publicKey
-    const cred = (await navigator.credentials.create({
+    const cred = (await createCredential({
       publicKey: {
         ...pk,
         challenge: fromB64url(pk.challenge),
@@ -221,7 +249,8 @@ export async function enrollWebAuthn(password: string, label: string): Promise<{
     rememberCredential(cred.id)
     return { outcome: 'ok' }
   } catch (err) {
-    return { outcome: outcomeOf(err), message: err instanceof Error ? err.message : String(err) }
+    const message = (err as { message?: unknown } | null)?.message
+    return { outcome: outcomeOf(err), message: typeof message === 'string' ? message : String(err) }
   }
 }
 
