@@ -220,6 +220,7 @@
       case 'rename':
       case 'open-webauthn':
       case 'lock':
+      case 'select-session':
         toEmbed(data)
         break
       case 'theme-pref':

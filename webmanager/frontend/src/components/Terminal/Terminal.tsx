@@ -3097,6 +3097,19 @@ export function Terminal({
     [activeSession],
   )
 
+  // Embedded, a session picked from Home may already be shown by another
+  // view (a bottom-panel terminal moved up to the editor leaves this one on
+  // Home, listing it). Two clients on one session echo each other's input
+  // and fight over its size, so the extension decides: it focuses the view
+  // that has it, or answers `select-session` to show it here.
+  const selectFromHome = useCallback(
+    (name: string) => {
+      if (embedded) postToHost({ type: 'open-session', session: name })
+      else selectSession(name)
+    },
+    [embedded, selectSession],
+  )
+
   const addSession = useCallback(
     (opts?: SessionCreateOptions) => {
       // Embedded, a new session without a set cwd asks the extension: it
@@ -3256,11 +3269,12 @@ export function Terminal({
     if (!embedded) return
     return onHostMessage((msg) => {
       if (msg.type === 'focus') termRef.current?.focus()
+      if (msg.type === 'select-session') selectSession(msg.session)
       if (activeSession === HOME_TAB_ID) return
       if (msg.type === 'pin') void togglePin(activeSession, msg.pinned)
       if (msg.type === 'rename') void renameSession(activeSession, msg.name)
     })
-  }, [embedded, activeSession, togglePin, renameSession])
+  }, [embedded, activeSession, selectSession, togglePin, renameSession])
 
   const closeSession = useCallback(
     async (name: string) => {
@@ -3619,7 +3633,7 @@ export function Terminal({
         {activeSession === HOME_TAB_ID && (
           <TerminalHome
             sessions={sessions}
-            onSelectSession={selectSession}
+            onSelectSession={selectFromHome}
             onTogglePin={togglePin}
             onCloseSession={requestClose}
             profiles={profiles}

@@ -181,7 +181,7 @@ function recordId(state) {
 }
 
 function recordTitle(host) {
-  const entry = { id: recordId(host.state), title: host.panel.title }
+  const entry = { id: recordId(host.state), title: host.title }
   const list = panelTitles()
   if (list.some((e) => e.id === entry.id && e.title === entry.title)) return
   ctx.workspaceState.update(PANEL_TITLES_KEY, [...list, entry])
@@ -189,12 +189,14 @@ function recordTitle(host) {
 
 // Only drops the pair once no open panel shows it any more; a pair left
 // behind by a tab closed while unresolved just makes matching more
-// cautious, and activate() prunes pairs no tab carries.
+// cautious, and activate() prunes pairs no tab carries. Reads host.title,
+// not panel.title: this also runs from onDidDispose, where the panel's
+// getters throw.
 function forgetTitle(host) {
   const id = recordId(host.state)
-  const title = host.panel.title
+  const title = host.title
   for (const h of hosts) {
-    if (h !== host && h.kind === 'panel' && recordId(h.state) === id && h.panel.title === title) return
+    if (h !== host && h.kind === 'panel' && recordId(h.state) === id && h.title === title) return
   }
   ctx.workspaceState.update(
     PANEL_TITLES_KEY,
@@ -206,8 +208,10 @@ function updateTitle(host) {
   refreshContexts()
   const title = titleOf(host.state)
   if (host.kind === 'panel') {
-    if (host.panel.title !== (host.state.pinned ? `📌 ${title}` : title)) forgetTitle(host)
-    host.panel.title = host.state.pinned ? `📌 ${title}` : title
+    const shown = host.state.pinned ? `📌 ${title}` : title
+    if (host.title !== undefined && host.title !== shown) forgetTitle(host)
+    host.panel.title = shown
+    host.title = shown
     recordTitle(host)
   } else {
     host.view.title = title
@@ -291,7 +295,7 @@ function unresolvedTabsFor(state) {
   const title = titleOf(state)
   const titles = [title, `📌 ${title}`]
   for (const h of hosts) {
-    if (h.kind === 'panel' && titles.includes(h.panel.title)) return []
+    if (h.kind === 'panel' && titles.includes(h.title)) return []
   }
   const ids = new Set(panelTitles().filter((e) => titles.includes(e.title)).map((e) => e.id))
   if (ids.size !== 1 || !ids.has(recordId(state))) return []
@@ -328,8 +332,8 @@ function setupPanel(panel, state) {
     else if (activePanelHost === host) setActivePanel(null)
   })
   panel.onDidDispose(() => {
-    forgetTitle(host)
     detach(host)
+    forgetTitle(host)
     if (activePanelHost === host) setActivePanel(null)
   })
   return host
@@ -596,6 +600,21 @@ async function newSessionInView(host, m) {
   })
 }
 
+// A session picked from a view's terminal Home (term1 shows it while
+// unbound, e.g. right after Move to Editor - which is why the session it
+// just gave away is in the list). Shown once per window, like openState.
+async function openSessionInView(host, name) {
+  const state = { section: 'terminal', session: name }
+  const existing = findHostFor(state, host)
+  if (existing) {
+    revealHost(existing)
+    return
+  }
+  const stale = unresolvedTabsFor(state)
+  if (stale.length) await vscode.window.tabGroups.close(stale)
+  host.webview.postMessage({ type: 'select-session', session: name })
+}
+
 // The view a palette command acts on: the focused editor tab, else a
 // visible panel slot, else any open view.
 function withTargetHost(fn) {
@@ -705,6 +724,9 @@ async function onMessage(host, m) {
       break
     case 'open-terminal':
       await openTerminalFromEmbed(m)
+      break
+    case 'open-session':
+      if (typeof m.session === 'string' && m.session) await openSessionInView(host, m.session)
       break
     // "열기" in a VNC target list: each target is its own editor tab.
     case 'open-vnc':
