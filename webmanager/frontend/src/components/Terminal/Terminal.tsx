@@ -688,6 +688,7 @@ export function Terminal({
   embedCwd,
   embedCommand,
   embedCreated,
+  embedUnpinned,
 }: {
   initialOpen?: { cwd?: string; label?: string; command?: string; session?: string } | null
   onInitialOpenConsumed?: () => void
@@ -722,6 +723,8 @@ export function Terminal({
   // keeps it across a rename, so it's how the view finds its session again
   // when another client renamed it while this view wasn't running.
   embedCreated?: string
+  // embedSession was unpinned by the user (see embedUnpinnedRef).
+  embedUnpinned?: boolean
 } = {}) {
   const embedded = embedSession !== undefined
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -856,6 +859,10 @@ export function Terminal({
   // Embed only: where to recreate the session if it has to be - its live
   // cwd as last seen, else the directory the view was opened with.
   const embedCwdRef = useRef(embedCwd)
+  // Embedded, a session this view creates starts pinned, like a code-server
+  // terminal that outlives its panel - except one the user has unpinned,
+  // named here, which a recreate (idle GC, webmanager restart) leaves as is.
+  const embedUnpinnedRef = useRef(embedUnpinned ? embedSession : null)
   const activeProjectPathRef = useRef<string | null>(null)
   const onOpenCommitRef = useRef(onOpenCommit)
   const [sessionActionError, setSessionActionError] = useState<string | null>(null)
@@ -2945,6 +2952,7 @@ export function Terminal({
     const cwd = pending?.cwd ?? (embedded ? embedCwdRef.current : undefined)
     if (cwd) params.set('cwd', cwd)
     if (pending?.command) params.set('cmd', pending.command)
+    if (embedded && embedUnpinnedRef.current !== activeSession) params.set('pin', '1')
 
     // The container was hidden until the render that scheduled this effect
     // committed, so fit here (now that it has a real box) rather than
@@ -3169,6 +3177,8 @@ export function Terminal({
   useEffect(() => {
     if (!embedded) return
     if (activeInfo?.cwd) embedCwdRef.current = activeInfo.cwd
+    if (activeInfo && !activeInfo.pinned) embedUnpinnedRef.current = activeInfo.name
+    else if (activeInfo && embedUnpinnedRef.current === activeInfo.name) embedUnpinnedRef.current = null
     reportEmbedState({
       session: activeSession === HOME_TAB_ID ? null : activeSession,
       cwd: embedCwdRef.current,

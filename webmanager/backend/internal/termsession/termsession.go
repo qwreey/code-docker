@@ -156,6 +156,10 @@ type CreateOptions struct {
 	// an interactive shell, not a value substituted into another
 	// exec.Command.
 	InitialCommand string
+	// Pinned starts the session exempt from idle GC, as if pinned right
+	// after creation - what the code-server widget asks for, since a panel
+	// closed there shouldn't cost the shell 30 minutes later.
+	Pinned bool
 }
 
 // WEBMANAGER_TERMINAL_SESSION is set on every registry-backed session's own
@@ -221,6 +225,7 @@ func newSessionCmd(name, command string, args []string, extraEnv []string, scrol
 		clip:           newClipboardFilter(),
 		sinks:          make(map[uint64]writerFunc),
 		lastAttachedAt: now,
+		pinned:         opts.Pinned,
 		done:           make(chan struct{}),
 	}
 	if opts.InitialCommand != "" {

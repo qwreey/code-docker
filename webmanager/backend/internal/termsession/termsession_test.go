@@ -117,3 +117,33 @@ func TestSinkErrorDoesNotBlockPump(t *testing.T) {
 		t.Fatalf("reapCheck still reports attached=%v after sink errored, want the sink to have been cleared", attached)
 	}
 }
+
+// A session created with Pinned survives idle GC like one pinned by hand,
+// and a later GetOrCreate for the same name (a reattach) doesn't unpin it.
+func TestCreatePinnedSurvivesReap(t *testing.T) {
+	r := NewRegistry(func() string { return "/bin/sh" }, 4096, time.Nanosecond)
+	pinned, err := r.GetOrCreate("pinned", CreateOptions{Cwd: t.TempDir(), Pinned: true})
+	if err != nil {
+		t.Fatalf("GetOrCreate(pinned) = %v", err)
+	}
+	defer pinned.Close()
+	plain, err := r.GetOrCreate("plain", CreateOptions{Cwd: t.TempDir()})
+	if err != nil {
+		t.Fatalf("GetOrCreate(plain) = %v", err)
+	}
+	defer plain.Close()
+	if _, err := r.GetOrCreate("pinned", CreateOptions{}); err != nil {
+		t.Fatalf("reattach = %v", err)
+	}
+
+	time.Sleep(time.Millisecond)
+	r.reapIdle()
+
+	var names []string
+	for _, info := range r.List() {
+		names = append(names, info.Name+":"+strconv.FormatBool(info.Pinned))
+	}
+	if len(names) != 1 || names[0] != "pinned:true" {
+		t.Fatalf("after reap = %v, want [pinned:true]", names)
+	}
+}

@@ -21,6 +21,9 @@ function buildPath(state) {
     // name if it was renamed elsewhere meanwhile (see Terminal.tsx).
     if (state.created) params.set('created', state.created)
     if (state.command) params.set('cmd', state.command)
+    // New sessions start pinned; one the user unpinned stays so when a
+    // refresh has to recreate it.
+    if (state.pinned === false) params.set('unpinned', '1')
   } else if (state.query) {
     for (const [k, v] of new URLSearchParams(state.query)) params.set(k, v)
   }

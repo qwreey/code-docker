@@ -40,6 +40,7 @@
     if (state.session) q.set('session', state.session)
     if (state.cwd) q.set('cwd', state.cwd)
     if (state.created) q.set('created', state.created)
+    if (state.pinned === false) q.set('unpinned', '1')
     const qs = q.toString()
     return 'terminal' + (qs ? `?${qs}` : '')
   }

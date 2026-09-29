@@ -27,6 +27,9 @@ export const embedParams = {
   cwd: params.get('cwd') || undefined,
   command: params.get('cmd') || undefined,
   created: params.get('created') || undefined,
+  // Set by the extension for a session the user unpinned: recreating it
+  // (idle GC, webmanager restart) must not pin it again.
+  unpinned: params.get('unpinned') === '1',
   theme: params.get('theme') === 'light' ? 'light' : params.get('theme') === 'dark' ? 'dark' : null,
 } as const
 
@@ -57,7 +60,7 @@ export function onHostMessage(listener: (msg: HostMessage) => void) {
 // Query keys that only mean something to the embed itself, and so never
 // belong in the path reported back (which is also what "Open in Browser"
 // opens).
-const EMBED_ONLY_KEYS = ['embed', 'theme', 'cwd', 'cmd', 'created']
+const EMBED_ONLY_KEYS = ['embed', 'theme', 'cwd', 'cmd', 'created', 'unpinned']
 
 type EmbedState = { session?: string | null; cwd?: string; pinned?: boolean; created?: string }
 let extraState: EmbedState = {}
