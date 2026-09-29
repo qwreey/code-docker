@@ -44,7 +44,7 @@ export function SessionLog({
     : undefined
 
   return (
-    <RequiresUnlock>
+    <RequiresUnlock section>
       <SessionList
         onSelect={setSelected}
         onResume={resumeInTerminal}

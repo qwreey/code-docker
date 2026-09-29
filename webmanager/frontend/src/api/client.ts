@@ -30,12 +30,13 @@ export function requestUnlock(): Promise<void> {
   return unlockPrompter()
 }
 
-// RequiresUnlock's inline card is a password prompt of its own. While one is
-// on screen, UnlockModalHost keeps its modal hidden and sends the user to
-// the card instead: otherwise the two stacked, with the card stuck behind
-// the modal's backdrop (e.g. the Terminal's lock overlay opened the modal,
-// then the next poll's 401 swapped the Terminal for the card underneath).
-// Each entry focuses its own card.
+// A RequiresUnlock card that stands in for a whole page is a password prompt
+// of its own, and nothing else on that page is left to ask for one. While
+// such a card is on screen, UnlockModalHost keeps its modal hidden and sends
+// the user to the card instead of stacking a second prompt with the card
+// stuck behind its backdrop (the Terminal's lock overlay opens the modal,
+// and the next poll's 401 swaps the Terminal for the card). Each entry
+// focuses its own card.
 const inlineGates = new Set<() => void>()
 const inlineGateListeners = new Set<() => void>()
 

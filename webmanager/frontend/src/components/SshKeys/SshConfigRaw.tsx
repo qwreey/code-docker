@@ -92,7 +92,7 @@ function SshConfigRawInner() {
 // unlocking first.
 export function SshConfigRaw() {
   return (
-    <RequiresUnlock>
+    <RequiresUnlock section>
       <SshConfigRawInner />
     </RequiresUnlock>
   )

@@ -14,7 +14,7 @@ import './RequiresUnlock.css'
  * before children mount. Not coupled to any specific feature — file manager
  * is the first consumer, terminal is expected to reuse this unchanged later.
  */
-export function RequiresUnlock({ children }: { children: ReactNode }) {
+export function RequiresUnlock({ children, section = false }: { children: ReactNode; section?: boolean }) {
   const { status, error: loadError, refresh } = useAuthStatus()
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -22,11 +22,13 @@ export function RequiresUnlock({ children }: { children: ReactNode }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const showCard = !loadError && !!status && status.required && !status.unlocked
 
-  // While the card is up it is the password prompt - see registerInlineGate.
+  // A card that stands in for a whole page is that page's password prompt -
+  // see registerInlineGate. A `section` card (one part of a page, next to
+  // other gated actions) isn't: prompts for those still need the modal.
   useEffect(() => {
-    if (!showCard) return
+    if (!showCard || section) return
     return registerInlineGate(() => inputRef.current?.focus())
-  }, [showCard])
+  }, [showCard, section])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

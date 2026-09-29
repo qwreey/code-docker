@@ -39,6 +39,12 @@ export function UnlockModalHost() {
   // auth-status effect below once the card unlocks) and focus goes to the
   // card. See registerInlineGate in api/client.ts.
   const inlineGate = useSyncExternalStore(subscribeInlineGates, inlineGateVisible)
+  // Set while the prompt is handed over to a card, and kept after the card
+  // goes away until the gate has been re-checked: a card goes away because
+  // it unlocked (then the waiters resolve - showing the modal in between
+  // would flash it, and auto-start its fingerprint prompt) or because the
+  // user left that page (then the modal comes back for the waiters).
+  const [handedOff, setHandedOff] = useState(false)
 
   const prompt = useCallback(() => {
     return new Promise<void>((resolve, reject) => {
@@ -51,8 +57,31 @@ export function UnlockModalHost() {
   // The card can also appear while the modal is already up (a poll's 401
   // swapping a tab for the card) - hand the prompt over to it.
   useEffect(() => {
-    if (open && inlineGate) focusInlineGate()
+    if (!open || !inlineGate) return
+    setHandedOff(true)
+    focusInlineGate()
   }, [open, inlineGate])
+
+  useEffect(() => {
+    if (!open || inlineGate || !handedOff) return
+    let cancelled = false
+    void api
+      .get<{ unlocked: boolean }>('/auth/status')
+      .then((s) => {
+        if (cancelled) return
+        if (s.unlocked) finishUnlocked()
+        else setHandedOff(false)
+      })
+      .catch(() => {
+        if (!cancelled) setHandedOff(false)
+      })
+    return () => {
+      cancelled = true
+    }
+    // finishUnlocked is recreated each render; the check only needs to run
+    // when the handover ends.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, inlineGate, handedOff])
 
   useEffect(() => {
     setUnlockPrompter(prompt)
@@ -83,6 +112,7 @@ export function UnlockModalHost() {
 
   function resetForm() {
     setOpen(false)
+    setHandedOff(false)
     setPassword('')
     setSubmitError(null)
     setSubmitting(false)
@@ -125,7 +155,7 @@ export function UnlockModalHost() {
     }
   }
 
-  if (!open || inlineGate) return null
+  if (!open || inlineGate || handedOff) return null
 
   return (
     <div className="unlock-modal-backdrop" onClick={handleCancel}>
