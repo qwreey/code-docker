@@ -148,11 +148,7 @@ export function WebAuthnHost() {
       return
     }
     setEnrollMessage(
-      outcome === 'cancelled'
-        ? '등록이 취소되었습니다.'
-        : message?.includes('sameOriginWithAncestors')
-          ? '브라우저 확장(Bitwarden 등 암호 관리자)이 이 창 안에서의 등록을 막았습니다. webmanager를 새 탭에서 열어 등록하거나, 확장의 패스키 저장 기능을 끄고 다시 시도하세요.'
-          : `등록하지 못했습니다${message ? ` (${message})` : ''}.`,
+      outcome === 'cancelled' ? '등록이 취소되었습니다.' : `등록하지 못했습니다${message ? ` (${message})` : ''}.`,
     )
   }
 
