@@ -985,7 +985,22 @@ function activate(context) {
   context.subscriptions.push(
     vscode.window.registerWebviewPanelSerializer(VIEW_TYPE, {
       async deserializeWebviewPanel(panel, saved) {
-        setupPanel(panel, saved && saved.section ? saved : { section: 'terminal' })
+        // A tab closed just before a reload can come back (the layout VS
+        // Code restores was saved before the close): with its view state
+        // already dropped - every live view saves one as soon as it starts
+        // (media/embed.js) - or showing a session that is by now shown
+        // elsewhere, in which case the other view wins.
+        if (!saved || typeof saved.section !== 'string') {
+          log('restored tab has no saved state - closed')
+          panel.dispose()
+          return
+        }
+        if (findHostFor(normalizeState(saved))) {
+          log(`restored tab for ${identityOf(normalizeState(saved))} is shown elsewhere - closed`)
+          panel.dispose()
+          return
+        }
+        setupPanel(panel, saved)
       },
     }),
   )
