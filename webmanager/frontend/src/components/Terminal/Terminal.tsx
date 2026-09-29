@@ -1067,18 +1067,6 @@ export function Terminal({
     fitAddonRef.current?.fit()
   }, [])
 
-  // Apply the selected Font Manager family live, same "initial value at
-  // creation, then kept in sync by its own effect" shape as the theme
-  // effect above. A font swap can change cell metrics, so re-fit afterward
-  // (same call the ResizeObserver below already makes for size changes).
-  useEffect(() => {
-    if (termRef.current) {
-      termRef.current.options.fontFamily = resolveFontFamily(effectiveSettings.fontFamily)
-      fitIfVisible()
-      sendResizeRef.current?.()
-    }
-  }, [effectiveSettings.fontFamily, fitIfVisible])
-
   // Tells the backend the PTY's size changed — shared by the ResizeObserver
   // below (container size changed) and the zoom effect further down (font
   // size changed, which can shift cols/rows without the container itself
@@ -1109,69 +1097,53 @@ export function Terminal({
     if (ws && sentSizes.get(ws) === `${term.cols}x${term.rows}`) return
     sendSize(term.cols, term.rows, 'resize')
   }, [sendSize])
-  // For the font effect above, which is declared before sendResize exists.
-  const sendResizeRef = useRef(sendResize)
-  sendResizeRef.current = sendResize
-
-  // xterm measures the cell size only when the font option changes, not
-  // when the webfont behind an unchanged option finishes loading. A font
-  // selected while its file was still downloading (a large CJK .ttf takes a
-  // while) was therefore measured with the fallback's metrics and kept them:
-  // the grid stayed too many columns wide for the glyphs actually drawn.
-  // Setting the option to something else and back forces the re-measure.
-  const remeasureFont = useCallback(() => {
-    const term = termRef.current
-    if (!term) return
-    const family = term.options.fontFamily
-    term.options.fontFamily = family === DEFAULT_MONO_STACK ? 'monospace' : DEFAULT_MONO_STACK
-    term.options.fontFamily = family
-    fitIfVisible()
-  }, [fitIfVisible])
-
-  // The connect effect puts the PTY size on the URL, and the size depends on
-  // the font. Connecting before the user's font was known (settings still
-  // loading - every remount, e.g. right after unlocking) or loaded (webfont
-  // still downloading) attached at the fallback font's size and resized a
-  // moment later: two SIGWINCHes during the reattach replay, which left Ink
-  // apps like Claude Code drawn for the wrong width until the next manual
-  // resize. So the first connect waits for both, bounded, since a font that
-  // never arrives must not keep the terminal from connecting at all.
+  // Apply the selected Font Manager family, same "initial value at creation,
+  // then kept in sync by its own effect" shape as the theme effect above -
+  // but only once the font file has loaded. xterm measures the cell size
+  // when this option changes, and a family whose file is still downloading
+  // measures with the fallback's metrics and keeps them (a large CJK .ttf
+  // takes a while). Applying after the load gives one correct measurement
+  // and one PTY resize.
+  //
+  // It also gates the first connect (fontReady): the connect puts the PTY
+  // size on the URL, so connecting before the user's font is applied would
+  // attach at the default font's size and resize again right after - a
+  // second SIGWINCH during the reattach replay, which leaves Ink apps like
+  // Claude Code drawn for the wrong width. A deadline from mount keeps a
+  // slow settings request or font from holding the connection back.
   const [fontReady, setFontReady] = useState(false)
-  const settingsSettled = settings !== null || settingsError !== null
+  const settingsLoaded = settings !== null
   useEffect(() => {
-    if (fontReady || !settingsSettled) return
-    let cancelled = false
-    const ready = () => {
-      if (!cancelled) setFontReady(true)
-    }
+    const deadline = window.setTimeout(() => setFontReady(true), FONT_READY_TIMEOUT_MS)
+    return () => window.clearTimeout(deadline)
+  }, [])
+  useEffect(() => {
+    if (settingsError !== null) setFontReady(true)
+  }, [settingsError])
+  useEffect(() => {
+    if (!settingsLoaded) return
     const family = effectiveSettings.fontFamily
+    let cancelled = false
+    const apply = () => {
+      if (cancelled) return
+      const term = termRef.current
+      if (term) {
+        term.options.fontFamily = resolveFontFamily(family)
+        fitIfVisible()
+        sendResize()
+      }
+      setFontReady(true)
+    }
     if (!family) {
-      ready()
+      apply()
       return
     }
-    const timeout = new Promise((resolve) => window.setTimeout(resolve, FONT_READY_TIMEOUT_MS))
-    const loaded = () => {
-      if (cancelled) return
-      remeasureFont()
-      ready()
-    }
-    Promise.race([document.fonts.load(`${fontSize}px '${family}'`), timeout]).then(loaded, loaded)
+    // The size in the descriptor doesn't matter - loading any size loads the face.
+    document.fonts.load(`16px '${family}'`).then(apply, apply)
     return () => {
       cancelled = true
     }
-  }, [fontReady, settingsSettled, effectiveSettings.fontFamily, fontSize, remeasureFont])
-
-  // A font that arrives after that timeout (or any later webfont load)
-  // changes the cell size without the container resizing, so the
-  // ResizeObserver never sees it.
-  useEffect(() => {
-    const onFontsLoaded = () => {
-      remeasureFont()
-      sendResize()
-    }
-    document.fonts.addEventListener('loadingdone', onFontsLoaded)
-    return () => document.fonts.removeEventListener('loadingdone', onFontsLoaded)
-  }, [remeasureFont, sendResize])
+  }, [settingsLoaded, effectiveSettings.fontFamily, fitIfVisible, sendResize])
 
   // Apply the zoom (font size) level live — same "initial value at creation,
   // then kept in sync by its own effect" shape as theme/fontFamily above.
