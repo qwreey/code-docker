@@ -40,6 +40,7 @@ REPOS=(
   "dev dind-authz-docker"
   "dev code-server-autoinstall"
   "dev envmigrate"
+  "dev qwreey-fish"
 )
 
 failed=0
