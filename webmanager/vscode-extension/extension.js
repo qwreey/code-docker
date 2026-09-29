@@ -571,11 +571,10 @@ async function openTerminalFromEmbed(m) {
   )
 }
 
-// The Terminal Home's "+" (or a profile without a cwd) inside a view: the
-// view itself becomes the new session. Where it starts is decided here, the
-// way VS Code's own new terminal does - the one workspace folder, or with
-// several, a pick with the active editor's folder first.
-async function newSessionInView(host, m) {
+// A new session, started where VS Code's own new terminal would: the one
+// workspace folder, or with several, a pick with the active editor's folder
+// first. undefined when that pick is dismissed.
+async function newSessionState(m = {}) {
   const folders = S.fileFolders()
   let cwd = folders[0]
   if (folders.length > 1) {
@@ -584,7 +583,7 @@ async function newSessionInView(host, m) {
       folders.map((f) => ({ label: S.folderBase(f), description: f, detail: f === active ? '현재 에디터의 폴더' : undefined, cwd: f })),
       { placeHolder: '새 세션을 열 폴더' },
     )
-    if (!pick) return
+    if (!pick) return undefined
     cwd = pick.cwd
   }
   let names = []
@@ -594,12 +593,19 @@ async function newSessionInView(host, m) {
     // a collision just joins that session instead
   }
   const base = (typeof m.label === 'string' && m.label) || S.folderBase(cwd) || '세션'
-  navigateHost(host, {
+  return {
     section: 'terminal',
     session: S.uniqueName(base, names),
     cwd,
     command: typeof m.command === 'string' ? m.command : undefined,
-  })
+  }
+}
+
+// The Terminal Home's "+" (or a profile without a cwd) inside a view: the
+// view itself becomes the new session.
+async function newSessionInView(host, m) {
+  const state = await newSessionState(m)
+  if (state) navigateHost(host, state)
 }
 
 // A session picked from a view's terminal Home (term1 shows it while
@@ -908,6 +914,12 @@ function activate(context) {
   reg('webmanager.openTerminalInPanel', async () => {
     const s = await pickSession()
     if (s) await openStateInPanel(s)
+  })
+  // The panel's "+": straight to a new session in the next free terminal
+  // slot, like VS Code's own terminal panel - no session picker.
+  reg('webmanager.newTerminalInPanel', async () => {
+    const s = await newSessionState()
+    if (s) await openInPanel(s)
   })
   reg('webmanager.openTabInPanel', async () => {
     const s = await pickSection()

@@ -100,6 +100,12 @@
         "category": "webmanager"
       },
       {
+        "command": "webmanager.newTerminalInPanel",
+        "title": "New Terminal Session in Panel",
+        "category": "webmanager",
+        "icon": "$(add)"
+      },
+      {
         "command": "webmanager.openTabInPanel",
         "title": "Open webmanager Tab in Panel…",
         "category": "webmanager"
@@ -722,6 +728,11 @@
         }
       ],
       "view/title": [
+        {
+          "command": "webmanager.newTerminalInPanel",
+          "when": "view =~ /^webmanager\\.term[1-4]$/",
+          "group": "navigation@0"
+        },
         {
           "command": "webmanager.slot.term1.changeSession",
           "when": "view == webmanager.term1",
