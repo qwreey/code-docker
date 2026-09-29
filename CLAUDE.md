@@ -16,7 +16,12 @@ docker compose up -d   # (re)start
 docker compose build code-docker && docker compose up -d   # after editing a config/*.override.* file
 ```
 
-There are no automated tests or linters in this repo. Validate changes by building the image and, when practical, exercising the affected service through `docker compose up` (e.g. checking `docker compose logs`, opening the code-server URL, `ssh`-ing in).
+```sh
+./dev-check.sh           # before committing: gofmt + go test per module, bash -n, compose config - this checkout and every dev/*
+./dev-check.sh --clean   # same, on a throwaway worktree of each repo's HEAD (catches a file missing from the commit)
+```
+
+There is no CI: pushes go straight to main, so a post-push check would block nothing. `dev-check.sh` is the gate instead, and `dev-clone.sh` installs it as a pre-push hook in this checkout and each `dev/*` (hooks can't be committed; an existing pre-push such as git-lfs's is chained after it). It doesn't cover the frontends' `tsc` (that runs in the image build) or `builds/*`. Beyond it, validate changes by building the image and, when practical, exercising the affected service through `docker compose up` (e.g. checking `docker compose logs`, opening the code-server URL, `ssh`-ing in).
 
 If a repo-root `.allow-test` file exists (gitignored — `touch .allow-test` to create it), the running `docker compose` stack in this checkout is a disposable test environment, not someone's live/in-use instance — building, restarting, and exercising services freely (without asking first) is fine. Without it, treat the stack as potentially live and confirm before rebuilding/restarting.
 

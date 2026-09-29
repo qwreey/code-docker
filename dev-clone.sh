@@ -110,6 +110,57 @@ for entry in "${REPOS[@]}"; do
   sync_repo "$dir" "$name"
 done
 
+# --- pre-push 훅 (dev-check.sh) ----------------------------------------------
+# 훅은 커밋할 수 없어서 여기서 깝니다. push하려는 커밋마다 dev-check.sh --clean으로
+# 그 저장소를 검사하고, 통과해야 push됩니다(급할 때는 git push --no-verify).
+# 이미 다른 pre-push 훅이 있으면(git-lfs 등) pre-push.before-dev-check로 옮기고
+# 검사 통과 뒤 같은 stdin/인자로 이어서 실행합니다. core.hooksPath가 설정돼 있으면
+# 그 디렉터리는 다른 저장소와 공유될 수 있어 건드리지 않습니다.
+HOOK_MARKER="# installed by code-docker dev-clone.sh: dev-check pre-push"
+
+install_pre_push() {
+  local repo=$1 hooks hook
+  if [ -n "$(git -C "$repo" config --get core.hooksPath)" ]; then
+    warn "$repo: core.hooksPath가 설정돼 있어 pre-push 훅을 깔지 않았습니다 - 직접 ./dev-check.sh --clean $repo 를 걸어주세요"
+    return
+  fi
+  hooks="$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)/hooks"
+  hook="$hooks/pre-push"
+  mkdir -p "$hooks"
+  if [ -e "$hook" ] && ! grep -qF "$HOOK_MARKER" "$hook"; then
+    if [ -e "$hook.before-dev-check" ]; then
+      warn "$repo: pre-push와 pre-push.before-dev-check가 둘 다 있어 건드리지 않았습니다"
+      return
+    fi
+    mv "$hook" "$hook.before-dev-check"
+    printf '%s: 기존 pre-push 훅을 pre-push.before-dev-check로 옮겨 이어서 실행되게 했습니다\n' "$repo"
+  fi
+  cat >"$hook" <<EOF
+#!/bin/bash
+$HOOK_MARKER
+# push되는 커밋마다 dev-check.sh로 검사합니다. 건너뛰려면 git push --no-verify.
+input=\$(cat)
+zero=0000000000000000000000000000000000000000
+checked=" "
+while read -r _ local_sha _ _; do
+  [ -n "\$local_sha" ] && [ "\$local_sha" != "\$zero" ] || continue
+  case \$checked in *" \$local_sha "*) continue ;; esac
+  checked="\$checked\$local_sha "
+  "$PWD/dev-check.sh" --clean="\$local_sha" "$repo" || exit 1
+done <<<"\$input"
+chained="\$(dirname "\$0")/pre-push.before-dev-check"
+if [ -x "\$chained" ]; then
+  if [ -n "\$input" ]; then printf '%s\n' "\$input"; fi | "\$chained" "\$@" || exit \$?
+fi
+EOF
+  chmod +x "$hook"
+}
+
+install_pre_push .
+for d in dev/*/; do
+  git -C "$d" rev-parse --git-dir >/dev/null 2>&1 && install_pre_push "${d%/}"
+done
+
 # --- .env / extra-include.yml에 넣을 줄 안내 ---------------------------------
 
 echo
