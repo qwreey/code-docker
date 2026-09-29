@@ -22,10 +22,13 @@ REPO=qwreey/qwreey-fish
 TARGET=config/user-init/user-init.default.sh
 
 commit=0
-if [ "${1:-}" = "--commit" ]; then
-  commit=1
-  shift
-fi
+new=""
+for arg in "$@"; do
+  case $arg in
+    --commit) commit=1 ;;
+    *) new=$arg ;;
+  esac
+done
 
 old=$(sed -n 's/^QWREEY_FISH_QS_SETUP_SHA="\([0-9a-f]*\)"$/\1/p' "$TARGET")
 if [ -z "$old" ]; then
@@ -33,7 +36,6 @@ if [ -z "$old" ]; then
   exit 1
 fi
 
-new="${1:-}"
 if [ -z "$new" ]; then
   new=$(git ls-remote "https://github.com/$REPO.git" refs/heads/main | cut -f1)
 fi
@@ -46,23 +48,27 @@ if [ "$new" = "$old" ]; then
   exit 0
 fi
 
+# 컨테이너가 실제로 받는 곳에서 받아지는지가 곧 "push됐는가" 확인입니다.
+url="https://raw.githubusercontent.com/$REPO/$new/functions/qs_setup.fish"
+fetched=$(mktemp)
+trap 'rm -f "$fetched"' EXIT
+if ! curl -fsSL "$url" -o "$fetched"; then
+  echo "! $url 를 받지 못했습니다 - ${new:0:12} 가 GitHub에 push돼 있나요? 아무것도 고치지 않았습니다." >&2
+  exit 1
+fi
+sha256=$(sha256sum "$fetched" | cut -d' ' -f1)
+
 # diff를 볼 저장소: dev-clone.sh로 받은 dev/qwreey-fish가 있으면 그걸, 없으면 임시 클론.
 if [ -d dev/qwreey-fish/.git ]; then
   src=dev/qwreey-fish
   git -C "$src" fetch --quiet origin || { echo "! dev/qwreey-fish fetch 실패" >&2; exit 1; }
 else
   src=$(mktemp -d)
-  trap 'rm -rf "$src"' EXIT
+  trap 'rm -f "$fetched"; rm -rf "$src"' EXIT
   git clone --quiet --bare --filter=blob:none "https://github.com/$REPO.git" "$src" || exit 1
 fi
 if ! git -C "$src" cat-file -e "$new^{commit}" 2>/dev/null; then
-  echo "! ${new:0:12} 커밋이 $REPO 에 없습니다 - 먼저 push하세요. 아무것도 고치지 않았습니다." >&2
-  exit 1
-fi
-
-url="https://raw.githubusercontent.com/$REPO/$new/functions/qs_setup.fish"
-if ! sha256=$(curl -fsSL "$url" | sha256sum | cut -d' ' -f1) || [ -z "$sha256" ]; then
-  echo "! $url 를 받지 못했습니다" >&2
+  echo "! ${new:0:12} 를 $src 에서 찾지 못해 diff를 보여줄 수 없습니다. 아무것도 고치지 않았습니다." >&2
   exit 1
 fi
 
@@ -85,8 +91,9 @@ sed -i \
 git --no-pager diff -- "$TARGET"
 
 echo
-echo "이미 돌고 있는 /code 볼륨에는 적용되지 않습니다(qs_setup은 새 볼륨에서 한 번만) -"
-echo "기존 볼륨은 컨테이너 안에서 qs_update로 올립니다."
+echo "이미 쓰던 /code 볼륨에는 적용되지 않습니다(qs_setup은 새 볼륨에서 한 번만). 기존 볼륨을"
+echo "이 커밋으로 옮기려면 컨테이너 안 fish에서 (qs_update는 핀이 아니라 main으로 갑니다):"
+echo "  curl -fsSL $url | source; and qs_setup --self $REPO@$new"
 if [ $commit = 1 ]; then
   git add "$TARGET"
   git commit -q -m "Bump qwreey-fish to ${new:0:12}" && git log --oneline -1
