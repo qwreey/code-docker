@@ -324,7 +324,9 @@ function revealHost(host) {
 function setupPanel(panel, state) {
   const host = { kind: 'panel', panel }
   hosts.add(host)
-  panel.iconPath = mediaUri('icon.svg')
+  // A tab icon is drawn as an image, where icon.svg's currentColor is
+  // black; only the panel's view-container icon is a theme-colored mask.
+  panel.iconPath = { light: mediaUri('icon-light.svg'), dark: mediaUri('icon-dark.svg') }
   attach(host, panel.webview, state)
   if (panel.active) setActivePanel(host)
   panel.onDidChangeViewState((e) => {
