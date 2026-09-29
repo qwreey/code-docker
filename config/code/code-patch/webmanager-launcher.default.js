@@ -211,10 +211,26 @@
             const go = () => {
                 if (done) return;
                 done = true;
-                frame.removeEventListener("load", go);
+                frame.removeEventListener("load", onLoad);
                 tab.location.replace(url);
             };
-            frame.addEventListener("load", go);
+            // Any load is not enough: the frame may already have been mid-way
+            // through some other navigation when the button was clicked, and
+            // that load would fire first. What matters is that the document
+            // holding the session is gone - a new document whose URL carries
+            // no ?session=.
+            const oldDoc = frame.contentDocument;
+            const onLoad = () => {
+                try {
+                    const w = frame.contentWindow;
+                    if (w.document === oldDoc) return;
+                    if (new URL(w.location.href).searchParams.has("session")) return;
+                } catch {
+                    // Now cross-origin - not the terminal page any more.
+                }
+                go();
+            };
+            frame.addEventListener("load", onLoad);
             setTimeout(go, 2000);
             try {
                 frame.contentWindow.location.replace(released);

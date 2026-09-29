@@ -40,20 +40,9 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
 - 2026-09-29, code-docker:
   - F16 `.env*`를 600으로(`set_env_var`/ootb 생성 직후/migrate가 기존 배포도 조임),
     migrate 백업은 `<file>.bak.<시각>` 최근 5개(`ootb-lib.sh` `backup_env_file`)
+  - F23 위젯 팝아웃이 세션을 쥔 문서가 실제로 사라진 `load`에서만 새 탭을 이동
 
 ---
-
-## F23 [Medium, 기능 버그] webmanager - 위젯 팝아웃의 세션 해제 경합
-
-- **저장소/위치**: `config/code/code-patch/webmanager-launcher.default.js:207-223`.
-- **문제**: `frame.addEventListener("load", go)`를 먼저 달고 그 다음에
-  `frame.contentWindow.location.replace(released)`를 호출하는데, `go()`는 "방금 시킨
-  이동의 완료"가 아니라 **아무 `load` 이벤트**에나 반응한다. 클릭 시점에 iframe이 이미
-  다른 내비게이션 중이면 무관한 `load`가 `go()`를 조기 발사해, 세션을 아직 놓지 않은
-  상태로 새 탭이 열려 커밋 `d191619`가 고치려던 "두 클라이언트가 PTY 크기를 두고 싸우는"
-  버그가 재현된다.
-- **방향**: `load` 핸들러에서 `frame.contentWindow.location.href === released`인지
-  확인하거나, 해제된 페이지가 `postMessage`로 준비 완료를 알리게 한다.
 
 ## F27 [High] code-docker - CI가 전혀 없음
 
