@@ -44,6 +44,10 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
     커밋만, 태그+`ROUTER_REF` bump 전까지 배포엔 안 들어감)
   - F31 문서(docs/index.md) + `ootb-config.sh`가 PREFIX 설정 + 기본 볼륨 경로일 때 경고
     (기본 경로는 안 바꿈 - 기존 배포가 빈 볼륨으로 뜸)
+  - F26 묶음 전부: router VNC 브리지 32개 상한(`cd2c8a0`), vhostpwa manifest 1 MiB
+    (`0679303`), DNS 대소문자 정규화(`d4f657e`), embedTheme 부모 창/출처 검사(`ec07373`) -
+    router-docker 커밋만, 태그 전. webmanager 업로드 `[]`, CLAUDE.md makepkg 트레이드오프,
+    `.dockerignore` `.env*`/`*.bak*` - code-docker.
   - F23 위젯 팝아웃이 세션을 쥔 문서가 실제로 사라진 `load`에서만 새 탭을 이동
 
 ---
@@ -73,24 +77,3 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
 - **방향**: 최소한 이 backlog 항목으로 존재를 남긴다(요청받은 조치). 실제 고정은
   qwreey-fish 핀과 같은 방식(SHA+체크섬)을 fisher/mise.run에도 적용하거나, mise는
   자체 버전 핀 메커니즘이 있으니 그걸 쓰도록 전환.
-
-## F26 [Low 모음] 기타 소소한 코드 결함 (전부 재확인됨)
-
-- `router-docker` `backend/handlers_vnc.go`의 `handleVncSocket`에 동시 브리지 수 제한
-  없음(인증된 호출자가 fd/고루틴 무제한 소모 가능).
-- `router-docker` `internal/vhostpwa/vhostpwa.go:165`의 원격 manifest fetch가
-  `MaxBytesReader` 없이 `json.NewDecoder(resp.Body).Decode()`.
-- `router-docker` `internal/dns/customhosts.go`/`blocklist.go`의 중복 제거가 대소문자
-  구분 - `Example.com`과 `example.com`이 별개로 저장되어 차단이 조용히 무력화될 수 있음.
-- `router-docker` `frontend/src/embedTheme.ts:55`의 `message` 리스너에 `event.origin`
-  검사 없음(영향은 테마 토글뿐, 코드 자체가 이미 인지하고 있음).
-- `webmanager/backend/handlers_files.go:233`의 `var results []files.UploadResult`가
-  빈 업로드에서 `{"results": null}`을 반환 - 이 프로젝트의 "Go nil slice → JSON null"
-  재발 버그 부류(메모리에 이미 있는 일반 원칙인데 이 자리는 놓침).
-- code-docker `Dockerfile`의 makepkg 사용자 + `/etc/sudoers.d/makepkg`
-  (`NOPASSWD:ALL`)가 최종 이미지에 영구히 남는데, CLAUDE.md의 "의도적 트레이드오프"
-  목록에 없음(문서 누락, yay가 root로 못 도는 구조상 의도적일 가능성 높음).
-- code-docker `.dockerignore`가 `.env*`/`*.bak`를 제외하지 않음(지금은 COPY 안 되니
-  실질 위험은 없지만 백스톱이 없음).
-
-각 항목 모두 저비용 수정이라 한 번에 묶어 처리해도 되고, 개별로 나눠도 된다.
