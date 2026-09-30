@@ -368,13 +368,27 @@ async function saveBinding(id, state) {
   if (state) b[id] = state
   else delete b[id]
   await ctx.workspaceState.update(SLOTS_KEY, b)
+  await syncSlotContexts()
 }
 
-function setSlotContext(id, on) {
-  // term1 has no `when` clause: it is always there, showing the terminal
-  // Home while unbound, so the panel tab never disappears.
-  if (id === 'term1') return Promise.resolve()
-  return vscode.commands.executeCommand('setContext', `webmanager.slot.${id}`, on)
+// Which slots the panel shows (package.json `when`): the bound ones. term1
+// also shows unbound - the terminal Home - but only while nothing else is
+// bound, so the panel tab never disappears and yet a closed term1 doesn't
+// linger as a Home nobody needs next to other terminals.
+let lastSlotContexts = ''
+async function syncSlotContexts() {
+  const bindings = slotBindings()
+  const next = {}
+  for (const id of SLOT_IDS) next[`webmanager.slot.${id}`] = !!bindings[id]
+  next['webmanager.panelInUse'] = SLOT_IDS.some((id) => id !== 'term1' && bindings[id])
+  const key = JSON.stringify(next)
+  if (key === lastSlotContexts) return
+  lastSlotContexts = key
+  // Whatever shows a view goes first: for a moment with no view left, VS
+  // Code closes the whole webmanager tab and switches the panel to another.
+  const shows = ([k, v]) => (k === 'webmanager.panelInUse' ? !v : v)
+  const entries = Object.entries(next).sort((a, b) => shows(b) - shows(a))
+  for (const [k, v] of entries) await vscode.commands.executeCommand('setContext', k, v)
 }
 
 function defaultSlotState(id) {
@@ -400,7 +414,6 @@ function slotProvider(id) {
 async function bindSlot(id, state) {
   state = normalizeState(state)
   await saveBinding(id, state)
-  await setSlotContext(id, true)
   const host = slotHosts.get(id)
   if (host) {
     host.closedState = null
@@ -417,11 +430,7 @@ async function closeSlot(id) {
   // (term1 goes on to show Home, where the user may pick a new session).
   if (host) host.closedState = host.state
   await saveBinding(id, null)
-  if (id === 'term1') {
-    if (host) navigateHost(host, defaultSlotState(id))
-  } else {
-    setSlotContext(id, false)
-  }
+  if (id === 'term1' && host) navigateHost(host, defaultSlotState(id))
 }
 
 // The slot a state should go into: the first free one of its kind, or the
@@ -1042,9 +1051,7 @@ function activate(context) {
     panelTitles().filter((e) => labels.has(e.title)),
   )
 
-  for (const id of Object.keys(slotBindings())) {
-    if (SLOT_IDS.includes(id)) setSlotContext(id, true)
-  }
+  syncSlotContexts()
 
   // The window coming back to the front: a visible terminal re-claims its
   // PTY size (another client may have resized the session meanwhile). A

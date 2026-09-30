@@ -32,7 +32,8 @@
         {
           "type": "webview",
           "id": "webmanager.term1",
-          "name": "Terminal 1"
+          "name": "Terminal 1",
+          "when": "webmanager.slot.term1 || !webmanager.panelInUse"
         },
         {
           "type": "webview",
