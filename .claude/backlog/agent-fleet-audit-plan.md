@@ -5,6 +5,26 @@
 > "studio 환경까지 계정을 분리할지" 두 가지가 구현 방향을 크게 바꾸므로, 이
 > 문서를 읽고 바로 만들지 말고 아래 "미해결 질문"부터 사용자와 확인할 것.
 
+
+## 2026-09-30 오너 답변 + 외부 보관 조사
+
+- **목적**: 실시간 승인 게이트가 아니라 **사후 검토용**. 공격 방어는 컨테이너 스택(격리 +
+  netgate + dind authz)이 맡는다. 이 문서의 성격은 "이렇게 쓰는 방법이 있다"는 best
+  practice 제시 - code-docker에 강제되는 기능이 아님(반쯤 유효).
+- `git.qwreey.moe`는 이미 쓰는 중. 병렬 인스턴스는 각자의 PWA로 본다(중앙 webmanager 불필요).
+  계정 분리는 메인 인스턴스엔 안 함 - 쓰는 곳에서 제한 계정을 물려줄 뿐.
+- **컨테이너 밖 보관 선택지** (Claude Code 문서 기준, 실측 전):
+  - A. 사이드카가 호스트 `./code/.claude/projects`를 읽기 전용으로 따라 읽어 code-docker가
+    마운트하지 않는 볼륨에 이어 붙임. Claude Code 설정 불필요, 프롬프트/응답/툴 전부 포함,
+    기본 30일 뒤 지워지는 원본(`cleanupPeriodDays`)과 무관. 빠지는 경우: 다른
+    `CLAUDE_CONFIG_DIR`나 `--no-session-persistence`로 띄운 세션. **가장 쉬움, 추천.**
+  - B. `/etc/claude-code/managed-settings.json`의 `"type": "http"` 훅(PostToolUse/Stop 등)을
+    밖의 수신기로. 플랜 제한 없음, 사용자 설정보다 우선하지만 컨테이너 root가 파일을 고치면
+    새 세션부터 빠짐. 수신기를 따로 만들어야 함.
+  - C. OpenTelemetry(`CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_LOGS_EXPORTER=otlp`) → 밖의
+    collector. 명령 내용은 `OTEL_LOG_TOOL_DETAILS=1` 등 opt-in, 강제 종료 시 유실 보장 없음.
+- 제공 형태(opt-in compose 서비스 / `builds/` 프로바이더 / `docs/tips`만)는 오너 결정 대기.
+
 ## 동기 (사용자 설명 그대로)
 
 병렬로 컨테이너 여럿을 켜서 Claude에게 개발 도구를 주고 개발을 맡기려 함:
