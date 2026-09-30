@@ -46,7 +46,7 @@ if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
     # once, synchronously, before user-init.sh's own qwreey-fish curl below,
     # as a short-lived bootstrap: it's the same plain "127.0.0.11 then
     # router" resolv.conf shape that only some resolvers fail over past
-    # correctly (see .claude/backlog/dns-local-servfail-fix.md), good enough
+    # correctly (see .claude/archive/dns-local-servfail-fix-done.md), good enough
     # for the tools user-init.sh itself uses (curl, glibc-based, correctly
     # fails over), but not a permanent fix. The dns-local supervisord program
     # (config/dns-local/dns-local.default.sh) supersedes this moments later

@@ -8,14 +8,11 @@
 
 ## 지금 바로 결정하면 유용한 것 (작지만 실사용에 영향)
 
-- **비밀번호 게이트 미설정 상태**: 지금 `WEBMANAGER_AUTH_PASSWORD_HASH`가
-  설정 안 돼 있으면 Terminal/파일 매니저/Logs/각종 쓰기 액션 전부 그냥 열려
-  있음(기존 신뢰 모델 그대로) — `webmanager --hash-password` CLI 헬퍼가
-  있으니 설정 자체는 막혀있지 않음(`archive/authgate-plan-done.md` 참고).
-- **`WEBMANAGER_FILES_ROOT` 기본값이 `/code`로 좁혀져 있음** — 컨테이너 전체
-  (`/etc`, `/usr` 등)까지 파일 매니저로 브라우징하고 싶으면 이 값을 `/`로
-  바꿔야 함. 지금은 "루트 폴더를 code-server 밖에서 만지고 싶다"는 원래
-  요청보다 보수적으로 좁혀서 시작함(안전한 기본값 우선).
+- ~~비밀번호 게이트 기본값~~ — **답함 (2026-09-30)**: 기본은 꺼둔 채로 두되
+  문서와 `example-env.webmanager`에 "권장"으로 표시(`b788dc3`).
+- ~~`WEBMANAGER_FILES_ROOT` 범위~~ — **답함 (2026-09-30)**: 넓혀도 됨(터미널로
+  이미 닿는 데이터). 기본 `/`, 처음 여는 곳은 `WEBMANAGER_FILES_HOME`(기본
+  `/code`), WebDAV는 SSO 밖이라 `/code`에 그대로 둠(`b788dc3`).
 
 ## 구현하면서 기본값으로 처리한 것 (원하면 언제든 조정 가능)
 
@@ -154,5 +151,5 @@ Terminal, mise)과 일관성 맞춤. **탭 이름/`<h1>` 제목만** 바꿨고, 
 9. **탭바를 가로 스크롤로 바꿀지.** `research/terminal-control-bar-plan.md`가
    "안 한 것"으로 남겨둔 유일한 항목이고, 예전부터 사용자 결정 대기 중이다.
 10. **authgate per-IP 백오프의 전역 버킷 문제를 고칠지.**
-    `.claude/backlog/authgate-client-ip-blind-spot.md` — 이번에 VNC 쪽만
+    `.claude/archive/authgate-client-ip-blind-spot-done.md` — 이번에 VNC 쪽만
     `realClientIP()`로 고쳤고 인증 백오프는 일부러 안 건드렸다.

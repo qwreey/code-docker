@@ -21,8 +21,8 @@ Antigravity, 아카이브: `.claude/archive/security-audit-2026-09-16.md`,
 - F12/F13/F14 autoinstall — code-server-autoinstall `v0.1.1` (스테이징 후 교체,
   오프라인 기동, `CODE_SERVER_VERSION` 핀), code-docker `602a1ab`
 - F19 폰트 CSS 이스케이프, F24 온볼륨 유닛 이름 — code-docker `35b0391`
-- F10 — 문서의 clone 명령에 `-b main` (`a5b488a`). **GitHub 기본 브랜치 설정은
-  아직 master** — 저장소 설정 변경이 필요(gh 미인증이라 에이전트가 못 함).
+- F10 — 문서의 clone 명령에 `-b main` (`a5b488a`). GitHub 기본 브랜치도
+  `main`으로 바뀌어 있음(2026-09-30 `git ls-remote --symref origin HEAD`로 확인).
 - (관련) router 앞문이 형제 격리망에서 열려 있던 문제 — router-docker `v0.1.1`.
   F34는 이것과 범위가 다르다(외부망 최초 구동 레이스).
 

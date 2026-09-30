@@ -75,20 +75,17 @@
   작업을 시작할 때 참고
   - `code-patch-widgets.md` — `window.CDDialog` 기반 브라우저 위젯 아이디어 (상태
     표시줄, 확인창, 리소스 미터 등 code-server 패치 쪽)
-  - `pastebin-integration.md` — 외부 pastebin 연동 아이디어 (초기 메모 수준)
+  - `connection-health-dialog-plan.md` — code-server/router/webmanager 연결 상태
+    진단 다이얼로그 (설계 질문 3개는 착수할 때 정하기로)
+  - `dind-dns-servfail.md` — dind 안 컨테이너의 DNS SERVFAIL 노출 조사 (착수 전
+    재현부터 다시)
+  - `agent-sandbox-hardening.md` — 에이전트를 돌릴 때의 보안 권고 모음. 일부(LAN
+    격리, 리소스 제한, dind authz)는 구현됨 — 참고 문서 성격
   - `agent-fleet-audit-plan.md` — 병렬 Claude Code 에이전트 컨테이너를
     제한된 git 계정으로 격리하면서 뭘 시도했는지 기록을 남기는 방법 조사
     (세션 트랜스크립트/훅/OTel 등, 착수 전 질문 다수)
-  - `readme-revamp-plan.md` — README.md 재단장(뱃지, 소개 문단 다듬기)
-    아이디어 — 문서 콘텐츠 자체를 `docs/`로 옮기는 작업(2026-08-05)은 이미
-    끝났고, 이건 그 다음 단계
-  - `repo-restructure-plan.md` — submodule 4개(router/code-dind/envmigrate/
-    code-server-autoinstall)를 원격 참조로 바꾸고 개발용 `dev/` 폴더를 두는 계획.
-    "Compose가 원격 include를 지원한다", "ARG를 ADD의 source로 쓸 수 있다" 두 전제를
-    실측으로 확인해둔 문서 (2026-09-03)
-  - `qa-batch-2026-09-03.md` — 사용자 QA 제보 11건의 원인 분석 + 수정 방향.
-    `CS_DISABLE_PROXY`가 사라졌다는 전제가 틀렸다는 정정과, 그럼에도 실재하는
-    구멍(`remote.autoForwardPorts`)이 여기 있음
+  - `readme-revamp-plan.md` — README.md 재단장(뱃지, 소개 문단 다듬기) —
+    **보류**(기능이 자리 잡은 뒤)
 
 - **webmanager 전용 계획/설계**: `webmanager/.claude/` — 완료된 기능은
   `*-plan-done.md`, 아직 안 한 건 `*-plan.md`. 인덱스는 그 폴더의 `README.md`.

@@ -5,7 +5,7 @@
 
 - 확인 끝난 항목은 `[x]`로 바꾸고, 문제가 있으면 그 자리에 증상을 적을 것
 - 배치 전체가 끝나면 이 파일에서 지우고 해당 plan 문서 쪽에 결과를 반영
-- 관련 계획/원인 분석은 `.claude/backlog/qa-batch-2026-09-03.md` 참고
+- 관련 계획/원인 분석은 `.claude/archive/qa-batch-2026-09-03-done.md` 참고
 
 ---
 
@@ -389,7 +389,7 @@ Task Manager는 flex 표, Supervisor 탭은 그 아래 펼쳐지는 일반 auto-
 
 - 커밋 `173d176`의 메시지에 탭 이름변경 원인 설명이 **틀린 채로** 남아 있다
   (홈 탭 `draggable` 비대칭 → 실제로는 활성/비활성 탭 차이). 정정은
-  `.claude/backlog/qa-batch-2026-09-03.md`에 있다. 아직 푸시 전이라 history
+  `.claude/archive/qa-batch-2026-09-03-done.md`에 있다. 아직 푸시 전이라 history
   재작성은 가능하지만 하지 않았다 — **할지 말지 사용자 결정 대기.**
 - 전체 QA는 사용자가 나중에 batch로 한 번에 하기로 했다. 개별 항목을 그때그때
   물어보지 말 것.

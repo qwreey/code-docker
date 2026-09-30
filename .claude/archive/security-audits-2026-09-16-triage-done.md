@@ -21,7 +21,7 @@
 더 이상 적용되지 않는다 — `git check-ignore -v`로 재확인함).
 
 이 트리아지 작업 자체는 코드를 하나도 고치지 않았다. 열린 항목은
-`.claude/backlog/security-audit-2026-09-16-open.md`에 별도로 정리했다.
+`.claude/archive/security-audit-2026-09-16-open-done.md`에 별도로 정리했다.
 
 ## 읽는 법
 
@@ -59,7 +59,7 @@
 | F08 | 원격 GitHub `#main` 플로팅 브랜치 + unpinned 스크립트 빌드 | A-SEC08, C-SEC05 | **부분 FIXED** | `docker-compose.yml`/`Dockerfile` 확인 결과 `router-docker`(v0.1.1)·`dind-authz-docker`(v0.1.0)·`code-server-autoinstall`(v0.1.0)는 태그 고정으로 전환됨(커밋 `78201fc`, 2026-09-2x 리팩터). **`router-docker-client`(netshare/dns-local/netinit-docker)만 여전히 `#main` 플로팅** - 가장 고권한(도커 소켓+SYS_ADMIN+NET_ADMIN+호스트 netns) 소비자라 잔여 위험은 남음. backlog에는 F08로 별도 기재하지 않고 이 표에만 남김(고권한 쪽은 F09 WONTFIX 설계 범위 안에서 이미 문서화됨) |
 | F09 | netinit-docker의 과도한 호스트 권한(docker.sock+SYS_ADMIN+NET_ADMIN+host netns) | A-SEC09 | WONTFIX(설계) | CLAUDE.md "docker-compose 토폴로지" 절 - ":ro 마운트는 완화가 아니다", "cap이 넓히는 건 blast radius이지 trust ceiling이 아니다"라고 명시적으로 트레이드오프 서술 |
 | F10 | `origin/HEAD`가 6주(이제 8주+, 커밋 400개+) 묵은 `master`를 가리켜 문서대로 클론하면 router/dind-authz/09-07 수정이 전부 빠진 스택이 설치됨 | B-D1 | **OPEN (Critical)** | `git symbolic-ref refs/remotes/origin/HEAD` → 여전히 `refs/remotes/origin/master`(2026-08-02 커밋). `docs/index.md:8`의 clone 명령에 `--branch` 없음 - 둘 다 재확인 |
-| F11 | webmanager authgate 잠금 버킷이 전역 하나(nginx가 실제 IP를 안 넘김) → 인증 없는 전원 영구 잠금 가능 | B-S1 | **OPEN (High)** | `webmanager/backend/handlers_auth.go:15-21` `clientKey`가 `r.RemoteAddr` 그대로, nginx의 webmanager `proxy_pass` 블록 어디에도 `X-Real-IP` 세팅 없음 - 재확인. router의 동일 문제(09-07 H2)는 이미 고쳐짐(`rateLimitKey`가 X-Real-IP 사용). `.claude/backlog/authgate-client-ip-blind-spot.md`(2026-09-06)가 이 비대칭을 이미 추적 중이었고, "webmanager도 같은지 확인 필요"라는 미해결 질문의 답이 이번에 "그렇다"로 확정됨 |
+| F11 | webmanager authgate 잠금 버킷이 전역 하나(nginx가 실제 IP를 안 넘김) → 인증 없는 전원 영구 잠금 가능 | B-S1 | **OPEN (High)** | `webmanager/backend/handlers_auth.go:15-21` `clientKey`가 `r.RemoteAddr` 그대로, nginx의 webmanager `proxy_pass` 블록 어디에도 `X-Real-IP` 세팅 없음 - 재확인. router의 동일 문제(09-07 H2)는 이미 고쳐짐(`rateLimitKey`가 X-Real-IP 사용). `.claude/archive/authgate-client-ip-blind-spot-done.md`(2026-09-06)가 이 비대칭을 이미 추적 중이었고, "webmanager도 같은지 확인 필요"라는 미해결 질문의 답이 이번에 "그렇다"로 확정됨 |
 | F12 | code-server가 런타임에 `releases/latest`를 버전 핀/체크섬/opt-out 없이 root로 자동 설치 | B-S2 | **OPEN (High)** | `dev/code-server-autoinstall/install.sh` - `CODE_SERVER_VERSION`/autoupdate 끄는 옵션 없음, 재확인 |
 | F13 | install.sh가 다운로드 **전에** 기존 설치를 삭제 | B-S3 | **OPEN (High)** | `install.sh:37-40` - `rm -rf`가 `curl -fL` 앞에 그대로 있음(다운로드 curl 자체는 `-fL`로 개선돼 있음) |
 | F14 | install.sh 버전 확인 curl에 `-f` 없어 5xx도 성공 취급, 신규 설치에서 아무것도 안 깔고 exit 0 가능 | B-S4(본문 표기) | OPEN (Medium) | `install.sh:21` `curl -s`(플래그 `-f` 없음), 31행의 `[ "x$LATEST" == "x$CURRENT" ]` 로직 그대로 |
@@ -90,7 +90,7 @@
 ## 다음 단계
 
 - 열린 항목(F02~F35 중 OPEN 표시)의 상세·심각도·수정 방향은
-  `.claude/backlog/security-audit-2026-09-16-open.md` 참고.
+  `.claude/archive/security-audit-2026-09-16-open-done.md` 참고.
 - UNCLEAR로 남긴 두 가지(F15의 exec 권한상승 여부, F21의 tinyauth 쿠키 Domain
   스코프)는 실행 중인 인스턴스에서 한 번만 확인하면 결론난다 - 다음에 손댈 때
   같이 확인할 것.
@@ -102,6 +102,6 @@
 ## 후속 (2026-09-28)
 
 같은 날 F02·F04·F10(문서 부분)·F11·F12/F13/F14·F15·F19·F24를 수정했다 — 커밋과
-버전은 `.claude/backlog/security-audit-2026-09-16-open.md` 상단 목록 참고. F02와
+버전은 `.claude/archive/security-audit-2026-09-16-open-done.md` 상단 목록 참고. F02와
 F11은 수정 전에 테스트 스택에서 직접 재현해 확인했다. 위 표의 상태 열은 트리아지
 시점(수정 전) 기준이다.

@@ -30,10 +30,11 @@
   password 필드 방식 자체를 기본값에서 내리고 새 입력 방식(`diff`)으로 교체했다.
   갤럭시에서 한글 조합·영문·백스페이스·빠른 입력 모두 랙 없이 정상, 회귀 없음.
   전체 경위: `webmanager/.claude/archive/terminal-mobile-input-touch-plan-done.md`
-- (2026-09-06, 사용자가 나중에 더 보기로 함) **authgate의 per-IP 백오프가
-  클라이언트를 구분하지 못함** — router-manager는 유닉스 소켓으로만 listen해서
+- ~~(2026-09-06, 사용자가 나중에 더 보기로 함) **authgate의 per-IP 백오프가
+  클라이언트를 구분하지 못함**~~ — **해결됨**: router는 `rateLimitKey`(X-Real-IP),
+  webmanager는 `authgate.ClientKey`(`d1f747e`). 아래는 당시 기록. — router-manager는 유닉스 소켓으로만 listen해서
   `r.RemoteAddr`가 모든 호출자에 대해 동일하고, 그 값을 키로 쓰는 실패 백오프가
   사실상 전역 버킷 하나로 동작한다(한 명이 5번 틀리면 전원이 막힘). 2026-09-06에
   VNC 연결 패널 쪽만 `realClientIP()`로 고쳤고 인증 백오프는 일부러 안 건드렸음 —
   인증 동작 변경이라 별도 판단이 필요. webmanager 쪽도 같은지는 아직 확인 안 함.
-  전체 분석: `.claude/backlog/authgate-client-ip-blind-spot.md`
+  전체 분석: `.claude/archive/authgate-client-ip-blind-spot-done.md`
