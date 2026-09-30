@@ -77,7 +77,9 @@
     banner.hidden = !text
   }
 
+  let navSeq = 0
   function navigate(path) {
+    const seq = ++navSeq
     showBanner('')
     clearTimeout(readyTimer)
     // No `ready` from webmanager in time means the page never came up as
@@ -87,7 +89,23 @@
       showBanner('webmanager가 응답하지 않습니다 — 새로고침하거나 webmanager 상태를 확인하세요.')
       vscode.postMessage({ type: 'embed-timeout' })
     }, 15000)
-    frame.src = frameUrl(path)
+    const url = frameUrl(path)
+    // An expired outer login (SSO forward-auth) answers with a redirect to
+    // its login page, which refuses to be framed - the frame would show
+    // Chrome's bare "content is blocked". Asked first, so the view can say
+    // what to do instead: only a top-level reload logs back in.
+    fetch(url, { redirect: 'manual', cache: 'no-store' })
+      .then((res) => res.type === 'opaqueredirect')
+      .catch(() => false)
+      .then((expired) => {
+        if (seq !== navSeq) return
+        if (!expired) {
+          frame.src = url
+          return
+        }
+        clearTimeout(readyTimer)
+        showBanner('로그인이 만료되었습니다 — code-server 페이지를 새로고침하면 다시 로그인합니다.')
+      })
   }
 
   function toEmbed(msg) {

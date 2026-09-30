@@ -53,7 +53,10 @@
     // session list, nothing more.
     async function heartbeat() {
         try {
-            const res = await fetch(HEARTBEAT_URL, {
+            // CDDialog.fetch when it's there: it stops this after the outer
+            // login expires instead of logging a CORS error every 30s.
+            const send = window.CDDialog ? (u, o) => window.CDDialog.fetch(u, o) : fetch;
+            const res = await send(HEARTBEAT_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id, browserId, folder, userAgent: navigator.userAgent }),

@@ -152,6 +152,15 @@ export function apiUrl(path: string): string {
 // to disable the timeout entirely for a call with no natural upper bound.
 const DEFAULT_TIMEOUT_MS = 15_000
 
+// An outer SSO (forward-auth in front of code-docker) answers an expired
+// login with a redirect to its login page. Followed, that's a cross-origin
+// fetch that fails with a CORS error - on every poll of every open view,
+// indefinitely - and only a top-level reload can log back in. So the first
+// redirect is reported as what it is, and later requests fail fast without
+// touching the network. No /api route redirects on its own.
+let loginExpired = false
+const LOGIN_EXPIRED = '로그인이 만료되었습니다 — 페이지를 새로고침하면 다시 로그인합니다'
+
 async function request<T>(
   path: string,
   init?: RequestInit,
@@ -159,12 +168,13 @@ async function request<T>(
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
   prompt = true,
 ): Promise<T> {
+  if (loginExpired) throw new ApiError(0, LOGIN_EXPIRED)
   const controller = new AbortController()
   const timeoutId = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : undefined
 
   let res: Response
   try {
-    res = await fetch(apiUrl(path), { ...init, signal: controller.signal })
+    res = await fetch(apiUrl(path), { ...init, signal: controller.signal, redirect: 'manual' })
   } catch (err) {
     // AbortError from our own timeout (not a caller-supplied signal — none
     // of this codebase's call sites pass one) is surfaced as a distinct,
@@ -178,6 +188,11 @@ async function request<T>(
     throw err
   } finally {
     if (timeoutId !== undefined) clearTimeout(timeoutId)
+  }
+
+  if (res.type === 'opaqueredirect') {
+    loginExpired = true
+    throw new ApiError(0, LOGIN_EXPIRED)
   }
 
   if (isUnlockPath(path) && res.ok) {

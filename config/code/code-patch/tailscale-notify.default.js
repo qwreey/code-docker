@@ -62,7 +62,7 @@
     async function poll() {
         let data;
         try {
-            const res = await fetch(`${statusUrl}?t=${Date.now()}`, { cache: "no-store" });
+            const res = await window.CDDialog.fetch(`${statusUrl}?t=${Date.now()}`, { cache: "no-store" });
             if (!res.ok) throw new Error(`status ${res.status}`);
             data = await res.json();
         } catch {

@@ -53,7 +53,8 @@ function passthroughChords() {
 // code-server's own origin: webviews are served from it (relative
 // webviewEndpoint), and so is webmanager (nginx /manager/), so the nested
 // frame is same-origin all the way up - which is what makes webmanager's
-// cookie, clipboard and fullscreen work inside it at all.
+// cookie, clipboard and fullscreen work inside it at all. connect-src 'self'
+// is embed.js asking, before each load, whether the outer login expired.
 function render(webview, extensionUri, { state, build }) {
   const nonce = crypto.randomBytes(16).toString('base64')
   const media = (f) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', f))
@@ -73,7 +74,7 @@ function render(webview, extensionUri, { state, build }) {
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src 'self'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src 'self'; connect-src 'self'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="${media('embed.css')}">
 </head>

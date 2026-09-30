@@ -109,6 +109,11 @@
         return card;
     }
 
+    // Set once a same-origin request came back as a redirect: the SSO
+    // forward-auth in front of code-server answers an expired login that
+    // way, and nothing a page does from here recovers it - see fetch below.
+    let sessionExpired = false;
+
     window.CDDialog = {
         // Persistent card keyed by id - a second call with the same id
         // replaces the previous one in place instead of stacking a duplicate.
@@ -130,6 +135,28 @@
             const card = buildCard(opts, null);
             stack().appendChild(card);
             setTimeout(() => card.remove(), opts.duration || 5000);
+        },
+        // fetch() for code-patch scripts polling their own origin. An
+        // expired outer login (SSO forward-auth) turns every request into a
+        // redirect to the login page, which a script can't follow
+        // cross-origin: each poll then logs a CORS error, forever, and every
+        // webmanager view that reloads shows Chrome's "content is blocked"
+        // (the login page refuses to be framed). Only a top-level reload
+        // logs back in, so the first redirect raises one banner saying so,
+        // and every later call fails fast without a request.
+        async fetch(url, opts) {
+            if (sessionExpired) throw new Error("login expired");
+            const res = await fetch(url, { ...opts, redirect: "manual" });
+            if (res.type !== "opaqueredirect") return res;
+            sessionExpired = true;
+            this.banner("cd-login-expired", {
+                kind: "warning",
+                title: "로그인이 만료되었습니다",
+                lines: ["페이지를 새로고침하면 다시 로그인합니다. 그 전까지 webmanager 뷰와 알림은 동작하지 않습니다."],
+                actions: [{ label: "새로고침", onClick: () => location.reload() }],
+                dismissible: true,
+            });
+            throw new Error("login expired");
         },
         // Best-effort native browser notification - silently does nothing
         // unless the user already granted permission (never prompts).
