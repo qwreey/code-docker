@@ -101,8 +101,9 @@ NAT면 이 변경은 의미 없음 — 먼저 확인 필요).
 1. **Claude Code 상태/관리 탭 M4~M5** — M1~M3는 구현 완료(설치/버전확인/로그인
    자동화는 별도 트랙으로 이미 구현됨, 위 참고). 다음은 M4(익스텐션 설치 배너,
    이미 구현된 익스텐션 API 재사용 가능). `.claude/claude-rework-v2.md`
-2. **익스텐션 검색/URL 설치**(마켓플레이스 URL 붙여넣기 → open-vsx 교차 조회 →
-   vsix 직접 설치 폴백) — 설계 완료, 미착수. `.claude/extension-search-plan.md`
+2. **익스텐션 검색**(open-vsx 자유 텍스트 검색) — 설계 완료, 미착수. URL 붙여넣기
+   설치(open-vsx 교차 조회 + vsix 직접 설치 폴백)는 구현 완료.
+   `.claude/extension-search-plan.md`
 3. code-server 설정(settings.json 등) 편집 UI — 후순위, 타당성 재검토 필요(`ideas.md`)
 4. `/code/.local/share/code-docker/vector/logs/*.jsonl` 보존기간(retention) 정책 없음 — 알려진 갭
    (`.claude/archive/webmanager-review.md` (레포 루트) 참고), 문서 없음

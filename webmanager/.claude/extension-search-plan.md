@@ -1,4 +1,4 @@
-# 익스텐션 검색/URL 설치 (구현 전 설계, 미착수)
+# 익스텐션 검색/URL 설치 (URL 붙여넣기 설치 구현 완료, 검색은 미착수)
 
 `.claude/archive/extensions-plan-done.md`(구현 완료, 아카이브됨)의 후속 기능.
 지금은 `recommendations.*.yaml`에 미리 등록된 목록만 설치 가능함 — 여기서는
@@ -31,6 +31,9 @@
   (출처: `coder/code-server` GitHub 이슈 #7601, code-server FAQ)
 
 ## 1. 검색/URL 붙여넣기로 설치
+
+**상태**: URL 붙여넣기 설치(URL 파싱 + open-vsx 교차 조회 + vsix 폴백)는 구현
+완료 — 아래 "구현된 API"를 볼 것. 자유 텍스트 검색은 미착수(설계만 남아 있음).
 
 ### 요구사항 (사용자 설명 그대로)
 
@@ -80,28 +83,50 @@ Services.VSIXPackage` 류 — **정확한 엔드포인트/버전 조회 방법�
 물어보고 동의를 받아야 함(사용자 요구사항에 이미 명시됨) — 이 경로를 기본값으로
 켜두지 말 것.
 
-## API 설계 (초안)
+## 구현된 API (URL 붙여넣기 설치)
 
 ```
-GET /api/code-extensions/lookup?text=<붙여넣은 텍스트 전체>
-  → {matched: bool, source: "open-vsx"|"marketplace"|null, id: string|null,
-     openVsx: {found: bool, label?, description?, homepage?} | null}
-  marketplace URL이 매치됐는데 open-vsx에 없으면 openVsx.found=false로 내려줌
-  (여기까지는 새 의존성/설치 없이 조회만 — 안전)
+GET /api/code-extensions/lookup?text=<붙여넣은 텍스트 전체>          (게이트 없음, 읽기)
+  → {matched, source?: "marketplace"|"open-vsx"|"id", id?,
+     openVsx?: {found, label?, description?, homepage?, version?},
+     vsixFallback?: {host, maxBytes}}       // open-vsx에 없을 때만
+  인식 못 하면 matched=false(200), id 형식이 깨졌으면 400, open-vsx에
+  못 닿으면 502(= "없음"과 구분, 폴백을 권하지 않기 위해)
 
-POST /api/code-extensions/install-vsix   body {id, version}
-  → marketplace에서 vsix 직접 다운로드 + 로컬 설치(사용자가 폴백에 명시적으로
-    동의한 뒤에만 프론트가 호출) — 비밀번호 게이트는 필요 없어 보임(설치 자체는
-    이미 다른 익스텐션 설치와 동일 위험도, `archive/authgate-plan-done.md`의 "extensions
-    쓰기는 범위 밖" 판단과 일관되게 안 건 채로 두는 게 맞아 보이나 최종 판단은
-    구현 시점에 재확인)
+POST /api/code-extensions/install-vsix   body {id}                   (RequirePassword)
+  → 마켓플레이스에서 최신 .vsix를 받아 검증 후 설치
 ```
+
+- 파싱은 `internal/extensions/lookup.go`의 `ParseInput`. 통짜 텍스트가 bare id면
+  그대로, 아니면 텍스트 안의 첫 마켓플레이스/open-vsx 아이템 URL. 호스트는
+  정확 일치(`net/url`)만 인정하고, 어떤 경로든 최종 id는 `ValidateID`를 통과해야
+  exec/URL에 닿음. 문장 속 bare id(`install foo.bar please`)는 일부러 안 집음.
+- open-vsx에 있으면 기존 `POST /api/code-extensions`(같은 설치 버튼/진행 상태/재시작
+  배너)로 설치 — 새 설치 경로 없음.
+- vsix 폴백은 사용자가 확인 다이얼로그에서 동의한 뒤에만 프론트가 호출(출처
+  호스트, 크기 상한, 라이선스 회색지대 문구 표시). 게이트는 이 계획 초안의
+  "필요 없어 보임" 판단을 뒤집어 걸었음 — 임의 URL은 아니지만 서버가 외부 파일을
+  받아 설치하는 쓰기 동작이라 일반 설치와 같은 등급으로 통일.
+- **다운로드 URL 재확인 결과(2026-09-30)**: `https://marketplace.visualstudio.com/
+  _apis/public/gallery/publishers/<pub>/vsextensions/<name>/latest/vspackage`가
+  버전 조회 없이 최신본을 바로 줌(리다이렉트 없음). 응답은
+  `Content-Encoding: gzip`이라 Go의 transport가 풀어주고, 헤더가 빠진 채 gzip
+  본문만 오는 경우도 매직 바이트로 처리. 없으면 404. 상한 200MB(해제 후 기준),
+  zip 여부 + `extension.vsixmanifest`/`extension/package.json` 존재 + package.json의
+  publisher.name이 요청한 id와 같은지(대소문자 무시) 확인한 뒤 설치.
+- 설치는 `--install-extension=<절대경로>` 형태. `--` 뒤에 경로를 두면 옵션 파싱이
+  거기서 끝나 플래그 값이 비고 경로가 "열 파일"이 될 수 있어서 `=`로 붙임(경로는
+  임시 디렉터리의 절대경로라 플래그로 오해될 수도 없음). 실제 code-server 바이너리로는
+  확인하지 못함 — fake 바이너리로 인자 형태만 테스트.
+- vsix로 설치한 익스텐션은 open-vsx에 없으니 code-server가 업데이트를 못 찾음.
 
 ## 남은 질문 (착수 시 정하면 됨)
 
 - 검색(자유 텍스트로 open-vsx 전체 검색) UI를 URL 붙여넣기와 같은 화면에 둘지,
-  별도 탭/모달로 분리할지.
-- vsix 직접 설치 폴백의 정확한 다운로드 URL 패턴 재확인(비공식 API라 변경 위험).
+  별도 탭/모달로 분리할지. (URL 붙여넣기는 Extensions 탭 상단 "URL로 설치" 입력칸에
+  들어가 있음 — 검색을 같은 입력칸에 붙일지 결정 필요.)
+- 마켓플레이스 vspackage URL은 비공식이라 바뀔 수 있음 — 깨지면 `vsix.go`의
+  `downloadVSIX` 한 곳만 고치면 됨.
 
 ## 참고
 

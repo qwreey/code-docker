@@ -489,9 +489,10 @@ dependencies on each other or on anything still queued):
    now-implemented extensions API) → M5 (MCP server list, deliberately last
    within this feature — `claude mcp list` has no `--json` output and needs a
    real multi-server example to design the parser against).
-2. `.claude/extension-search-plan.md` — extension search + marketplace-URL
-   paste-to-install (with an open-vsx cross-lookup + vsix-direct-download
-   fallback). Design done, not started.
+2. `.claude/extension-search-plan.md` — extension search (design done, not
+   started). Its other half, marketplace-URL paste-to-install (open-vsx
+   cross-lookup + consented vsix-direct-download fallback), is implemented:
+   `internal/extensions/lookup.go`/`vsix.go`, `Extensions/InstallFromUrl.tsx`.
 
 Projects tab phase 2 (`.claude/archive/projects-plan-done.md`, delete UI for
 reclaimable folders) is now done too — same exact-match path-validation

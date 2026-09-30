@@ -196,6 +196,16 @@ logout`) 제공
 목록(기본 접힘, 삭제 가능), 추천 목록 표시 여부 토글(기기별 저장) — 설치/삭제
 직후엔 mise 탭과 같은 "지금 재시작" 배너가 뜹니다
 
+맨 위 "URL로 설치" 칸에 VS Code 마켓플레이스 주소(`marketplace.visualstudio.com/items?itemName=...`),
+open-vsx 주소(`open-vsx.org/extension/...`) 또는 `publisher.name` id를 붙여넣고 "확인"을 누르면
+open-vsx에서 같은 익스텐션을 찾아 설치 버튼을 보여줍니다(code-server는 open-vsx에서만
+설치합니다). open-vsx에 없으면 그렇다고 알려주고, 원할 때만 마켓플레이스에서 `.vsix`를
+직접 받아 설치하는 방법을 제안합니다 — 출처와 크기 상한(200MB)을 보여주는 확인창에서 동의해야만
+받으며, 받은 파일이 요청한 익스텐션의 올바른 패키지인지 확인한 뒤 설치합니다. 마켓플레이스
+이용 약관상 회색지대라 기본 동작이 아니고, 이렇게 설치한 익스텐션은 code-server가 업데이트를
+찾지 못합니다. 비밀번호 게이트를 켰다면 설치 때 잠금 해제가 필요하고, 외부 접속을 막아 둔
+환경이면 `open-vsx.org`(vsix 폴백은 `marketplace.visualstudio.com`)에 닿아야 합니다.
+
 ### Projects
 
 `$HOME/Projects`(`user-init`이 매 부팅마다 없으면 자동으로 만듭니다) 아래

@@ -37,7 +37,7 @@ webmanager만을 위한 계획/설계 문서 모음 (레포 전체에 걸치는 
 | 문서 | 기능 | 우선순위 |
 |---|---|---|
 | `claude-rework-v2.md` | Claude Code 탭 남은 작업 — M4(익스텐션 설치 배너)/M5(MCP 서버 목록, `claude mcp list` 텍스트 파싱 필요). M1~M3+로그인/설치/mise 버전확인은 전부 완료돼서 `archive/claude-plan-done.md`로 분리됨 | M4는 바로 가능, M5는 실제 MCP 서버 출력 관찰부터 |
-| `extension-search-plan.md` | 익스텐션 검색/마켓플레이스 URL 붙여넣기 설치 — "더 보기" 링크와 삭제(uninstall)는 이미 구현 완료돼서 이 문서에서 빠짐(각각 `archive/extensions-plan-done.md` 참고), 비활성화(disable)는 조사 후 미구현 결정 | 급하지 않음 |
+| `extension-search-plan.md` | 익스텐션 검색(미착수) — 마켓플레이스 URL 붙여넣기 설치는 구현 완료(open-vsx 조회 + vsix 폴백, 남은 건 검색뿐). "더 보기" 링크와 삭제(uninstall)는 이미 구현 완료돼서 이 문서에서 빠짐(각각 `archive/extensions-plan-done.md` 참고), 비활성화(disable)는 조사 후 미구현 결정 | 급하지 않음 |
 | `terminal-pinch-zoom-plan.md` | 터미널 두 손가락(핀치) 확대/축소 — 조사 완료, 구현 전. 두 손가락 제스처 슬롯이 지금 완전히 비어 있어서 뺏어올 기존 동작이 없다는 게 핵심 결론. 실기기에서만 드러날 함정 3개(패딩 영역의 페이지 줌 / iOS의 `gesturestart` / 리사이즈 폭풍) 정리됨 | 사용자가 "조사만" 요청 |
 
 ## 사용자 QA 대기 (`qa-request/*-plan-done.md`)
