@@ -23,7 +23,8 @@
     새 세션부터 빠짐. 수신기를 따로 만들어야 함.
   - C. OpenTelemetry(`CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_LOGS_EXPORTER=otlp`) → 밖의
     collector. 명령 내용은 `OTEL_LOG_TOOL_DETAILS=1` 등 opt-in, 강제 종료 시 유실 보장 없음.
-- 제공 형태(opt-in compose 서비스 / `builds/` 프로바이더 / `docs/tips`만)는 오너 결정 대기.
+- 제공 형태: 우선 문서만(`docs/tips/claude-audit.md`, A안 vector 사이드카, 실측함). 나중에 이
+  저장소의 opt-in compose 서비스로 넣을지 오너가 고려 중.
 
 ## 동기 (사용자 설명 그대로)
 

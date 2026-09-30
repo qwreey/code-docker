@@ -248,6 +248,12 @@ vscord 확장으로 Discord Rich Presence를 연동하고, ssh 소켓 포워딩�
 
 자세한 내용은 [tips/dind.md](tips/dind.md)를 확인하세요.
 
+## Claude Code 작업 기록 밖에 남기기
+
+에이전트가 무엇을 했는지 사후 검토용 기록을, 에이전트가 고칠 수 없는 컨테이너 밖에 쌓는 방법입니다. 원본 세션 기록을 읽기 전용으로만 보는 작은 vector 컨테이너를 `EXTRA_INCLUDE`로 붙입니다.
+
+자세한 내용은 [tips/claude-audit.md](tips/claude-audit.md)를 확인하세요.
+
 ## roblox-studio-docker 연동
 
 `EXTRA_INCLUDE` 훅으로 완전히 독립된 별도 프로젝트([roblox-studio-docker](https://github.com/qwreey/roblox-studio-docker))를 code-docker 옆에 붙이는 예시입니다 - submodule이 아니라, `docker-compose.yml`이 제공하는 범용 오버레이 메커니즘을 씁니다.
