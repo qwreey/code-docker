@@ -9,6 +9,7 @@ import (
 	"webmanager/internal/cgroup"
 	"webmanager/internal/claudecode"
 	"webmanager/internal/diskusage"
+	"webmanager/internal/extensions"
 	"webmanager/internal/mise"
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
@@ -60,6 +61,11 @@ type Server struct {
 	// webmanager/.claude/env-migration-plan.md. Computed once in main(),
 	// not re-read per request: it only changes on a container rebuild.
 	envTemplateVersion string
+
+	// extSources is where pasted-URL installs look an extension up
+	// (open-vsx) and, on the user's say-so, download a vsix from (MS
+	// Marketplace).
+	extSources extensions.Sources
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

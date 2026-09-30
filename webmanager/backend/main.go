@@ -17,6 +17,7 @@ import (
 	"webmanager/internal/cgroup"
 	"webmanager/internal/claudecode"
 	"webmanager/internal/diskusage"
+	"webmanager/internal/extensions"
 	"webmanager/internal/mise"
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
@@ -186,6 +187,7 @@ func main() {
 			EnvPasswordHash: webdavPasswordHash,
 		}),
 		envTemplateVersion: envTemplateVersion,
+		extSources:         extensions.DefaultSources(),
 	}
 
 	mux := http.NewServeMux()
@@ -355,6 +357,10 @@ func main() {
 	mux.HandleFunc("GET /api/code-extensions", s.handleListCodeExtensions)
 	mux.Handle("POST /api/code-extensions", gate.RequirePassword(http.HandlerFunc(s.handleInstallCodeExtension)))
 	mux.Handle("DELETE /api/code-extensions/{id}", gate.RequirePassword(http.HandlerFunc(s.handleUninstallCodeExtension)))
+	// Lookup only reads (open-vsx, by a validated id); the vsix install
+	// downloads and installs, so it's gated like the plain install.
+	mux.HandleFunc("GET /api/code-extensions/lookup", s.handleLookupCodeExtension)
+	mux.Handle("POST /api/code-extensions/install-vsix", gate.RequirePassword(http.HandlerFunc(s.handleInstallCodeExtensionVSIX)))
 
 	mux.HandleFunc("GET /api/mise/tools", s.handleListMiseTools)
 	mux.Handle("POST /api/mise/tools", gate.RequirePassword(http.HandlerFunc(s.handleCreateMiseTool)))
