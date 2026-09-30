@@ -106,6 +106,16 @@
         "icon": "$(add)"
       },
       {
+        "command": "webmanager.openTerminalHere",
+        "title": "Open in webmanager Terminal",
+        "category": "webmanager"
+      },
+      {
+        "command": "webmanager.openTerminalHereInPanel",
+        "title": "Open in webmanager Terminal (Panel)",
+        "category": "webmanager"
+      },
+      {
         "command": "webmanager.openTabInPanel",
         "title": "Open webmanager Tab in Panel…",
         "category": "webmanager"
@@ -490,6 +500,14 @@
     ],
     "menus": {
       "commandPalette": [
+        {
+          "command": "webmanager.openTerminalHere",
+          "when": "false"
+        },
+        {
+          "command": "webmanager.openTerminalHereInPanel",
+          "when": "false"
+        },
         {
           "command": "webmanager.view.renameSession",
           "when": "activeWebviewPanelId == 'webmanager.page' && webmanager.activePanelSession"
@@ -1029,6 +1047,18 @@
           "command": "webmanager.view.lockNow",
           "when": "activeWebviewPanelId == 'webmanager.page'",
           "group": "3_security@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "webmanager.openTerminalHere",
+          "when": "resourceScheme == file",
+          "group": "navigation@31"
+        },
+        {
+          "command": "webmanager.openTerminalHereInPanel",
+          "when": "resourceScheme == file",
+          "group": "navigation@32"
         }
       ]
     },

@@ -557,8 +557,10 @@ async function openTerminalFromEmbed(m) {
 }
 
 // A not-yet-taken name for a new session in cwd, from the view's label or
-// the folder name, with its initial command.
-async function newSessionAt(cwd, m) {
+// the folder name, with its initial command. alsoTaken: names about to be
+// used that don't exist yet (a session is only created when its view
+// connects).
+async function newSessionAt(cwd, m, alsoTaken = []) {
   let names = []
   try {
     names = await S.fetchSessionNames()
@@ -569,9 +571,30 @@ async function newSessionAt(cwd, m) {
   const base = (typeof m.label === 'string' && m.label) || S.folderBase(cwd) || '세션'
   return {
     section: 'terminal',
-    session: S.uniqueName(base, names),
+    session: S.uniqueName(base, [...names, ...alsoTaken]),
     cwd,
     command: typeof m.command === 'string' ? m.command : undefined,
+  }
+}
+
+// The Explorer's context menu, like VS Code's own Open in Integrated
+// Terminal: any folder, or a file's own folder; one session per selected
+// item.
+async function openFromExplorer(uri, selected, inPanel) {
+  const uris = Array.isArray(selected) && selected.length ? selected : uri ? [uri] : []
+  const taken = []
+  for (const u of uris) {
+    if (!(u instanceof vscode.Uri) || u.scheme !== 'file') continue
+    let dir = u.fsPath
+    try {
+      if (!((await vscode.workspace.fs.stat(u)).type & vscode.FileType.Directory)) dir = path.dirname(dir)
+    } catch {
+      continue
+    }
+    const state = await newSessionAt(dir, {}, taken)
+    taken.push(state.session)
+    if (inPanel) await openInPanel(state)
+    else await openState(state, vscode.ViewColumn.Active)
   }
 }
 
@@ -912,6 +935,8 @@ function activate(context) {
   })
   // The panel's "+": straight to a new session in the next free terminal
   // slot, like VS Code's own terminal panel - no session picker.
+  reg('webmanager.openTerminalHere', (uri, selected) => openFromExplorer(uri, selected, false))
+  reg('webmanager.openTerminalHereInPanel', (uri, selected) => openFromExplorer(uri, selected, true))
   reg('webmanager.newTerminalInPanel', async () => {
     const s = await newSessionState()
     if (s) await openInPanel(s)
