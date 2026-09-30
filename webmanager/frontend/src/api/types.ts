@@ -546,6 +546,23 @@ export interface CodeExtensionsResponse {
   installed: string[]
 }
 
+export interface OpenVsxInfo {
+  found: boolean
+  label?: string
+  description?: string
+  homepage?: string
+  version?: string
+}
+
+export interface LookupExtensionResponse {
+  matched: boolean
+  source?: 'marketplace' | 'open-vsx' | 'id'
+  id?: string
+  openVsx?: OpenVsxInfo
+  // Present only when open-vsx doesn't have it.
+  vsixFallback?: { host: string; maxBytes: number }
+}
+
 export interface MiseRecommendedTool {
   id: string
   label: string

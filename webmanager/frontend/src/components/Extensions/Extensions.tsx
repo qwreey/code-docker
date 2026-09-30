@@ -9,6 +9,7 @@ import '../common/common.css'
 import './Extensions.css'
 import { withViewTransition } from '../../utils/viewTransition'
 import { CollapseChevron } from '../common/CollapseChevron'
+import { InstallFromUrl } from './InstallFromUrl'
 
 const SHOW_RECOMMENDATIONS_KEY = 'webmanager.extensions.showRecommendations'
 
@@ -110,15 +111,19 @@ export function Extensions() {
     groups.push(other)
   }
 
+  function markInstalled(id: string) {
+    setInstalled((prev) => new Set(prev).add(id))
+    setInstalledList((prev) => (prev.includes(id) ? prev : [...prev, id]))
+    setError(null)
+    setRestartCheckToken((t) => t + 1)
+  }
+
   async function handleInstall(id: string) {
     if (installingIds.has(id)) return
     setInstallingIds((prev) => new Set(prev).add(id))
     try {
       await api.post<{ ok: true }>('/code-extensions', { id }, EXTENSION_INSTALL_TIMEOUT_MS)
-      setInstalled((prev) => new Set(prev).add(id))
-      setInstalledList((prev) => (prev.includes(id) ? prev : [...prev, id]))
-      setError(null)
-      setRestartCheckToken((t) => t + 1)
+      markInstalled(id)
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -191,9 +196,20 @@ export function Extensions() {
           </button>
         </div>
       </div>
-      <p className="section-description">추천 code-server 익스텐션을 확인하고 바로 설치할 수 있습니다.</p>
+      <p className="section-description">추천 code-server 익스텐션을 확인하고 바로 설치하거나, 마켓플레이스 URL을 붙여넣어 설치할 수 있습니다.</p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <RestartNeededBanner refreshToken={restartCheckToken} />
+
+      <div className="extensions-group">
+        <h2 className="extensions-group-title extensions-url-title">URL로 설치</h2>
+        <InstallFromUrl
+          installed={installed}
+          installing={installingIds}
+          onInstall={handleInstall}
+          onVsixInstalled={markInstalled}
+          onError={setError}
+        />
+      </div>
 
       <div className="extensions-group">
         <button

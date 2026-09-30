@@ -98,3 +98,31 @@
   font-size: 0.82rem;
   margin-top: 0.9rem;
 }
+
+.extensions-url-title {
+  margin-bottom: 0.5rem;
+}
+
+.extensions-url-form {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.extensions-url-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.extensions-url-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.extensions-vsix-notes {
+  margin: 0.6rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
