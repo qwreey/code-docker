@@ -32,7 +32,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=20
+WEBMANAGER_ENV_VERSION=21
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -42,7 +42,9 @@ WEBMANAGER_ENV_VERSION=20
 #. 넣지 않고 여기 바로 아래 뒀습니다.
 #WEBMANAGER_ENV_VERSION_DISMISS_PATH=
 
-#. --- 비밀번호 게이트 (선택, 기본 꺼짐) ---
+#. --- 비밀번호 게이트 (권장, 기본 꺼짐) ---
+#. 켜 두기를 권합니다 - 바깥 SSO가 뚫리거나 빠진 경우에도 터미널·파일에 닿는
+#. 길목이 하나 더 잠깁니다.
 #. 설정하면 Terminal/File Manager 탭 전체가 잠기고, 다른 탭의 쓰기(추가/수정/삭제)
 #. 동작에도 비밀번호가 필요해집니다. 반드시 argon2id 해시여야 하며 평문 비밀번호를
 #. 넣으면 안 됩니다 - 컨테이너가 이미 떠 있는 상태에서 아래 명령으로 생성하세요:
@@ -66,14 +68,17 @@ WEBMANAGER_ENV_VERSION=20
 #WEBMANAGER_WEBAUTHN_PATH=/code/.local/share/code-docker/webmanager/webauthn.json
 
 #. --- File Manager ---
-#. 브라우징을 허용할 최상위 경로. 컨테이너 전체를 열어주려면 "/"로.
-#WEBMANAGER_FILES_ROOT=/code
+#. 브라우징을 허용할 최상위 경로. 기본은 컨테이너 전체 - 같은 게이트 뒤의
+#. 터미널로 이미 어디든 읽고 쓸 수 있어서, 좁혀도 지켜 주는 것이 없습니다.
+#WEBMANAGER_FILES_ROOT=/
+#. 처음 열리는 폴더("홈"). 위 경로 안이어야 하고, 아니면 위 경로에서 엽니다.
+#WEBMANAGER_FILES_HOME=/code
 #. 업로드 최대 크기(바이트).
 #WEBMANAGER_FILES_MAX_UPLOAD_BYTES=2147483648
 
 #. --- File share (WebDAV) ---
-#. 다른 기기(파일 탐색기/Finder/Solid Explorer/rclone)에서 위 File Manager와
-#. 같은 트리를 네이티브로 마운트하기 위한 WebDAV 공유입니다. 기본 꺼짐이고,
+#. 다른 기기(파일 탐색기/Finder/Solid Explorer/rclone)에서 /code(아래
+#. WEBMANAGER_WEBDAV_ROOT)를 네이티브로 마운트하기 위한 WebDAV 공유입니다. 기본 꺼짐이고,
 #. 비밀번호가 없으면 켜도 아무것도 서빙하지 않습니다(fail-closed).
 #.
 #. 보통은 이 파일을 건드릴 필요가 없습니다 - webmanager의 "File share" 탭에서
@@ -93,7 +98,8 @@ WEBMANAGER_ENV_VERSION=20
 #. argon2id 해시. 위 WEBMANAGER_AUTH_PASSWORD_HASH와 같은 방법으로 만들고,
 #. 같은 이유로 반드시 작은따옴표로 감싸세요.
 #WEBMANAGER_WEBDAV_PASSWORD_HASH=
-#. 공유할 최상위 경로. 기본값은 WEBMANAGER_FILES_ROOT와 동일합니다 - 드롭박스
+#. 공유할 최상위 경로. 기본 /code - File Manager와 달리 SSO 밖에 있어서
+#. WEBMANAGER_FILES_ROOT를 따라 컨테이너 전체로 넓어지지 않습니다. 드롭박스
 #. 용도로만 쓸 거라면 하위 폴더 하나로 좁히는 편이 안전합니다.
 #WEBMANAGER_WEBDAV_ROOT=
 #. 탭에서 저장한 설정(사용 여부/사용자명/비밀번호 해시)이 들어가는 파일.

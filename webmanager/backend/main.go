@@ -458,10 +458,11 @@ func main() {
 	mux.Handle("DELETE /api/fonts/{id}", gate.RequirePassword(http.HandlerFunc(s.handleDeleteFont)))
 
 	// SECURITY: arbitrary filesystem read/write/delete under
-	// WEBMANAGER_FILES_ROOT (default /code) — webmanager's single largest
+	// WEBMANAGER_FILES_ROOT (default /, the whole container) — webmanager's single largest
 	// risk surface alongside the terminal above and dind. Gated by the
 	// same RequirePassword instance, so the two features share one
 	// password/env var.
+	mux.Handle("GET /api/files/home", gate.RequirePassword(http.HandlerFunc(s.handleFilesHome)))
 	mux.Handle("GET /api/files/list", gate.RequirePassword(http.HandlerFunc(s.handleFilesList)))
 	mux.Handle("GET /api/files/stat", gate.RequirePassword(http.HandlerFunc(s.handleFilesStat)))
 	mux.Handle("GET /api/files/download", gate.RequirePassword(http.HandlerFunc(s.handleFilesDownload)))

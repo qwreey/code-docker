@@ -105,7 +105,7 @@ curl -s https://<code-server 주소>/manifest.json | jq .shortcuts
 
 ## 비밀번호 게이트
 
-> **주의: webmanager는 자체 비밀번호 게이트를 지원합니다(선택 사항, 기본은 꺼짐).**
+> **주의: webmanager는 자체 비밀번호 게이트를 지원합니다(기본은 꺼짐, 켜 두기를 권장).**
 > `WEBMANAGER_AUTH_PASSWORD_HASH` 환경변수에 argon2id로 해시한 비밀번호를 설정하면
 > `/api/auth/unlock`으로 풀기 전까진 접근할 수 없는 라우트가 생깁니다. 잠금은 **마지막
 > 요청 기준 10분**(쓰기 작업 재확인 기준)이며, 게이트를 통과하는 요청마다 다시 밀립니다 —

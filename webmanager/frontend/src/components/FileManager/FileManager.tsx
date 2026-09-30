@@ -138,6 +138,25 @@ export function FileManager({
     setSelected(new Set())
   }, [currentPath])
 
+  // "홈" (path null) is where the backend opens, WEBMANAGER_FILES_HOME; the
+  // root it may browse up to is usually above it (the whole container), so
+  // that one gets a crumb of its own in front.
+  useEffect(() => {
+    let cancelled = false
+    api
+      .get<{ root: string; home: string }>('/files/home')
+      .then(({ root, home }) => {
+        if (cancelled || root === home) return
+        setPathStack((prev) => (prev[0]?.path === null ? [{ label: '루트', path: root }, ...prev] : prev))
+      })
+      .catch(() => {
+        // no way up then - the listing itself still works
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   function openDir(entry: FileEntry) {
     setPathStack((prev) => [...prev, { label: entry.name, path: entry.path }])
   }

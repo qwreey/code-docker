@@ -1,6 +1,10 @@
 package main
 
-import "os"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+)
 
 type Config struct {
 	Addr                 string
@@ -67,9 +71,12 @@ type Config struct {
 	WebAuthnEnabled bool
 	WebAuthnPath    string
 
-	// FilesRoot defaults to /code rather than / — narrower, safer default;
-	// an operator who wants full-container browsing can widen it.
+	// FilesRoot is how far the file manager reaches, the whole container by
+	// default: it sits behind the same gate as the terminal, which already
+	// reads and writes anything, so a narrower root would protect nothing.
+	// FilesHome is where it opens (a path inside FilesRoot, else FilesRoot).
 	FilesRoot           string
+	FilesHome           string
 	FilesMaxUploadBytes string
 
 	// WebDAV* back the File share tab (internal/webdavshare) — a WebDAV
@@ -86,10 +93,10 @@ type Config struct {
 	// took. Left unset (the default), all three come from
 	// WebDAVSettingsPath, which the tab writes.
 	//
-	// WebDAVRoot defaults to FilesRoot rather than being independent: the
-	// two features expose the same tree through different protocols, so
-	// narrowing one and not the other would be surprising. Set it
-	// explicitly to share a subdirectory only.
+	// WebDAVRoot defaults to /code, not to FilesRoot: unlike the file
+	// manager, WebDAV sits outside the outer forward-auth with only its own
+	// password in front, so it doesn't follow FilesRoot out to the whole
+	// container. Set it explicitly to share more, or a subdirectory only.
 	WebDAVEnabled      string
 	WebDAVUsername     string
 	WebDAVPasswordHash string
@@ -183,9 +190,11 @@ func getenv(key, def string) string {
 }
 
 func loadConfig() Config {
-	// filesRoot is read once so WEBMANAGER_WEBDAV_ROOT can default to it
-	// (see the WebDAV* field comments above) instead of repeating /code.
-	filesRoot := getenv("WEBMANAGER_FILES_ROOT", "/code")
+	filesRoot := getenv("WEBMANAGER_FILES_ROOT", "/")
+	filesHome := filepath.Clean(getenv("WEBMANAGER_FILES_HOME", "/code"))
+	if rel, err := filepath.Rel(filepath.Clean(filesRoot), filesHome); err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
+		filesHome = filesRoot
+	}
 
 	return Config{
 		Addr:                 getenv("WEBMANAGER_ADDR", "127.0.0.1:81"),
@@ -234,12 +243,13 @@ func loadConfig() Config {
 		WebAuthnPath:     getenv("WEBMANAGER_WEBAUTHN_PATH", "/code/.local/share/code-docker/webmanager/webauthn.json"),
 
 		FilesRoot:           filesRoot,
+		FilesHome:           filesHome,
 		FilesMaxUploadBytes: getenv("WEBMANAGER_FILES_MAX_UPLOAD_BYTES", "2147483648"),
 
 		WebDAVEnabled:      getenv("WEBMANAGER_WEBDAV_ENABLED", ""),
 		WebDAVUsername:     getenv("WEBMANAGER_WEBDAV_USER", ""),
 		WebDAVPasswordHash: getenv("WEBMANAGER_WEBDAV_PASSWORD_HASH", ""),
-		WebDAVRoot:         getenv("WEBMANAGER_WEBDAV_ROOT", filesRoot),
+		WebDAVRoot:         getenv("WEBMANAGER_WEBDAV_ROOT", "/code"),
 		WebDAVSettingsPath: getenv("WEBMANAGER_WEBDAV_SETTINGS_PATH", "/code/.local/share/code-docker/webmanager/webdav.json"),
 
 		TerminalSettingsPath: getenv("WEBMANAGER_TERMINAL_SETTINGS_PATH", "/code/.local/share/code-docker/webmanager/terminal-settings.json"),

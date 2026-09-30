@@ -36,10 +36,16 @@ func writeFilesError(w http.ResponseWriter, err error) {
 	}
 }
 
+// handleFilesHome says where the file manager opens and how far up it can
+// go, so it can offer the way up from the one to the other.
+func (s *Server) handleFilesHome(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"root": s.cfg.FilesRoot, "home": s.cfg.FilesHome})
+}
+
 func (s *Server) handleFilesList(w http.ResponseWriter, r *http.Request) {
 	p := r.URL.Query().Get("path")
 	if p == "" {
-		p = s.cfg.FilesRoot
+		p = s.cfg.FilesHome
 	}
 	entries, err := files.List(s.cfg.FilesRoot, p)
 	if err != nil {
