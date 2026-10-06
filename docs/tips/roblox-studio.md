@@ -155,6 +155,7 @@ code-docker 안의 Rojo 프로젝트 폴더에서 `studio-sync`를 실행하면 
 ```sh
 studio-sync                     # default.project.json, owner = git 브랜치 이름
 studio-sync path/to/x.project.json --owner my-task --json
+studio-sync --release           # 내 owner 표시만 지움(인스턴스는 그대로)
 ```
 
 ```
@@ -163,7 +164,7 @@ owned: ReplicatedStorage.Shared, ServerScriptService.Server
 ```
 
 - **프로젝트가 핀한 rojo를 그대로 씁니다.** 싱크하는 동안만 그 프로젝트의 `rojo serve`(mise나 PATH가 고른 버전)를 띄웠다가 끕니다. 저장소에는 아무것도 쓰지 않습니다. Studio 쪽 플러그인은 Rojo 플러그인 원본을 그대로 묶은 것이라 Rojo 프로토콜 5(7.7.0 이상)의 서버와 맞습니다.
-- **여러 에이전트가 같은 Studio를 씁니다.** 싱크한 최상위 인스턴스(서비스 바로 아래)에 `AgentOwner` 속성이 붙고, 다른 owner가 붙은 곳을 바꾸게 되는 싱크는 거부됩니다(종료 코드 1). 동시에 실행하면 차례로 처리됩니다. Studio MCP의 안내문도 에이전트에게 같은 규칙을 알려 줍니다.
+- **여러 에이전트가 같은 Studio를 씁니다.** 싱크한 최상위 인스턴스(서비스 바로 아래)에 `AgentOwner` 속성이 붙고, 다른 owner가 붙은 곳을 바꾸게 되는 싱크는 거부됩니다(종료 코드 1). 동시에 실행하면 차례로 처리됩니다. 작업을 끝낸 에이전트는 `studio-sync --release`로 자기 표시를 풀어 다른 에이전트가 이어받게 할 수 있습니다. Studio MCP의 안내문도 에이전트에게 같은 규칙을 알려 줍니다.
 - **필요한 것:** Studio가 실행 중이고 플레이스가 열려 있어야 합니다. 플러그인은 `studio` 컨테이너가 부팅할 때 설치되고, Studio는 플러그인을 시작할 때만 읽으므로 처음 한 번은 Studio를 다시 시작해야 합니다. 끄려면 `.env`에 `STUDIO_SYNC_PLUGIN=false`.
 - **사람이 쓰는 실시간 싱크**는 지금처럼 Rojo 플러그인으로 하면 됩니다. `rojo serve --address 0.0.0.0`(포트 34872~34879)으로 띄우고 Studio에서 호스트 `studio-front`로 연결합니다(`studio-front`가 code-docker로 넘겨줍니다).
 
