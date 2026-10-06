@@ -436,6 +436,17 @@ GET으로 내려받는 파일은 항상 `Content-Disposition: attachment`로 응
 자체는 게이트하지 않습니다), 목록 조회는 Terminal/Files/Logs와 동급으로 탭
 전체가 비밀번호 게이트 대상입니다.
 
+### Providers (붙인 프로젝트의 페이지)
+
+`EXTRA_INCLUDE`로 붙인 사이드 프로젝트가 자기 관리 페이지를 내주면(예:
+code-docker-chrome의 포트 포워딩 관리), 사이드바 맨 아래 **Providers** 묶음에 그
+프로젝트가 정한 이름으로 탭이 생깁니다. 붙인 프로젝트가 없으면 이 묶음 자체가
+보이지 않습니다. 기본 탭들과 따로 두는 이유는, 이 탭들은 webmanager 기능이 아니라
+붙인 프로젝트의 것이고 그 프로젝트를 떼면 같이 사라지기 때문입니다(그래서 드래그
+순서 저장에도 들어가지 않습니다). 탭 전체가 비밀번호 게이트 대상이고, 설정 방법은
+[webmanager-config.md#프로바이더-페이지](webmanager-config.md#프로바이더-페이지-webmanager_provider_)
+참고.
+
 ---
 
 git-lfs 는 `config/build/build.default.sh`에 포함되어 기본으로 설치됩니다(패키지 설치만 —
@@ -445,7 +456,7 @@ git-lfs 는 `config/build/build.default.sh`에 포함되어 기본으로 설치�
 
 webmanager는 자체 비밀번호 게이트를 지원합니다(선택 사항, 기본은 꺼짐) — 원칙은
 **조회(읽기)는 그대로 열어두고, 변경(쓰기)만 게이트**이며, Terminal/파일 탭/Logs/
-Sessions/File share/Supervisor의 프로그램별 로그 조회, Claude Code 탭 안의 대화 세션
+Sessions/File share/Providers 탭/Supervisor의 프로그램별 로그 조회, Claude Code 탭 안의 대화 세션
 로그 서브탭(Projects 탭 상세 시트에서 프로젝트로 필터링해 재사용하는 곳 포함)은 조회까지
 통째로 게이트됩니다. 켜는 방법
 (해시 생성, `WEBMANAGER_AUTH_PASSWORD_HASH` 설정)과 전체 동작 방식은

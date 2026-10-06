@@ -267,7 +267,7 @@ externally-spilled tool-result files are out of scope for v1. A shared
 password gate (`internal/authgate` — see `.claude/archive/authgate-plan-done.md` for
 the full list of what it gates; principle is reads-stay-open/writes-gated,
 with Terminal/File Manager/Logs/Sessions/Supervisor-log-view/Claude-session-log
-gated entirely), a file
+and provider pages gated entirely), a file
 manager, a File share tab (`internal/webdavshare` — the same tree over
 WebDAV so a phone/desktop file browser can mount it; off by default and
 fail-closed, with its own Basic auth password deliberately separate from
@@ -523,6 +523,56 @@ lowest-priority tier, scope needs to be discussed with the repo owner
 before starting — several open questions in the doc, e.g. whether grid-view
 thumbnails conflict with the existing file manager's deliberate no-thumbnails
 decision).
+
+## Provider pages (contract for sibling projects)
+
+A project attached through `EXTRA_INCLUDE` can show its own small management
+page as a webmanager tab (`internal/providers`, `components/ProviderEmbed/`).
+The browser can reach only code-docker's nginx, never a container on
+`code-docker-internal`, so webmanager reverse-proxies the page.
+
+- **Declare** it from the project's compose overlay, on the `code-docker`
+  service: `WEBMANAGER_PROVIDER_<ID>="<Title>|<URL>"`. `<ID>` must match
+  `[A-Z0-9_]+`; the tab id is `<ID>` lowercased with `_` → `-`. One env var
+  per provider, because two overlays merging into one shared key would
+  overwrite each other. Parsed once at startup: a change needs the
+  container recreated (`up -d`), not a webmanager restart.
+- **URL**: `http`/`https` only, host a single-label name (the container's
+  name on `code-docker-internal`) or an IP literal, no credentials. Anything
+  else is skipped with a log line - this is what keeps webmanager from
+  becoming a proxy to arbitrary internet sites. An empty value switches the
+  entry off (also logged).
+- **Routes**: `GET /api/providers` → `[{"id","title"}]` (open read, `[]`
+  when none). `/providers/<id>/...` (browser: `/manager/providers/<id>/...`)
+  proxies to `<URL>` with the `/providers/<id>` prefix stripped, query kept,
+  WebSocket upgrades passed through, GET/POST/PUT/PATCH/DELETE only. The bare
+  `/providers/<id>` redirects to the trailing-slash form. Unknown id → 404,
+  unreachable provider → 502, body over the shared 1 MiB cap → 413.
+- **Gate**: the whole proxy is behind `authgate` (reads included, like
+  Terminal/Files), and the tab is wrapped in `<RequiresUnlock>`. A request
+  made while locked gets 401 JSON from webmanager, not from the provider.
+- **Write the page with relative URLs only** (`api/forwards`, never
+  `/api/forwards`): the page is served under a prefix the provider can't
+  see. The prefix is passed as `X-Forwarded-Prefix: /manager/providers/<id>/`
+  for anything that must be absolute; `X-Forwarded-Host` and
+  `X-Forwarded-For` (the real client IP) are set too.
+- **No cookies or credentials, either direction**: `Cookie`,
+  `Authorization`, `Proxy-Authorization` and `X-Real-IP` are dropped on the
+  way in, `Set-Cookie` on the way out. The page shares webmanager's origin,
+  so a cookie it set would land on every `/manager/` path.
+- **Trust**: same-origin also means the page's scripts can call
+  webmanager's own API with the user's unlock. A provider is trusted exactly
+  as much as the compose overlay that declared it - which already has host
+  access - so this is not a sandbox, and must not be offered as one.
+- **Layout**: the iframe is full-bleed with no padding (same box as the
+  router tabs, `RouterFrame.css`); the page brings its own padding and
+  background. Theme changes are posted to it as
+  `{source: 'code-docker-webmanager', type: 'theme', theme}` (`theme` is
+  `light`/`dark`/`system`) on load and on each change; listening is optional.
+- **Navigation**: provider tabs form their own "Providers" group under the
+  built-in tabs, outside the drag-reorder list - they come from attached
+  projects, exist only while that overlay is included, and carry the
+  project's own title. SPA path `/manager/provider-<id>`.
 
 ## Ground rules
 

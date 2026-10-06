@@ -63,6 +63,39 @@ curl -s https://<code-server 주소>/manifest.json | jq .shortcuts
   충전 중 + Wi-Fi 조건까지 붙습니다. 바로 안 보인다고 설정이 틀린 게 아닙니다 —
   위 `curl`로 매니페스트부터 확인하세요.
 
+## 프로바이더 페이지 (`WEBMANAGER_PROVIDER_*`)
+
+붙인 사이드 프로젝트의 관리 페이지를 webmanager 탭으로 띄웁니다
+([webmanager.md#providers](webmanager.md#providers-붙인-프로젝트의-페이지)). 보통은 그
+프로젝트의 compose 오버레이가 `code-docker` 서비스의 `environment:`에 직접 선언하므로
+손으로 넣을 일은 드뭅니다.
+
+```sh
+WEBMANAGER_PROVIDER_CHROME="Chrome ports|http://chrome-front:8090/"
+#                   ^^^^^^  탭 이름     |주소
+```
+
+- 키 이름의 `WEBMANAGER_PROVIDER_` 뒷부분(`[A-Z0-9_]`만)이 **아이디**가 됩니다(소문자,
+  `_`는 `-`). 항목마다 키를 따로 두는 이유는 PWA 바로가기와 같습니다 — 여러 프로젝트가
+  동시에 붙어도 서로 덮어쓰지 않게.
+- 주소는 `http`/`https`이고 호스트가 **점 없는 이름(`code-docker-internal`의 컨테이너
+  이름)이나 IP**여야 합니다. `example.com` 같은 도메인은 거부됩니다 — webmanager가 아무
+  인터넷 사이트로나 가는 프록시가 되지 않게 하려는 제한입니다.
+- 브라우저는 그 컨테이너에 직접 닿지 못하므로 webmanager가 `/manager/providers/<아이디>/`
+  아래로 중계합니다. 이 경로는 **조회까지 전부 [비밀번호 게이트](#비밀번호-게이트)
+  대상**이고(이 페이지들은 무언가를 바꾸는 페이지입니다), webmanager의 쿠키나 인증
+  헤더는 프로바이더에 전달되지 않습니다.
+- 형식이 틀리거나 주소가 거부되면 그 항목만 건너뛰고 **이유가 webmanager 로그에
+  남습니다**. 값을 비우면 그 항목만 꺼집니다. 환경 변수라 바꾼 뒤엔
+  `docker compose up -d`가 필요합니다.
+- 프로바이더 페이지는 webmanager와 같은 origin에서 돌기 때문에 webmanager와 같은 권한을
+  가집니다 — 믿는 프로젝트만 붙이세요(compose 오버레이를 붙인다는 것 자체가 이미 그만큼의
+  신뢰입니다).
+
+페이지를 만드는 쪽(상대 경로만 쓸 것, 넘겨주는 헤더, 쿠키 불가, 테마 메시지)의 규칙은
+[`webmanager/CLAUDE.md`의 "Provider pages"](../webmanager/CLAUDE.md#provider-pages-contract-for-sibling-projects)에
+있습니다.
+
 ## 마이그레이션 (env-migrate)
 
 **이미지를 업데이트했는데 `example-env.webmanager`의 키가 추가/삭제됐다면**,
