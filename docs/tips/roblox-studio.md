@@ -189,7 +189,7 @@ studio ──▶ studio-front (별칭 code-docker) ──▶ code-docker:34872-3
 studio ◀── studio-front (별칭 studio)      ◀── code-docker → studio:8787 (MCP)
 ```
 
-- **이유:** Studio는 플러그인이나 스크립트가 `HttpService`로 헤더까지 마음대로 정한 요청을 보낼 수 있는 컨테이너입니다. `code-docker-internal`에 붙어 있으면 code-docker의 nginx(로그인 없는 code-server, 기본값으로 로그인 없는 webmanager)와 인증 없는 `dind:2375`에 그대로 닿습니다(2026-10-06 실측). 툴박스 플러그인이나 모델 하나가 곧 code-docker 탈취 경로가 됩니다.
+- **이유:** Studio는 플러그인이나 스크립트가 `HttpService`로 헤더까지 마음대로 정한 요청을 보낼 수 있는 컨테이너입니다. `code-docker-internal`에 붙어 있으면 code-docker의 nginx(로그인 없는 code-server, 기본값으로 로그인 없는 webmanager)와 인증 없는 `dind:2375`에 그대로 닿습니다. 툴박스 플러그인이나 모델 하나가 곧 code-docker 탈취 경로가 됩니다.
 - **넘어가는 것:** code-docker → Studio는 MCP(8787) 하나, Studio → code-docker는 `STUDIO_CODE_DOCKER_PORTS`(`.env`, 기본 `34872-34881 3667`)뿐입니다. 34872~34879는 일반 `rojo serve`, 34880~34881은 [studio-sync](#rojo-프로젝트를-studio에-넣기-studio-sync), 3667은 luau-lsp Studio 플러그인용입니다. 공백으로 구분하고 범위는 `시작-끝`으로 씁니다. 바꾼 뒤엔 `docker compose up -d studio-front`.
 - **Studio 쪽 설정은 그대로입니다.** `studio-front`가 Studio 망에서 `code-docker`라는 이름을 갖고 있어서, Rojo 플러그인이나 luau-lsp 플러그인의 호스트를 `code-docker`로 두면 됩니다.
 - **code-docker 쪽 서버는 컨테이너 바깥에서 받아야 합니다.** `rojo serve --address 0.0.0.0`처럼 루프백이 아닌 주소에 바인딩해야 `studio-front`가 닿습니다.
