@@ -2130,7 +2130,19 @@ export function Terminal({
     // works. This is why installing webmanager as a PWA is tracked as a
     // to-do for the repo owner (root TODO.md) rather than something to
     // build here.
+    //
+    // Ctrl+Backspace sends ^W (delete word backward), as VS Code's terminal
+    // does. xterm's own encoding is ^H, which every shell here reads as a
+    // plain one-character backspace (fish binds ctrl-h to
+    // backward-delete-char), so the chord did nothing a Backspace didn't.
     term.attachCustomKeyEventHandler((event) => {
+      if (event.ctrlKey && !event.altKey && !event.metaKey && event.key === 'Backspace') {
+        if (event.type === 'keydown') {
+          event.preventDefault()
+          term.input('\x17')
+        }
+        return false
+      }
       if (event.type === 'keydown' && event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === 'w') {
         event.preventDefault()
       }
