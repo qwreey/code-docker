@@ -180,6 +180,20 @@ studio-output -n 200 --no-follow --level warning
 - MCP 브리지와 같은 포트·토큰(`studio:8787`, `MCP_TOKEN`)을 거칩니다. `MCP_TOKEN`이 비어 있으면(브리지를 꺼 두면) 쓸 수 없습니다.
 - 여러 에이전트가 같은 Studio를 쓰면 모두의 출력이 섞여 나옵니다.
 
+## VS Code에서 `game.Workspace.` 자동완성 (luau-lsp)
+
+luau-lsp VS Code 확장은 Studio의 실제 DataModel을 받아 `game.Workspace.Foo...` 같은 경로를 자동완성할 수 있습니다. 그 데이터를 보내는 Studio 플러그인은 roblox-studio-docker가 이미 설치해 두고, `studio-front`를 거쳐 code-docker의 3667 포트로 보냅니다.
+
+VS Code(code-server) 쪽에서 할 일:
+
+1. 확장 `JohnnyMorganz.luau-lsp`를 설치합니다(Open VSX).
+2. 설정에 `"luau-lsp.studioPlugin.enabled": true`를 넣습니다. 포트는 기본값 3667 그대로 둡니다.
+3. VS Code 창이 열려 있으면 Studio 플러그인이 10초 안에 알아서 연결합니다. Studio의 Output에 `[Luau LSP] INFO: Successfully connected`가 보이면 됩니다(`studio-output`으로 확인할 수 있습니다).
+
+- 확장의 서버는 VS Code 창이 열려 있는 동안만 있습니다. 창을 닫았다 열어도 플러그인이 다시 붙습니다.
+- 플러그인은 설정을 플레이스마다 `TestService.LuauLSP_Settings` 모듈로 만들어 둡니다(업스트림 동작). 이 모듈은 플레이스와 함께 저장되고 호스트가 `studio-front`로 들어가 있으니, 이 환경 밖으로 가져가는 플레이스에서는 지워도 됩니다.
+- 끄려면 `.env`에 `STUDIO_LUAU_LSP_PLUGIN=false`.
+
 ## 격리 구조
 
 읽지 않아도 쓰는 데 지장은 없지만, 왜 이렇게 생겼는지 궁금하거나 네트워크를 손볼 일이 있다면 참고하세요.
@@ -249,7 +263,7 @@ networks:
 - **예전에 `vnc-only:5900`(또는 `:6080`)으로 등록한 VNC 대상/forward가 연결 안 됨** - 별칭이 `roblox-studio-vnc`로 바뀌었습니다(2026-09-22). VNC 탭에서 그 대상을 편집해 호스트를 `roblox-studio-vnc`로 바꾸고, Net 관리의 forward도 마찬가지로 고치세요. `migrate.sh`가 allowlist에 새 이름을 더해 주므로 `.env.router`는 따로 손댈 필요가 없습니다(남아 있는 `vnc-only`는 지워도 됩니다).
 - **forward를 추가했는데 접속이 안 됨** - `code-docker-netinit-docker` 로그에서 `roblox-studio-vnc`에 대한 DOCKER-USER 예외가 실제로 걸렸는지 보세요. 그 네트워크에 `netinit.exempt-forward: "true"` 라벨이 있는지가 가장 흔한 원인입니다.
 - **Studio의 Rojo(또는 luau-lsp) 플러그인이 연결 안 됨** - 플러그인의 호스트가 `code-docker`가 아니라 `studio-front`인지 먼저 보세요(Studio 망에는 `code-docker`라는 이름이 없습니다). 그다음 포트가 `STUDIO_CODE_DOCKER_PORTS` 안에 있는지(`docker compose logs studio-front` 첫 줄에 넘기는 포트가 나옵니다), code-docker 쪽 서버가 루프백이 아닌 주소에 바인딩했는지(`rojo serve --address 0.0.0.0`) 보세요. `docker compose exec studio curl -s http://studio-front:34872/api/rojo`로 Studio 쪽에서 직접 확인할 수 있습니다.
-- **`studio-sync`가 `no Studio picked this up`으로 끝남** - Studio가 플레이스를 연 상태인지, 플러그인이 설치됐는지(`docker compose exec studio cat /var/log/studio-sync-plugin/stdout.log`), 설치 뒤 Studio를 다시 시작했는지 보세요. Studio 쪽 플러그인이 `code-docker`에 HTTP를 보내도 되는지 묻는 창이 VNC에 떠 있을 수도 있습니다.
+- **`studio-sync`가 `no Studio picked this up`으로 끝남** - Studio가 플레이스를 연 상태인지, 플러그인이 설치됐는지(`docker compose exec studio cat /var/log/studio-plugins/stdout.log`), 설치 뒤 Studio를 다시 시작했는지 보세요. Studio 쪽 플러그인이 `code-docker`에 HTTP를 보내도 되는지 묻는 창이 VNC에 떠 있을 수도 있습니다.
 - **MCP가 연결 안 됨** - 순서대로:
 
   ```sh
