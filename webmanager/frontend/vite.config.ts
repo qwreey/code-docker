@@ -19,6 +19,13 @@ export default defineConfig(({ mode, command }) => {
           changeOrigin: true,
           ws: true,
         },
+        // Provider pages (backend internal/providers) live beside /api, not
+        // under it.
+        '/providers': {
+          target: proxyTarget,
+          changeOrigin: true,
+          ws: true,
+        },
       },
     },
   }

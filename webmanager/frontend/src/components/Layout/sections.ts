@@ -23,6 +23,21 @@ export type SectionId =
   | 'file-share'
   | 'sessions'
 
+// A provider page's tab (components/ProviderEmbed). Not part of SectionId:
+// the set comes from GET /api/providers at runtime, not from this file. The
+// "provider-" prefix keeps it off the backend's /providers/<id>/ proxy path,
+// so a reload of /manager/provider-<id> still lands on the SPA.
+export type ProviderSectionId = `provider-${string}`
+export type ActiveId = SectionId | ProviderSectionId
+
+export function providerSectionId(providerId: string): ProviderSectionId {
+  return `provider-${providerId}`
+}
+
+export function providerIdOf(id: ActiveId): string | null {
+  return id.startsWith('provider-') ? id.slice('provider-'.length) : null
+}
+
 export interface SectionMeta {
   id: SectionId
   label: string

@@ -21,6 +21,7 @@ import (
 	"webmanager/internal/mise"
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
+	"webmanager/internal/providers"
 	"webmanager/internal/sessionheartbeat"
 	"webmanager/internal/supervisor"
 	"webmanager/internal/termsession"
@@ -188,6 +189,7 @@ func main() {
 		}),
 		envTemplateVersion: envTemplateVersion,
 		extSources:         extensions.DefaultSources(),
+		providers:          providers.FromEnv(),
 	}
 
 	mux := http.NewServeMux()
@@ -498,6 +500,23 @@ func main() {
 	// /api and also ungated — it is a redirect to a hostname this container
 	// was configured with, and the target's own auth is untouched.
 	mux.HandleFunc("GET /goto/{id}", s.handleGoto)
+
+	// Provider pages (internal/providers): a sibling project's own page,
+	// reverse-proxied from code-docker-internal. The list is an open read;
+	// the proxy is gated entirely, reads included, like Terminal and Files -
+	// these pages change things, and every request they make comes back
+	// through here.
+	//
+	// One pattern per method rather than a method-less "/providers/{id}/":
+	// ServeMux rejects that next to "GET /" as ambiguous (see webdavRouter).
+	// On the mux rather than ahead of it, so limitRequestBody's cap applies
+	// here the same as everywhere else.
+	mux.HandleFunc("GET /api/providers", s.handleListProviders)
+	providerProxy := gate.RequirePassword(s.providers)
+	mux.Handle("GET /providers/{id}", providerProxy)
+	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
+		mux.Handle(method+" /providers/{id}/", providerProxy)
+	}
 
 	mux.Handle("GET /", staticHandler(cfg.StaticDir))
 

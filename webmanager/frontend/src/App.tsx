@@ -3,8 +3,10 @@ import { CollapseChevron } from './components/common/CollapseChevron'
 import { FileManagerDialog } from './components/FileManager/FileManagerDialog'
 import { ProjectInfoDialog } from './components/Projects/ProjectInfoDialog'
 import { SidebarContainer } from './components/Layout/SidebarContainer'
-import { SECTIONS } from './components/Layout/sections'
-import type { SectionId } from './components/Layout/sections'
+import { providerIdOf, SECTIONS } from './components/Layout/sections'
+import type { ActiveId, SectionId } from './components/Layout/sections'
+import { ProviderFrame } from './components/ProviderEmbed/ProviderFrame'
+import { useProviders } from './components/ProviderEmbed/useProviders'
 import { Supervisor } from './components/Supervisor/Supervisor'
 import { SshKeys } from './components/SshKeys/SshKeys'
 import { GitConfig } from './components/GitConfig/GitConfig'
@@ -41,6 +43,12 @@ const FileManager = lazy(() =>
 
 function isSectionId(v: string | null): v is SectionId {
   return SECTIONS.some((s) => s.id === v)
+}
+
+// A provider tab is recognized by shape alone here - whether that provider
+// exists is only known once GET /api/providers answers (see the render).
+function isActiveId(v: string | null): v is ActiveId {
+  return isSectionId(v) || (v !== null && v.length > 'provider-'.length && v.startsWith('provider-'))
 }
 
 // Client-side-only UI preference (per webmanager/CLAUDE.md's ground rules) -
@@ -82,6 +90,11 @@ const IFRAME_SECTIONS = new Set<SectionId>([
   'router-settings',
 ])
 
+// Provider tabs (ProviderFrame) are iframes too.
+function isIframeSection(id: ActiveId): boolean {
+  return IFRAME_SECTIONS.has(id as SectionId) || providerIdOf(id) !== null
+}
+
 // Splits pathname into {root, section} the same way router-docker's own frontend/'s own
 // App.tsx does (see its splitPath doc comment for the full reasoning) - only
 // looks at the last path segment, so this works unmodified whether the
@@ -90,10 +103,10 @@ const IFRAME_SECTIONS = new Set<SectionId>([
 // webmanager are separate Vite apps with genuinely different Tab/SectionId
 // types - see root CLAUDE.md's "sidebar reuse" note on why a shared UI
 // package would need real work, not just moving this one function.
-function splitPath(pathname: string): { root: string; section: SectionId | null } {
+function splitPath(pathname: string): { root: string; section: ActiveId | null } {
   const segments = pathname.split('/')
   const last = segments[segments.length - 1] || null
-  if (isSectionId(last)) {
+  if (isActiveId(last)) {
     return { root: segments.slice(0, -1).join('/') + '/', section: last }
   }
   return { root: pathname.endsWith('/') ? pathname : pathname + '/', section: null }
@@ -123,7 +136,10 @@ function App() {
   const initialSplit = useMemo(() => splitPath(window.location.pathname), [])
   const initialQuery = useMemo(() => new URLSearchParams(window.location.search), [])
   const rootPath = initialSplit.root
-  const [active, setActiveState] = useState<SectionId>(() => initialSplit.section ?? 'supervisor')
+  const [active, setActiveState] = useState<ActiveId>(() => initialSplit.section ?? 'supervisor')
+  const providers = useProviders()
+  const activeProviderId = providerIdOf(active)
+  const activeProvider = providers?.find((p) => p.id === activeProviderId)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed)
   // Which way the sidebar last moved, or null before the first toggle of
@@ -144,7 +160,7 @@ function App() {
     setSidebarShift(next ? 'out' : 'in')
   }
 
-  function setActive(id: SectionId) {
+  function setActive(id: ActiveId) {
     setActiveState(id)
     window.history.pushState(null, '', rootPath + id)
   }
@@ -348,11 +364,12 @@ function App() {
       {!EMBED && (
       <SidebarContainer
         active={active}
-        onSelect={(id) => (IFRAME_SECTIONS.has(id) ? setActive(id) : withViewTransition(() => setActive(id)))}
+        onSelect={(id) => (isIframeSection(id) ? setActive(id) : withViewTransition(() => setActive(id)))}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={toggleSidebarCollapsed}
+        providers={providers}
       />
       )}
       {/* EnvVersionBanner lives here, above .app-content rather than inside
@@ -468,6 +485,22 @@ function App() {
           {active === 'sessions' && (
             <RequiresUnlock>
               <Sessions />
+            </RequiresUnlock>
+          )}
+          {/* Whole-tab gate: the backend gates every /providers/ request,
+              the page itself included, so an ungated frame would just load
+              a 401. */}
+          {activeProviderId !== null && (
+            <RequiresUnlock>
+              {providers === null ? (
+                <Skeleton />
+              ) : activeProvider ? (
+                <ProviderFrame key={activeProvider.id} id={activeProvider.id} title={activeProvider.title} />
+              ) : (
+                <p className="empty-state">
+                  '{activeProviderId}' provider가 설정되어 있지 않습니다 (WEBMANAGER_PROVIDER_* 환경 변수 확인).
+                </p>
+              )}
             </RequiresUnlock>
           )}
           {/* Last, so a section's own :first-child/only-child layout never

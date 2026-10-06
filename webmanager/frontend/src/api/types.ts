@@ -833,3 +833,10 @@ export interface GitWorktree {
   prunable: boolean
   prunableReason?: string
 }
+
+// Mirrors internal/providers.Info (GET /api/providers) - one provider page
+// declared through WEBMANAGER_PROVIDER_<ID>. The target URL stays server-side.
+export interface ProviderInfo {
+  id: string
+  title: string
+}

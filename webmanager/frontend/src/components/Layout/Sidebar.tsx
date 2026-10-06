@@ -49,6 +49,16 @@ interface SidebarProps {
   // actually visible until it's already correct, so no row ever visibly
   // shifts.
   loading?: boolean
+  // Labeled lists below the main one, for items that come and go with
+  // configuration rather than being part of the app itself (webmanager's
+  // provider pages). Not draggable and outside `order`: a saved position
+  // for an item that may be gone next restart would only be stale state.
+  groups?: SidebarGroup[]
+}
+
+export interface SidebarGroup {
+  label: string
+  items: SidebarItem[]
 }
 
 // Applies a persisted id order on top of the current items list: known ids
@@ -87,6 +97,7 @@ export function Sidebar({
   collapsed,
   onToggleCollapsed,
   loading,
+  groups,
 }: SidebarProps) {
   const sections = order.length > 0 ? reconcileOrder(items, order) : items
   const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -176,6 +187,35 @@ export function Sidebar({
               )
             })}
           </ul>
+          {groups
+            ?.filter((group) => group.items.length > 0)
+            .map((group) => (
+              <div key={group.label} className="sidebar-group">
+                <div className="sidebar-group-label">{group.label}</div>
+                <ul className="sidebar-list">
+                  {group.items.map((item) => {
+                    const ItemIcon = item.icon
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          className={'sidebar-item' + (item.id === active ? ' sidebar-item-active' : '')}
+                          onClick={() => {
+                            onSelect(item.id)
+                            onClose()
+                          }}
+                        >
+                          <span className="sidebar-icon-slot">
+                            <ItemIcon size={16} className="sidebar-item-icon" aria-hidden="true" />
+                          </span>
+                          <span>{item.label}</span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ))}
           <div
             className={'sidebar-skeleton-overlay' + (loading ? '' : ' sidebar-skeleton-overlay-hidden')}
             aria-hidden="true"

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   Activity,
+  Blocks,
   Bot,
   Container,
   FileText,
@@ -26,12 +27,12 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { api, errorMessage } from '../../api/client'
-import type { SidebarOrder } from '../../api/types'
+import type { ProviderInfo, SidebarOrder } from '../../api/types'
 import { Logo } from '../common/Logo'
 import { useTailscaleEnabled } from '../RouterEmbed/useTailscaleEnabled'
 import { SECTIONS } from './sections'
-import type { SectionId } from './sections'
-import { Sidebar, type SidebarItem } from './Sidebar'
+import { providerSectionId, type ActiveId, type SectionId } from './sections'
+import { Sidebar, type SidebarGroup, type SidebarItem } from './Sidebar'
 import { SidebarFooter } from './SidebarFooter'
 
 // webmanager's own wiring for the generic Sidebar component (see
@@ -74,8 +75,16 @@ const ITEMS: SidebarItem[] = SECTIONS.map((s) => ({
 }))
 
 interface SidebarContainerProps {
-  active: SectionId
-  onSelect: (id: SectionId) => void
+  active: ActiveId
+  onSelect: (id: ActiveId) => void
+  // GET /api/providers, null while loading. Rendered as their own group
+  // below the built-in tabs rather than mixed into them: a provider is an
+  // attached project's page, not a webmanager feature, it exists only
+  // while that project's compose overlay is included, and its title is
+  // whatever the project chose - keeping them apart says where each tab
+  // comes from, and keeps a provider that is gone next restart out of the
+  // persisted drag order.
+  providers: ProviderInfo[] | null
   open: boolean
   onClose: () => void
   collapsed: boolean
@@ -89,6 +98,7 @@ export function SidebarContainer({
   onClose,
   collapsed,
   onToggleCollapsed,
+  providers,
 }: SidebarContainerProps) {
   const [order, setOrder] = useState<string[]>([])
   // TAILSCALE_ENABLED=false (router's own env, see docs/router.md#tailscale)
@@ -99,6 +109,13 @@ export function SidebarContainer({
   // hidden until this resolves either way (see Sidebar.tsx's `loading` prop).
   const tailscaleEnabled = useTailscaleEnabled()
   const items = tailscaleEnabled === false ? ITEMS.filter((i) => i.id !== 'tailscale') : ITEMS
+
+  const groups: SidebarGroup[] = [
+    {
+      label: 'Providers',
+      items: (providers ?? []).map((p) => ({ id: providerSectionId(p.id), label: p.title, icon: Blocks })),
+    },
+  ]
 
   useEffect(() => {
     api
@@ -128,12 +145,13 @@ export function SidebarContainer({
       order={order}
       onReorder={handleReorder}
       active={active}
-      onSelect={(id) => onSelect(id as SectionId)}
+      onSelect={(id) => onSelect(id as ActiveId)}
       open={open}
       onClose={onClose}
       collapsed={collapsed}
       onToggleCollapsed={onToggleCollapsed}
-      loading={tailscaleEnabled === null}
+      loading={tailscaleEnabled === null || providers === null}
+      groups={groups}
     />
   )
 }

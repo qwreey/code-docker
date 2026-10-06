@@ -13,6 +13,7 @@ import (
 	"webmanager/internal/mise"
 	"webmanager/internal/procinfo"
 	"webmanager/internal/projects"
+	"webmanager/internal/providers"
 	"webmanager/internal/sessionheartbeat"
 	"webmanager/internal/supervisor"
 	"webmanager/internal/termsession"
@@ -55,6 +56,9 @@ type Server struct {
 	// serving /webdav/ itself — it holds the live config, so a change made
 	// in the tab takes effect on the next request with no restart.
 	webdav *webdavshare.Service
+	// providers backs GET /api/providers and the /providers/<id>/ reverse
+	// proxy, parsed once from WEBMANAGER_PROVIDER_* at startup.
+	providers *providers.Registry
 
 	// envTemplateVersion is cfg.EnvTemplatePath's WEBMANAGER_ENV_VERSION at
 	// startup ("" if the template was unreadable) — see
