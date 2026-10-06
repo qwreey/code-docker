@@ -167,6 +167,19 @@ owned: ReplicatedStorage.Shared, ServerScriptService.Server
 - **필요한 것:** Studio가 실행 중이고 플레이스가 열려 있어야 합니다. 플러그인은 `studio` 컨테이너가 부팅할 때 설치되고, Studio는 플러그인을 시작할 때만 읽으므로 처음 한 번은 Studio를 다시 시작해야 합니다. 끄려면 `.env`에 `STUDIO_SYNC_PLUGIN=false`.
 - **사람이 쓰는 실시간 싱크**는 지금처럼 Rojo 플러그인으로 하면 됩니다. `rojo serve --address 0.0.0.0`(포트 34872~34879)으로 띄우고 Studio에서 호스트 `studio-front`로 연결합니다(`studio-front`가 code-docker로 넘겨줍니다).
 
+## Studio 출력 보기 (studio-output)
+
+code-docker 안의 터미널(VS Code 터미널 등)에서 `studio-output`을 실행하면 Studio의 Output 창 내용을 보여 주고 계속 따라갑니다(`tail -f`처럼). 편집 모드, 플러그인, 플레이테스트의 서버·클라이언트 출력이 모두 나옵니다.
+
+```sh
+studio-output                                  # 최근 50줄, 이후 계속 따라감
+studio-output -n 200 --no-follow --level warning
+```
+
+- Studio 컨테이너 안에서 Studio 로그 파일의 출력 줄(print/warn/error)만 골라 내보냅니다. 로그의 나머지는 컨테이너 밖으로 나가지 않습니다.
+- MCP 브리지와 같은 포트·토큰(`studio:8787`, `MCP_TOKEN`)을 거칩니다. `MCP_TOKEN`이 비어 있으면(브리지를 꺼 두면) 쓸 수 없습니다.
+- 여러 에이전트가 같은 Studio를 쓰면 모두의 출력이 섞여 나옵니다.
+
 ## 격리 구조
 
 읽지 않아도 쓰는 데 지장은 없지만, 왜 이렇게 생겼는지 궁금하거나 네트워크를 손볼 일이 있다면 참고하세요.
