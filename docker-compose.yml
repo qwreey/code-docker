@@ -23,7 +23,7 @@
 # dev-clone.sh and example-env).
 include:
   - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}
-  - path: "${ROUTER_INCLUDE:-https://github.com/qwreey/router-docker.git#${ROUTER_REF:-v0.1.5}:docker-compose.router.yml}"
+  - path: "${ROUTER_INCLUDE:-https://github.com/qwreey/router-docker.git#${ROUTER_REF:-v0.1.6}:docker-compose.router.yml}"
 
 networks:
   code-docker-internal:
@@ -90,9 +90,12 @@ services:
       args:
         AUTOINSTALL_REF: "${AUTOINSTALL_REF:-v0.1.1}"
         ROUTER_CLIENT_REF: "${ROUTER_CLIENT_REF:-v0.1.0}"
-      # Name resolution can fail if the host uses something like Tailscale,
-      # so we work around this by using the host network only at build time.
-      network: host
+      # No `network: host` on any build here: buildx 0.37.2+ refuses it unless the
+      # network.host entitlement is granted, and `docker compose build` has no way to
+      # grant it. BuildKit's own bridge network already resolves names on a
+      # Tailscale/MagicDNS host (build containers get public DNS, not
+      # 100.100.100.100); a host where that still fails sets "dns" in its
+      # daemon.json, which build containers use too.
     restart: unless-stopped
     # What each of these does, its default, and how to override it lives in
     # example-env (copy it to .env) - kept terse here to avoid documenting the same
@@ -253,7 +256,6 @@ services:
       # Dockerfile's `FROM scratch AS netshare` stage.
       additional_contexts:
         netshare: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF:-v0.1.0}:}netshare"
-      network: host
       # dind (no protection) | dind-authz (default - denies privileged/dangerous-cap/
       # host-namespace/out-of-/code-mount container creation) | dind-authz-remap
       # (dind-authz + userns-remap - not the default, see docs/tips/dind.md's "추가
@@ -376,7 +378,6 @@ services:
       # or the more specific NETINIT_DOCKER_CONTEXT overrides it to build from a local
       # checkout - see example-env.
       context: "${NETINIT_DOCKER_CONTEXT:-${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF:-v0.1.0}:}netinit-docker}"
-      network: host
     network_mode: host
     cap_add:
       - NET_ADMIN
