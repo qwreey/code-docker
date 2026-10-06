@@ -164,14 +164,27 @@
 #   CODE_MEM_LIMIT="4g"
 #CODE_CPU_LIMIT="0"
 #CODE_MEM_LIMIT="0"
+# 스왑은 *_MEMSWAP_LIMIT로 정하는데, 스왑만의 크기가 아니라 메모리+스왑 합계입니다.
+# 예: CODE_MEM_LIMIT="16g" CODE_MEMSWAP_LIMIT="20g" → 스왑 4g. "-1"은 스왑 무제한,
+# "0"(기본값)은 Docker 기본값(스왑 = 메모리 상한만큼, 합계는 그 2배)입니다. 합계가
+# 메모리 상한보다 작으면 컨테이너가 생성되지 않고, *_MEM_LIMIT 없이 이것만 줄 수도
+# 없습니다.
+#
+# 실행 중인 컨테이너에 `docker update --memory`만 주면 생성 때 정해진 합계가 그대로
+# 남아서, 메모리를 늘린 만큼 스왑이 줄다가 합계에 닿으면 0이 됩니다(그 이상은 거부).
+# 여기 값을 바꾸고 `docker compose up -d`로 재생성하세요 - `docker update`로 바꾼
+# 값은 다음 재생성 때 어차피 이 값으로 돌아갑니다.
+#CODE_MEMSWAP_LIMIT="0"
 # 중첩 컨테이너(redis, postgres 등)를 포함해 dind 데몬 전체가 공유하는 상한입니다 -
 # dind 안 컨테이너 하나하나가 아니라 dind 자체의 cgroup에 적용됩니다.
 #DIND_CPU_LIMIT="0"
 #DIND_MEM_LIMIT="0"
+#DIND_MEMSWAP_LIMIT="0"
 # router는 host 80번 포트를 직접 받는 인터넷 대면 컨테이너이므로, 외부
 # 플러딩/DoS가 호스트 자원까지 잠식하지 않도록 이 값도 같이 설정하세요.
 #ROUTER_CPU_LIMIT="0"
 #ROUTER_MEM_LIMIT="0"
+#ROUTER_MEMSWAP_LIMIT="0"
 
 # tailscale, Dev Proxy 노출 정책, router-manager 자체 비밀번호, tinyauth 등
 # router 전용 기능 설정은 router-docker의 example-env.router로 옮겨졌습니다 - router가

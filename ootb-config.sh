@@ -121,15 +121,18 @@ if [ -n "$(get_env_var "$TARGET_DIR/.env" PREFIX)" ]; then
 fi
 
 section "리소스 제한" \
-  .env:CODE_CPU_LIMIT .env:CODE_MEM_LIMIT \
-  .env:DIND_CPU_LIMIT .env:DIND_MEM_LIMIT \
-  .env:ROUTER_CPU_LIMIT .env:ROUTER_MEM_LIMIT
+  .env:CODE_CPU_LIMIT .env:CODE_MEM_LIMIT .env:CODE_MEMSWAP_LIMIT \
+  .env:DIND_CPU_LIMIT .env:DIND_MEM_LIMIT .env:DIND_MEMSWAP_LIMIT \
+  .env:ROUTER_CPU_LIMIT .env:ROUTER_MEM_LIMIT .env:ROUTER_MEMSWAP_LIMIT
 prompt_set .env CODE_CPU_LIMIT "code-docker CPU 제한 (예: 4, 비우면 무제한)"
 prompt_set .env CODE_MEM_LIMIT "code-docker 메모리 제한 (예: 4g, 비우면 무제한)"
+prompt_set .env CODE_MEMSWAP_LIMIT "code-docker 메모리+스왑 합계 (예: 메모리 16g에 20g면 스왑 4g, 비우면 스왑 = 메모리)"
 prompt_set .env DIND_CPU_LIMIT "code-docker-dind CPU 제한 (비우면 무제한)"
 prompt_set .env DIND_MEM_LIMIT "code-docker-dind 메모리 제한 (비우면 무제한)"
+prompt_set .env DIND_MEMSWAP_LIMIT "code-docker-dind 메모리+스왑 합계 (비우면 스왑 = 메모리)"
 prompt_set .env ROUTER_CPU_LIMIT "code-docker-router CPU 제한 (비우면 무제한)"
 prompt_set .env ROUTER_MEM_LIMIT "code-docker-router 메모리 제한 (비우면 무제한)"
+prompt_set .env ROUTER_MEMSWAP_LIMIT "code-docker-router 메모리+스왑 합계 (비우면 스왑 = 메모리)"
 
 section "호스트 바인딩 / 리버스 프록시" \
   .env:ROUTER_HTTP_BIND .env:ROUTER_HTTP_PORT .env:TRUSTED_PROXIES
