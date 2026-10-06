@@ -1435,6 +1435,34 @@ export function Terminal({
     [keepFocus],
   )
 
+  // Ctrl+wheel zooms the terminal instead of the whole page, the same
+  // gesture VS Code's own terminal uses. A trackpad pinch arrives as
+  // ctrlKey wheel events too, so it gets the same treatment. Capture phase
+  // on the container, so it runs before any of xterm's own wheel listeners
+  // (mouse report / alt-screen arrow keys / scrollback) on the elements
+  // inside it, and non-passive so preventDefault can stop the browser's
+  // page zoom. A mouse notch is one step regardless of its size; a pinch's
+  // many small deltas accumulate until they add up to one.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    const PIXELS_PER_STEP = 50
+    let remainder = 0
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey || event.deltaY === 0) return
+      event.preventDefault()
+      event.stopPropagation()
+      const pixels = event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? event.deltaY : Math.sign(event.deltaY) * PIXELS_PER_STEP
+      if (Math.sign(pixels) !== Math.sign(remainder)) remainder = 0
+      remainder += pixels
+      if (Math.abs(remainder) < PIXELS_PER_STEP) return
+      remainder = 0
+      zoom(pixels < 0 ? 'in' : 'out')
+    }
+    container.addEventListener('wheel', onWheel, { capture: true, passive: false })
+    return () => container.removeEventListener('wheel', onWheel, { capture: true })
+  }, [zoom])
+
   const changeInputMode = useCallback((mode: TerminalInputMode) => {
     saveInputMode(mode)
     setInputModeState(mode)
