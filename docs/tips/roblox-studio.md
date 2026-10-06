@@ -65,9 +65,9 @@ VNC 포트는 host에 게시되지 않습니다. 접속 경로는 두 가지고,
 <details>
 <summary>왜 <code>studio</code>가 아니라 <code>roblox-studio-vnc</code>인지</summary>
 
-`studio` 컨테이너는 `code-docker-internal`과 `roblox-studio-vnc` **두 망에 모두** 붙어있고 router도 그 둘에 다 붙어있습니다. 그래서 router가 `studio`를 resolve하면 A 레코드가 두 개 돌아오고, 어느 쪽이 먼저 올지는 보장되지 않습니다.
+`studio` 컨테이너는 `roblox-studio-net`과 `roblox-studio-vnc` **두 망에 모두** 붙어있고 router도 그 둘에 다 붙어있습니다. 그래서 router가 `studio`를 resolve하면 A 레코드가 두 개 돌아오고, 어느 쪽이 먼저 올지는 보장되지 않습니다.
 
-netgate의 forwards는 그중 첫 번째 IP를 골라 DNAT 규칙으로 굳혀버리는데(`config/netgate/firewall.default.sh`의 `getent hosts`), wayvnc는 `VNC_BIND_ALIAS`가 resolve된 IP - 즉 `roblox-studio-vnc` 쪽 IP - 에만 바인딩합니다. `code-docker-internal` 쪽 IP가 뽑히면 그 포트엔 아무도 듣고 있지 않아 `connection refused`가 되고, 규칙이 재적용될 때마다 결과가 달라질 수 있습니다.
+netgate의 forwards는 그중 첫 번째 IP를 골라 DNAT 규칙으로 굳혀버리는데(`config/netgate/firewall.default.sh`의 `getent hosts`), wayvnc는 `VNC_BIND_ALIAS`가 resolve된 IP - 즉 `roblox-studio-vnc` 쪽 IP - 에만 바인딩합니다. `roblox-studio-net` 쪽 IP가 뽑히면 그 포트엔 아무도 듣고 있지 않아 `connection refused`가 되고, 규칙이 재적용될 때마다 결과가 달라질 수 있습니다.
 
 별칭 `roblox-studio-vnc`는 같은 이름의 `roblox-studio-vnc` **망 위에만** 존재해서 항상 정확히 하나의 IP로 풀립니다 - 이 별칭을 따로 둔 이유가 그것뿐입니다(망과 같은 이름인 건 [code-docker-chrome](https://github.com/qwreey/code-docker-chrome)의 `chrome-vnc`와 맞춘 것입니다. 예전 이름은 `vnc-only`였습니다). router의 VNC 탭이 대상 호스트를 항상 `roblox-studio-vnc`로 잡는 것도 같은 이유입니다.
 
@@ -75,12 +75,12 @@ netgate의 forwards는 그중 첫 번째 IP를 골라 DNAT 규칙으로 굳혀�
 
 ## Claude Code에 Studio MCP 붙이기
 
-Roblox Studio는 MCP 서버를 내장하고 있지만 **stdio 전용 + 같은 머신 전용**이라 원격 클라이언트가 붙을 포트가 없습니다. roblox-studio-docker가 이걸 밖으로 꺼내주기 때문에, code-docker 안의 Claude Code가 `studio:8787`로 직접 붙을 수 있습니다.
+Roblox Studio는 MCP 서버를 내장하고 있지만 **stdio 전용 + 같은 머신 전용**이라 원격 클라이언트가 붙을 포트가 없습니다. roblox-studio-docker가 이걸 밖으로 꺼내주기 때문에, code-docker 안의 Claude Code가 `studio:8787`로 붙을 수 있습니다. 이 이름은 Studio 본체가 아니라 두 망 사이의 중계 컨테이너 `studio-front`입니다(아래 [격리 구조](#격리-구조) 참고).
 
 ```
-claude (code-docker) → studio:8787/mcp → caddy → supergateway → StudioMCP.exe(wine)
-                       └──────── code-docker-internal ────────┘        ↓ WebSocket
-                                                            Studio의 Assistant 플러그인
+claude (code-docker) → studio:8787/mcp → studio-front → caddy → supergateway → StudioMCP.exe(wine)
+                       └─ code-docker-internal ─┘└─ roblox-studio-net ─┘            ↓ WebSocket
+                                                                       Studio의 Assistant 플러그인
 ```
 
 **1. 토큰** — `MCP_TOKEN`은 ootb/migrate가 알아서 `.env`에 넣습니다. 아무것도 안 해도 됩니다.
@@ -129,7 +129,7 @@ docker compose up -d studio code-docker   # restart 아님 - env는 create 시�
 <details>
 <summary>이 토큰이 실제로 막는 것 (그리고 왜 묻지 않는지)</summary>
 
-`code-docker-internal` 위에서만 닿는 포트에 굳이 토큰이 필요한지는 따져볼 만합니다. 통합 배포에서 이 토큰은 인증 경계라기보다 **심층방어 한 겹**입니다:
+`code-docker-internal` 위에서만(`studio-front`를 거쳐) 닿는 포트에 굳이 토큰이 필요한지는 따져볼 만합니다. 통합 배포에서 이 토큰은 인증 경계라기보다 **심층방어 한 겹**입니다:
 
 - **code-docker 자신에게는 사실상 무의미합니다.** 토큰이 `.env`와 `~/.claude.json`에 있으므로, code-docker 안에서 뭔가 잘못되면(공급망 공격 등) 토큰도 같이 털립니다.
 - **의미가 있는 건 dind 안에서 사용자가 직접 띄운 컨테이너입니다.** 그것들은 이름으로 `studio`를 찾지는 못하지만(중첩 daemon은 별도 네트워크/DNS - [dind.md](dind.md) 참고) 내부 daemon의 NAT를 통해 `code-docker-internal` 대역에 IP로는 닿을 수 있는 구조이고, 토큰은 볼 수 없습니다. 신뢰하지 않는 이미지를 `docker run` 하는 게 이 환경의 일상적인 용법이라는 걸 생각하면 이쪽은 실질적인 방어입니다. (구조상 그렇다는 것이고 이 경로를 따로 실측하지는 않았습니다.)
@@ -160,9 +160,28 @@ roblox-studio-docker는 VNC 포트(5900)를 host에 게시하지 않고, `router
 </details>
 
 <details>
+<summary>Studio의 작업망과 <code>studio-front</code></summary>
+
+Studio는 `code-docker-internal`에 붙지 않습니다. 작업망 `roblox-studio-net`(`internal: true`)과 VNC 전용 `roblox-studio-vnc`에만 있고, 작업망에는 router(게이트웨이)와 중계 컨테이너 `studio-front`만 같이 있습니다.
+
+```
+[roblox-studio-net]                            [code-docker-internal]
+studio ──▶ studio-front (별칭 code-docker) ──▶ code-docker:34872-34881, :3667
+studio ◀── studio-front (별칭 studio)      ◀── code-docker → studio:8787 (MCP)
+```
+
+- **이유:** Studio는 플러그인이나 스크립트가 `HttpService`로 헤더까지 마음대로 정한 요청을 보낼 수 있는 컨테이너입니다. `code-docker-internal`에 붙어 있으면 code-docker의 nginx(로그인 없는 code-server, 기본값으로 로그인 없는 webmanager)와 인증 없는 `dind:2375`에 그대로 닿습니다(2026-10-06 실측). 툴박스 플러그인이나 모델 하나가 곧 code-docker 탈취 경로가 됩니다.
+- **넘어가는 것:** code-docker → Studio는 MCP(8787) 하나, Studio → code-docker는 `STUDIO_CODE_DOCKER_PORTS`(`.env`, 기본 `34872-34881 3667`: `rojo serve` 10개와 luau-lsp Studio 플러그인)뿐입니다. 공백으로 구분하고 범위는 `시작-끝`으로 씁니다. 바꾼 뒤엔 `docker compose up -d studio-front`.
+- **Studio 쪽 설정은 그대로입니다.** `studio-front`가 Studio 망에서 `code-docker`라는 이름을 갖고 있어서, Rojo 플러그인이나 luau-lsp 플러그인의 호스트를 `code-docker`로 두면 됩니다.
+- **code-docker 쪽 서버는 컨테이너 바깥에서 받아야 합니다.** `rojo serve --address 0.0.0.0`처럼 루프백이 아닌 주소에 바인딩해야 `studio-front`가 닿습니다.
+- **그 밖의 길은 없습니다.** Studio에서 code-docker의 80·82 포트, dind, router 앞문으로 가는 연결은 거부되거나(이름이 `studio-front`로 풀리고 그 포트를 안 들음) router에서 버려집니다(IP로 직접).
+
+</details>
+
+<details>
 <summary>DOCKER-USER 방화벽 예외와 <code>PREFIX</code></summary>
 
-`roblox-studio-vnc`가 `code-docker-internal`이 아닌 별도 네트워크이기 때문에, 최신 Docker Engine의 `DOCKER-USER`/`DOCKER-INTERNAL` 하드닝이 router의 forward 트래픽을 막습니다. 그 예외 규칙은 roblox-studio-docker 자신의 오버레이가 라벨로 직접 선언합니다:
+`roblox-studio-vnc`와 `roblox-studio-net`이 `code-docker-internal`이 아닌 별도 네트워크이기 때문에, 최신 Docker Engine의 `DOCKER-USER`/`DOCKER-INTERNAL` 하드닝이 router의 forward 트래픽을 막습니다. 그 예외 규칙은 roblox-studio-docker 자신의 오버레이가 라벨로 직접 선언합니다:
 
 ```yaml
 networks:
@@ -197,6 +216,7 @@ networks:
 - **router에서 `target host ... is not in the allowed target host list`** - `.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`에 `roblox-studio-vnc`가 있는지 확인하세요. `.env`가 아니라 `.env.router`이고, 고친 뒤 router 컨테이너를 재시작해야 반영됩니다. 컨테이너는 정상적으로 뜨기 때문에 다른 증상이 없습니다.
 - **예전에 `vnc-only:5900`(또는 `:6080`)으로 등록한 VNC 대상/forward가 연결 안 됨** - 별칭이 `roblox-studio-vnc`로 바뀌었습니다(2026-09-22). VNC 탭에서 그 대상을 편집해 호스트를 `roblox-studio-vnc`로 바꾸고, Net 관리의 forward도 마찬가지로 고치세요. `migrate.sh`가 allowlist에 새 이름을 더해 주므로 `.env.router`는 따로 손댈 필요가 없습니다(남아 있는 `vnc-only`는 지워도 됩니다).
 - **forward를 추가했는데 접속이 안 됨** - `code-docker-netinit-docker` 로그에서 `roblox-studio-vnc`에 대한 DOCKER-USER 예외가 실제로 걸렸는지 보세요. 그 네트워크에 `netinit.exempt-forward: "true"` 라벨이 있는지가 가장 흔한 원인입니다.
+- **Studio의 Rojo(또는 luau-lsp) 플러그인이 `code-docker`에 연결 안 됨** - 포트가 `STUDIO_CODE_DOCKER_PORTS` 안에 있는지(`docker compose logs studio-front` 첫 줄에 넘기는 포트가 나옵니다), code-docker 쪽 서버가 루프백이 아닌 주소에 바인딩했는지(`rojo serve --address 0.0.0.0`) 보세요. `docker compose exec studio curl -s http://code-docker:34872/api/rojo`로 Studio 쪽에서 직접 확인할 수 있습니다.
 - **MCP가 연결 안 됨** - 순서대로:
 
   ```sh
