@@ -164,7 +164,7 @@ func TestMutationsThroughEscapingAncestor(t *testing.T) {
 		t.Fatalf("Mkdir escaped the root: %v", err)
 	}
 
-	if err := WriteTextContent(root, filepath.Join(root, "evil", "written.txt"), "x"); !errors.Is(err, ErrInvalidPath) {
+	if _, err := WriteTextContent(root, filepath.Join(root, "evil", "written.txt"), "x", ""); !errors.Is(err, ErrInvalidPath) {
 		t.Fatalf("WriteTextContent through escaping ancestor = %v, want ErrInvalidPath", err)
 	}
 	if _, err := os.Stat(filepath.Join(outside, "written.txt")); !os.IsNotExist(err) {
@@ -250,7 +250,7 @@ func TestWriteOntoEscapingLeafSymlink(t *testing.T) {
 	if _, err := StartUpload(root, filepath.Join(root, "sub"), "pwn", true); !errors.Is(err, ErrInvalidPath) {
 		t.Fatalf("StartUpload onto an escaping link = %v, want ErrInvalidPath", err)
 	}
-	if err := WriteTextContent(root, filepath.Join(root, "sub", "pwn"), "pwned"); !errors.Is(err, ErrInvalidPath) {
+	if _, err := WriteTextContent(root, filepath.Join(root, "sub", "pwn"), "pwned", ""); !errors.Is(err, ErrInvalidPath) {
 		t.Fatalf("WriteTextContent onto an escaping link = %v, want ErrInvalidPath", err)
 	}
 

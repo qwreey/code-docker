@@ -26,9 +26,10 @@ func writeFilesError(w http.ResponseWriter, err error) {
 		errors.Is(err, files.ErrIsDir),
 		errors.Is(err, files.ErrBinaryFile),
 		errors.Is(err, files.ErrFileTooLarge),
+		errors.Is(err, files.ErrNotUTF8),
 		errors.Is(err, files.ErrIntoItself):
 		writeError(w, http.StatusBadRequest, err.Error())
-	case errors.Is(err, files.ErrExists):
+	case errors.Is(err, files.ErrExists), errors.Is(err, files.ErrChanged):
 		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, os.ErrNotExist):
 		writeError(w, http.StatusNotFound, "not found")
@@ -96,18 +97,20 @@ func (s *Server) handleFilesContentGet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "path is required")
 		return
 	}
-	content, truncated, err := files.ReadTextContent(s.cfg.FilesRoot, p)
+	content, truncated, version, err := files.ReadTextContent(s.cfg.FilesRoot, p)
 	if err != nil {
 		writeFilesError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"content": content, "truncated": truncated})
+	writeJSON(w, http.StatusOK, map[string]any{"content": content, "truncated": truncated, "version": version})
 }
 
 func (s *Server) handleFilesContentPut(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Path    string `json:"path"`
 		Content string `json:"content"`
+		// The version GET returned; empty writes unconditionally.
+		BaseVersion string `json:"baseVersion"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		var tooLarge *http.MaxBytesError
@@ -122,11 +125,12 @@ func (s *Server) handleFilesContentPut(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "path is required")
 		return
 	}
-	if err := files.WriteTextContent(s.cfg.FilesRoot, body.Path, body.Content); err != nil {
+	version, err := files.WriteTextContent(s.cfg.FilesRoot, body.Path, body.Content, body.BaseVersion)
+	if err != nil {
 		writeFilesError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "version": version})
 }
 
 func (s *Server) handleFilesMkdir(w http.ResponseWriter, r *http.Request) {

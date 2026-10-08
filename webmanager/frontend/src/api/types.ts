@@ -667,6 +667,9 @@ export interface FileStat extends FileEntry {
 export interface FileContent {
   content: string
   truncated: boolean
+  // Sent back as baseVersion on save; the backend refuses the save (409) if
+  // the file changed on disk in between.
+  version: string
 }
 
 export interface FileOpResult {
