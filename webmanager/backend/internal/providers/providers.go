@@ -13,6 +13,7 @@
 package providers
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net"
@@ -22,8 +23,11 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 
 	"webmanager/internal/authgate"
 )
@@ -108,10 +112,52 @@ func Parse(environ []string) []Provider {
 	return out
 }
 
+// A provider is a container on code-docker-internal, so a target must be
+// one: checkTargetAddr allows private (RFC 1918 / ULA) and link-local
+// addresses only, and never dind's Docker API ports, whose unauthenticated
+// API behind webmanager's origin would be one typo away. It runs on IP
+// literals at parse time and on every resolved address at dial time, so a
+// single-label name can't lead anywhere else either.
+var errDockerAPIPort = errors.New("ports 2375/2376 are the Docker API, never a provider")
+
+// allowLoopbackTargets is for tests, whose upstream is an httptest server
+// on 127.0.0.1. A real provider on loopback would be webmanager's own
+// container.
+var allowLoopbackTargets = false
+
+func checkTargetAddr(ip net.IP, port int) error {
+	if port == 2375 || port == 2376 {
+		return errDockerAPIPort
+	}
+	if ip.IsLoopback() && allowLoopbackTargets {
+		return nil
+	}
+	if ip.IsPrivate() || ip.IsLinkLocalUnicast() {
+		return nil
+	}
+	return errors.New(ip.String() + " is not a private address on code-docker-internal")
+}
+
+// dialTarget is the proxy's dial, checking each address it actually
+// connects to.
+var dialTarget = (&net.Dialer{
+	Timeout: 10 * time.Second,
+	Control: func(_, address string, _ syscall.RawConn) error {
+		host, portStr, err := net.SplitHostPort(address)
+		if err != nil {
+			return err
+		}
+		port, _ := strconv.Atoi(portStr)
+		return checkTargetAddr(net.ParseIP(host), port)
+	},
+}).DialContext
+
 // ValidateTarget accepts only http(s) URLs whose host is a single-label name
-// (a container/service name on code-docker-internal) or an IP literal. The
-// point is that webmanager can never be configured into a proxy to an
-// arbitrary internet site: a dotted name is refused even if it would resolve.
+// (a container/service name on code-docker-internal) or a private IP, on a
+// port other than the Docker API's. A dotted name is refused even if it
+// would resolve, and so is localhost; a name's addresses are checked again
+// whenever the proxy connects (checkTargetAddr), so webmanager can't be
+// configured into a proxy to an internet or LAN host.
 func ValidateTarget(raw string) (*url.URL, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -127,8 +173,26 @@ func ValidateTarget(raw string) (*url.URL, error) {
 	if host == "" {
 		return nil, errors.New("no host")
 	}
-	if net.ParseIP(host) == nil && !singleLabelRe.MatchString(host) {
-		return nil, errors.New("host must be a single-label name (a container on code-docker-internal) or an IP")
+	port := 80
+	if u.Scheme == "https" {
+		port = 443
+	}
+	if p := u.Port(); p != "" {
+		if port, err = strconv.Atoi(p); err != nil {
+			return nil, errors.New("bad port")
+		}
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if err := checkTargetAddr(ip, port); err != nil {
+			return nil, err
+		}
+		return u, nil
+	}
+	if !singleLabelRe.MatchString(host) || strings.EqualFold(host, "localhost") {
+		return nil, errors.New("host must be a single-label container name on code-docker-internal or a private IP")
+	}
+	if port == 2375 || port == 2376 {
+		return nil, errDockerAPIPort
 	}
 	return u, nil
 }
@@ -160,6 +224,9 @@ func New(list []Provider) *Registry {
 	// route them through an outbound proxy instead.
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return dialTarget(ctx, network, addr)
+	}
 	for _, p := range list {
 		r.proxies[p.ID] = newProxy(p, transport)
 	}
@@ -223,6 +290,8 @@ func newProxy(p Provider, transport http.RoundTripper) http.Handler {
 			pr.Out.Header.Del("X-Real-IP")
 			pr.Out.Header.Set("X-Forwarded-Prefix", browserPrefix)
 			pr.Out.Header.Set("X-Forwarded-Host", pr.In.Host)
+			// webmanager's own idea of the client, which is the address
+			// nginx passed on - behind router, router's, not the browser's.
 			pr.Out.Header.Set("X-Forwarded-For", authgate.ClientKey(pr.In))
 		},
 		// A provider shares webmanager's origin, so a cookie it set would

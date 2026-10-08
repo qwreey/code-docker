@@ -538,10 +538,12 @@ The browser can reach only code-docker's nginx, never a container on
   overwrite each other. Parsed once at startup: a change needs the
   container recreated (`up -d`), not a webmanager restart.
 - **URL**: `http`/`https` only, host a single-label name (the container's
-  name on `code-docker-internal`) or an IP literal, no credentials. Anything
-  else is skipped with a log line - this is what keeps webmanager from
-  becoming a proxy to arbitrary internet sites. An empty value switches the
-  entry off (also logged).
+  name on `code-docker-internal`, not `localhost`) or a private IP, no
+  credentials, not port 2375/2376 (dind's Docker API). Every address the
+  proxy connects to is checked again at dial time, so a name can't resolve
+  its way out either. Anything else is skipped with a log line - this is
+  what keeps webmanager from becoming a proxy to internet or LAN hosts. An
+  empty value switches the entry off (also logged).
 - **Routes**: `GET /api/providers` → `[{"id","title"}]` (open read, `[]`
   when none). `/providers/<id>/...` (browser: `/manager/providers/<id>/...`)
   proxies to `<URL>` with the `/providers/<id>` prefix stripped, query kept,
@@ -555,7 +557,9 @@ The browser can reach only code-docker's nginx, never a container on
   `/api/forwards`): the page is served under a prefix the provider can't
   see. The prefix is passed as `X-Forwarded-Prefix: /manager/providers/<id>/`
   for anything that must be absolute; `X-Forwarded-Host` and
-  `X-Forwarded-For` (the real client IP) are set too.
+  `X-Forwarded-For` are set too. The latter is the client as webmanager
+  sees it (`authgate.ClientKey`), which behind router is router's address,
+  not the browser's - don't key anything per-user on it.
 - **No cookies or credentials, either direction**: `Cookie`,
   `Authorization`, `Proxy-Authorization` and `X-Real-IP` are dropped on the
   way in, `Set-Cookie` on the way out. The page shares webmanager's origin,

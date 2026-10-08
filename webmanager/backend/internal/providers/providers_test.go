@@ -66,6 +66,8 @@ func TestListNeverNil(t *testing.T) {
 
 func newTestRegistry(t *testing.T, upstream *httptest.Server, targetPath string) *Registry {
 	t.Helper()
+	allowLoopbackTargets = true
+	t.Cleanup(func() { allowLoopbackTargets = false })
 	target, err := ValidateTarget(upstream.URL + targetPath)
 	if err != nil {
 		t.Fatal(err)
@@ -210,5 +212,36 @@ func TestProxyUpgrade(t *testing.T) {
 	line, err := br.ReadString('\n')
 	if err != nil || line != "echo:ping\n" {
 		t.Fatalf("after upgrade got %q, %v", line, err)
+	}
+}
+
+// A provider is a container on code-docker-internal; nothing else can be
+// one, and the Docker API never can.
+func TestValidateTargetRefusesNonProviders(t *testing.T) {
+	for _, raw := range []string{
+		"http://example.com/",
+		"http://93.184.216.34/",
+		"http://8.8.8.8:8080/",
+		"http://127.0.0.1:8080/",
+		"http://localhost:8090/",
+		"http://0.0.0.0/",
+		"http://dind:2375/",
+		"http://172.21.0.6:2376/",
+	} {
+		if _, err := ValidateTarget(raw); err == nil {
+			t.Errorf("ValidateTarget(%q) accepted", raw)
+		}
+	}
+	for _, raw := range []string{"http://chrome-front:8090/", "http://172.30.0.5:81", "https://10.0.0.2/", "http://[fd00::5]:8080/"} {
+		if _, err := ValidateTarget(raw); err != nil {
+			t.Errorf("ValidateTarget(%q) = %v", raw, err)
+		}
+	}
+}
+
+// A single-label name is checked again on the address it resolves to.
+func TestDialRefusesANameThatResolvesOutside(t *testing.T) {
+	if _, err := dialTarget(t.Context(), "tcp", "127.0.0.1:1"); err == nil || !strings.Contains(err.Error(), "not a private address") {
+		t.Fatalf("dial to loopback = %v, want refused before connecting", err)
 	}
 }
