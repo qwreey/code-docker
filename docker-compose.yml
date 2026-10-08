@@ -23,7 +23,7 @@
 # dev-clone.sh and example-env).
 include:
   - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}
-  - path: "${ROUTER_INCLUDE:-https://github.com/qwreey/router-docker.git#${ROUTER_REF:-v0.1.6}:docker-compose.router.yml}"
+  - path: "${ROUTER_INCLUDE:-https://github.com/qwreey/router-docker.git#${ROUTER_REF:-v0.1.7}:docker-compose.router.yml}"
 
 networks:
   code-docker-internal:
@@ -86,9 +86,9 @@ services:
         # it with a local checkout. The build arg only matters for the stage's own
         # fallback ADD, which this context overrides - passed anyway so the two can't
         # disagree about which tag an image was built from.
-        code-server-autoinstall: "${AUTOINSTALL_SOURCE:-https://github.com/qwreey/code-server-autoinstall.git#${AUTOINSTALL_REF:-v0.1.1}}"
+        code-server-autoinstall: "${AUTOINSTALL_SOURCE:-https://github.com/qwreey/code-server-autoinstall.git#${AUTOINSTALL_REF:-v0.1.2}}"
       args:
-        AUTOINSTALL_REF: "${AUTOINSTALL_REF:-v0.1.1}"
+        AUTOINSTALL_REF: "${AUTOINSTALL_REF:-v0.1.2}"
         ROUTER_CLIENT_REF: "${ROUTER_CLIENT_REF:-v0.1.0}"
       # No `network: host` on any build here: buildx 0.37.2+ refuses it unless the
       # network.host entitlement is granted, and `docker compose build` has no way to
@@ -256,7 +256,7 @@ services:
       # (DIND_REF) - used to be a submodule at code-dind/, see that repo's own
       # CLAUDE.md. DIND_CONTEXT points it at a local checkout (dev/dind-authz-docker,
       # see dev-clone.sh and example-env).
-      context: "${DIND_CONTEXT:-https://github.com/qwreey/dind-authz-docker.git#${DIND_REF:-v0.1.3}}"
+      context: "${DIND_CONTEXT:-https://github.com/qwreey/dind-authz-docker.git#${DIND_REF:-v0.1.4}}"
       # Same netshare override as code-docker's own build above - replaces the
       # Dockerfile's `FROM scratch AS netshare` stage.
       additional_contexts:
