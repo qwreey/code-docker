@@ -20,16 +20,10 @@ set -e
 # Runs from code-service.default.sh, after install.sh (so the user-data dir's
 # parent exists) and before code-server itself starts.
 
-SOURCE_DEFAULT=/etc/code-docker/code/settings.default.json
-SOURCE_OVERRIDE=/etc/code-docker/code/settings.override.json
 TARGET_DIR=/code/.local/share/code-docker/code/user-data/User
 TARGET="$TARGET_DIR/settings.json"
 
-if [ -e "$SOURCE_OVERRIDE" ]; then
-    source_file="$SOURCE_OVERRIDE"
-else
-    source_file="$SOURCE_DEFAULT"
-fi
+source_file="$(/etc/code-docker/override path code/settings.default.json)"
 
 if [ ! -e "$source_file" ]; then
     echo "code-settings: no $source_file - nothing to seed"
