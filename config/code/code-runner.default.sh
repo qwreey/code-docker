@@ -7,8 +7,9 @@ set -e
 # override) - see code-config.default.yaml's comment for why this can't
 # just be a static value in that file. Loopback because nginx, in this same
 # container, is the only thing meant to reach it: code-server has no login
-# (auth: none), so an address on code-docker-internal let every container on
-# that network skip nginx and talk to it directly.
+# (auth: none), and nginx is where who may connect is decided
+# (NGINX_ALLOWED_PEERS, see nginx-service.default.sh) - an address on
+# code-docker-internal would let every container on that network around it.
 CODE_SERVER_BIND_ADDR="${CODE_SERVER_BIND_ADDR:-127.0.0.1:8080}"
 case "$CODE_SERVER_BIND_ADDR" in
     private:*)

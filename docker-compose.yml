@@ -126,6 +126,8 @@ services:
       # the host - it exists so a router vhost can point a hostname at
       # code-docker:82 and get the file share without code-server on it too.
       NGINX_WEBDAV_PORT: "${NGINX_WEBDAV_PORT:-82}"
+      # Who may connect to nginx at all - empty means ROUTER_HOSTNAME (see example-env).
+      NGINX_ALLOWED_PEERS: "${NGINX_ALLOWED_PEERS:-}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
       WEBMANAGER_ENV_TEMPLATE_PATH: "${WEBMANAGER_ENV_TEMPLATE_PATH:-/etc/code-docker/webmanager/example-env.webmanager}"
