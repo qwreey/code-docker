@@ -8,9 +8,11 @@
 #   ./dev-check.sh --clean=<rev> dev/router-docker
 #
 # 저장소마다:
-#   - 추적 중인 go.mod가 있는 모듈마다 `gofmt -l`(목록이 나오면 실패)과 `go test ./...`
+#   - 추적 중인 go.mod가 있는 모듈마다 `gofmt -l`(목록이 나오면 실패), `go test ./...`,
+#     `go vet ./...`
 #   - 추적 중인 셸 스크립트(*.sh, 또는 sh/bash shebang) 전부 `bash -n`
 #   - 추적 중인 `*_test.sh` 실행(셸 스크립트 옆에 두는 테스트, 0이 아니면 실패)
+#   - 추적 중인 `*.js` 전부 `node --check`(node가 없으면 실패로 알림)
 #   - 이 체크아웃 자신이면 `docker compose config -q`
 #
 # --clean은 "커밋에 빠진 파일"을 잡기 위한 것입니다. 작업 트리에서는 커밋 안 한 새
@@ -35,7 +37,7 @@ for arg in "$@"; do
   case $arg in
     --clean) clean=1 ;;
     --clean=*) clean=1; rev=${arg#--clean=} ;;
-    -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "알 수 없는 옵션: $arg" >&2; exit 2 ;;
     *) repos+=("${arg%/}") ;;
   esac
@@ -78,6 +80,12 @@ check_repo() {
       fail "go test ($mod) 실패:"
       printf '%s\n' "$out" | grep -v '^ok \|no test files' | sed 's/^/      /'
     fi
+    if out=$(cd "$dir/$mod" && go vet ./... 2>&1); then
+      echo "  - go vet ($mod) 통과"
+    else
+      fail "go vet ($mod) 실패:"
+      printf '%s\n' "$out" | sed 's/^/      /'
+    fi
   done < <(git -C "$dir" ls-files -- 'go.mod' '*/go.mod')
 
   local scripts=()
@@ -97,6 +105,26 @@ check_repo() {
     fi
   done
   [ $bad = 0 ] && echo "  - bash -n 스크립트 ${#scripts[@]}개 통과"
+
+  # 추적 중인 *.js(code-patch, vscode 확장 - 빌드 단계 없이 그대로 실리는 파일)의
+  # 문법 검사. 여기 문법 오류가 있으면 code-server UI가 조용히 깨집니다.
+  local js=()
+  while IFS= read -r f; do js+=("$f"); done < <(git -C "$dir" ls-files -- '*.js')
+  if [ ${#js[@]} -gt 0 ]; then
+    if ! command -v node >/dev/null 2>&1; then
+      fail "node가 없어 *.js ${#js[@]}개의 문법을 검사하지 못했습니다"
+    else
+      bad=0
+      for f in "${js[@]}"; do
+        if ! out=$(node --check "$dir/$f" 2>&1); then
+          fail "node --check $f:"
+          printf '%s\n' "$out" | sed 's/^/      /'
+          bad=1
+        fi
+      done
+      [ $bad = 0 ] && echo "  - node --check *.js ${#js[@]}개 통과"
+    fi
+  fi
 
   # *_test.sh: 셸 스크립트 옆에 두는 테스트. 종료 코드가 0이 아니면 실패입니다.
   while IFS= read -r f; do

@@ -17,7 +17,7 @@ docker compose build code-docker && docker compose up -d   # after editing a con
 ```
 
 ```sh
-./dev-check.sh           # before committing: gofmt + go test per module, bash -n, compose config - this checkout and every dev/*
+./dev-check.sh           # before committing: gofmt + go test + go vet per module, bash -n, *_test.sh, node --check *.js, compose config - this checkout and every dev/*
 ./dev-check.sh --clean   # same, on a throwaway worktree of each repo's HEAD (catches a file missing from the commit)
 ```
 
