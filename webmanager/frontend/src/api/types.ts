@@ -358,6 +358,14 @@ export interface ClaudeMemory {
 // toggle state it's read into.
 export interface ClaudeSettingsRaw {
   content: string
+  // Hash of the real file, masked or not - the changed-on-disk check.
+  version: string
+  // Behind a locked password gate env values and apiKeyHelper read as
+  // "<hidden: ...>"; saving keeps the real values (the backend restores them).
+  masked: boolean
+  // Locked, and the file isn't valid JSON, so it couldn't be masked: content
+  // is empty.
+  unreadable?: boolean
 }
 
 // POST /api/claude/logout's response.

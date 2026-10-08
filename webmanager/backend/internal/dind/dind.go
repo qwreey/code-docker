@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ErrNotFound is returned when docker reports "No such container"/"No such
@@ -255,6 +256,8 @@ func Inspect(ctx context.Context, id string) (json.RawMessage, error) {
 // buffer here — runDocker's separate stdout/stderr buffers exist precisely
 // to keep docker's own error messages away from command output, which would
 // throw away half of a real container's log lines.
+const logsTimeout = 30 * time.Second
+
 func ContainerLogs(ctx context.Context, id string, tail int, since string) (string, error) {
 	if err := ValidateID(id); err != nil {
 		return "", err
@@ -268,6 +271,11 @@ func ContainerLogs(ctx context.Context, id string, tail int, since string) (stri
 	}
 	args = append(args, id)
 
+	// Bounded like the rest of a request's work: a dind that stopped
+	// answering would otherwise hold the request (and its buffer) open for as
+	// long as the client waits.
+	ctx, cancel := context.WithTimeout(ctx, logsTimeout)
+	defer cancel()
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	var combined bytes.Buffer
 	cmd.Stdout = &combined

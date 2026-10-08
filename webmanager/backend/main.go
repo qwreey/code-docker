@@ -288,7 +288,9 @@ func main() {
 	// every other write route below.
 	mux.HandleFunc("GET /api/dind/containers", s.handleListDindContainers)
 	mux.HandleFunc("GET /api/dind/images", s.handleListDindImages)
-	mux.HandleFunc("GET /api/dind/containers/{id}/logs", s.handleDindContainerLogs)
+	// Gated like supervisor logs: a container's output is as likely to
+	// print a secret.
+	mux.Handle("GET /api/dind/containers/{id}/logs", gate.RequirePassword(http.HandlerFunc(s.handleDindContainerLogs)))
 	mux.Handle("GET /api/dind/containers/{id}/inspect", gate.RequirePassword(http.HandlerFunc(s.handleInspectDindContainer)))
 	mux.Handle("POST /api/dind/containers/{id}/start", gate.RequirePassword(http.HandlerFunc(s.handleStartDindContainer)))
 	mux.Handle("POST /api/dind/containers/{id}/stop", gate.RequirePassword(http.HandlerFunc(s.handleStopDindContainer)))

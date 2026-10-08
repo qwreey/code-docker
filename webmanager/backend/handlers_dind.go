@@ -38,7 +38,12 @@ func (s *Server) handleListDindImages(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, images)
 }
 
-const dindDefaultLogTail = 1000
+// dindMaxLogTail bounds ?tail=: docker logs' whole output is held in memory
+// and sent as one JSON string.
+const (
+	dindDefaultLogTail = 1000
+	dindMaxLogTail     = 10000
+)
 
 func (s *Server) handleDindContainerLogs(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
@@ -50,8 +55,8 @@ func (s *Server) handleDindContainerLogs(w http.ResponseWriter, r *http.Request)
 	tail := dindDefaultLogTail
 	if v := r.URL.Query().Get("tail"); v != "" {
 		n, err := strconv.Atoi(v)
-		if err != nil || n <= 0 {
-			writeError(w, http.StatusBadRequest, "tail must be a positive integer")
+		if err != nil || n <= 0 || n > dindMaxLogTail {
+			writeError(w, http.StatusBadRequest, "tail must be between 1 and 10000")
 			return
 		}
 		tail = n

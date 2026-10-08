@@ -44,17 +44,20 @@ export function ClaudeSettings() {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  // Snapshot of what was last loaded/saved, so handleSave can detect the
+  // Version of the file as last loaded/saved, so handleSave can detect the
   // file changing elsewhere (e.g. edited directly on disk) while this
-  // editor sat open, instead of silently clobbering it - same pattern as
-  // RawConfigEditor/SshConfigRaw.
-  const loadedContentRef = useRef('')
+  // editor sat open, instead of silently clobbering it. A version rather
+  // than the text: the text differs between the masked and unlocked views
+  // of the same file.
+  const loadedVersionRef = useRef('')
+  const [masked, setMasked] = useState<ClaudeSettingsRaw | null>(null)
 
   const load = useCallback(async () => {
     try {
       const data = await api.get<ClaudeSettingsRaw>('/claude/settings')
       setContent(data.content)
-      loadedContentRef.current = data.content
+      loadedVersionRef.current = data.version
+      setMasked(data.masked ? data : null)
       setError(null)
     } catch (e) {
       setError(errorMessage(e))
@@ -95,12 +98,15 @@ export function ClaudeSettings() {
     setError(null)
     try {
       const latest = await api.get<ClaudeSettingsRaw>('/claude/settings')
-      if (latest.content !== loadedContentRef.current) {
+      if (latest.version !== loadedVersionRef.current) {
         setError('다른 곳에서 이 설정이 이미 바뀌었어요 — 새로고침한 뒤 다시 편집해주세요. 지금 저장하면 그 변경이 사라집니다.')
         return
       }
       await api.put<{ ok: true }>('/claude/settings', { content })
-      loadedContentRef.current = content
+      // Reload rather than keep `content`: a save from the masked view has
+      // had its placeholders replaced server-side, and the save may have
+      // unlocked the gate.
+      await load()
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (e) {
@@ -118,6 +124,13 @@ export function ClaudeSettings() {
         편집합니다 — code-server 자체 편집기가 이 파일을 다루기에 더 나으니, 세밀한 조정은 그쪽을 권장합니다.
       </p>
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+      {masked && (
+        <p className="claude-settings-note">
+          {masked.unreadable
+            ? '잠겨 있는 동안에는 보여 줄 수 없습니다: JSON 문법이 깨져 있어 비밀 값을 가릴 수 없습니다. 잠금을 풀면 보입니다.'
+            : 'env 값과 apiKeyHelper는 잠겨 있는 동안 <hidden: ...>으로 가려집니다. 그대로 두고 저장하면 원래 값이 유지됩니다.'}
+        </p>
+      )}
       {loading ? (
         <Skeleton />
       ) : (

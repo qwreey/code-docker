@@ -16,6 +16,17 @@ func (s *Server) handleListSystemProcesses(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// Readable without the gate, but command lines carry secrets often
+	// enough (procinfo.RedactCmdline) that a locked gate masks them. A copy,
+	// in case the sampler hands out a slice it keeps.
+	if s.gate.Configured() && !s.gate.Unlocked(r) {
+		masked := make([]procinfo.ProcessInfo, len(procs))
+		for i, p := range procs {
+			p.Cmdline = procinfo.RedactCmdline(p.Cmdline)
+			masked[i] = p
+		}
+		procs = masked
+	}
 	writeJSON(w, http.StatusOK, procs)
 }
 

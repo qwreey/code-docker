@@ -450,15 +450,23 @@ func (s *Server) handleClaudeSessionLines(w http.ResponseWriter, r *http.Request
 // Claude Code has never run against.
 // handleClaudeSettingsGet returns the raw text of CLAUDE_CONFIG_DIR/
 // settings.json, for the raw editor + friendly toggles in the frontend.
-// Ungated (unlike git/ssh raw config, this file carries no secrets) -
-// matching this repo's reads-stay-open convention.
+// Ungated, matching this repo's reads-stay-open convention, but the file can
+// carry credentials (env, apiKeyHelper): behind a configured gate that this
+// request hasn't unlocked, those are masked (claudecode.MaskSettings), and
+// a file too broken to mask isn't shown at all. version is the real file's,
+// masked or not, for the editor's changed-on-disk check.
 func (s *Server) handleClaudeSettingsGet(w http.ResponseWriter, r *http.Request) {
 	content, err := claudecode.ReadSettingsRaw(s.cfg.ClaudeConfigDir)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"content": content})
+	resp := map[string]any{"content": content, "version": claudecode.SettingsVersion(content), "masked": false}
+	if s.gate.Configured() && !s.gate.Unlocked(r) {
+		masked, ok := claudecode.MaskSettings(content)
+		resp["content"], resp["masked"], resp["unreadable"] = masked, true, !ok
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handleClaudeSettingsPut validates and writes CLAUDE_CONFIG_DIR/
@@ -473,7 +481,19 @@ func (s *Server) handleClaudeSettingsPut(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if err := claudecode.WriteSettingsRaw(s.cfg.ClaudeConfigDir, body.Content); err != nil {
+	// A save from the masked view carries placeholders; they stand for the
+	// values on disk and must never be written as such.
+	current, err := claudecode.ReadSettingsRaw(s.cfg.ClaudeConfigDir)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	content, err := claudecode.RestoreHidden(body.Content, current)
+	if err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	if err := claudecode.WriteSettingsRaw(s.cfg.ClaudeConfigDir, content); err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, claudecode.ErrInvalidSettingsJSON) {
 			status = http.StatusBadRequest
