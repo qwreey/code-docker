@@ -68,7 +68,7 @@ prompt_set() {
     printf '%s: ' "$prompt"
   fi
   read -r val
-  [ -n "$val" ] && set_env_var "$TARGET_DIR/$file" "$key" "\"$val\""
+  [ -n "$val" ] && set_env_var "$TARGET_DIR/$file" "$key" "$(env_quote "$val")"
 }
 
 prompt_bool() {

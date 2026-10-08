@@ -63,20 +63,38 @@ resolve_target_dir() {
 
 set_env_var() {
   # set_env_var <file> <key> <raw_value>  - 기존 (주석 처리됐든 아니든) 라인을
-  # 찾아 교체하거나, 없으면 파일 끝에 추가. sed 대신 awk -v를 쓰는 이유는
-  # <raw_value>에 argon2 해시처럼 sed 치환 특수문자($, &, |, \)가 그대로
-  # 들어있을 수 있어서 - awk -v로 넘긴 값은 정규식/백레퍼런스로 재해석되지
-  # 않고 문자열 그대로 print된다.
+  # 찾아 교체하거나, 없으면 파일 끝에 추가. <raw_value>는 따옴표까지 포함해
+  # 그대로 쓰입니다 - 사용자가 입력한 값이면 env_quote로 감싸서 넘기세요.
+  # 값은 sed가 아니라 awk의 ENVIRON으로 넘깁니다. sed는 $, &, |, \를 치환
+  # 문법으로 읽고, awk -v도 \n, \\ 같은 이스케이프를 해석해서 값이 바뀝니다.
+  # ENVIRON으로 읽은 값은 아무것도 해석되지 않습니다.
   # 임시 파일은 umask 077로 만들어서, 해시가 든 내용이 잠깐이라도 644로 디스크에
   # 있는 순간이 없게 합니다(mv가 그 권한째로 원본을 대체).
   file=$1 key=$2 value=$3
   touch "$file"
-  (umask 077; awk -v k="$key" -v v="$value" '
+  (umask 077; OOTB_SET_KEY="$key" OOTB_SET_VALUE="$value" awk '
+    BEGIN { k = ENVIRON["OOTB_SET_KEY"]; v = ENVIRON["OOTB_SET_VALUE"] }
     $0 ~ "^#?" k "=" { print k "=" v; done=1; next }
     { print }
     END { if (!done) print k "=" v }
   ' "$file" > "$file.ootb.tmp") && mv "$file.ootb.tmp" "$file"
   secure_env_file "$file"
+}
+
+# env_quote <value> - 값을 docker compose의 .env가 글자 그대로 읽게 따옴표로
+# 감싸 출력합니다. 큰따옴표 안에서는 compose가 $VAR를 보간하고 \를 이스케이프로
+# 읽으므로, 기본은 아무것도 해석하지 않는 작은따옴표입니다. 값에 작은따옴표가
+# 있을 때만 큰따옴표를 쓰고 \, ", $를 이스케이프합니다.
+env_quote() {
+  case $1 in
+    *"'"*)
+      _eq=${1//\\/\\\\}
+      _eq=${_eq//\"/\\\"}
+      _eq=${_eq//\$/\$\$}
+      printf '"%s"' "$_eq"
+      ;;
+    *) printf "'%s'" "$1" ;;
+  esac
 }
 
 # .env* 파일에는 argon2id 비밀번호 해시(WEBMANAGER_AUTH_PASSWORD_HASH,
@@ -228,7 +246,7 @@ apply_manifest_declarative() {
         print out
       }')"
     if [ "$_amd_new" != "$_amd_cur" ]; then
-      set_env_var "$TARGET_DIR/.env.router" ROUTER_EXTRA_ALLOWED_TARGET_HOSTS "\"$_amd_new\""
+      set_env_var "$TARGET_DIR/.env.router" ROUTER_EXTRA_ALLOWED_TARGET_HOSTS "$(env_quote "$_amd_new")"
       echo "${_amd_indent}- ROUTER_EXTRA_ALLOWED_TARGET_HOSTS=$_amd_new (router 대상 allowlist)"
       _amd_changed=1
     fi
@@ -390,7 +408,7 @@ ask_allowed_hosts() {
       echo "  ! 호스트 이름만 적을 수 있습니다:$_aah_bad"
       continue
     fi
-    set_env_var "$_aah_env" ALLOWED_HOSTS "\"$_aah_in\""
+    set_env_var "$_aah_env" ALLOWED_HOSTS "$(env_quote "$_aah_in")"
     echo "  - ALLOWED_HOSTS=\"$_aah_in\""
     return 0
   done
@@ -446,12 +464,12 @@ apply_manifest_prompts() {
         printf '%s%s (%s, 비밀값, 비우면 미설정): ' "$_amp_indent" "$_amp_name" "$_amp_desc"
         read -r -s _amp_val
         echo
-        set_env_var "$_amp_target" "$_amp_name" "${_amp_val:+\"$_amp_val\"}"
+        set_env_var "$_amp_target" "$_amp_name" "${_amp_val:+$(env_quote "$_amp_val")}"
         ;;
       *)
         printf '%s%s (%s, 비우면 미설정): ' "$_amp_indent" "$_amp_name" "$_amp_desc"
         read -r _amp_val
-        set_env_var "$_amp_target" "$_amp_name" "${_amp_val:+\"$_amp_val\"}"
+        set_env_var "$_amp_target" "$_amp_name" "${_amp_val:+$(env_quote "$_amp_val")}"
         ;;
     esac
   done
