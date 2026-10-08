@@ -10,6 +10,7 @@
 # 저장소마다:
 #   - 추적 중인 go.mod가 있는 모듈마다 `gofmt -l`(목록이 나오면 실패)과 `go test ./...`
 #   - 추적 중인 셸 스크립트(*.sh, 또는 sh/bash shebang) 전부 `bash -n`
+#   - 추적 중인 `*_test.sh` 실행(셸 스크립트 옆에 두는 테스트, 0이 아니면 실패)
 #   - 이 체크아웃 자신이면 `docker compose config -q`
 #
 # --clean은 "커밋에 빠진 파일"을 잡기 위한 것입니다. 작업 트리에서는 커밋 안 한 새
@@ -96,6 +97,16 @@ check_repo() {
     fi
   done
   [ $bad = 0 ] && echo "  - bash -n 스크립트 ${#scripts[@]}개 통과"
+
+  # *_test.sh: 셸 스크립트 옆에 두는 테스트. 종료 코드가 0이 아니면 실패입니다.
+  while IFS= read -r f; do
+    if out=$(bash "$dir/$f" 2>&1); then
+      echo "  - $f 통과"
+    else
+      fail "$f 실패:"
+      printf '%s\n' "$out" | sed 's/^/      /'
+    fi
+  done < <(git -C "$dir" ls-files -- '*_test.sh')
 
   if [ "$label" = "." ]; then
     if out=$(cd "$dir" && docker compose config -q 2>&1); then
