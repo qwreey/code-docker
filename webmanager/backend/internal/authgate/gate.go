@@ -204,18 +204,16 @@ func (g *Gate) sign(payload []byte) []byte {
 // or the timestamps are inconsistent — claiming to be issued in the future
 // (clock skew or tampering) or refreshed before they were issued — all
 // rejected rather than treated as "very fresh".
-//
-// A payload with no ":" is a token minted before sliding expiry existed (a
-// single timestamp); it's accepted with origin == refreshed so cookies
-// issued by an older build keep working across an upgrade instead of
-// forcing everyone to re-enter the password once.
 func (g *Gate) tokenTimes(r *http.Request) (origin, refreshed time.Time, ok bool) {
 	origin, refreshed, _, ok = g.parseToken(r)
 	return origin, refreshed, ok
 }
 
-// parseToken is tokenTimes plus the session id ("" for a token minted before
-// ids existed). A revoked session fails here, like a bad signature.
+// parseToken is tokenTimes plus the session id. A revoked session fails
+// here, like a bad signature. The payload is always origin:refreshed:sid -
+// the only shape mintSession produces, and no token from an earlier process
+// (an earlier build included) passes the HMAC check, since New draws a new
+// secret every start.
 func (g *Gate) parseToken(r *http.Request) (origin, refreshed time.Time, sid string, ok bool) {
 	cookie, err := r.Cookie(CookieName)
 	if err != nil {
@@ -236,11 +234,11 @@ func (g *Gate) parseToken(r *http.Request) (origin, refreshed time.Time, sid str
 	if !hmac.Equal(givenSig, g.sign(payload)) {
 		return time.Time{}, time.Time{}, "", false
 	}
-	originStr, rest, found := strings.Cut(string(payload), ":")
-	refreshedStr := originStr
-	if found {
-		refreshedStr, sid, _ = strings.Cut(rest, ":")
+	fields := strings.Split(string(payload), ":")
+	if len(fields) != 3 || fields[2] == "" {
+		return time.Time{}, time.Time{}, "", false
 	}
+	originStr, refreshedStr, sid := fields[0], fields[1], fields[2]
 	originUnix, err := strconv.ParseInt(originStr, 10, 64)
 	if err != nil {
 		return time.Time{}, time.Time{}, "", false
@@ -254,7 +252,7 @@ func (g *Gate) parseToken(r *http.Request) (origin, refreshed time.Time, sid str
 	if origin.After(now) || refreshed.After(now) || refreshed.Before(origin) {
 		return time.Time{}, time.Time{}, "", false
 	}
-	if sid != "" && g.isRevoked(sid) {
+	if g.isRevoked(sid) {
 		return time.Time{}, time.Time{}, "", false
 	}
 	return origin, refreshed, sid, true
@@ -390,7 +388,7 @@ func (g *Gate) Revoke(r *http.Request) {
 		return
 	}
 	origin, _, sid, ok := g.parseToken(r)
-	if !ok || sid == "" {
+	if !ok {
 		return
 	}
 	now := time.Now()
@@ -481,9 +479,6 @@ func (g *Gate) refreshCookie(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	if now.Sub(refreshed) < refreshThreshold {
 		return
-	}
-	if sid == "" {
-		sid = newSessionID()
 	}
 	g.SetCookie(w, r, g.mintSession(origin, now, sid))
 }

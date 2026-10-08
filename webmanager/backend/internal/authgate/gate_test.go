@@ -17,8 +17,9 @@ func requestWithToken(g *Gate, origin, refreshed time.Time) *http.Request {
 	return r
 }
 
-// legacyToken is the single-timestamp payload minted by builds from before
-// sliding expiry existed.
+// legacyToken is the single-timestamp payload builds from before sliding
+// expiry minted, signed with this gate's secret - a shape no real token can
+// have anymore, since an older build's secret dies with its process.
 func legacyToken(g *Gate, issued time.Time) string {
 	payload := strconv.FormatInt(issued.Unix(), 10)
 	sig := g.sign([]byte(payload))
@@ -50,14 +51,22 @@ func TestUnlockedHonorsIdleAndLifetime(t *testing.T) {
 	}
 }
 
-// A token minted by an older build carries one timestamp and no ":" — it
-// must keep working across an upgrade rather than forcing a re-login.
-func TestLegacyTokenStillAccepted(t *testing.T) {
+// Only origin:refreshed:sid is a token. The single-timestamp shape, and one
+// without a session id (which Revoke couldn't end), are refused even with a
+// valid signature.
+func TestOnlyCurrentTokenShapeAccepted(t *testing.T) {
 	g := New("dummy-hash")
-	r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
-	r.AddCookie(&http.Cookie{Name: CookieName, Value: legacyToken(g, time.Now().Add(-time.Minute))})
-	if !g.Unlocked(r) {
-		t.Fatal("a legacy single-timestamp token should still unlock")
+	now := time.Now().Add(-time.Minute)
+	sign := func(payload string) string {
+		return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + base64.RawURLEncoding.EncodeToString(g.sign([]byte(payload)))
+	}
+	ts := strconv.FormatInt(now.Unix(), 10)
+	for _, token := range []string{legacyToken(g, now), sign(ts + ":" + ts), sign(ts + ":" + ts + ":"), sign(ts + ":" + ts + ":a:b")} {
+		r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
+		r.AddCookie(&http.Cookie{Name: CookieName, Value: token})
+		if g.Unlocked(r) {
+			t.Fatalf("token %q unlocked", token)
+		}
 	}
 }
 
