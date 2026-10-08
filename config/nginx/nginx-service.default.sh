@@ -34,11 +34,14 @@ valid_host_token() {
 # domain - must be listed. That is what defeats DNS rebinding: the attack needs
 # the browser to send the attacker's own domain as Host, which is never one of
 # these. An empty ALLOWED_HOSTS therefore means "local access only", not "any
-# Host".
+# Host". The IP-literal patterns must match nothing but an IP literal's exact
+# shape (IPv6 always arrives bracketed in Host): any looser, and hex-only
+# registrable names such as deadbeef.de pass as "IP literals".
+# nginx-allowed-hosts_test.sh pins this.
 map_body='default 0;
     "localhost" 1;
-    "~^[0-9.]+$" 1;
-    "~^\[?[0-9A-Fa-f:.]+\]?$" 1;
+    "~^[0-9]{1,3}(\.[0-9]{1,3}){3}$" 1;
+    "~^\[[0-9A-Fa-f:.]+\]$" 1;
     "~^[^.]+$" 1;
     "~\.ts\.net$" 1;'
 if [ -n "${ALLOWED_HOSTS:-}" ]; then

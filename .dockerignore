@@ -1,4 +1,6 @@
 data/
+# dev-check.sh's shell tests (*_test.sh next to the script they test).
+**/*_test.sh
 # Env files and migrate's backups hold password hashes; nothing COPYs them
 # today, this keeps a future broad COPY from baking them into a layer.
 .env*
