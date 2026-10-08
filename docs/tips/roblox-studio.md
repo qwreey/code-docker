@@ -75,10 +75,10 @@ netgate의 forwards는 그중 첫 번째 IP를 골라 DNAT 규칙으로 굳혀�
 
 ## Claude Code에 Studio MCP 붙이기
 
-Roblox Studio는 MCP 서버를 내장하고 있지만 **stdio 전용 + 같은 머신 전용**이라 원격 클라이언트가 붙을 포트가 없습니다. roblox-studio-docker가 이걸 밖으로 꺼내주기 때문에, code-docker 안의 Claude Code가 `studio:8787`로 붙을 수 있습니다. 이 이름은 Studio 본체가 아니라 두 망 사이의 중계 컨테이너 `studio-front`입니다(아래 [격리 구조](#격리-구조) 참고).
+Roblox Studio는 MCP 서버를 내장하고 있지만 **stdio 전용 + 같은 머신 전용**이라 원격 클라이언트가 붙을 포트가 없습니다. roblox-studio-docker가 이걸 밖으로 꺼내주기 때문에, code-docker 안의 Claude Code가 `studio:8787`로 붙을 수 있습니다. 이 이름은 Studio 본체가 아니라 두 망 사이의 중계 컨테이너 `roblox-studio-front`입니다(아래 [격리 구조](#격리-구조) 참고).
 
 ```
-claude (code-docker) → studio:8787/mcp → studio-front → caddy → supergateway → StudioMCP.exe(wine)
+claude (code-docker) → studio:8787/mcp → roblox-studio-front → caddy → supergateway → StudioMCP.exe(wine)
                        └─ code-docker-internal ─┘└─ roblox-studio-net ─┘            ↓ WebSocket
                                                                        Studio의 Assistant 플러그인
 ```
@@ -129,7 +129,7 @@ docker compose up -d studio code-docker   # restart 아님 - env는 create 시�
 <details>
 <summary>이 토큰이 실제로 막는 것 (그리고 왜 묻지 않는지)</summary>
 
-`code-docker-internal` 위에서만(`studio-front`를 거쳐) 닿는 포트에 굳이 토큰이 필요한지는 따져볼 만합니다. 통합 배포에서 이 토큰은 인증 경계라기보다 **심층방어 한 겹**입니다:
+`code-docker-internal` 위에서만(`roblox-studio-front`를 거쳐) 닿는 포트에 굳이 토큰이 필요한지는 따져볼 만합니다. 통합 배포에서 이 토큰은 인증 경계라기보다 **심층방어 한 겹**입니다:
 
 - **code-docker 자신에게는 사실상 무의미합니다.** 토큰이 `.env`와 `~/.claude.json`에 있으므로, code-docker 안에서 뭔가 잘못되면(공급망 공격 등) 토큰도 같이 털립니다.
 - **의미가 있는 건 dind 안에서 사용자가 직접 띄운 컨테이너입니다.** 그것들은 이름으로 `studio`를 찾지는 못하지만(중첩 daemon은 별도 네트워크/DNS - [dind.md](dind.md) 참고) 내부 daemon의 NAT를 통해 `code-docker-internal` 대역에 IP로는 닿을 수 있는 구조이고, 토큰은 볼 수 없습니다. 신뢰하지 않는 이미지를 `docker run` 하는 게 이 환경의 일상적인 용법이라는 걸 생각하면 이쪽은 실질적인 방어입니다. (구조상 그렇다는 것이고 이 경로를 따로 실측하지는 않았습니다.)
@@ -166,7 +166,7 @@ owned: ReplicatedStorage.Shared, ServerScriptService.Server
 - **프로젝트가 핀한 rojo를 그대로 씁니다.** 싱크하는 동안만 그 프로젝트의 `rojo serve`(mise나 PATH가 고른 버전)를 띄웠다가 끕니다. 저장소에는 아무것도 쓰지 않습니다. Studio 쪽 플러그인은 Rojo 플러그인 원본을 그대로 묶은 것이라 Rojo 프로토콜 5(7.7.0 이상)의 서버와 맞습니다.
 - **여러 에이전트가 같은 Studio를 씁니다.** 싱크한 최상위 인스턴스(서비스 바로 아래)에 `AgentOwner` 속성이 붙고, 다른 owner가 붙은 곳을 바꾸게 되는 싱크는 거부됩니다(종료 코드 1). 동시에 실행하면 차례로 처리됩니다. 작업을 끝낸 에이전트는 `studio-sync --release`로 자기 표시를 풀어 다른 에이전트가 이어받게 할 수 있습니다. Studio MCP의 안내문도 에이전트에게 같은 규칙을 알려 줍니다.
 - **필요한 것:** Studio가 실행 중이고 플레이스가 열려 있어야 합니다. 플러그인은 `studio` 컨테이너가 부팅할 때 설치되고, Studio는 플러그인을 시작할 때만 읽으므로 처음 한 번은 Studio를 다시 시작해야 합니다. 끄려면 `.env`에 `STUDIO_SYNC_PLUGIN=false`.
-- **사람이 쓰는 실시간 싱크**는 지금처럼 Rojo 플러그인으로 하면 됩니다. `rojo serve --address 0.0.0.0`(포트 34872~34879)으로 띄우고 Studio에서 호스트 `studio-front`로 연결합니다(`studio-front`가 code-docker로 넘겨줍니다).
+- **사람이 쓰는 실시간 싱크**는 지금처럼 Rojo 플러그인으로 하면 됩니다. `rojo serve --address 0.0.0.0`(포트 34872~34879)으로 띄우고 Studio에서 호스트 `roblox-studio-front`로 연결합니다(`roblox-studio-front`가 code-docker로 넘겨줍니다).
 
 ## Studio 출력 보기 (studio-output)
 
@@ -183,7 +183,7 @@ studio-output -n 200 --no-follow --level warning
 
 ## VS Code에서 `game.Workspace.` 자동완성 (luau-lsp)
 
-luau-lsp VS Code 확장은 Studio의 실제 DataModel을 받아 `game.Workspace.Foo...` 같은 경로를 자동완성할 수 있습니다. 그 데이터를 보내는 Studio 플러그인은 roblox-studio-docker가 이미 설치해 두고, `studio-front`를 거쳐 code-docker의 3667 포트로 보냅니다.
+luau-lsp VS Code 확장은 Studio의 실제 DataModel을 받아 `game.Workspace.Foo...` 같은 경로를 자동완성할 수 있습니다. 그 데이터를 보내는 Studio 플러그인은 roblox-studio-docker가 이미 설치해 두고, `roblox-studio-front`를 거쳐 code-docker의 3667 포트로 보냅니다.
 
 VS Code(code-server) 쪽에서 할 일:
 
@@ -192,7 +192,7 @@ VS Code(code-server) 쪽에서 할 일:
 3. VS Code 창이 열려 있으면 Studio 플러그인이 10초 안에 알아서 연결합니다. Studio의 Output에 `[Luau LSP] INFO: Successfully connected`가 보이면 됩니다(`studio-output`으로 확인할 수 있습니다).
 
 - 확장의 서버는 VS Code 창이 열려 있는 동안만 있습니다. 창을 닫았다 열어도 플러그인이 다시 붙습니다.
-- 플러그인은 설정을 플레이스마다 `TestService.LuauLSP_Settings` 모듈로 만들어 둡니다(업스트림 동작). 이 모듈은 플레이스와 함께 저장되고 호스트가 `studio-front`로 들어가 있으니, 이 환경 밖으로 가져가는 플레이스에서는 지워도 됩니다.
+- 플러그인은 설정을 플레이스마다 `TestService.LuauLSP_Settings` 모듈로 만들어 둡니다(업스트림 동작). 이 모듈은 플레이스와 함께 저장되고 호스트가 `roblox-studio-front`로 들어가 있으니, 이 환경 밖으로 가져가는 플레이스에서는 지워도 됩니다.
 - 끄려면 `.env`에 `STUDIO_LUAU_LSP_PLUGIN=false`.
 
 ## 격리 구조
@@ -207,21 +207,21 @@ roblox-studio-docker는 VNC 포트(5900)를 host에 게시하지 않고, `router
 </details>
 
 <details>
-<summary>Studio의 작업망과 <code>studio-front</code></summary>
+<summary>Studio의 작업망과 <code>roblox-studio-front</code></summary>
 
-Studio는 `code-docker-internal`에 붙지 않습니다. 작업망 `roblox-studio-net`(`internal: true`)과 VNC 전용 `roblox-studio-vnc`에만 있고, 작업망에는 router(게이트웨이)와 중계 컨테이너 `studio-front`만 같이 있습니다.
+Studio는 `code-docker-internal`에 붙지 않습니다. 작업망 `roblox-studio-net`(`internal: true`)과 VNC 전용 `roblox-studio-vnc`에만 있고, 작업망에는 router(게이트웨이)와 중계 컨테이너 `roblox-studio-front`만 같이 있습니다.
 
 ```
 [roblox-studio-net]                            [code-docker-internal]
-studio ──▶ studio-front:34872-34881, :3667 ──▶ code-docker (같은 포트)
-studio ◀── studio-front (별칭 studio)      ◀── code-docker → studio:8787 (MCP)
+studio ──▶ roblox-studio-front:34872-34881, :3667 ──▶ code-docker (같은 포트)
+studio ◀── roblox-studio-front (별칭 studio)      ◀── code-docker → studio:8787 (MCP)
 ```
 
 - **이유:** Studio는 플러그인이나 스크립트가 `HttpService`로 헤더까지 마음대로 정한 요청을 보낼 수 있는 컨테이너입니다. `code-docker-internal`에 붙어 있으면 code-docker의 nginx(로그인 없는 code-server, 기본값으로 로그인 없는 webmanager)와 인증 없는 `dind:2375`에 그대로 닿습니다. 툴박스 플러그인이나 모델 하나가 곧 code-docker 탈취 경로가 됩니다.
-- **넘어가는 것:** code-docker → Studio는 MCP(8787) 하나, Studio → code-docker는 `STUDIO_CODE_DOCKER_PORTS`(`.env`, 기본 `34872-34881 3667`)뿐입니다. 34872~34879는 일반 `rojo serve`, 34880~34881은 [studio-sync](#rojo-프로젝트를-studio에-넣기-studio-sync), 3667은 luau-lsp Studio 플러그인용입니다. 공백으로 구분하고 범위는 `시작-끝`으로 씁니다. 바꾼 뒤엔 `docker compose up -d studio-front`.
-- **Studio 쪽 플러그인의 호스트는 `studio-front`입니다.** Rojo 플러그인이나 luau-lsp 플러그인에서 code-docker의 서버에 붙을 때 호스트를 `studio-front`로 두면, 같은 포트로 code-docker에 넘겨줍니다. Studio 망에서 `studio-front`에 `code-docker`라는 별칭을 주지 않는 건 router도 그 망에 있어서, router가 `code-docker`를 찾을 때 `studio-front`로 잘못 풀릴 수 있기 때문입니다.
-- **code-docker 쪽 서버는 컨테이너 바깥에서 받아야 합니다.** `rojo serve --address 0.0.0.0`처럼 루프백이 아닌 주소에 바인딩해야 `studio-front`가 닿습니다.
-- **그 밖의 길은 없습니다.** Studio에서 code-docker의 80·82 포트, dind, router 앞문으로 가는 연결은 거부되거나(이름이 `studio-front`로 풀리고 그 포트를 안 들음) router에서 버려집니다(IP로 직접).
+- **넘어가는 것:** code-docker → Studio는 MCP(8787) 하나, Studio → code-docker는 `STUDIO_CODE_DOCKER_PORTS`(`.env`, 기본 `34872-34881 3667`)뿐입니다. 34872~34879는 일반 `rojo serve`, 34880~34881은 [studio-sync](#rojo-프로젝트를-studio에-넣기-studio-sync), 3667은 luau-lsp Studio 플러그인용입니다. 공백으로 구분하고 범위는 `시작-끝`으로 씁니다. 바꾼 뒤엔 `docker compose up -d roblox-studio-front`.
+- **Studio 쪽 플러그인의 호스트는 `roblox-studio-front`입니다.** Rojo 플러그인이나 luau-lsp 플러그인에서 code-docker의 서버에 붙을 때 호스트를 `roblox-studio-front`로 두면, 같은 포트로 code-docker에 넘겨줍니다. Studio 망에서 `roblox-studio-front`에 `code-docker`라는 별칭을 주지 않는 건 router도 그 망에 있어서, router가 `code-docker`를 찾을 때 `roblox-studio-front`로 잘못 풀릴 수 있기 때문입니다.
+- **code-docker 쪽 서버는 컨테이너 바깥에서 받아야 합니다.** `rojo serve --address 0.0.0.0`처럼 루프백이 아닌 주소에 바인딩해야 `roblox-studio-front`가 닿습니다.
+- **그 밖의 길은 없습니다.** Studio에서 code-docker의 80·82 포트, dind, router 앞문으로 가는 연결은 거부되거나(이름이 `roblox-studio-front`로 풀리고 그 포트를 안 들음) router에서 버려집니다(IP로 직접).
 
 </details>
 
@@ -263,7 +263,7 @@ networks:
 - **router에서 `target host ... is not in the allowed target host list`** - `.env.router`의 `ROUTER_EXTRA_ALLOWED_TARGET_HOSTS`에 `roblox-studio-vnc`가 있는지 확인하세요. `.env`가 아니라 `.env.router`이고, 고친 뒤 router 컨테이너를 재시작해야 반영됩니다. 컨테이너는 정상적으로 뜨기 때문에 다른 증상이 없습니다.
 - **예전에 `vnc-only:5900`(또는 `:6080`)으로 등록한 VNC 대상/forward가 연결 안 됨** - 별칭이 `roblox-studio-vnc`로 바뀌었습니다(2026-09-22). VNC 탭에서 그 대상을 편집해 호스트를 `roblox-studio-vnc`로 바꾸고, Net 관리의 forward도 마찬가지로 고치세요. `migrate.sh`가 allowlist에 새 이름을 더해 주므로 `.env.router`는 따로 손댈 필요가 없습니다(남아 있는 `vnc-only`는 지워도 됩니다).
 - **forward를 추가했는데 접속이 안 됨** - `code-docker-netinit-docker` 로그에서 `roblox-studio-vnc`에 대한 DOCKER-USER 예외가 실제로 걸렸는지 보세요. 그 네트워크에 `netinit.exempt-forward: "true"` 라벨이 있는지가 가장 흔한 원인입니다.
-- **Studio의 Rojo(또는 luau-lsp) 플러그인이 연결 안 됨** - 플러그인의 호스트가 `code-docker`가 아니라 `studio-front`인지 먼저 보세요(Studio 망에는 `code-docker`라는 이름이 없습니다). 그다음 포트가 `STUDIO_CODE_DOCKER_PORTS` 안에 있는지(`docker compose logs studio-front` 첫 줄에 넘기는 포트가 나옵니다), code-docker 쪽 서버가 루프백이 아닌 주소에 바인딩했는지(`rojo serve --address 0.0.0.0`) 보세요. `docker compose exec studio curl -s http://studio-front:34872/api/rojo`로 Studio 쪽에서 직접 확인할 수 있습니다.
+- **Studio의 Rojo(또는 luau-lsp) 플러그인이 연결 안 됨** - 플러그인의 호스트가 `code-docker`가 아니라 `roblox-studio-front`인지 먼저 보세요(Studio 망에는 `code-docker`라는 이름이 없습니다). 그다음 포트가 `STUDIO_CODE_DOCKER_PORTS` 안에 있는지(`docker compose logs roblox-studio-front` 첫 줄에 넘기는 포트가 나옵니다), code-docker 쪽 서버가 루프백이 아닌 주소에 바인딩했는지(`rojo serve --address 0.0.0.0`) 보세요. `docker compose exec studio curl -s http://roblox-studio-front:34872/api/rojo`로 Studio 쪽에서 직접 확인할 수 있습니다.
 - **`studio-sync`가 `no Studio picked this up`으로 끝남** - Studio가 플레이스를 연 상태인지, 플러그인이 설치됐는지(`docker compose exec studio cat /var/log/studio-plugins/stdout.log`), 설치 뒤 Studio를 다시 시작했는지 보세요. Studio 쪽 플러그인이 `code-docker`에 HTTP를 보내도 되는지 묻는 창이 VNC에 떠 있을 수도 있습니다.
 - **MCP가 연결 안 됨** - 순서대로:
 
