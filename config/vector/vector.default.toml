@@ -107,7 +107,7 @@ is_bare_timestamp = match(msg, r'^\[\d{2}:\d{2}:\d{2}\]$')
 # lines a day even when idle - see
 # https://github.com/tailscale/tailscale/issues/282), which is why a
 # dedicated filter_tailscaled transform used to live here. tailscaled itself
-# moved to router (see .claude/backlog/functional-router-plan.md's
+# moved to router (see router-docker's .claude/functional-router-plan.md's
 # "tailscale 전체 이관") - code-docker's own vector no longer sees any
 # "tailscaled" app_name at all, so that transform (and TAILSCALE_LOG_LEVEL)
 # were removed rather than left as permanently-inert dead code. If router

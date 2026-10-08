@@ -95,7 +95,7 @@ export NGINX_WEBDAV_PORT="$webdav_port"
 # Dev Proxy (/exports/) and router-manager's admin API used to be proxied
 # through from here too (caddy-adapter/router-manager upstreams) - router
 # now terminates host:80 directly and handles both itself, see
-# router/.claude/router-nginx-hardening-plan.md. This nginx only ever
+# router-docker's .claude/router-nginx-hardening-plan.md. This nginx only ever
 # serves code-server/webmanager now.
 
 # NGINX_ALLOWED_PEERS (docker-compose.yml, comma-separated hostnames, IPs or

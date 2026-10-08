@@ -7,7 +7,7 @@ set -e
 # same reasoning about code-server.
 case "${WEBMANAGER_ADDR:-}" in
     private:*)
-        # Fail loudly on stdout (vector only tails stdout.log*, see CLAUDE.md).
+        # Fail loudly: the `private` network alias this used to default to is gone.
         echo "ERR: WEBMANAGER_ADDR=$WEBMANAGER_ADDR - the 'private' alias no longer exists; use 127.0.0.1:${WEBMANAGER_ADDR#private:} (or unset it)"
         exit 1
         ;;

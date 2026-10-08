@@ -7,7 +7,7 @@ set -e
 # Phase 1 of egress-netgate-plan.md's outbound lockdown: this container has
 # zero NET_ADMIN of its own (unlike the old code-docker-netinit sidecar,
 # which shared this netns and held NET_ADMIN - see
-# .claude/backlog/netinit-docker-plan.md). The default route toward netgate
+# .claude/archive/netinit-docker-plan-done.md). The default route toward netgate
 # is instead planted from *outside* this netns by the host-side
 # code-docker-netinit-docker agent (nsenter into this container's SandboxKey
 # - see docker-compose.yml and root CLAUDE.md's "docker-compose topology"
@@ -42,7 +42,7 @@ fi
 if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
     # code-docker-internal is `internal: true`, so Docker's own embedded DNS
     # (127.0.0.11) refuses to forward queries externally - router runs a real
-    # forwarder instead (see router/.claude/router-dns-plan.md). Do this
+    # forwarder instead (see router-docker's .claude/router-dns-plan.md). Do this
     # once, synchronously, before user-init.sh's own qwreey-fish curl below,
     # as a short-lived bootstrap: it's the same plain "127.0.0.11 then
     # router" resolv.conf shape that only some resolvers fail over past
@@ -57,7 +57,7 @@ if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
     # yet - Docker's embedded DNS already resolves same-network container/
     # alias names regardless of the internal-network restriction, only
     # external forwarding is blocked. apply_nameserver is shared with
-    # code-dind/script/dind-entrypoint.sh - see root CLAUDE.md's "netshare"
+    # dind-authz-docker's script/dind-entrypoint.sh - see root CLAUDE.md's "netshare"
     # section.
     router_hostname="${ROUTER_HOSTNAME:-router}"
     if wait_until "router's DNS forwarder" 60 2 getent hosts "$router_hostname"; then
@@ -65,7 +65,7 @@ if [ "${NETGATE_ENABLED:-true}" != "false" ]; then
         # stops resolving, and `set -e` above would turn that into a dead
         # container rather than a degraded one. The wait just succeeded so
         # this is a narrow race, but it's the same shape as the bug that
-        # crash-looped dind (see code-dind/script/dind-entrypoint.sh).
+        # crash-looped dind (see dind-authz-docker's script/dind-entrypoint.sh).
         apply_nameserver "$router_hostname" || true
     else
         echo >&2 "entrypoint: could not resolve '$router_hostname' after 60s - continuing without DNS, dns-local will keep retrying once supervisord starts"

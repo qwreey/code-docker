@@ -133,9 +133,10 @@ func (s *Server) handleWebAuthnUnlockFinish(w http.ResponseWriter, r *http.Reque
 	credID, err := s.webauthn.FinishUnlock(r.URL.Query().Get("ceremony"), rpID, r.Body)
 	if err != nil {
 		// Only a response that was actually checked and failed counts toward
-		// the backoff. The key is the TCP peer - nginx for every browser - so
-		// counting a stale tab's expired ceremony or a garbled body would
-		// lock everyone out over ordinary client mishaps.
+		// the backoff. The key (authgate.ClientKey) is in practice router's
+		// address for every browser, so counting a stale tab's expired
+		// ceremony or a garbled body would lock everyone out over ordinary
+		// client mishaps.
 		if !errors.Is(err, webauthnunlock.ErrUnknownCeremony) && !errors.Is(err, webauthnunlock.ErrMalformed) {
 			s.gate.RecordFailure(key)
 		}

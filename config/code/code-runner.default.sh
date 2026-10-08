@@ -13,8 +13,7 @@ set -e
 CODE_SERVER_BIND_ADDR="${CODE_SERVER_BIND_ADDR:-127.0.0.1:8080}"
 case "$CODE_SERVER_BIND_ADDR" in
     private:*)
-        # Fail loudly on stdout (vector only tails stdout.log*, see
-        # CLAUDE.md): the `private` network alias this used to default to is gone.
+        # Fail loudly: the `private` network alias this used to default to is gone.
         echo "ERR: CODE_SERVER_BIND_ADDR=$CODE_SERVER_BIND_ADDR - the 'private' alias no longer exists; use 127.0.0.1:${CODE_SERVER_BIND_ADDR#private:} (or unset it)"
         exit 1
         ;;

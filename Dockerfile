@@ -161,6 +161,6 @@ RUN chsh root --shell "$(cat "$(/etc/code-docker/override path shell/shell.defau
     mv /etc/ssh /etc/default
 
 # Metadata
-EXPOSE 22 80 81
+EXPOSE 22 80 82
 STOPSIGNAL 15
 ENTRYPOINT ["/etc/code-docker/entrypoint.sh"]
