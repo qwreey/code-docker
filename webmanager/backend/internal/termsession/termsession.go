@@ -38,6 +38,7 @@ package termsession
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"regexp"
@@ -254,8 +255,7 @@ func (s *Session) pump() {
 			// duplicated output. See Attach's own comment for the other half
 			// of this.
 			s.mu.Lock()
-			s.ring.Write(s.clip.Filter(chunk))
-			s.modes.Feed(chunk)
+			s.feedParsers(chunk)
 			sinks := make(map[uint64]writerFunc, len(s.sinks))
 			for id, sink := range s.sinks {
 				sinks[id] = sink
@@ -284,6 +284,27 @@ func (s *Session) pump() {
 			return
 		}
 	}
+}
+
+// feedParsers runs chunk through the two stateful byte parsers on its way
+// into the ring. A bug in either is a bad byte sequence away from a panic,
+// and a panic in pump's goroutine would take the whole process - every
+// session's PTY with it - down. So one is caught here, logged, and costs only
+// this session's parser state (reset) and this chunk's filtering (it goes
+// into the ring as-is). Called with s.mu held; the recover stays inside so
+// the lock is released normally.
+func (s *Session) feedParsers(chunk []byte) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("termsession: %s: output parser panicked, resetting it: %v", s.Name, r)
+			s.clip = newClipboardFilter()
+			s.modes = newModeTracker()
+			s.ring.Write(chunk)
+		}
+	}()
+	filtered := s.clip.Filter(chunk)
+	s.modes.Feed(chunk)
+	s.ring.Write(filtered)
 }
 
 // removeSink drops one sink by id — used both by pump() when a write to it

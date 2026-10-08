@@ -24,6 +24,12 @@ func TestClipboardFilter(t *testing.T) {
 		{"empty osc 52", []string{"q\x1b]52\x07w"}, "qw"},
 		{"two clipboard writes", []string{"\x1b]52;c;YQ==\x07mid\x1b]52;c;Yg==\x07end"}, "midend"},
 		{"dcs payload passed through", []string{"\x1bP+q544\x1b\\x"}, "\x1bP+q544\x1b\\x"},
+		// An ESC ending one PTY read and "]" starting the next used to index
+		// before the start of the second chunk's buffer and panic.
+		{"esc at chunk end then osc 52", []string{"hello\x1b", "]52;c;aGk=\x07after"}, "helloafter"},
+		{"esc esc at chunk end then osc 52", []string{"x\x1b\x1b", "]52;c;aGk=\x07y"}, "x\x1by"},
+		{"esc at chunk end then csi", []string{"a\x1b", "[2Jb"}, "a\x1b[2Jb"},
+		{"esc at chunk end then osc 0", []string{"a\x1b", "]0;t\x07"}, "a\x1b]0;t\x07"},
 	}
 
 	for _, tc := range cases {

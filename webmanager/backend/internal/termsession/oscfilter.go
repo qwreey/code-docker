@@ -76,7 +76,8 @@ func newClipboardFilter() *clipboardFilter {
 // Filter returns p with any OSC 52 removed. The returned slice is either p
 // itself (nothing to strip, the overwhelmingly common case) or a fresh
 // buffer - p is never modified in place, since pump forwards that same
-// chunk on to every live sink.
+// chunk on to every live sink. A chunk's trailing ESC comes out at the
+// start of the next call instead, once it's known not to start an OSC 52.
 func (f *clipboardFilter) Filter(p []byte) []byte {
 	// Nothing can start, continue or end a sequence in a chunk with no ESC
 	// in it while the parser sits at ground.
@@ -88,29 +89,34 @@ func (f *clipboardFilter) Filter(p []byte) []byte {
 	for _, b := range p {
 		switch f.state {
 		case filterGround:
-			out = append(out, b)
 			if b == 0x1b {
+				// Held back until the next byte says whether it starts an
+				// OSC - possibly in the next chunk, which is why it isn't
+				// appended now and trimmed later: by then it would belong to
+				// a buffer already returned.
 				f.state = filterEscape
+				break
 			}
+			out = append(out, b)
 		case filterEscape:
 			switch b {
 			case ']':
-				// Hold the "\x1b]" back too: emitting it now would leave an
+				// Hold the "\x1b]" back: emitting it now would leave an
 				// orphaned introducer behind if this turns out to be a 52.
-				out = out[:len(out)-1]
 				f.prefix = f.prefix[:0]
 				f.state = filterPrefix
 			case 0x1b:
-				// A second ESC restarts the sequence.
-				out = append(out, b)
+				// A second ESC restarts the sequence: the first one was
+				// just an ESC.
+				out = append(out, 0x1b)
 			case 'P', '^', '_', 'X':
 				// DCS/PM/APC/SOS: arbitrary payloads, so skip to the
 				// terminator rather than scanning them for an OSC that isn't
 				// really there.
-				out = append(out, b)
+				out = append(out, 0x1b, b)
 				f.state = filterPass
 			default:
-				out = append(out, b)
+				out = append(out, 0x1b, b)
 				f.state = filterGround
 			}
 		case filterPrefix:
