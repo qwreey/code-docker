@@ -13,8 +13,12 @@ const (
 	// of sniffing the first 512 bytes.
 	textDetectSampleSize = 512
 	// maxTextFileBytes is an upper bound on what's reasonable to load into
-	// LazyCodeEditor at once.
+	// LazyCodeEditor at once, and so also on what it saves.
 	maxTextFileBytes = 5 * 1024 * 1024
+	// MaxTextSaveBodyBytes is the request body cap for saving a text file:
+	// the content as a JSON string, whose escaping (quotes, backslashes,
+	// control characters) adds to its size, plus the path.
+	MaxTextSaveBodyBytes = 2*maxTextFileBytes + 64*1024
 )
 
 var (
@@ -81,6 +85,9 @@ func ReadTextContent(root, userPath string) (content string, truncated bool, err
 // mid-write never leaves a truncated file behind. Creates a new file if one
 // doesn't already exist.
 func WriteTextContent(root, userPath, content string) error {
+	if len(content) > maxTextFileBytes {
+		return ErrFileTooLarge
+	}
 	resolved, err := ResolveForAccess(root, userPath)
 	if err != nil {
 		return err
