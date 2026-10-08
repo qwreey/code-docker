@@ -36,9 +36,28 @@ copy_if_missing() {
 echo "=== code-docker ootb 설치 ==="
 locate_target_dir
 
+# compose_is_pristine <file> - <file>이 code-docker가 언젠가 커밋했던
+# docker-compose.yml 중 하나와 똑같으면(=손 안 댄 배포본) 참.
+compose_is_pristine() {
+  _cip_blob="$(git -C "$SCRIPT_DIR" hash-object "$1")" || return 1
+  git -C "$SCRIPT_DIR" log --format=%H -- docker-compose.yml | while read -r _cip_c; do
+    [ "$(git -C "$SCRIPT_DIR" rev-parse -q --verify "$_cip_c:docker-compose.yml" 2>/dev/null)" = "$_cip_blob" ] && exit 0
+  done
+}
+
 echo "=== 기본 파일 복사 ==="
-cp "$SCRIPT_DIR/docker-compose.yml" "$TARGET_DIR/docker-compose.yml"
-echo "  - 갱신: $TARGET_DIR/docker-compose.yml"
+# 다시 실행해도 안전해야 하므로, 이미 있는 docker-compose.yml은 migrate처럼
+# 손 안 댄 배포본일 때만 덮어씁니다.
+if [ ! -e "$TARGET_DIR/docker-compose.yml" ] || compose_is_pristine "$TARGET_DIR/docker-compose.yml"; then
+  cp "$SCRIPT_DIR/docker-compose.yml" "$TARGET_DIR/docker-compose.yml"
+  echo "  - 갱신: $TARGET_DIR/docker-compose.yml"
+elif cmp -s "$SCRIPT_DIR/docker-compose.yml" "$TARGET_DIR/docker-compose.yml"; then
+  echo "  - 이미 최신: $TARGET_DIR/docker-compose.yml"
+else
+  echo "  ! $TARGET_DIR/docker-compose.yml 이 code-docker가 커밋한 어떤 버전과도 달라서"
+  echo "    (직접 수정한 것으로 보임) 덮어쓰지 않았습니다. 새 버전과의 차이:"
+  diff -u "$TARGET_DIR/docker-compose.yml" "$SCRIPT_DIR/docker-compose.yml" || true
+fi
 cp "$SCRIPT_DIR/empty-extra-include.yml" "$TARGET_DIR/empty-extra-include.yml"
 echo "  - 갱신: $TARGET_DIR/empty-extra-include.yml"
 copy_if_missing "$SCRIPT_DIR/example-env" "$TARGET_DIR/.env"
