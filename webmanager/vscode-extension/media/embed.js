@@ -211,12 +211,17 @@
       return
     }
 
-    // From the extension host. Anything posted from inside webmanager's own
-    // frame tree - a router page or whatever it embeds, nested any depth -
-    // is refused, so nothing there can impersonate the host: `navigate` to
-    // terminal?cmd=... would otherwise run a command. (Not "must equal
-    // window.parent": VS Code's own frame layout around this document isn't
-    // something to pin down, and that check dropped the real host's messages.)
+    // From the extension host. Nothing else may impersonate it: `navigate`
+    // to terminal?cmd=... would otherwise run a command. VS Code relays the
+    // host's messages from its own webview frame, which is code-server's
+    // origin like this document (see src/html.js), so a different origin -
+    // a page in Simple Browser, another extension's remote content - is
+    // refused outright. Same-origin senders inside webmanager's own frame
+    // tree (a router page or whatever it embeds, nested any depth) are
+    // refused too. (Not "must equal window.parent": VS Code's own frame
+    // layout around this document isn't something to pin down, and that
+    // check dropped the real host's messages.)
+    if (e.origin !== location.origin) return
     if (data.source || (e.source && fromEmbedTree(e.source))) return
     switch (data.type) {
       case 'navigate':
