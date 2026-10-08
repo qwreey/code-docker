@@ -179,8 +179,8 @@ func TestMutationsThroughEscapingAncestor(t *testing.T) {
 		t.Fatalf("Delete escaped the root: secret.txt is gone (%v)", err)
 	}
 
-	if _, _, err := OpenUploadDest(root, filepath.Join(root, "evil"), "up.txt"); !errors.Is(err, ErrInvalidPath) {
-		t.Fatalf("OpenUploadDest into escaping dir = %v, want ErrInvalidPath", err)
+	if _, err := StartUpload(root, filepath.Join(root, "evil"), "up.txt", false); !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("StartUpload into escaping dir = %v, want ErrInvalidPath", err)
 	}
 
 	// Removing the escaping link entry itself must still work.
@@ -247,8 +247,8 @@ func TestWriteOntoEscapingLeafSymlink(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err := OpenUploadDest(root, filepath.Join(root, "sub"), "pwn"); !errors.Is(err, ErrInvalidPath) {
-		t.Fatalf("OpenUploadDest onto an escaping link = %v, want ErrInvalidPath", err)
+	if _, err := StartUpload(root, filepath.Join(root, "sub"), "pwn", true); !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("StartUpload onto an escaping link = %v, want ErrInvalidPath", err)
 	}
 	if err := WriteTextContent(root, filepath.Join(root, "sub", "pwn"), "pwned"); !errors.Is(err, ErrInvalidPath) {
 		t.Fatalf("WriteTextContent onto an escaping link = %v, want ErrInvalidPath", err)
@@ -262,7 +262,7 @@ func TestWriteOntoEscapingLeafSymlink(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(src, "pwn"), []byte("pwned"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	results := Copy(root, []string{filepath.Join(src, "pwn")}, filepath.Join(root, "sub"))
+	results := Copy(root, []string{filepath.Join(src, "pwn")}, filepath.Join(root, "sub"), true)
 	if len(results) != 1 || results[0].Ok {
 		t.Fatalf("Copy onto an escaping link = %+v, want failure", results)
 	}

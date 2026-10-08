@@ -29,6 +29,13 @@ var (
 	// ErrInvalidName is returned for an empty/`.`/`..`/separator-containing
 	// name in rename or upload.
 	ErrInvalidName = errors.New("files: invalid name")
+	// ErrExists is returned when a rename/move/copy/upload destination
+	// already exists and the caller didn't ask to overwrite it. Nothing is
+	// replaced without that explicit choice.
+	ErrExists = errors.New("files: destination already exists")
+	// ErrIntoItself is returned for copying or moving a directory into
+	// itself or one of its own subdirectories, which would recurse.
+	ErrIntoItself = errors.New("files: cannot copy or move a directory into itself")
 )
 
 // within reports whether p is base itself or lives somewhere beneath it.

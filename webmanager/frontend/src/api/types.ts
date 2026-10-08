@@ -673,12 +673,18 @@ export interface FileOpResult {
   path: string
   ok: boolean
   error?: string
+  // The destination already exists and overwrite wasn't asked for; the item
+  // can be re-sent with overwrite set.
+  exists?: boolean
 }
 
 export interface FileUploadResult {
   name: string
   ok: boolean
   error?: string
+  // The destination already exists and overwrite wasn't asked for; the item
+  // can be re-sent with overwrite set.
+  exists?: boolean
 }
 
 export interface KeyBinding {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ExternalLink, Terminal as TerminalIcon } from 'lucide-react'
-import { api, apiUrl, errorMessage } from '../../api/client'
+import { api, apiUrl, ApiError, errorMessage } from '../../api/client'
 import type { FileEntry, FileOpResult, FileUploadResult } from '../../api/types'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
@@ -33,8 +33,10 @@ function basenamePosix(p: string): string {
   return idx >= 0 ? p.slice(idx + 1) || p : p
 }
 
+// "Already exists" is not reported as a failure: those items go to the
+// overwrite question instead (see the *Conflict state below).
 function summarizeFailures(results: FileOpResult[]): string | null {
-  const failed = results.filter((r) => !r.ok)
+  const failed = results.filter((r) => !r.ok && !r.exists)
   if (failed.length === 0) return null
   return `${failed.length}개 실패: ${failed.map((f) => `${f.path} (${f.error ?? '알 수 없는 오류'})`).join(', ')}`
 }
@@ -80,6 +82,12 @@ export function FileManager({
   const [uploadSummary, setUploadSummary] = useState<string | null>(null)
 
   const [bulkMode, setBulkMode] = useState<'move' | 'copy' | null>(null)
+  // Nothing is replaced without asking. The backend refuses an existing
+  // destination (409 / exists: true); these hold what to re-send with
+  // overwrite set if the user says so.
+  const [renameConflict, setRenameConflict] = useState<{ entry: FileEntry; newName: string } | null>(null)
+  const [uploadConflict, setUploadConflict] = useState<File[] | null>(null)
+  const [bulkConflict, setBulkConflict] = useState<{ mode: 'move' | 'copy'; destDir: string; items: string[] } | null>(null)
   const [confirmDeletePaths, setConfirmDeletePaths] = useState<string[] | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
@@ -182,19 +190,25 @@ export function FileManager({
     window.location.href = apiUrl(`/files/download?path=${encodeURIComponent(entry.path)}`)
   }
 
-  async function submitRename(entry: FileEntry, newName: string) {
+  async function submitRename(entry: FileEntry, newName: string, overwrite = false) {
     if (!newName || newName === entry.name) {
       setRenamingPath(null)
       return
     }
     setRenameBusy(true)
     try {
-      await api.post<{ ok: true }>('/files/rename', { path: entry.path, newName })
+      await api.post<{ ok: true }>('/files/rename', { path: entry.path, newName, overwrite })
       setRenamingPath(null)
+      setRenameConflict(null)
       setError(null)
       await load()
     } catch (e) {
-      setError(errorMessage(e))
+      if (e instanceof ApiError && e.status === 409 && !overwrite) {
+        setRenameConflict({ entry, newName })
+      } else {
+        setRenameConflict(null)
+        setError(errorMessage(e))
+      }
     } finally {
       setRenameBusy(false)
     }
@@ -233,7 +247,7 @@ export function FileManager({
     }
   }
 
-  async function handleUpload(files: FileList) {
+  async function handleUpload(files: File[], overwrite = false) {
     if (currentDirPath === null) {
       setError('현재 디렉토리 경로를 확인할 수 없어 업로드할 수 없습니다.')
       return
@@ -242,20 +256,24 @@ export function FileManager({
     setUploadSummary(null)
     try {
       const fd = new FormData()
+      // Both fields must come before the file parts (handleFilesUpload).
       fd.append('dir', currentDirPath)
-      for (const f of Array.from(files)) fd.append('files', f)
+      if (overwrite) fd.append('overwrite', 'true')
+      for (const f of files) fd.append('files', f)
       const res = await fetch(apiUrl('/files/upload'), { method: 'POST', body: fd })
       if (!res.ok) {
         throw new Error(`업로드 요청이 실패했습니다 (${res.status})`)
       }
       const data: { results: FileUploadResult[] } = await res.json()
       const ok = data.results.filter((r) => r.ok).length
-      const failed = data.results.filter((r) => !r.ok)
+      const failed = data.results.filter((r) => !r.ok && !r.exists)
+      const existing = new Set(data.results.filter((r) => r.exists).map((r) => r.name))
       setUploadSummary(
         failed.length === 0
           ? `${ok}개 성공`
-          : `${ok}개 성공, ${failed.length}개 실패: ${failed.map((f) => f.name).join(', ')}`,
+          : `${ok}개 성공, ${failed.length}개 실패: ${failed.map((f) => `${f.name} (${f.error ?? '알 수 없는 오류'})`).join(', ')}`,
       )
+      setUploadConflict(existing.size > 0 ? files.filter((f) => existing.has(f.name)) : null)
       setError(null)
       await load()
     } catch (e) {
@@ -265,15 +283,23 @@ export function FileManager({
     }
   }
 
-  async function submitBulk(destDir: string) {
-    if (!bulkMode) return
+  async function submitBulk(
+    destDir: string,
+    mode = bulkMode,
+    items = Array.from(selected),
+    overwrite = false,
+  ) {
+    if (!mode) return
     setBulkBusy(true)
     try {
-      const res = await api.post<{ results: FileOpResult[] }>(`/files/${bulkMode}`, {
-        items: Array.from(selected),
+      const res = await api.post<{ results: FileOpResult[] }>(`/files/${mode}`, {
+        items,
         destDir,
+        overwrite,
       })
       setError(summarizeFailures(res.results))
+      const existing = res.results.filter((r) => r.exists).map((r) => r.path)
+      setBulkConflict(existing.length > 0 ? { mode, destDir, items: existing } : null)
       setBulkMode(null)
       setSelected(new Set())
       await load()
@@ -391,7 +417,7 @@ export function FileManager({
             disabled={uploading || currentDirPath === null}
             onChange={(e) => {
               const files = e.target.files
-              if (files && files.length > 0) handleUpload(files)
+              if (files && files.length > 0) handleUpload(Array.from(files))
               e.target.value = ''
             }}
           />
@@ -459,9 +485,53 @@ export function FileManager({
           initialDir={currentDirPath ?? ''}
           busy={bulkBusy}
           onCancel={() => setBulkMode(null)}
-          onConfirm={submitBulk}
+          onConfirm={(destDir) => submitBulk(destDir)}
         />
       )}
+
+      <ConfirmDialog
+        open={renameConflict !== null}
+        onClose={() => setRenameConflict(null)}
+        onConfirm={() => renameConflict && submitRename(renameConflict.entry, renameConflict.newName, true)}
+        title="이미 있는 이름"
+        confirmLabel="덮어쓰기"
+        busy={renameBusy}
+      >
+        '{renameConflict?.newName}'이(가) 이미 있습니다. 바꾸면 기존 항목은 사라집니다.
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={uploadConflict !== null}
+        onClose={() => setUploadConflict(null)}
+        onConfirm={() => {
+          const files = uploadConflict
+          setUploadConflict(null)
+          if (files) handleUpload(files, true)
+        }}
+        title="이미 있는 파일"
+        confirmLabel="덮어쓰기"
+        cancelLabel="건너뛰기"
+        busy={uploading}
+      >
+        이 폴더에 이미 있어 올리지 않은 파일: {uploadConflict?.map((f) => f.name).join(', ')}. 덮어쓸까요?
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={bulkConflict !== null}
+        onClose={() => setBulkConflict(null)}
+        onConfirm={() => {
+          const c = bulkConflict
+          setBulkConflict(null)
+          if (c) submitBulk(c.destDir, c.mode, c.items, true)
+        }}
+        title="이미 있는 항목"
+        confirmLabel="덮어쓰기"
+        cancelLabel="건너뛰기"
+        busy={bulkBusy}
+      >
+        {bulkConflict?.destDir}에 같은 이름이 이미 있어 {bulkConflict?.mode === 'move' ? '이동' : '복사'}하지 않은 항목:{' '}
+        {bulkConflict?.items.map(basenamePosix).join(', ')}. 덮어쓸까요? 폴더는 기존 폴더에 합쳐집니다.
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={confirmDeletePaths !== null}

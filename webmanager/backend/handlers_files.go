@@ -25,8 +25,11 @@ func writeFilesError(w http.ResponseWriter, err error) {
 		errors.Is(err, files.ErrNotDir),
 		errors.Is(err, files.ErrIsDir),
 		errors.Is(err, files.ErrBinaryFile),
-		errors.Is(err, files.ErrFileTooLarge):
+		errors.Is(err, files.ErrFileTooLarge),
+		errors.Is(err, files.ErrIntoItself):
 		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, files.ErrExists):
+		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, os.ErrNotExist):
 		writeError(w, http.StatusNotFound, "not found")
 	case errors.Is(err, os.ErrPermission):
@@ -142,8 +145,9 @@ func (s *Server) handleFilesMkdir(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleFilesRename(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Path    string `json:"path"`
-		NewName string `json:"newName"`
+		Path      string `json:"path"`
+		NewName   string `json:"newName"`
+		Overwrite bool   `json:"overwrite"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -153,7 +157,7 @@ func (s *Server) handleFilesRename(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "path and newName are required")
 		return
 	}
-	if err := files.Rename(s.cfg.FilesRoot, body.Path, body.NewName); err != nil {
+	if err := files.Rename(s.cfg.FilesRoot, body.Path, body.NewName, body.Overwrite); err != nil {
 		writeFilesError(w, err)
 		return
 	}
@@ -162,8 +166,9 @@ func (s *Server) handleFilesRename(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleFilesMove(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Items   []string `json:"items"`
-		DestDir string   `json:"destDir"`
+		Items     []string `json:"items"`
+		DestDir   string   `json:"destDir"`
+		Overwrite bool     `json:"overwrite"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -173,14 +178,15 @@ func (s *Server) handleFilesMove(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "items and destDir are required")
 		return
 	}
-	results := files.Move(s.cfg.FilesRoot, body.Items, body.DestDir)
+	results := files.Move(s.cfg.FilesRoot, body.Items, body.DestDir, body.Overwrite)
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 
 func (s *Server) handleFilesCopy(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Items   []string `json:"items"`
-		DestDir string   `json:"destDir"`
+		Items     []string `json:"items"`
+		DestDir   string   `json:"destDir"`
+		Overwrite bool     `json:"overwrite"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -190,7 +196,7 @@ func (s *Server) handleFilesCopy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "items and destDir are required")
 		return
 	}
-	results := files.Copy(s.cfg.FilesRoot, body.Items, body.DestDir)
+	results := files.Copy(s.cfg.FilesRoot, body.Items, body.DestDir, body.Overwrite)
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 
@@ -218,10 +224,14 @@ func (s *Server) handleFilesDelete(w http.ResponseWriter, r *http.Request) {
 // (WEBMANAGER_FILES_MAX_UPLOAD_BYTES) is applied directly via
 // http.MaxBytesReader before anything reads the body.
 //
-// Expected form fields: a "dir" field (target directory) that must appear
-// before any "files" part in the multipart stream (this handler reads parts
-// in order and needs the directory before it can validate/open the first
-// file), followed by one or more "files" parts.
+// Expected form fields: a "dir" field (target directory) and an optional
+// "overwrite" field ("true") that must appear before any "files" part in the
+// multipart stream (this handler reads parts in order and needs both before
+// it can validate/open the first file), followed by one or more "files"
+// parts. Each file is received into a temporary file and only then put in
+// place (files.StartUpload), so a cut-off transfer never costs the file that
+// was already there. A name that already exists fails with exists: true
+// unless overwrite was sent; the client asks and re-sends just those.
 func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 	maxUpload, err := strconv.ParseInt(s.cfg.FilesMaxUploadBytes, 10, 64)
 	if err != nil || maxUpload <= 0 {
@@ -236,6 +246,7 @@ func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var dir string
+	overwrite := false
 	// Non-nil so an upload with no file parts still encodes as [] rather than null.
 	results := []files.UploadResult{}
 
@@ -259,6 +270,11 @@ func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 			}
 			dir = strings.TrimSpace(string(data))
 
+		case "overwrite":
+			data, _ := io.ReadAll(io.LimitReader(part, 16))
+			part.Close()
+			overwrite = strings.TrimSpace(string(data)) == "true"
+
 		case "files":
 			name := part.FileName()
 			if dir == "" {
@@ -267,19 +283,22 @@ func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			dest, f, oerr := files.OpenUploadDest(s.cfg.FilesRoot, dir, name)
+			up, oerr := files.StartUpload(s.cfg.FilesRoot, dir, name, overwrite)
 			if oerr != nil {
 				part.Close()
-				results = append(results, files.UploadResult{Name: name, Ok: false, Error: oerr.Error()})
+				results = append(results, files.UploadResult{Name: name, Ok: false, Error: oerr.Error(), Exists: errors.Is(oerr, files.ErrExists)})
 				continue
 			}
 
-			_, cerr := io.Copy(f, part)
-			f.Close()
+			_, cerr := io.Copy(up, part)
 			part.Close()
 			if cerr != nil {
-				_ = os.Remove(dest)
+				up.Abort()
 				results = append(results, files.UploadResult{Name: name, Ok: false, Error: cerr.Error()})
+				continue
+			}
+			if cerr := up.Commit(); cerr != nil {
+				results = append(results, files.UploadResult{Name: name, Ok: false, Error: cerr.Error(), Exists: errors.Is(cerr, files.ErrExists)})
 				continue
 			}
 			results = append(results, files.UploadResult{Name: name, Ok: true})

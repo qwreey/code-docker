@@ -9,9 +9,10 @@ import (
 // siblings so a partial failure doesn't fail the whole upload request (per
 // CLAUDE.md's "부분 실패는 전체 요청 실패보다 열화" ground rule).
 type UploadResult struct {
-	Name  string `json:"name"`
-	Ok    bool   `json:"ok"`
-	Error string `json:"error,omitempty"`
+	Name   string `json:"name"`
+	Ok     bool   `json:"ok"`
+	Error  string `json:"error,omitempty"`
+	Exists bool   `json:"exists,omitempty"`
 }
 
 // sanitizeUploadName reduces an untrusted multipart part filename to a bare
@@ -25,41 +26,85 @@ func sanitizeUploadName(filename string) (string, error) {
 	return base, nil
 }
 
-// OpenUploadDest validates dir + filename and opens (create/truncate) the
-// destination file for writing. The handler is expected to io.Copy the
-// multipart part's body into the returned file and close it.
-func OpenUploadDest(root, dir, filename string) (destPath string, f *os.File, err error) {
+// Upload is one file being received: the bytes go to a temporary file next
+// to the destination, and only Commit puts it in place. A transfer that is
+// cut off or over the size cap therefore leaves the file that was already
+// there untouched.
+type Upload struct {
+	*os.File
+	dest      string
+	mode      os.FileMode
+	overwrite bool
+}
+
+// StartUpload validates dir + filename and opens a temporary file to
+// receive the upload. An existing destination is ErrExists unless
+// overwrite is set; that is checked here, before any body is read, and
+// again at Commit.
+func StartUpload(root, dir, filename string, overwrite bool) (*Upload, error) {
 	resolvedDir, err := ResolveForAccess(root, dir)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	info, err := os.Stat(resolvedDir)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	if !info.IsDir() {
-		return "", nil, ErrNotDir
+		return nil, ErrNotDir
 	}
 
 	name, err := sanitizeUploadName(filename)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
 	// ResolveForAccess, not the lexical ResolvePath: the destination may
-	// already exist *as a symlink*, and os.OpenFile below follows it — an
-	// entry named like the upload that points out of the root would
-	// otherwise turn an upload into an arbitrary root-owned write. A link
-	// that stays inside the root resolves to its target and is written
-	// through as before.
+	// already exist *as a symlink*. One that points out of the root is
+	// refused; one that stays inside resolves to its target, which is what
+	// gets replaced.
 	dest, err := ResolveForAccess(root, filepath.Join(resolvedDir, name))
 	if err != nil {
-		return "", nil, err
+		return nil, err
+	}
+	mode := os.FileMode(0o644)
+	if existing, err := os.Stat(dest); err == nil {
+		if existing.IsDir() {
+			return nil, ErrIsDir
+		}
+		if !overwrite {
+			return nil, ErrExists
+		}
+		mode = existing.Mode().Perm()
 	}
 
-	f, err = os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	f, err := os.CreateTemp(filepath.Dir(dest), "."+filepath.Base(dest)+".partial-*")
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
-	return dest, f, nil
+	return &Upload{File: f, dest: dest, mode: mode, overwrite: overwrite}, nil
+}
+
+// Commit closes the temporary file and moves it to the destination.
+func (u *Upload) Commit() error {
+	name := u.Name()
+	if err := u.Close(); err != nil {
+		os.Remove(name)
+		return err
+	}
+	if err := os.Chmod(name, u.mode); err != nil {
+		os.Remove(name)
+		return err
+	}
+	if err := rename(name, u.dest, u.overwrite); err != nil {
+		os.Remove(name)
+		return err
+	}
+	return nil
+}
+
+// Abort discards the temporary file; the destination was never touched.
+func (u *Upload) Abort() {
+	u.Close()
+	os.Remove(u.Name())
 }
