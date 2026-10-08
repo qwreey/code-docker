@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -129,13 +130,11 @@ func (s *Server) handleUploadFont(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m, err := fonts.Load(s.cfg.FontsDir)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	m.Fonts = append(m.Fonts, f)
-	if err := fonts.Save(s.cfg.FontsDir, m); err != nil {
+	if _, err := fonts.Update(s.cfg.FontsDir, func(m *fonts.Manifest) error {
+		m.Fonts = append(m.Fonts, f)
+		return nil
+	}); err != nil {
+		_ = fonts.DeleteFile(s.cfg.FontsDir, f)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -158,35 +157,29 @@ func (s *Server) handlePatchFont(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m, err := fonts.Load(s.cfg.FontsDir)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	found := false
-	for i := range m.Fonts {
-		if m.Fonts[i].ID != id {
-			continue
+	m, err := fonts.Update(s.cfg.FontsDir, func(m *fonts.Manifest) error {
+		for i := range m.Fonts {
+			if m.Fonts[i].ID != id {
+				continue
+			}
+			if family := strings.TrimSpace(body.Family); family != "" {
+				m.Fonts[i].Family = family
+			}
+			if body.Weight >= 100 && body.Weight <= 900 {
+				m.Fonts[i].Weight = body.Weight
+			}
+			if body.Style == "normal" || body.Style == "italic" || body.Style == "oblique" {
+				m.Fonts[i].Style = body.Style
+			}
+			return nil
 		}
-		if family := strings.TrimSpace(body.Family); family != "" {
-			m.Fonts[i].Family = family
-		}
-		if body.Weight >= 100 && body.Weight <= 900 {
-			m.Fonts[i].Weight = body.Weight
-		}
-		if body.Style == "normal" || body.Style == "italic" || body.Style == "oblique" {
-			m.Fonts[i].Style = body.Style
-		}
-		found = true
-		break
-	}
-	if !found {
+		return fonts.ErrNotFound
+	})
+	if errors.Is(err, fonts.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "font not found")
 		return
 	}
-
-	if err := fonts.Save(s.cfg.FontsDir, m); err != nil {
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -197,27 +190,22 @@ func (s *Server) handlePatchFont(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteFont(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	m, err := fonts.Load(s.cfg.FontsDir)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	idx := -1
-	for i, f := range m.Fonts {
-		if f.ID == id {
-			idx = i
-			break
+	var target fonts.Font
+	m, err := fonts.Update(s.cfg.FontsDir, func(m *fonts.Manifest) error {
+		for i, f := range m.Fonts {
+			if f.ID == id {
+				target = f
+				m.Fonts = append(m.Fonts[:i], m.Fonts[i+1:]...)
+				return nil
+			}
 		}
-	}
-	if idx == -1 {
+		return fonts.ErrNotFound
+	})
+	if errors.Is(err, fonts.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "font not found")
 		return
 	}
-
-	target := m.Fonts[idx]
-	m.Fonts = append(m.Fonts[:idx], m.Fonts[idx+1:]...)
-	if err := fonts.Save(s.cfg.FontsDir, m); err != nil {
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

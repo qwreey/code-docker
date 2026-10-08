@@ -13,11 +13,15 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+
+	"webmanager/internal/atomicfile"
 )
 
 // Font is one uploaded font file's metadata. ID is a random hex string used
@@ -84,8 +88,31 @@ func Load(dir string) (Manifest, error) {
 	return m, nil
 }
 
-// Save writes m atomically (temp file + os.Rename in the same directory),
-// same idiom as internal/terminalsettings.Save.
+// manifestMu serializes Update: an upload, a patch, a delete and the
+// boot-time default-font seed all read-modify-write the manifest, and two at
+// once lost one of the changes (leaving a font file no entry points to).
+var manifestMu sync.Mutex
+
+// ErrNotFound is for an Update callback that didn't find the font it was
+// asked to change.
+var ErrNotFound = errors.New("fonts: font not found")
+
+// Update loads the manifest, lets change modify it, and saves the result,
+// all under one lock. An error from change aborts without saving.
+func Update(dir string, change func(*Manifest) error) (Manifest, error) {
+	manifestMu.Lock()
+	defer manifestMu.Unlock()
+	m, err := Load(dir)
+	if err != nil {
+		return m, err
+	}
+	if err := change(&m); err != nil {
+		return m, err
+	}
+	return m, Save(dir, m)
+}
+
+// Save writes m atomically. Read-modify-write goes through Update.
 func Save(dir string, m Manifest) error {
 	if m.Fonts == nil {
 		m.Fonts = []Font{}
@@ -99,28 +126,7 @@ func Save(dir string, m Manifest) error {
 		return err
 	}
 
-	tmp, err := os.CreateTemp(dir, ".fonts-manifest-*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-
-	_, writeErr := tmp.Write(data)
-	closeErr := tmp.Close()
-	if writeErr != nil {
-		os.Remove(tmpPath)
-		return writeErr
-	}
-	if closeErr != nil {
-		os.Remove(tmpPath)
-		return closeErr
-	}
-
-	if err := os.Rename(tmpPath, manifestPath(dir)); err != nil {
-		os.Remove(tmpPath)
-		return err
-	}
-	return nil
+	return atomicfile.Write(manifestPath(dir), data, 0o600, 0o755)
 }
 
 // allowedExts is the upload whitelist — anything else is rejected outright

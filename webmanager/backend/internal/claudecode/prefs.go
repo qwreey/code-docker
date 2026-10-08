@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"webmanager/internal/atomicfile"
 )
 
 // Prefs is the small set of user-customizable Claude Code tab preferences
@@ -47,26 +49,5 @@ func SavePrefs(path string, p Prefs) error {
 		return err
 	}
 
-	tmp, err := os.CreateTemp(dir, ".claude-prefs-*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-
-	_, writeErr := tmp.Write(data)
-	closeErr := tmp.Close()
-	if writeErr != nil {
-		os.Remove(tmpPath)
-		return writeErr
-	}
-	if closeErr != nil {
-		os.Remove(tmpPath)
-		return closeErr
-	}
-
-	if err := os.Rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath)
-		return err
-	}
-	return nil
+	return atomicfile.Write(path, data, 0o600, 0o755)
 }

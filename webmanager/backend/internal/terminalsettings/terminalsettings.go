@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"webmanager/internal/atomicfile"
 )
 
 // KeyBinding is one user-customizable on-screen mobile control button. Bytes
@@ -113,26 +115,5 @@ func Save(path string, s Settings) error {
 		return err
 	}
 
-	tmp, err := os.CreateTemp(dir, ".terminal-settings-*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-
-	_, writeErr := tmp.Write(data)
-	closeErr := tmp.Close()
-	if writeErr != nil {
-		os.Remove(tmpPath)
-		return writeErr
-	}
-	if closeErr != nil {
-		os.Remove(tmpPath)
-		return closeErr
-	}
-
-	if err := os.Rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath)
-		return err
-	}
-	return nil
+	return atomicfile.Write(path, data, 0o600, 0o755)
 }

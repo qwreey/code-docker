@@ -146,12 +146,11 @@ func installRecommendedFont(ctx context.Context, client *http.Client, dir string
 		return fonts.Font{}, err
 	}
 
-	m, err := fonts.Load(dir)
-	if err != nil {
-		return fonts.Font{}, err
-	}
-	m.Fonts = append(m.Fonts, f)
-	if err := fonts.Save(dir, m); err != nil {
+	if _, err := fonts.Update(dir, func(m *fonts.Manifest) error {
+		m.Fonts = append(m.Fonts, f)
+		return nil
+	}); err != nil {
+		_ = fonts.DeleteFile(dir, f)
 		return fonts.Font{}, err
 	}
 	return f, nil
