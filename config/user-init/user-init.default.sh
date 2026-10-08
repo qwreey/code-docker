@@ -99,11 +99,21 @@ fi
 #
 # Never clobber a value the user chose: core.hooksPath is a single global
 # slot, and silently taking it over would kill whatever they pointed it at.
+#
+# Not a migration, so a failure here only warns: a hand-edited .gitconfig
+# with a typo makes every `git config` exit 128, and under `set -e` that
+# would crash-loop the whole container over an optional hook.
 HOOKS_PATH="/etc/code-docker/git/hooks"
-CURRENT_HOOKS_PATH="$(git config --global --get core.hooksPath || true)"
-if [ -z "$CURRENT_HOOKS_PATH" ]; then
-    git config --global core.hooksPath "$HOOKS_PATH"
-    echo "user-init: set git core.hooksPath to $HOOKS_PATH"
+GITCONFIG_RC=0
+CURRENT_HOOKS_PATH="$(git config --global --get core.hooksPath 2>/dev/null)" || GITCONFIG_RC=$?
+if [ "$GITCONFIG_RC" -gt 1 ]; then
+    echo "user-init: WARNING - git can't read the global gitconfig (exit $GITCONFIG_RC; run 'git config --global --list' to see why) - core.hooksPath not checked. Core services are unaffected." >&2
+elif [ -z "$CURRENT_HOOKS_PATH" ]; then
+    if git config --global core.hooksPath "$HOOKS_PATH"; then
+        echo "user-init: set git core.hooksPath to $HOOKS_PATH"
+    else
+        echo "user-init: WARNING - could not set git core.hooksPath to $HOOKS_PATH (see the error above). Core services are unaffected." >&2
+    fi
 elif [ "$CURRENT_HOOKS_PATH" != "$HOOKS_PATH" ]; then
     echo "user-init: git core.hooksPath is already set to '$CURRENT_HOOKS_PATH' - leaving it alone." >&2
     echo "user-init: the AI commit-trailer hook will NOT run. To use it, chain to $HOOKS_PATH/hook-dispatch from there, or unset core.hooksPath and reboot." >&2
