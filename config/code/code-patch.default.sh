@@ -71,24 +71,40 @@ if [ -d "$SOURCE_DIR" ]; then
         fi
 
         live_hash="$(sha1sum "$target" | awk '{print $1}')"
-        if [ -n "${prev_hash[$name]:-}" ] && [ "$live_hash" = "${prev_hash[$name]}" ]; then
+        if [ "$live_hash" = "$desired_hash" ]; then
+            # Already the bundled content - whatever the manifest said, it
+            # can be tracked (and refreshed) from here on.
+            printf '%s\t%s\n' "$name" "$desired_hash" >> "$MANIFEST.tmp"
+        elif [ -n "${prev_hash[$name]:-}" ] && [ "$live_hash" = "${prev_hash[$name]}" ]; then
             # Untouched since we last seeded it - safe to refresh in place.
             cp "$source_file" "$target"
             printf '%s\t%s\n' "$name" "$desired_hash" >> "$MANIFEST.tmp"
+            echo "code-patch: updated $name to the bundled version"
         else
             # User-modified (or predates hash tracking) - leave it, but keep
             # carrying forward whatever baseline we last knew (possibly
-            # still empty) so this stays consistent on future runs.
+            # still empty) so this stays consistent on future runs. Said
+            # out loud, since it means a bundled fix isn't reaching this file.
             printf '%s\t%s\n' "$name" "${prev_hash[$name]:-}" >> "$MANIFEST.tmp"
+            echo "code-patch: $name differs from the bundled version and was edited (or predates tracking) - left as-is; delete $target to get the bundled one"
         fi
     done
 fi
 
 mv "$MANIFEST.tmp" "$MANIFEST"
 
+# A patch the image no longer ships goes too - but only while it's still
+# exactly what was seeded, the same rule as refreshing above.
 for name in "${!prev_hash[@]}"; do
     case " $current_names " in
-        *" $name "*) ;;
-        *) rm -f "$TARGET_DIR/$name" ;;
+        *" $name "*) continue ;;
     esac
+    target="$TARGET_DIR/$name"
+    [ -e "$target" ] || continue
+    if [ -n "${prev_hash[$name]}" ] && [ "$(sha1sum "$target" | awk '{print $1}')" = "${prev_hash[$name]}" ]; then
+        rm -f "$target"
+        echo "code-patch: removed $name (no longer bundled)"
+    else
+        echo "code-patch: $name is no longer bundled but was edited (or predates tracking) - left in place; delete $target if it's not yours"
+    fi
 done
