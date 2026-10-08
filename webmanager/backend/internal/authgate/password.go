@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/argon2"
 )
@@ -32,7 +33,25 @@ const (
 	argonSaltLen     = 16
 )
 
+// Each check allocates its own argonMemoryKiB, and the unlock routes it
+// sits behind are reachable before any login (WebDAV's even from the
+// internet, outside forward-auth). The per-client lockout can't bound
+// that: concurrent requests all pass it before any of them records a
+// failure. So at most maxConcurrentVerifies run at once, and a check that
+// can't get a slot within verifyQueueWait fails with ErrBusy instead of
+// piling up.
+const maxConcurrentVerifies = 2
+
 var (
+	verifySlots     = make(chan struct{}, maxConcurrentVerifies)
+	verifyQueueWait = 3 * time.Second // a var only so tests can shorten it
+)
+
+var (
+	// ErrBusy is returned by VerifyPassword when every verification slot
+	// stayed taken for verifyQueueWait. It wraps ErrRateLimited, so callers
+	// already answering that with 429 do the same here.
+	ErrBusy = fmt.Errorf("%w: too many password checks at once", ErrRateLimited)
 	// ErrInvalidHash is returned when an encoded hash string doesn't match
 	// the expected $argon2id$v=19$m=...,t=...,p=...$salt$hash format.
 	ErrInvalidHash = errors.New("authgate: invalid encoded hash format")
@@ -86,9 +105,9 @@ func VerifyPassword(plaintext, encodedHash string) (bool, error) {
 		return false, ErrIncompatibleVersion
 	}
 
-	var memory, time uint32
+	var memory, iterations uint32
 	var parallelism uint8
-	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &time, &parallelism); err != nil {
+	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &iterations, &parallelism); err != nil {
 		return false, ErrInvalidHash
 	}
 
@@ -101,6 +120,14 @@ func VerifyPassword(plaintext, encodedHash string) (bool, error) {
 		return false, ErrInvalidHash
 	}
 
-	computed := argon2.IDKey([]byte(plaintext), salt, time, memory, parallelism, uint32(len(hash)))
+	timer := time.NewTimer(verifyQueueWait)
+	defer timer.Stop()
+	select {
+	case verifySlots <- struct{}{}:
+		defer func() { <-verifySlots }()
+	case <-timer.C:
+		return false, ErrBusy
+	}
+	computed := argon2.IDKey([]byte(plaintext), salt, iterations, memory, parallelism, uint32(len(hash)))
 	return subtle.ConstantTimeCompare(hash, computed) == 1, nil
 }
