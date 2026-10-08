@@ -41,6 +41,17 @@ GIT_DIR_PATH="${GIT_DIR:-}"
 if [ -z "$GIT_DIR_PATH" ]; then
     GIT_DIR_PATH="$(git rev-parse --absolute-git-dir 2>/dev/null || true)"
 fi
+# In a linked worktree that is .git/worktrees/<name>, which has no hooks of
+# its own: they live in the common directory its `commondir` file points at
+# (relative to the worktree's git dir, or absolute).
+if [ -n "$GIT_DIR_PATH" ] && [ -f "$GIT_DIR_PATH/commondir" ]; then
+    read -r COMMON_DIR < "$GIT_DIR_PATH/commondir" || true
+    case "$COMMON_DIR" in
+        "") ;;
+        /*) GIT_DIR_PATH="$COMMON_DIR" ;;
+        *) GIT_DIR_PATH="$GIT_DIR_PATH/$COMMON_DIR" ;;
+    esac
+fi
 if [ -n "$GIT_DIR_PATH" ] && [ -x "$GIT_DIR_PATH/hooks/$HOOK_NAME" ]; then
     REPO="$GIT_DIR_PATH/hooks/$HOOK_NAME"
 fi
