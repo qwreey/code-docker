@@ -168,6 +168,25 @@
     toEmbed({ type: 'focus' })
   })
 
+  // VS Code lays a webview over its editor or panel slot with CSS anchor
+  // positioning. While that slot is hidden (another editor tab in front, the
+  // panel closed) the anchor isn't rendered, the anchor sizes stop applying,
+  // and the webview shrinks to an iframe's default 300x150 - hidden with
+  // visibility:hidden, so still laid out, and document.visibilityState stays
+  // "visible". Every page inside would follow it down: a terminal reflowing to
+  // a few columns, a VNC viewer asking its server for a 300x150 desktop. So
+  // the frame's last real size is kept here, and embed.css's 300x150 media
+  // query holds webmanager's frame at it - in the same layout pass, which a
+  // resize listener can't do: by the time `resize` fires, the pages inside
+  // have already been laid out (and their ResizeObservers run) at 300x150.
+  const root = document.documentElement
+  new ResizeObserver(() => {
+    if (window.innerWidth === 300 && window.innerHeight === 150) return
+    root.style.setProperty('--cd-frame-w', `${frame.clientWidth}px`)
+    root.style.setProperty('--cd-frame-h', `${frame.clientHeight}px`)
+    root.classList.add('cd-frame-sized')
+  }).observe(frame)
+
   new MutationObserver(() => toEmbed({ type: 'theme', theme: currentTheme() })).observe(document.body, {
     attributes: true,
     attributeFilter: ['class'],
