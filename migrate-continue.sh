@@ -189,8 +189,10 @@ if [ "$built" = "1" ]; then
         echo "  ! $file 백업을 만들지 못해 마이그레이션을 건너뜁니다."
         continue
       fi
-      new="$(docker compose run --rm -T --entrypoint "$bin" "$service" --env-migrate < "$TARGET_DIR/$file")"
-      if [ -n "$new" ]; then
+      # 출력만이 아니라 종료 코드도 봅니다 - 파일 일부만 찍고 실패한 실행이 원본을
+      # 덮어쓰면 안 됩니다.
+      if new="$(docker compose run --rm -T --entrypoint "$bin" "$service" --env-migrate < "$TARGET_DIR/$file")" \
+         && [ -n "$new" ]; then
         printf '%s' "$new" > "$TARGET_DIR/$file"
         echo "  - $file 마이그레이션 완료 (백업: $(basename "$backup"), 최근 5개만 보관)"
       else
