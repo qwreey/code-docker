@@ -453,9 +453,13 @@ apply_manifest_prompts() {
     [ -z "$_amp_item" ] && break
     _amp_i=$((_amp_i + 1))
 
-    _amp_name="$(echo "$_amp_item" | cut -d: -f1)"
-    _amp_desc="$(echo "$_amp_item" | cut -d: -f2)"
-    _amp_kind="$(echo "$_amp_item" | cut -d: -f3)"
+    # 이름은 첫 `:` 앞, 종류는 마지막 `:` 뒤, 설명은 그 사이 전부 - 설명에 `:`이
+    # 들어가도(URL, "예: ...") 종류가 밀리지 않습니다. 필드 번호로 자르면 secret이
+    # plain으로 읽혀 입력값이 화면에 보입니다.
+    _amp_name="${_amp_item%%:*}"
+    _amp_kind="${_amp_item##*:}"
+    _amp_desc="${_amp_item#*:}"
+    _amp_desc="${_amp_desc%:*}"
 
     has_env_var "$_amp_target" "$_amp_name" && continue
 
