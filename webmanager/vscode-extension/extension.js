@@ -19,7 +19,7 @@ const path = require('path')
 const vscode = require('vscode')
 const { SECTIONS, sectionLabel } = require('./src/sections')
 const S = require('./src/sessions')
-const { buildPath, render, passthroughChords, canonicalChord } = require('./src/html')
+const { buildPath, render, newBind, passthroughChords, canonicalChord } = require('./src/html')
 
 const VIEW_TYPE = 'webmanager.page'
 const SLOT_IDS = ['term1', 'term2', 'term3', 'term4', 'page1', 'page2']
@@ -41,6 +41,8 @@ let build = 'dev'
 let warnedInsecure = false
 const hosts = new Set()
 const slotHosts = new Map()
+// slot id -> whether its view was registered to stay alive while hidden
+const slotRetain = new Map()
 let activePanelHost = null
 
 function log(line) {
@@ -224,7 +226,8 @@ function attach(host, webview, state) {
   host.state = normalizeState(state)
   host.webview = webview
   webview.options = { enableScripts: true, enableForms: true, localResourceRoots: [mediaUri('')] }
-  webview.html = render(webview, ctx.extensionUri, { state: host.state, build })
+  host.bind = newBind()
+  webview.html = render(webview, ctx.extensionUri, { state: host.state, build, bind: host.bind })
   host.subscription = webview.onDidReceiveMessage((m) => onMessage(host, m))
   // A webview needs a secure context for its service worker: over plain
   // http on a LAN address it never boots, so nothing inside it can report
@@ -245,6 +248,29 @@ function detach(host) {
   clearTimeout(host.readyTimer)
   if (host.subscription) host.subscription.dispose()
   hosts.delete(host)
+}
+
+// Whether a view's page stays alive while hidden. Decided when the view was
+// created, so a later change of the setting doesn't reach it.
+function retained(host) {
+  if (host.kind === 'panel') return host.panel.options.retainContextWhenHidden === true
+  return slotRetain.get(host.id) === true
+}
+
+// A changed setting, sent to every view. A view that is hidden and not kept
+// alive has no page to receive it: VS Code rebuilds that one from its stored
+// HTML when it is shown again, with the settings that HTML was rendered
+// with. So its HTML is rendered again instead - under the same binding, so it
+// still resumes where it was (media/embed.js's startPath).
+function tellViews(messages) {
+  for (const h of hosts) {
+    const visible = h.kind === 'panel' ? h.panel.visible : h.view.visible
+    if (visible || retained(h)) {
+      for (const m of messages) h.webview.postMessage(m)
+    } else {
+      h.webview.html = render(h.webview, ctx.extensionUri, { state: h.state, build, bind: h.bind })
+    }
+  }
 }
 
 function describe(host) {
@@ -1009,9 +1035,10 @@ function activate(context) {
     }
     reg(`webmanager.slot.${id}.closeSlot`, () => closeSlot(id))
 
+    slotRetain.set(id, retainFor(isTerminalSlot(id) ? 'terminal' : 'page-slot'))
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(`webmanager.${id}`, slotProvider(id), {
-        webviewOptions: { retainContextWhenHidden: retainFor(isTerminalSlot(id) ? 'terminal' : 'page-slot') },
+        webviewOptions: { retainContextWhenHidden: slotRetain.get(id) },
       }),
     )
   }
@@ -1067,13 +1094,15 @@ function activate(context) {
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
+      const messages = []
       if (e.affectsConfiguration('webmanager.theme')) {
         const theme = vscode.workspace.getConfiguration('webmanager').get('theme') || 'auto'
-        for (const h of hosts) h.webview.postMessage({ type: 'theme-pref', theme })
+        messages.push({ type: 'theme-pref', theme })
       }
-      if (!e.affectsConfiguration('webmanager.passthroughKeys')) return
-      const chords = passthroughChords()
-      for (const h of hosts) h.webview.postMessage({ type: 'keys', chords })
+      if (e.affectsConfiguration('webmanager.passthroughKeys')) {
+        messages.push({ type: 'keys', chords: passthroughChords() })
+      }
+      if (messages.length) tellViews(messages)
     }),
   )
 }

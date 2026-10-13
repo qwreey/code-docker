@@ -55,13 +55,18 @@ function passthroughChords() {
 // frame is same-origin all the way up - which is what makes webmanager's
 // cookie, clipboard and fullscreen work inside it at all. connect-src 'self'
 // is embed.js asking, before each load, whether the outer login expired.
-function render(webview, extensionUri, { state, build }) {
+// Identifies one binding of a view to what it shows; see media/embed.js's
+// startPath.
+function newBind() {
+  return crypto.randomBytes(9).toString('base64')
+}
+
+function render(webview, extensionUri, { state, build, bind }) {
   const nonce = crypto.randomBytes(16).toString('base64')
   const media = (f) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', f))
   const basePath = vscode.workspace.getConfiguration('webmanager').get('basePath') || '/manager/'
   const config = {
-    // Identifies this render; see media/embed.js's startPath.
-    bind: crypto.randomBytes(9).toString('base64'),
+    bind,
     basePath,
     path: buildPath(state),
     state,
@@ -87,4 +92,4 @@ function render(webview, extensionUri, { state, build }) {
 </html>`
 }
 
-module.exports = { buildPath, render, passthroughChords, canonicalChord }
+module.exports = { buildPath, render, newBind, passthroughChords, canonicalChord }
