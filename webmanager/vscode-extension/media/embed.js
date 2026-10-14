@@ -179,11 +179,18 @@
   // query holds webmanager's frame at it - in the same layout pass, which a
   // resize listener can't do: by the time `resize` fires, the pages inside
   // have already been laid out (and their ResizeObservers run) at 300x150.
+  //
+  // Whether the webview is collapsed is decided by that media query alone:
+  // while it holds the frame, the frame doesn't change size and this observer
+  // doesn't run. (A second test here on window.innerHeight could disagree
+  // with it: that reads 150 for a viewport the query sees as 150.4px.) The
+  // size is kept unrounded, since a frame held a fraction of a pixel off its
+  // real size is still a resize to the pages inside.
   const root = document.documentElement
   new ResizeObserver(() => {
-    if (window.innerWidth === 300 && window.innerHeight === 150) return
-    root.style.setProperty('--cd-frame-w', `${frame.clientWidth}px`)
-    root.style.setProperty('--cd-frame-h', `${frame.clientHeight}px`)
+    const box = frame.getBoundingClientRect()
+    root.style.setProperty('--cd-frame-w', `${box.width}px`)
+    root.style.setProperty('--cd-frame-h', `${box.height}px`)
     root.classList.add('cd-frame-sized')
   }).observe(frame)
 

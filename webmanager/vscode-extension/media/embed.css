@@ -25,8 +25,11 @@ body {
 }
 
 /* The webview collapsed to an iframe's default size - its slot is hidden; see
-   embed.js. Keep webmanager's frame at the last size it really had. */
-@media (width: 300px) and (height: 150px) {
+   embed.js. Keep webmanager's frame at the last size it really had.
+   A range around 300x150, not exactly it: a frame is snapped to whole device
+   pixels, so at a display scale or browser zoom where 150px isn't a whole
+   number of them (125%: 187.5) the collapsed viewport is 150.4px tall. */
+@media (298px <= width <= 302px) and (148px <= height <= 152px) {
   .cd-frame-sized #cd-frame {
     flex: none;
     width: var(--cd-frame-w);
