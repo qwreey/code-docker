@@ -6,10 +6,10 @@
 # of a local path couldn't: it would have to sit inside this build context, and dev/
 # is .dockerignore'd on purpose. A bare `docker build .` gets these defaults.
 FROM scratch AS netshare
-ARG ROUTER_CLIENT_REF=v0.1.0
+ARG ROUTER_CLIENT_REF=v0.1.1
 ADD https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF}:netshare /
 FROM scratch AS dns-local
-ARG ROUTER_CLIENT_REF=v0.1.0
+ARG ROUTER_CLIENT_REF=v0.1.1
 ADD https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF}:dns-local /
 # code-server-autoinstall, same mechanism and also pinned to a release tag.
 # docker-compose.yml passes AUTOINSTALL_REF (and AUTOINSTALL_SOURCE for a local dev/

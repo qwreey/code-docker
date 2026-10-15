@@ -80,8 +80,8 @@ services:
       # ending in `/` for development (./dev-clone.sh prints the line) - so one
       # variable covers every subdirectory, including netinit-docker's build below.
       additional_contexts:
-        netshare: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF:-v0.1.0}:}netshare"
-        dns-local: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF:-v0.1.0}:}dns-local"
+        netshare: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF:-v0.1.1}:}netshare"
+        dns-local: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF:-v0.1.1}:}dns-local"
         # Pinned (see the Dockerfile's own stage comment); AUTOINSTALL_SOURCE replaces
         # it with a local checkout. The build arg only matters for the stage's own
         # fallback ADD, which this context overrides - passed anyway so the two can't
@@ -89,7 +89,7 @@ services:
         code-server-autoinstall: "${AUTOINSTALL_SOURCE:-https://github.com/qwreey/code-server-autoinstall.git#${AUTOINSTALL_REF:-v0.1.2}}"
       args:
         AUTOINSTALL_REF: "${AUTOINSTALL_REF:-v0.1.2}"
-        ROUTER_CLIENT_REF: "${ROUTER_CLIENT_REF:-v0.1.0}"
+        ROUTER_CLIENT_REF: "${ROUTER_CLIENT_REF:-v0.1.1}"
       # No `network: host` on any build here: buildx 0.37.2+ refuses it unless the
       # network.host entitlement is granted, and `docker compose build` has no way to
       # grant it. BuildKit's own bridge network already resolves names on a
@@ -260,7 +260,7 @@ services:
       # Same netshare override as code-docker's own build above - replaces the
       # Dockerfile's `FROM scratch AS netshare` stage.
       additional_contexts:
-        netshare: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF:-v0.1.0}:}netshare"
+        netshare: "${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF:-v0.1.1}:}netshare"
       # dind (no protection) | dind-authz (default - denies privileged/dangerous-cap/
       # host-namespace/out-of-/code-mount container creation) | dind-authz-remap
       # (dind-authz + userns-remap - not the default, see docs/tips/dind.md's "추가
@@ -383,7 +383,7 @@ services:
       # contexts above. ROUTER_CLIENT_SOURCE (shared with code-docker's own build above)
       # or the more specific NETINIT_DOCKER_CONTEXT overrides it to build from a local
       # checkout - see example-env.
-      context: "${NETINIT_DOCKER_CONTEXT:-${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF:-v0.1.0}:}netinit-docker}"
+      context: "${NETINIT_DOCKER_CONTEXT:-${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF:-v0.1.1}:}netinit-docker}"
     network_mode: host
     cap_add:
       - NET_ADMIN
