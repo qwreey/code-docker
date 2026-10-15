@@ -121,22 +121,39 @@ function splitPath(pathname: string): { root: string; section: ActiveId | null }
 // and pushing an entry per folder step would redefine the browser's Back
 // button as "go up one directory" in Files and "previously selected session"
 // in Terminal, which is not what Back means anywhere else in this app.
-// Switching tabs drops the query entirely, since setActive pushes a bare
-// `rootPath + id` — a ?session= has no meaning on the Files tab.
+// Switching tabs drops the query entirely, since setActive writes a bare
+// `rootPath + id` — a ?session= has no meaning on the Files tab. The entry's
+// state is carried over, since it holds the HomeBelow marker below.
 function writeQuery(key: string, value: string | null) {
   const params = new URLSearchParams(window.location.search)
   if (value) params.set(key, value)
   else params.delete(key)
   const qs = params.toString()
-  window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''))
+  window.history.replaceState(window.history.state, '', window.location.pathname + (qs ? `?${qs}` : ''))
   reportEmbedState()
+}
+
+// Back works the way it does in a phone app's bottom navigation: from any
+// tab it goes to the home tab, and from there it leaves. History therefore
+// never holds more than [home, current tab] — switching between non-home
+// tabs replaces the entry rather than pushing one, so Back can't walk
+// through every tab visited. That matters most on the Terminal tab, where
+// Back is also how the on-screen keyboard gets closed: one press too many
+// lands on home instead of closing the browser tab.
+//
+// An entry pushed on top of the home entry is marked with this state, so
+// returning home can pop back to it instead of stacking a second one.
+const HOME: ActiveId = 'supervisor'
+type HistoryState = { homeBelow: true } | null
+function hasHomeBelow(): boolean {
+  return (window.history.state as HistoryState)?.homeBelow === true
 }
 
 function App() {
   const initialSplit = useMemo(() => splitPath(window.location.pathname), [])
   const initialQuery = useMemo(() => new URLSearchParams(window.location.search), [])
   const rootPath = initialSplit.root
-  const [active, setActiveState] = useState<ActiveId>(() => initialSplit.section ?? 'supervisor')
+  const [active, setActiveState] = useState<ActiveId>(() => initialSplit.section ?? HOME)
   const providers = useProviders()
   const activeProviderId = providerIdOf(active)
   const activeProvider = providers?.find((p) => p.id === activeProviderId)
@@ -160,10 +177,32 @@ function App() {
     setSidebarShift(next ? 'out' : 'in')
   }
 
+  // See HOME above for the history shape this keeps.
   function setActive(id: ActiveId) {
     setActiveState(id)
-    window.history.pushState(null, '', rootPath + id)
+    const current = splitPath(window.location.pathname).section ?? HOME
+    if (id === current) return
+    if (id === HOME) {
+      if (hasHomeBelow()) window.history.back()
+      else window.history.replaceState(null, '', rootPath + id)
+    } else if (current === HOME) {
+      window.history.pushState({ homeBelow: true } satisfies HistoryState, '', rootPath + id)
+    } else {
+      window.history.replaceState(window.history.state, '', rootPath + id)
+    }
   }
+
+  // Opened straight onto a non-home tab (a PWA shortcut, a bookmark, a
+  // reload), there is no home entry to go back to, so one is slipped in
+  // underneath. Not inside code-server: there the frame shows one fixed
+  // section, and an extra entry would only make the editor's own Back
+  // navigate this iframe.
+  useEffect(() => {
+    if (EMBED || initialSplit.section === null || initialSplit.section === HOME || hasHomeBelow()) return
+    const here = window.location.pathname + window.location.search
+    window.history.replaceState(null, '', rootPath + HOME)
+    window.history.pushState({ homeBelow: true } satisfies HistoryState, '', here)
+  }, [initialSplit, rootPath])
 
   // The VNC tab's frame stays mounted once visited, hidden while another
   // tab shows, so leaving VNC doesn't disconnect its viewers - only closing
@@ -325,7 +364,7 @@ function App() {
 
   useEffect(() => {
     function onPopState() {
-      setActiveState(splitPath(window.location.pathname).section ?? 'supervisor')
+      setActiveState(splitPath(window.location.pathname).section ?? HOME)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)

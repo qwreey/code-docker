@@ -297,7 +297,9 @@ they were watching" reasoning as `ProjectInfoDialog`, and the reason
 `Sheet` grew a `size="full"` variant that the file editor uses too — plus
 deep-link query state for the one piece of within-tab state each of three
 tabs has (`?session=`/`?path=`/`?project=`, `replaceState` so Back doesn't
-become "up one directory"; a URL-supplied session name is verified against
+become "up one directory"; tab switches themselves keep history at
+[home tab, current tab], so Back goes home and then leaves — see `HOME` in
+`App.tsx`; a URL-supplied session name is verified against
 the live list before selection, because sessions are created lazily by the
 WS handshake and selecting an unknown one would silently spawn a shell —
 see `.claude/qa-request/url-state-and-file-overlay-plan-done.md`), a responsive

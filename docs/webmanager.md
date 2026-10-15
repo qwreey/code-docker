@@ -6,6 +6,10 @@ nginx가 `/manager`를 webmanager로 라우팅해줍니다(자세한 라우팅 �
 [build-customization.md](build-customization.md#nginxconf-단일-origin-라우팅-설정) 참고).
 구현된 기능:
 
+뒤로 가기는 휴대폰 앱의 하단 탭처럼 동작합니다. 어느 탭에서든 한 번 누르면 Supervisor 탭으로
+돌아가고, Supervisor 탭에서 한 번 더 누르면 webmanager를 떠납니다. 다른 탭 링크로 바로 들어온
+경우에도 Supervisor 탭을 한 번 거칩니다.
+
 ### Supervisor
 
 supervisord 프로그램 목록 조회 및 start/stop/restart, 표준출력/표준에러 로그 확인.
