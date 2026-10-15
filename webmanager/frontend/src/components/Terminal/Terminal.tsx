@@ -40,6 +40,7 @@ import { TerminalSettingsPanel } from './TerminalSettingsPanel'
 import { TerminalTabs, HOME_TAB_ID } from './TerminalTabs'
 import { TerminalHome } from './TerminalHome'
 import { useKeyboardInset } from './useKeyboardInset'
+import { createCompositionMark } from './compositionMark'
 import { onHostMessage, postToHost, reportEmbedState } from '../../embed'
 import { registerTerminalLinks } from './terminalLinks'
 import './Terminal.css'
@@ -806,11 +807,13 @@ export function Terminal({
   // take effect live.
   const autoReconnectEnabledRef = useRef(autoReconnectEnabled)
   autoReconnectEnabledRef.current = autoReconnectEnabled
-  // No ref mirror needed here, unlike autoReconnectEnabled right above -
-  // this only ever gates a plain conditional render (<TerminalControls>
-  // below and TerminalTabs' zoom group), so plain state already re-applies
-  // on every render with no listener-closure staleness to work around.
+  // Mostly a plain conditional render (<TerminalControls> below and
+  // TerminalTabs' zoom group). The ref is for the mobile-input effect: the
+  // bar carries the keyboard button, so only while it shows may a tap on the
+  // terminal stop opening the keyboard (see openKeyboard).
   const [controlBarEnabled, setControlBarEnabledState] = useState<boolean>(loadControlBarEnabled)
+  const controlBarEnabledRef = useRef(controlBarEnabled)
+  controlBarEnabledRef.current = controlBarEnabled
   const [sessions, setSessions] = useState<TerminalSessionInfo[]>([])
   // HOME_TAB_ID is a virtual tab (never a real termsession.Session), and is
   // also the initial state now: opening the Terminal tab must not silently
@@ -1413,14 +1416,36 @@ export function Terminal({
     // real device 2026-09-06 — the guard above alone did not fix the
     // reported "확대 축소만 하려는데도 키보드가 열려서".
     //
-    // visualViewport's inset is the only signal that actually distinguishes
-    // an open keyboard from a closed one (see useKeyboardInset). Zero inset
-    // therefore means "do nothing": on a phone that is the closed-keyboard
-    // case this exists to skip, and on a desktop, where the inset is always
-    // zero, re-focusing an element that already has focus was a no-op
-    // anyway.
+    // Only the viewport geometry distinguishes an open keyboard from a
+    // closed one (see useKeyboardInset), so "doesn't look open" means "do
+    // nothing": on a phone that is the closed-keyboard case this exists to
+    // skip, and on a desktop, where neither signal moves, re-focusing an
+    // element that already has focus was a no-op anyway.
     if (keyboardInsetRef.current < KEYBOARD_OPEN_MIN_INSET) return
     target.focus()
+  }, [])
+
+  // On a touch device with the control bar showing, its keyboard button is
+  // the only thing that opens the on-screen keyboard: a tap on the terminal
+  // never moves focus (see the mobile-input effect), because a tap that
+  // opened it also fired on the flicks of someone just reading scrollback.
+  // Closing is left to the system (Back, or the keyboard's own hide key):
+  // no browser says whether the keyboard is up, and guessing it from the
+  // viewport height misreads split-screen and rotation.
+  //
+  // Already focused is either "open" or the Back-dismissed state, where the
+  // field keeps focus with the keyboard gone and a plain focus() on it does
+  // nothing. Blur-then-focus inside the tap's user activation brings the
+  // keyboard back in that state and leaves an open one open.
+  //
+  // HTMLElement.prototype.focus rather than target.focus(): in 'native'
+  // mode the target is xterm's own textarea, whose focus is shadowed with a
+  // no-op on touch devices.
+  const openKeyboard = useCallback(() => {
+    const target = mobileInputRef.current ?? termRef.current?.textarea ?? null
+    if (!target) return
+    if (document.activeElement === target) target.blur()
+    HTMLElement.prototype.focus.call(target, { preventScroll: true })
   }, [])
 
   const zoom = useCallback(
@@ -1843,16 +1868,18 @@ export function Terminal({
       // A drag never needs the keyboard, so swallow that one focus call for the
       // duration of our own dispatch. xterm's focus() is
       // `this.textarea.focus(...)`, so an own property on the textarea shadows
-      // it; deleting that property afterwards restores the prototype method.
-      // A real tap's compatibility click is not dispatched through here, so it
-      // still focuses and opens the keyboard exactly as before.
+      // it; putting back whatever was there before (the mobile-input effect's
+      // own shadow, or nothing) restores the previous behavior. A real tap's
+      // compatibility click is not dispatched through here.
       const textarea = term.textarea
       if (type === 'mousedown' && textarea) {
+        const previous = Object.getOwnPropertyDescriptor(textarea, 'focus')
         textarea.focus = () => {}
         try {
           wheelTarget().dispatchEvent(event)
         } finally {
-          Reflect.deleteProperty(textarea, 'focus')
+          if (previous) Object.defineProperty(textarea, 'focus', previous)
+          else Reflect.deleteProperty(textarea, 'focus')
         }
         return
       }
@@ -2322,8 +2349,32 @@ export function Terminal({
     const isTouchDevice = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
     const useField = isTouchDevice && inputMode !== 'native'
 
+    // A tap on the terminal never opens the on-screen keyboard while the
+    // control bar (and so its keyboard button, see openKeyboard) is
+    // showing. Every tap path ends in xterm calling `this.textarea.focus()` —
+    // its mousedown handler, and on Android its Linux selection hook — so an
+    // own property shadows all of them at once, the same trick dispatchMouse
+    // uses for a single drag. Shadowing rather than redirecting means a tap
+    // changes nothing: an open keyboard stays open, a closed one stays closed.
+    // Applies in every mode, 'native' included, since the complaint
+    // (scrolling to read pops the keyboard up) has nothing to do with which
+    // element takes the text.
+    let restoreTextareaFocus = () => {}
+    if (isTouchDevice) {
+      textarea.focus = (options?: FocusOptions) => {
+        if (!controlBarEnabledRef.current) {
+          HTMLTextAreaElement.prototype.focus.call(textarea, options)
+          return
+        }
+        debug?.log('  (xterm focus ignored: keyboard opens from the control bar)')
+      }
+      restoreTextareaFocus = () => {
+        Reflect.deleteProperty(textarea, 'focus')
+      }
+    }
+
     if (!useField) {
-      if (!debug) return
+      if (!debug) return restoreTextareaFocus
       const onNativeEvent = (e: Event) => logEvent('xterm', e, textarea.value)
       for (const type of ['compositionstart', 'compositionupdate', 'compositionend', 'input', 'keydown']) {
         textarea.addEventListener(type, onNativeEvent)
@@ -2332,6 +2383,7 @@ export function Terminal({
         for (const type of ['compositionstart', 'compositionupdate', 'compositionend', 'input', 'keydown']) {
           textarea.removeEventListener(type, onNativeEvent)
         }
+        restoreTextareaFocus()
         debugLogRef.current = null
         debug.dispose()
       }
@@ -2425,6 +2477,32 @@ export function Terminal({
     }
     syncFieldBox()
     const cursorDisposable = term.onCursorMove(syncFieldBox)
+
+    // xterm draws its cursor as a hollow outline (cursorInactiveStyle)
+    // whenever its own textarea lacks focus — which, with focus on this
+    // field, was always, so a phone never showed whether the terminal was
+    // taking input at all. While the field has focus the inactive style is
+    // set to the shape the cursor would have when focused. That shape can
+    // come from the application (DECSCUSR, `CSI Ps SP q` — vim's bar in
+    // insert mode), which xterm keeps privately, so it is tracked here; the
+    // handler returns false so xterm's own still runs.
+    const inactiveCursorDefault = term.options.cursorInactiveStyle ?? 'outline'
+    let appCursorStyle: 'block' | 'underline' | 'bar' | null = null
+    const mirrorCursor = () => {
+      term.options.cursorInactiveStyle = document.activeElement === field
+        ? (appCursorStyle ?? term.options.cursorStyle ?? 'block')
+        : inactiveCursorDefault
+      // Changing this option alone doesn't repaint the cursor row.
+      term.refresh(0, term.rows - 1)
+    }
+    const cursorShapeDisposable = term.parser.registerCsiHandler({ intermediates: ' ', final: 'q' }, (params) => {
+      const ps = typeof params[0] === 'number' ? params[0] : 0
+      appCursorStyle = ps === 0 ? null : ps <= 2 ? 'block' : ps <= 4 ? 'underline' : ps <= 6 ? 'bar' : appCursorStyle
+      if (document.activeElement === field) mirrorCursor()
+      return false
+    })
+    field.addEventListener('focus', mirrorCursor)
+    field.addEventListener('blur', mirrorCursor)
 
     // One sentinel character is always kept in the field: deleting from an
     // already-empty field fires no input event at all (nothing for the
@@ -2596,6 +2674,9 @@ export function Terminal({
       // previous designs all truncated the field, which meant every such
       // re-emission looked like brand new text.
       let sent = ANCHOR
+      const screen = container.querySelector<HTMLElement>('.xterm-screen')
+      const compositionMark = screen ? createCompositionMark(term, screen) : null
+      const markComposition = (text: string) => compositionMark?.set(text, liveCompositionRef.current)
       // Set when the keyboard started inserting *before* the anchor instead of
       // after it, leaving the anchor as the field's last character. See
       // readValue below — this is what put a phantom space into English
@@ -2769,10 +2850,12 @@ export function Terminal({
       const onCompositionStart = (e: Event) => {
         composing = true
         logEvent('field', e, field.value)
+        markComposition((e as CompositionEvent).data ?? '')
       }
       const onCompositionEnd = (e: Event) => {
         composing = false
         logEvent('field', e, field.value)
+        markComposition('')
         flush()
         // With live composition, a space typed *inside* the composition
         // was already sent by an input event while `composing` was still
@@ -2799,6 +2882,7 @@ export function Terminal({
         // true, silently disabling caret pinning and word-boundary resets from
         // then on. The input event's own isComposing is authoritative.
         if (composing && e instanceof InputEvent && !e.isComposing) composing = false
+        if (!composing) markComposition('')
         // Mid-composition the field holds a half-assembled syllable. With
         // live composition on it goes out anyway, and the next input's diff
         // backspaces over it once the IME assembles it further — that is
@@ -2865,6 +2949,7 @@ export function Terminal({
       }
       const onBlur = () => {
         composing = false
+        markComposition('')
         if (refocusing) return
         resetField('blur')
       }
@@ -2889,6 +2974,7 @@ export function Terminal({
       const resync = (reason: string) => {
         if (document.activeElement !== field) return
         composing = false
+        markComposition('')
         resetField(reason)
         pinCaretToEnd()
       }
@@ -2898,11 +2984,14 @@ export function Terminal({
       }
       const onPageShow = () => resync('pageshow')
       const onWindowFocus = () => resync('window focus')
-      // Observed only, never acted on: an IME that keeps a composing region
-      // fires several of these between one compositionstart/end pair, and an
-      // IME that has given up composing fires none. That difference is the
-      // single most useful thing in a copied debug log.
-      const onCompositionUpdate = (e: Event) => logEvent('field', e, field.value)
+      // An IME that keeps a composing region fires several of these between
+      // one compositionstart/end pair, and an IME that has given up composing
+      // fires none. That difference is the single most useful thing in a
+      // copied debug log. Its data is also what the composition mark shows.
+      const onCompositionUpdate = (e: Event) => {
+        logEvent('field', e, field.value)
+        markComposition((e as CompositionEvent).data ?? '')
+      }
       field.addEventListener('compositionstart', onCompositionStart)
       field.addEventListener('compositionupdate', onCompositionUpdate)
       field.addEventListener('compositionend', onCompositionEnd)
@@ -2915,6 +3004,7 @@ export function Terminal({
       window.addEventListener('pageshow', onPageShow)
       window.addEventListener('focus', onWindowFocus)
       cleanups.push(() => {
+        compositionMark?.dispose()
         window.clearTimeout(refocusTimer)
         field.removeEventListener('focus', onFocus)
         field.removeEventListener('beforeinput', onBeforeInput)
@@ -2936,15 +3026,29 @@ export function Terminal({
     // workaround field without special-casing each call site. (keepFocus
     // itself targets mobileInputRef directly; this listener covers every
     // OTHER path, above all xterm's own real click-to-focus.)
-    const onTextareaFocus = () => {
+    const onTextareaFocus = (e: FocusEvent) => {
+      // Focus that came straight from the field goes back to it: whatever
+      // the keyboard was doing, it keeps doing.
+      if (e.relatedTarget === field) {
+        debug?.log('  (focus returned to input field)')
+        field.focus()
+        return
+      }
       // Inside a touch drag or momentum coast (see holdFocus in the touch
       // handler), whatever focused xterm's textarea was xterm itself, never a
-      // user asking to type — so hand focus straight back instead of
-      // forwarding it, and the keyboard stays as it was. A tap made after the
-      // window has passed redirects normally.
+      // user asking to type — so drop the focus instead of forwarding it, and
+      // the keyboard stays closed.
       if (performance.now() < suppressFocusUntilRef.current) {
         textarea.blur()
         debug?.log('  (focus redirect suppressed: touch drag/momentum)')
+        return
+      }
+      // xterm's own focus calls are already shadowed while the control bar
+      // shows (see the top of this effect); this catches focus that reached
+      // the textarea some other way, and still never opens the keyboard.
+      if (controlBarEnabledRef.current) {
+        textarea.blur()
+        debug?.log('  (focus redirect refused: keyboard opens from the control bar)')
         return
       }
       debug?.log('  (focus redirected to input field)')
@@ -2954,7 +3058,12 @@ export function Terminal({
 
     return () => {
       textarea.removeEventListener('focus', onTextareaFocus)
+      restoreTextareaFocus()
       cursorDisposable.dispose()
+      cursorShapeDisposable.dispose()
+      field.removeEventListener('focus', mirrorCursor)
+      field.removeEventListener('blur', mirrorCursor)
+      term.options.cursorInactiveStyle = inactiveCursorDefault
       for (const fn of cleanups) fn()
       cleanups = []
       field.remove()
@@ -3721,6 +3830,7 @@ export function Terminal({
             onArmModifier={armModifier}
             onSendBytes={sendBytes}
             onZoom={zoom}
+            onOpenKeyboard={isCoarsePointer ? openKeyboard : undefined}
           />
         )}
       </div>

@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react'
-import { ZoomIn, ZoomOut } from 'lucide-react'
+import { Keyboard, ZoomIn, ZoomOut } from 'lucide-react'
 import type { KeyBinding } from '../../api/types'
 import { isModifierBinding, type ModifierId } from './keybindings'
 
@@ -37,6 +37,11 @@ function preventFocusSteal(event: MouseEvent) {
  * this bar itself no longer forces a refocus on every touch release the way
  * an earlier version did, since that fought any attempt to deliberately
  * dismiss the on-screen keyboard.
+ *
+ * `onOpenKeyboard` (touch devices only) adds the on-screen keyboard's open
+ * button, pinned to the bar's left edge so it stays reachable however far
+ * the row is scrolled. While the bar shows, it is the only way the keyboard
+ * opens — see Terminal.tsx's openKeyboard.
  */
 export function TerminalControls({
   keybindings,
@@ -44,15 +49,31 @@ export function TerminalControls({
   onArmModifier,
   onSendBytes,
   onZoom,
+  onOpenKeyboard,
 }: {
   keybindings: KeyBinding[]
   armedModifier: ModifierId | null
   onArmModifier: (id: ModifierId) => void
   onSendBytes: (bytes: string) => void
   onZoom: (direction: 'in' | 'out') => void
+  onOpenKeyboard?: () => void
 }) {
   return (
     <div className="terminal-controls" role="toolbar" aria-label="터미널 특수키">
+      {onOpenKeyboard && (
+        <div className="terminal-controls-pinned">
+          <button
+            type="button"
+            className="terminal-key-btn terminal-key-action"
+            aria-label="키보드 열기"
+            title="키보드 열기"
+            onMouseDown={preventFocusSteal}
+            onClick={onOpenKeyboard}
+          >
+            <Keyboard size={16} />
+          </button>
+        </div>
+      )}
       {keybindings.map((binding) => {
         const modifierId = isModifierBinding(binding.id) ? binding.id : null
         return modifierId ? (

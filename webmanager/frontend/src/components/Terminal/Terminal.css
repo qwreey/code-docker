@@ -608,6 +608,41 @@
   background: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
+/* The keyboard button stays put while the keys scroll under it. The wrapper
+   carries the terminal's own opaque background (the button's tint is
+   translucent) and reaches back over the bar's left padding, so a key
+   scrolled past it disappears behind it instead of showing through. The
+   sticky inset counts from the bar's content box, not its edge, hence the
+   negative left matching the bar's padding. */
+.terminal-controls-pinned {
+  position: sticky;
+  left: -0.5rem;
+  z-index: 1;
+  flex: none;
+  display: flex;
+  margin-left: -0.5rem;
+  padding: 0 0.1rem 0 0.5rem;
+  background: var(--term-bg, #000);
+}
+
+/* Text the keyboard is still composing (compositionMark.ts). Underlined in
+   place when it has already been echoed (live composition); drawn in a box
+   at the cursor when it hasn't, like xterm's own .composition-view. */
+.terminal-composition-mark {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  box-sizing: border-box;
+  border-bottom: 2px solid var(--term-fg, #e6e6e6);
+  background: color-mix(in srgb, var(--term-fg, #e6e6e6) 18%, transparent);
+}
+
+.terminal-composition-mark.pending {
+  white-space: nowrap;
+  background: var(--term-fg, #e6e6e6);
+  color: var(--term-bg, #000);
+}
+
 @media (max-width: 720px) {
   .terminal-section {
     margin: -1.25rem;

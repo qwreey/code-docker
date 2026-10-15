@@ -123,8 +123,14 @@ old anchor" branch instead. `touchend` cancels compatibility mouse events
 after a drag, since their late mousedown would otherwise wipe the selection.
 xterm focuses its textarea on mousedown and — because Android's
 `navigator.platform` contains "Linux" — on every selection refresh
-(`onLinuxMouseSelection`), so the focus redirect is suppressed during and just
-after drags and momentum; a later tap opens the keyboard normally. Momentum
+(`onLinuxMouseSelection`). While the control bar shows, a tap never moves
+focus at all — `textarea.focus` is shadowed with a no-op on touch devices, in
+every input mode — and the bar's left-pinned keyboard button
+(`openKeyboard`) is the only way the keyboard opens. Closing is left to Back or
+the keyboard's own hide key, since no browser reports whether the keyboard is
+up. With the bar
+hidden, taps open it as before, with the redirect suppressed during and just
+after drags and momentum. Momentum
 scrolling applies to the viewport and to apps with mouse tracking on (wheel
 reports), never to an alternate-screen app without tracking (wheel becomes
 arrow keys). Once a row-count change settles, full-screen apps get a one-row
@@ -132,10 +138,16 @@ repaint nudge, same trick as the backend's `nudgeRepaint` — vim was measured
 to redraw correctly from a single SIGWINCH in a real PTY, yet its mode line
 could stay missing on the device after a keyboard resize. Control-bar buttons
 go through `keepFocus`, which refocuses only when the field already has focus
-*and* visualViewport reports a real keyboard inset, so a closed keyboard is
-never forced open (note that Chrome on Android with a resizing layout viewport
-reports an inset of 0 even with the keyboard up; resizes then arrive through
-the ResizeObserver instead). Keys that produce no text — arrows, Home/End, Tab, Escape, F-keys, Ctrl/Alt chords — from a physical keyboard on a touch device are replayed onto xterm's own textarea with `keyCode` shadowed (xterm's `evaluateKeyboardEvent` switches on it), since focus sits on the workaround field and those keys otherwise never reached the PTY; an unconsumed arrow was even taken by the browser's spatial navigation and moved focus onto the session tabs. On the Terminal tab the app's own
+*and* the keyboard looks open, so a closed keyboard is never forced open.
+"Looks open" is a visualViewport inset *or* innerHeight dropping below the
+tallest seen at that width (`useKeyboardInset`'s `layoutLoss`): with
+`interactive-widget=resizes-content`, Chrome on Android shrinks the layout
+viewport and the inset stays 0 with the keyboard up. Because focus sits on the
+field, xterm would draw its hollow unfocused cursor forever, so while the field
+has focus `cursorInactiveStyle` mirrors the focused shape (tracking DECSCUSR
+itself), and text still being composed is marked by `compositionMark.ts` —
+underlined in place when live composition already echoed it, a box at the
+cursor otherwise. Keys that produce no text — arrows, Home/End, Tab, Escape, F-keys, Ctrl/Alt chords — from a physical keyboard on a touch device are replayed onto xterm's own textarea with `keyCode` shadowed (xterm's `evaluateKeyboardEvent` switches on it), since focus sits on the workaround field and those keys otherwise never reached the PTY; an unconsumed arrow was even taken by the browser's spatial navigation and moved focus onto the session tabs. On the Terminal tab the app's own
 `.mobile-topbar` is hidden and its hamburger is adopted into
 `.terminal-topbar`, reclaiming ~3.6rem of the height a phone keyboard makes
 scarce), a Font Manager tab (`internal/fonts` — upload/list/
