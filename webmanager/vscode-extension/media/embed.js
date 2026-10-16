@@ -272,6 +272,7 @@
       case 'lock':
       case 'select-session':
       case 'foreground':
+      case 'visibility':
         toEmbed(data)
         break
       case 'theme-pref':

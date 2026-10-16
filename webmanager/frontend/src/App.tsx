@@ -32,7 +32,7 @@ import { useAuthStatus } from './components/common/useAuthStatus'
 import { ensureUnlocked } from './components/common/useUnlockGate'
 import { withViewTransition } from './utils/viewTransition'
 import { useEmbedEscapeClose } from './utils/embedEscape'
-import { EMBED, embedParams, postToHost, reportEmbedState } from './embed'
+import { EMBED, embedParams, postToHost, reportEmbedState, useHostVisible } from './embed'
 import './App.css'
 
 // FileManager pulls in the CodeMirror editor chunk and is a sizable feature
@@ -211,6 +211,9 @@ function App() {
   // desktop request); coming back finds it at the same size.
   const [vncVisited, setVncVisited] = useState(active === 'vnc')
   if (active === 'vnc' && !vncVisited) setVncVisited(true)
+  // Inside code-server, the view itself can be hidden too; router's viewers
+  // stop taking screen updates while it is.
+  const hostVisible = useHostVisible()
   // Which target is showing inside it (null = the target list), as router
   // last reported - mirrored into ?target= while the tab is showing, the way
   // Terminal mirrors ?session=.
@@ -547,7 +550,12 @@ function App() {
               sizing measured against .app-content itself. */}
           {vncVisited && (
             <div style={{ display: active === 'vnc' ? 'contents' : 'none' }}>
-              <RouterFrame tab="vnc" params={vncInitialParams} onEmbedMessage={handleVncMessage} />
+              <RouterFrame
+                tab="vnc"
+                params={vncInitialParams}
+                onEmbedMessage={handleVncMessage}
+                shown={active === 'vnc' && hostVisible}
+              />
             </div>
           )}
         </main>

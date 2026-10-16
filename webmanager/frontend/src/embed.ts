@@ -14,6 +14,8 @@
 // code-server's origin), so the parent isn't a trust boundary; messages are
 // still checked for origin, source window and our own `source` tag.
 
+import { useSyncExternalStore } from 'react'
+
 export const EMBED_SOURCE = 'cd-webmanager-embed'
 
 const params = new URLSearchParams(window.location.search)
@@ -42,6 +44,10 @@ export type HostMessage =
   | { type: 'open-webauthn' }
   | { type: 'lock' }
   | { type: 'select-session'; session: string }
+  // Whether the view holding this page is visible. VS Code keeps a hidden
+  // view's page alive (and laid out, and document.visibilityState "visible"),
+  // so this is the only way the page learns it is hidden.
+  | { type: 'visibility'; visible: boolean }
 
 export function postToHost(msg: Record<string, unknown>) {
   if (!EMBED) return
@@ -49,6 +55,25 @@ export function postToHost(msg: Record<string, unknown>) {
 }
 
 const hostListeners = new Set<(msg: HostMessage) => void>()
+
+// The last 'visibility' the host sent. Kept here rather than in a component:
+// the host answers the 'ready' sent below, which can arrive before React has
+// mounted anything to listen.
+let hostVisible = true
+const visibleListeners = new Set<() => void>()
+
+function subscribeHostVisible(listener: () => void) {
+  visibleListeners.add(listener)
+  return () => {
+    visibleListeners.delete(listener)
+  }
+}
+
+// Whether the code-server view holding this page is visible; always true
+// outside embed mode.
+export function useHostVisible(): boolean {
+  return useSyncExternalStore(subscribeHostVisible, () => hostVisible)
+}
 
 export function onHostMessage(listener: (msg: HostMessage) => void) {
   hostListeners.add(listener)
@@ -128,6 +153,10 @@ export function installEmbedBridges() {
     if (e.source !== window.parent || e.origin !== window.location.origin) return
     const data = e.data
     if (!data || typeof data !== 'object' || data.source !== EMBED_SOURCE) return
+    if (data.type === 'visibility' && typeof data.visible === 'boolean' && data.visible !== hostVisible) {
+      hostVisible = data.visible
+      visibleListeners.forEach((listener) => listener())
+    }
     hostListeners.forEach((listener) => listener(data as HostMessage))
   })
   document.addEventListener('click', onLinkClick, true)

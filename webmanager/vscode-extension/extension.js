@@ -273,6 +273,15 @@ function tellViews(messages) {
   }
 }
 
+// Tells the page whether its view is visible. A view kept alive while hidden
+// stays laid out with document.visibilityState "visible", so the page can't
+// tell by itself; router's VNC viewers use this to stop taking screen
+// updates while nobody can see them.
+function tellVisibility(host) {
+  const visible = host.kind === 'panel' ? host.panel.visible : host.view.visible
+  host.webview.postMessage({ type: 'visibility', visible })
+}
+
 function describe(host) {
   return host.kind === 'panel' ? `panel "${titleOf(host.state)}"` : `slot ${host.id}`
 }
@@ -359,6 +368,7 @@ function setupPanel(panel, state) {
   panel.onDidChangeViewState((e) => {
     if (e.webviewPanel.active) setActivePanel(host)
     else if (activePanelHost === host) setActivePanel(null)
+    tellVisibility(host)
   })
   panel.onDidDispose(() => {
     detach(host)
@@ -428,6 +438,7 @@ function slotProvider(id) {
       hosts.add(host)
       slotHosts.set(id, host)
       attach(host, view.webview, slotBindings()[id] || defaultSlotState(id))
+      view.onDidChangeVisibility(() => tellVisibility(host))
       view.onDidDispose(() => {
         detach(host)
         if (slotHosts.get(id) === host) slotHosts.delete(id)
@@ -736,6 +747,10 @@ async function onMessage(host, m) {
     case 'wv-ready':
       clearTimeout(host.readyTimer)
       if (!m.secure) log(`view ${describe(host)} is not in a secure context`)
+      break
+    case 'ready':
+      // webmanager's page (re)loaded: it starts out assuming it is visible.
+      tellVisibility(host)
       break
     case 'embed-timeout':
       log(`view ${describe(host)}: webmanager never reported ready`)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Skeleton } from '../common/Skeleton'
 import { useTheme } from '../../useTheme'
 import { useRouterTrustedHosts } from './useRouterTrustedHosts'
@@ -30,6 +30,11 @@ interface RouterFrameProps {
   // Messages the embedded page sends about itself (router-docker's own
   // frontend/src/embedTheme.ts notifyEmbedParent), other than the 'ready' handled here.
   onEmbedMessage?: (data: Record<string, unknown>) => void
+  // Whether this frame can be seen, for a frame kept mounted while hidden
+  // (the VNC tab). Passed on to the page, whose viewers stop taking screen
+  // updates while hidden (router-docker's frontend/src/embedTheme.ts
+  // useEmbedShown). Left out, the page assumes it is shown.
+  shown?: boolean
 }
 
 /**
@@ -57,7 +62,7 @@ export function RouterFrame(props: RouterFrameProps) {
 // host is undefined when no dedicated ROUTER_MANAGER_HOSTS domain is
 // configured - the iframe then just points at this same origin's own
 // /router/ path instead of a cross-origin one.
-function RouterIframe({ host, tab, params, onEmbedMessage }: RouterFrameProps & { host?: string }) {
+function RouterIframe({ host, tab, params, onEmbedMessage, shown }: RouterFrameProps & { host?: string }) {
   const { theme } = useTheme()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [loaded, setLoaded] = useState(false)
@@ -114,7 +119,15 @@ function RouterIframe({ host, tab, params, onEmbedMessage }: RouterFrameProps & 
     iframeRef.current?.contentWindow?.postMessage({ source: MESSAGE_SOURCE, type: 'theme', theme }, targetOrigin)
   }, [theme, targetOrigin])
 
+  const postShown = useCallback(() => {
+    if (shown === undefined) return
+    iframeRef.current?.contentWindow?.postMessage({ source: MESSAGE_SOURCE, type: 'shown', shown }, targetOrigin)
+  }, [shown, targetOrigin])
+  useEffect(postShown, [postShown])
+
   function handleLoad() {
+    // Again on load: a message sent before the page loaded went nowhere.
+    postShown()
     setTimeout(() => setLoaded(true), LOAD_SETTLE_MS)
   }
 
