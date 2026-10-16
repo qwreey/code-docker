@@ -181,6 +181,22 @@ studio-output -n 200 --no-follow --level warning
 - MCP 브리지와 같은 포트·토큰(`studio:8787`, `MCP_TOKEN`)을 거칩니다. `MCP_TOKEN`이 비어 있으면(브리지를 꺼 두면) 쓸 수 없습니다.
 - 여러 에이전트가 같은 Studio를 쓰면 모두의 출력이 섞여 나옵니다.
 
+## Script Analysis 보기 (studio-analysis)
+
+`studio-analysis`는 Studio의 Script Analysis 창에 나온 타입 오류·린트 경고를 플레이스 전체 스크립트에 대해 출력합니다. MCP 도구로는 이 내용을 얻을 수 없어서 따로 둔 명령입니다.
+
+```sh
+studio-analysis                  # 열린 Studio마다 스크립트별 항목과 요약
+studio-analysis --place Place1   # 창 제목에 Place1이 들어간 Studio만
+studio-analysis --json
+```
+
+- **Script Analysis 창이 Studio에 열려 있어야 합니다.** 도킹돼 있어도, 다른 도크 탭 뒤에 있어도, 옆으로 접혀 있어도(사이드 탭) 읽습니다. 숨어 있으면 읽는 동안만 꺼냈다가 원래대로 돌려놓고, 목록의 스크롤 위치도 되돌립니다.
+- **닫혀 있으면 읽을 수 없습니다.** 그때는 Studio 화면 앞의 사람이 Window > Script > Analysis로 열어야 합니다. 에이전트도 그렇게 안내받습니다.
+- 접힌 스크립트 그룹은 이름만 나옵니다. 안의 항목은 Studio에서 펼쳐야 보입니다.
+- 한 번 읽는 데 15~25초쯤 걸립니다. 읽는 동안 Studio 위에서 마우스를 움직이면 사이드 탭이 닫혀 일부가 빠질 수 있고, 그럴 때는 출력에 그렇다고 나옵니다.
+- `studio-output`과 같은 MCP 브리지 포트·토큰을 거칩니다.
+
 ## VS Code에서 `game.Workspace.` 자동완성 (luau-lsp)
 
 luau-lsp VS Code 확장은 Studio의 실제 DataModel을 받아 `game.Workspace.Foo...` 같은 경로를 자동완성할 수 있습니다. 그 데이터를 보내는 Studio 플러그인은 roblox-studio-docker가 이미 설치해 두고, `roblox-studio-front`를 거쳐 code-docker의 3667 포트로 보냅니다.
