@@ -2,6 +2,7 @@ package projectgit
 
 import (
 	"errors"
+	"math"
 	"os/exec"
 	"testing"
 )
@@ -31,5 +32,23 @@ func TestCommitInfo(t *testing.T) {
 	}
 	if _, err := CommitInfo(dir, "--output=x"); !errors.Is(err, ErrInvalidHash) {
 		t.Fatalf("flag-shaped hash: got %v, want ErrInvalidHash", err)
+	}
+}
+
+// TestLogClampsLimit: limit sizes the result slice before git runs, so a
+// huge value from the query string used to be a fatal allocation.
+func TestLogClampsLimit(t *testing.T) {
+	dir := t.TempDir()
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "first"},
+	} {
+		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	page, err := Log(dir, math.MaxInt, "")
+	if err != nil || len(page.Commits) != 1 {
+		t.Fatalf("Log(MaxInt) = %d commits, %v; want 1, nil", len(page.Commits), err)
 	}
 }

@@ -10,6 +10,11 @@ import (
 // defaultLogLimit applies when the caller passes limit <= 0.
 const defaultLogLimit = 30
 
+// maxLogLimit caps limit: it sizes the result slice up front, so an
+// unbounded value from the query string could allocate past what the
+// process can survive.
+const maxLogLimit = 500
+
 // logFieldSep/logRecordSep delimit `git log --pretty=format:` output below.
 // Both are ASCII control characters (unit/record separator) that can never
 // appear in a commit's author name/email/date/subject, so no escaping or
@@ -51,6 +56,7 @@ func Log(path string, limit int, cursor string) (LogPage, error) {
 	if limit <= 0 {
 		limit = defaultLogLimit
 	}
+	limit = min(limit, maxLogLimit)
 	skip := 0
 	if cursor != "" {
 		if n, err := strconv.Atoi(cursor); err == nil && n > 0 {

@@ -281,6 +281,9 @@ func resolveSessionPath(configDir, project, sessionID string) (string, error) {
 	return path, nil
 }
 
+// maxSessionLinesLimit is the most lines one ReadSessionLines call returns.
+const maxSessionLinesLimit = 2000
+
 // ReadSessionLines returns raw JSONL lines [cursor, cursor+limit) from
 // project/sessionId's transcript, unparsed — the frontend's vendored schema
 // module does all interpretation. hasMore is determined by reading one line
@@ -297,6 +300,9 @@ func ReadSessionLines(configDir, project, sessionID string, cursor, limit int) (
 	if limit <= 0 {
 		limit = 500
 	}
+	// Capped because it sizes lines up front: an unbounded value from the
+	// query string could allocate past what the process can survive.
+	limit = min(limit, maxSessionLinesLimit)
 
 	f, err := os.Open(path)
 	if err != nil {
