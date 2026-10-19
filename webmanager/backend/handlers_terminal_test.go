@@ -89,3 +89,40 @@ func TestParseAttachSize(t *testing.T) {
 		})
 	}
 }
+
+// TestTerminalAcceptsLargePaste: a paste goes to the server as one message,
+// and past coder/websocket's 32KiB default read limit the server used to
+// close the connection, losing the paste.
+func TestTerminalAcceptsLargePaste(t *testing.T) {
+	paste := bytes.Repeat([]byte("x"), 64*1024)
+	got := make(chan []byte, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := acceptTerminal(w, r)
+		if err != nil {
+			t.Errorf("accept: %v", err)
+			got <- nil
+			return
+		}
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		_, data, err := conn.Read(r.Context())
+		if err != nil {
+			t.Errorf("read: %v", err)
+		}
+		got <- data
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http"), nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close(websocket.StatusNormalClosure, "")
+	if err := conn.Write(ctx, websocket.MessageBinary, paste); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if data := <-got; !bytes.Equal(data, paste) {
+		t.Fatalf("server read %d bytes, want %d", len(data), len(paste))
+	}
+}

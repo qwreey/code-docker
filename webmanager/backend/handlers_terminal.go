@@ -57,6 +57,22 @@ const terminalWriteTimeout = 10 * time.Second
 // own default has headroom too.
 const scrollbackChunkBytes = 16 * 1024
 
+// terminalReadLimit bounds one message from the browser. coder/websocket's
+// default is 32KiB, and Terminal.tsx sends a paste as a single message, so
+// anything pasted past that closed the connection and the paste was lost.
+const terminalReadLimit = 8 << 20
+
+// acceptTerminal is websocket.Accept plus terminalReadLimit, for every
+// handler that relays browser input into a PTY.
+func acceptTerminal(w http.ResponseWriter, r *http.Request) (*websocket.Conn, error) {
+	conn, err := websocket.Accept(w, r, nil)
+	if err != nil {
+		return nil, err
+	}
+	conn.SetReadLimit(terminalReadLimit)
+	return conn, nil
+}
+
 // terminalControlMessage is the JSON shape of text WebSocket frames sent by
 // the client. M1 only defines "resize"; unknown types are ignored so the
 // protocol can grow without breaking older clients.
@@ -86,7 +102,7 @@ func (s *Server) handleTerminal(w http.ResponseWriter, r *http.Request) {
 	// on. This doesn't replace real auth (there isn't any for M1, see
 	// above) — it just stops an unrelated site's page from opening a
 	// WebSocket to this endpoint through a victim's browser.
-	conn, err := websocket.Accept(w, r, nil)
+	conn, err := acceptTerminal(w, r)
 	if err != nil {
 		log.Printf("terminal: websocket accept failed: %v", err)
 		return
@@ -399,7 +415,7 @@ func (s *Server) handleClaudeInteractiveLoginTerminal(w http.ResponseWriter, r *
 		return
 	}
 
-	conn, err := websocket.Accept(w, r, nil)
+	conn, err := acceptTerminal(w, r)
 	if err != nil {
 		log.Printf("claude interactive login: websocket accept failed: %v", err)
 		return
