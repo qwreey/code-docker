@@ -30,8 +30,11 @@ export function Sheet({
 
   useEffect(() => {
     if (!open) return
+    // A dialog open on top (ConfirmDialog) handles Escape first and marks
+    // it handled; closing the sheet too would throw away what that dialog
+    // was protecting.
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !e.defaultPrevented) onClose()
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)

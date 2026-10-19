@@ -53,11 +53,16 @@ export function ConfirmDialog({
 
   useEffect(() => {
     if (!open) return
+    // Capture phase on window, so this runs before the document-level
+    // listener of a Sheet the dialog sits on, which skips an Escape already
+    // handled here.
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      onClose()
     }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [open, onClose])
 
   if (!open) return null

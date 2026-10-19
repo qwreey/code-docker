@@ -42,6 +42,13 @@ export function FileEditorSheet({
   onSaved: () => void
 }) {
   const [content, setContent] = useState('')
+  // content as last loaded or saved; anything else is unsaved, and closing
+  // asks before dropping it.
+  const [savedContent, setSavedContent] = useState('')
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
+  // A failed load leaves no file to edit: showing an empty editor with a
+  // save button would let one click replace the file with nothing.
+  const [loadFailed, setLoadFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [unsupported, setUnsupported] = useState<string | null>(null)
   // What the file was when loaded (or last saved). A save that finds
@@ -65,10 +72,12 @@ export function FileEditorSheet({
   const load = useCallback(async () => {
     setLoading(true)
     setUnsupported(null)
+    setLoadFailed(false)
     setError(null)
     try {
       const data = await api.get<FileContent>(`/files/content?path=${encodeURIComponent(entry.path)}`)
       setContent(data.content)
+      setSavedContent(data.content)
       setVersion(data.version)
     } catch (e) {
       if (e instanceof ApiError && e.status === 400) {
@@ -79,6 +88,7 @@ export function FileEditorSheet({
         )
       } else {
         setError(errorMessage(e))
+        setLoadFailed(true)
       }
     } finally {
       setLoading(false)
@@ -93,13 +103,15 @@ export function FileEditorSheet({
     setSaving(true)
     setSaved(false)
     setError(null)
+    const body = content
     try {
       const res = await api.put<{ ok: true; version: string }>('/files/content', {
         path: entry.path,
-        content,
+        content: body,
         baseVersion: overwrite ? '' : version,
       })
       setVersion(res.version)
+      setSavedContent(body)
       setChangedOnDisk(false)
       setSaved(true)
       onSaved()
@@ -115,15 +127,20 @@ export function FileEditorSheet({
     }
   }
 
+  function requestClose() {
+    if (content !== savedContent) setConfirmDiscard(true)
+    else onClose()
+  }
+
   return (
     <Sheet
       open
-      onClose={onClose}
+      onClose={requestClose}
       title={`편집 — ${entry.name}`}
       size="full"
       bodyClassName="sheet-body-flush file-editor-body"
       headerActions={
-        !loading && !unsupported ? (
+        !loading && !unsupported && !loadFailed ? (
           <>
             <button
               type="button"
@@ -150,6 +167,13 @@ export function FileEditorSheet({
         <p className="empty-state">불러오는 중...</p>
       ) : unsupported ? (
         <p className="empty-state">{unsupported}</p>
+      ) : loadFailed ? (
+        <div className="empty-state">
+          <p>파일을 불러오지 못했습니다.</p>
+          <button type="button" className="btn btn-secondary btn-small" onClick={load}>
+            다시 시도
+          </button>
+        </div>
       ) : (
         <Suspense fallback={<div className="empty-state">에디터 불러오는 중...</div>}>
           <LazyCodeEditor value={content} onChange={setContent} language="plain" wrap={wrap} height="100%" />
@@ -165,6 +189,15 @@ export function FileEditorSheet({
       >
         연 뒤에 다른 곳(에이전트, 터미널 등)에서 이 파일을 고쳤습니다. 덮어쓰면 그 변경은 사라집니다. 취소하면 내
         편집은 이 창에 남고 파일은 그대로입니다.
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={confirmDiscard}
+        onClose={() => setConfirmDiscard(false)}
+        onConfirm={onClose}
+        title="저장하지 않은 편집이 있습니다"
+        confirmLabel="버리고 닫기"
+      >
+        닫으면 저장하지 않은 편집은 사라집니다. 취소하면 편집기로 돌아갑니다.
       </ConfirmDialog>
     </Sheet>
   )
