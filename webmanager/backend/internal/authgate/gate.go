@@ -81,6 +81,11 @@ type Gate struct {
 	attemptsMu sync.Mutex
 	attempts   map[string]*attemptState
 
+	// keyLocks holds one mutex per key with an attempt in flight (see
+	// lockKey).
+	keyLocksMu sync.Mutex
+	keyLocks   map[string]*keyLock
+
 	// session id -> when that session would have expired anyway, after
 	// which the entry is dropped. Bounded by how many locks can happen in
 	// maxSessionLifetime, each of which needs a valid session to begin with.
@@ -104,6 +109,41 @@ func New(hash string) *Gate {
 		panic("authgate: failed to generate HMAC secret: " + err.Error())
 	}
 	return &Gate{hash: hash, secret: secret, attempts: map[string]*attemptState{}, revoked: map[string]time.Time{}}
+}
+
+// keyLock is one key's entry in Gate.keyLocks.
+type keyLock struct {
+	mu   sync.Mutex
+	refs int
+}
+
+// lockKey serializes password attempts for key and returns the matching
+// unlock. Without it the lockout check and the failure record sit on either
+// side of a slow argon2id verification, so concurrent attempts all pass the
+// check before any of them is recorded. Callers wait rather than being
+// refused, so a WebDAV client's parallel first requests still work; the
+// entry is dropped once nobody holds or waits on it.
+func (g *Gate) lockKey(key string) (unlock func()) {
+	g.keyLocksMu.Lock()
+	if g.keyLocks == nil {
+		g.keyLocks = map[string]*keyLock{}
+	}
+	l := g.keyLocks[key]
+	if l == nil {
+		l = &keyLock{}
+		g.keyLocks[key] = l
+	}
+	l.refs++
+	g.keyLocksMu.Unlock()
+	l.mu.Lock()
+	return func() {
+		l.mu.Unlock()
+		g.keyLocksMu.Lock()
+		if l.refs--; l.refs == 0 {
+			delete(g.keyLocks, key)
+		}
+		g.keyLocksMu.Unlock()
+	}
 }
 
 // rateLimited reports whether key is currently locked out, and for how much
@@ -308,6 +348,7 @@ func (g *Gate) TryUnlock(key, plaintext string) (token string, ok bool, err erro
 	if !g.Configured() {
 		return "", false, nil
 	}
+	defer g.lockKey(key)()
 	if remaining, locked := g.rateLimited(key); locked {
 		return "", false, fmt.Errorf("%w: try again in %s", ErrRateLimited, remaining.Round(time.Second))
 	}

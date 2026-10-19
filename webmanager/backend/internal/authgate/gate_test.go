@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -213,5 +215,36 @@ func TestLockoutSurvivesLongCampaign(t *testing.T) {
 		if !locked || remaining > lockoutMax {
 			t.Fatalf("after %d failures: locked=%v remaining=%s, want locked for at most %s", i, locked, remaining, lockoutMax)
 		}
+	}
+}
+
+// TestLockoutHoldsUnderConcurrency: the lockout used to be checked before
+// the password was verified and recorded after, so concurrent attempts all
+// passed the check and each got a full verification. Attempts for one key
+// now run one at a time, so a burst gets exactly maxFailuresBeforeLockout
+// verifications and the rest see the lockout.
+func TestLockoutHoldsUnderConcurrency(t *testing.T) {
+	hash, err := HashPassword("hunter2")
+	if err != nil {
+		t.Fatalf("HashPassword: %v", err)
+	}
+	g := New(hash)
+	var verified atomic.Int32
+	var wg sync.WaitGroup
+	for range 40 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, ok, err := g.TryUnlock("10.0.0.1", "wrong"); !ok && err == nil {
+				verified.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if n := verified.Load(); n != maxFailuresBeforeLockout {
+		t.Fatalf("%d concurrent wrong attempts were verified, want %d", n, maxFailuresBeforeLockout)
+	}
+	if n := len(g.keyLocks); n != 0 {
+		t.Fatalf("%d per-key locks left behind after every attempt returned", n)
 	}
 }
