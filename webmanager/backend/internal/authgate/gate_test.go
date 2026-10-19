@@ -197,3 +197,21 @@ func TestRevokeEndsOnlyThatSession(t *testing.T) {
 		t.Error("a new unlock after Revoke doesn't work")
 	}
 }
+
+// TestLockoutSurvivesLongCampaign is the regression test for the 2026-10-18
+// review: the backoff was lockoutBase * (1 << n), which overflowed int64 from
+// the 36th consecutive failure - negative or zero backoffs, i.e. no lockout,
+// for good from the 60th on.
+func TestLockoutSurvivesLongCampaign(t *testing.T) {
+	g := New("")
+	for i := 1; i <= 200; i++ {
+		g.recordFailure("10.0.0.1")
+		if i < maxFailuresBeforeLockout {
+			continue
+		}
+		remaining, locked := g.rateLimited("10.0.0.1")
+		if !locked || remaining > lockoutMax {
+			t.Fatalf("after %d failures: locked=%v remaining=%s, want locked for at most %s", i, locked, remaining, lockoutMax)
+		}
+	}
+}

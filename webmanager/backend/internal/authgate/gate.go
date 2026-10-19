@@ -137,10 +137,14 @@ func (g *Gate) recordFailure(key string) {
 	}
 	st.failures++
 	if st.failures >= maxFailuresBeforeLockout {
-		backoff := lockoutBase * time.Duration(1<<uint(st.failures-maxFailuresBeforeLockout))
-		if backoff > lockoutMax {
-			backoff = lockoutMax
+		// Doubled step by step rather than as lockoutBase << n: the shift
+		// overflows int64 a few dozen failures in, and a negative backoff
+		// is no lockout at all.
+		backoff := lockoutBase
+		for i := maxFailuresBeforeLockout; i < st.failures && backoff < lockoutMax; i++ {
+			backoff *= 2
 		}
+		backoff = min(backoff, lockoutMax)
 		st.lockedUntil = time.Now().Add(backoff)
 	}
 }
