@@ -23,7 +23,7 @@
 # dev-clone.sh and example-env).
 include:
   - path: ${EXTRA_INCLUDE:-empty-extra-include.yml}
-  - path: "${ROUTER_INCLUDE:-https://github.com/qwreey/router-docker.git#${ROUTER_REF:-v0.1.14}:docker-compose.router.yml}"
+  - path: "${ROUTER_INCLUDE:-https://github.com/qwreey/router-docker.git#${ROUTER_REF:-v0.1.15}:docker-compose.router.yml}"
 
 networks:
   code-docker-internal:
@@ -256,7 +256,7 @@ services:
       # (DIND_REF) - used to be a submodule at code-dind/, see that repo's own
       # CLAUDE.md. DIND_CONTEXT points it at a local checkout (dev/dind-authz-docker,
       # see dev-clone.sh and example-env).
-      context: "${DIND_CONTEXT:-https://github.com/qwreey/dind-authz-docker.git#${DIND_REF:-v0.1.5}}"
+      context: "${DIND_CONTEXT:-https://github.com/qwreey/dind-authz-docker.git#${DIND_REF:-v0.1.6}}"
       # Same netshare override as code-docker's own build above - replaces the
       # Dockerfile's `FROM scratch AS netshare` stage.
       additional_contexts:
