@@ -438,16 +438,6 @@ func (s *Server) handleClaudeSessionLines(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// handleClaudeMemory reports a project's Claude Code auto-memory
-// (CLAUDE_CONFIG_DIR/projects/<slug>/memory/ — MEMORY.md index + individual
-// memory files). Unlike handleClaudeSessions/handleClaudeSessionLines, this
-// is ungated: memory files are curated notes (feedback/project/user
-// summaries), not raw conversation content, and the same read-open
-// convention handlers_projectgit.go uses applies here — `project` is
-// validated against the already-known project scanner cache first, same as
-// projectGitPath. A missing memory directory is not an error (see
-// claudememory.Load's doc comment) — it's the normal state for a project
-// Claude Code has never run against.
 // handleClaudeSettingsGet returns the raw text of CLAUDE_CONFIG_DIR/
 // settings.json, for the raw editor + friendly toggles in the frontend.
 // Ungated, matching this repo's reads-stay-open convention, but the file can
@@ -529,6 +519,12 @@ func (s *Server) handleClaudeLogout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, claudeLogoutResponse{Message: message})
 }
 
+// handleClaudeMemory reports a project's Claude Code auto-memory
+// (CLAUDE_CONFIG_DIR/projects/<slug>/memory/ — MEMORY.md index + individual
+// memory files). `project` is validated against the already-known project
+// scanner cache first, same as projectGitPath. A missing memory directory is
+// not an error (see claudememory.Load's doc comment) — it's the normal state
+// for a project Claude Code has never run against.
 func (s *Server) handleClaudeMemory(w http.ResponseWriter, r *http.Request) {
 	project := r.URL.Query().Get("project")
 	if project == "" {

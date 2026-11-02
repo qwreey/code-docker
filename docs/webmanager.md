@@ -224,8 +224,8 @@ stashed/conflicts 요약, 커밋 로그/diff/리모트/브랜치/태그 조회 �
 게이트 없음), git worktree 목록/삭제(목록 조회는 게이트 없음, 삭제는 비밀번호
 게이트 + 확인 다이얼로그), 그 프로젝트를 건드린 Claude Code 대화 세션 기록(Claude
 Code 탭의 세션 로그 뷰어를 그대로 재사용 — 마찬가지로 비밀번호 게이트 대상), Claude
-Code 자동 메모리 뷰어(`CLAUDE_CONFIG_DIR/projects/<slug>/memory/` — 정제된 노트라
-게이트 없음, 기본 접힘), 그 프로젝트 아래 현재 열려 있는 Terminal 세션 목록(거기서
+Code 자동 메모리 뷰어(`CLAUDE_CONFIG_DIR/projects/<slug>/memory/` — 마찬가지로
+비밀번호 게이트 대상, 기본 접힘), 그 프로젝트 아래 현재 열려 있는 Terminal 세션 목록(거기서
 바로 해당 세션으로 이동 가능 — 개요 바로 아래, 기본 펼침)이 함께 표시됩니다. 세션
 기록의 각 항목에는 "터미널에서 이어하기" 버튼이 있어, 그 대화의 작업 디렉터리에서
 `claude --resume <id>`가 이미 실행된 터미널 탭이 바로 열립니다(Claude Code 탭의 대화

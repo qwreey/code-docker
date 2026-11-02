@@ -226,7 +226,10 @@ func main() {
 	mux.Handle("POST /api/git/lfs/install", gate.RequirePassword(http.HandlerFunc(s.handleInstallLFS)))
 	mux.HandleFunc("GET /api/git/config/raw", s.handleGetGitConfigRaw)
 	mux.Handle("PUT /api/git/config/raw", gate.RequirePassword(http.HandlerFunc(s.handlePutGitConfigRaw)))
-	mux.HandleFunc("GET /api/git/config/excludes", s.handleGetGitConfigExcludes)
+	// Gated on GET too: the path comes from .gitconfig, which code in the
+	// container can set, so an open read would hand any file to anyone who
+	// hasn't unlocked.
+	mux.Handle("GET /api/git/config/excludes", gate.RequirePassword(http.HandlerFunc(s.handleGetGitConfigExcludes)))
 	mux.Handle("PUT /api/git/config/excludes", gate.RequirePassword(http.HandlerFunc(s.handlePutGitConfigExcludes)))
 	// Gated on GET too (unlike git/config/raw above): raw ssh_config can
 	// contain ProxyJump hosts/usernames/internal hostnames beyond what the
@@ -321,7 +324,9 @@ func main() {
 	mux.Handle("POST /api/claude/login/interactive/{id}/cancel", gate.RequirePassword(http.HandlerFunc(s.handleClaudeInteractiveLoginCancel)))
 	mux.Handle("GET /api/claude/sessions", gate.RequirePassword(http.HandlerFunc(s.handleClaudeSessions)))
 	mux.Handle("GET /api/claude/sessions/{project}/{sessionId}", gate.RequirePassword(http.HandlerFunc(s.handleClaudeSessionLines)))
-	mux.HandleFunc("GET /api/claude/memory", s.handleClaudeMemory)
+	// Gated for the same reason as the sessions above: agents write these
+	// notes from the same conversations.
+	mux.Handle("GET /api/claude/memory", gate.RequirePassword(http.HandlerFunc(s.handleClaudeMemory)))
 	mux.HandleFunc("GET /api/claude/settings", s.handleClaudeSettingsGet)
 	mux.Handle("PUT /api/claude/settings", gate.RequirePassword(http.HandlerFunc(s.handleClaudeSettingsPut)))
 	mux.Handle("POST /api/claude/logout", gate.RequirePassword(http.HandlerFunc(s.handleClaudeLogout)))

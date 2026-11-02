@@ -3,6 +3,7 @@ import { api, errorMessage } from '../../api/client'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { Skeleton } from '../common/Skeleton'
 import { ExpandableEditor } from '../common/ExpandableEditor'
+import { RequiresUnlock } from '../common/RequiresUnlock'
 import { withViewTransition } from '../../utils/viewTransition'
 
 interface ExcludesFile {
@@ -16,7 +17,7 @@ interface ExcludesFile {
 // stale-fetch guard: a fetch that resolves after the user already started
 // editing must never silently clobber their in-progress edits, so handleSave
 // re-fetches and compares against what was last loaded/saved before writing.
-export function GlobalGitignore() {
+function GlobalGitignoreInner() {
   const [path, setPath] = useState('')
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
@@ -96,5 +97,15 @@ export function GlobalGitignore() {
         </>
       )}
     </div>
+  )
+}
+
+// Gated on reads too (see main.go): this card loads on tab open, and a plain
+// 401 would pop the unlock prompt for anyone just looking at Git Config.
+export function GlobalGitignore() {
+  return (
+    <RequiresUnlock section>
+      <GlobalGitignoreInner />
+    </RequiresUnlock>
   )
 }

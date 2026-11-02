@@ -465,12 +465,15 @@ gated exactly like the main session-log sub-tab, since it's the same
 conversation content, not a new trust tier — and a Claude Code auto-memory
 viewer (`components/Projects/ProjectMemoryPanel.tsx`, `internal/
 claudememory`, reading `CLAUDE_CONFIG_DIR/projects/<slug>/memory/`) that's
-deliberately ungated (curated summary notes, not raw transcripts) and
+gated like the session history (agents write these notes from the same
+conversations, and code in the container can plant files there; reads go through
+an `os.Root` so a symlink can't lead outside) and
 collapsed-by-default/lazy-fetched since most projects have never had Claude
 Code run against them. Git Config also gained a global-gitignore editor
 (`components/GitConfig/GlobalGitignore.tsx`, `internal/gitconfig/
-excludesfile.go` — whatever `core.excludesFile` points at, read ungated/
-write gated, same raw-editor shape as `.gitconfig`'s own raw editing). An
+excludesfile.go` — whatever `core.excludesFile` points at, gated on reads too
+because code in the container can point that key at any file; regular files
+up to 1 MiB only; same raw-editor shape as `.gitconfig`'s own raw editing). An
 **embed mode** (`?embed=vscode`, `src/embed.ts`) for the built-in code-server
 extension in `vscode-extension/` (root `CLAUDE.md`, `code-extensions`
 paragraph): no sidebar/banners, a single-session Terminal that recreates its

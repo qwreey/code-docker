@@ -7,12 +7,14 @@
 package claudememory
 
 import (
-	"fmt"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"syscall"
 
 	"gopkg.in/yaml.v3"
 )
@@ -23,6 +25,10 @@ const (
 	projectsDirName = "projects"
 	memorySubdir    = "memory"
 	indexFileName   = "MEMORY.md"
+
+	// maxMemoryFileSize is far above any real note. It keeps a planted huge
+	// file from being held in memory.
+	maxMemoryFileSize = 1 << 20
 )
 
 // slugReplacer derives the <slug> directory Claude Code CLI uses for a given
@@ -89,31 +95,41 @@ type frontmatter struct {
 // returned as an error; failures on individual files inside it are skipped
 // rather than failing the whole call (matching internal/claudecode's
 // per-file degrade convention).
+//
+// Everything is opened through an os.Root at the projects directory, so a
+// symlink under it can't lead outside. Code running in the container can write
+// here, and this viewer must not turn that into a read of ~/.ssh or the like.
 func Load(configDir, projectPath string) (Memory, error) {
-	slug := ProjectSlug(projectPath)
+	empty := Memory{Index: []IndexEntry{}, Files: []File{}}
 
-	root := filepath.Join(configDir, projectsDirName)
-	dir := filepath.Join(root, slug, memorySubdir)
-
-	// Defense in depth beyond the deterministic replacer above (which can
-	// never itself produce ".." — every "." is replaced too) — same
-	// containment check idiom as claudecode.resolveSessionPath.
-	cleanRoot := filepath.Clean(root) + string(filepath.Separator)
-	if !strings.HasPrefix(filepath.Clean(dir), cleanRoot) {
-		return Memory{}, fmt.Errorf("invalid project path")
-	}
-
-	entries, err := os.ReadDir(dir)
+	root, err := os.OpenRoot(filepath.Join(configDir, projectsDirName))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return Memory{Index: []IndexEntry{}, Files: []File{}}, nil
+			return empty, nil
 		}
 		return Memory{}, err
 	}
+	defer root.Close()
 
-	mem := Memory{Exists: true, Index: []IndexEntry{}, Files: []File{}}
+	rel := filepath.Join(ProjectSlug(projectPath), memorySubdir)
+	dir, err := root.Open(rel)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return empty, nil
+		}
+		return Memory{}, err
+	}
+	defer dir.Close()
 
-	if raw, err := os.ReadFile(filepath.Join(dir, indexFileName)); err == nil {
+	entries, err := dir.ReadDir(-1)
+	if err != nil {
+		return Memory{}, err
+	}
+
+	mem := empty
+	mem.Exists = true
+
+	if raw, err := readRegular(root, filepath.Join(rel, indexFileName)); err == nil {
 		mem.IndexRaw = string(raw)
 		mem.Index = parseIndex(mem.IndexRaw)
 	}
@@ -122,7 +138,7 @@ func Load(configDir, projectPath string) (Memory, error) {
 		if e.IsDir() || e.Name() == indexFileName || !strings.HasSuffix(e.Name(), ".md") {
 			continue
 		}
-		raw, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		raw, err := readRegular(root, filepath.Join(rel, e.Name()))
 		if err != nil {
 			continue
 		}
@@ -133,6 +149,33 @@ func Load(configDir, projectPath string) (Memory, error) {
 	sort.Slice(mem.Files, func(i, j int) bool { return mem.Files[i].Filename < mem.Files[j].Filename })
 
 	return mem, nil
+}
+
+// readRegular reads a regular file of at most maxMemoryFileSize. O_NONBLOCK
+// keeps the open from hanging on a FIFO; the type is checked on the opened
+// descriptor so the path can't be swapped between check and read.
+func readRegular(root *os.Root, name string) ([]byte, error) {
+	f, err := root.OpenFile(name, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("not a regular file")
+	}
+	raw, err := io.ReadAll(io.LimitReader(f, maxMemoryFileSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) > maxMemoryFileSize {
+		return nil, errors.New("file too large")
+	}
+	return raw, nil
 }
 
 // parseIndex extracts every recognizable bullet from MEMORY.md's raw text.

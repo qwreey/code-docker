@@ -1,10 +1,18 @@
 package gitconfig
 
 import (
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
+
+// maxExcludesFileSize is far above any real gitignore. The path comes from
+// .gitconfig, so without a limit it could name a file too large to hold in
+// memory.
+const maxExcludesFileSize = 1 << 20
 
 // ExcludesFilePath resolves the effective path of the system-wide gitignore
 // file core.excludesFile points at, mirroring git's own resolution order: an
@@ -51,13 +59,34 @@ func expandTilde(path string) (string, error) {
 // path. A missing file reads as "" rather than erroring — it's normal for
 // this to not exist yet (git never creates it on its own), mirroring
 // ReadRaw's identical convention in raw.go.
+//
+// Anything but a regular file is refused. O_NONBLOCK keeps the open itself from
+// hanging on a FIFO, and the type is checked on the opened descriptor so the
+// path can't be swapped between check and read. A symlink is followed on
+// purpose: dotfile managers link this file.
 func ReadExcludesFile(path string) (string, error) {
-	data, err := os.ReadFile(path)
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", nil
 		}
 		return "", err
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", errors.New("core.excludesFile does not point at a regular file")
+	}
+	data, err := io.ReadAll(io.LimitReader(f, maxExcludesFileSize+1))
+	if err != nil {
+		return "", err
+	}
+	if len(data) > maxExcludesFileSize {
+		return "", errors.New("core.excludesFile points at a file larger than 1 MiB")
 	}
 	return string(data), nil
 }
