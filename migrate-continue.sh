@@ -82,6 +82,52 @@ if [ ${#tightened[@]} -gt 0 ]; then
   echo
 fi
 
+# webmanager 비밀번호 해시는 2026-08-07부터 .env.webmanager에서만 읽습니다
+# (docker-compose.yml의 env_file). 그 전에 .env에 넣어 둔 배포는 해시가 .env에
+# 남아 있어도 컨테이너에 전달되지 않으므로, 비밀번호 게이트가 아무 경고 없이
+# 꺼져 있습니다. 줄을 그대로 옮기는 이유: 두 파일은 compose가 같은 규칙으로
+# 읽으므로 따옴표까지 그대로여야 값이 바뀌지 않습니다.
+remove_env_line() {
+  (umask 077; OOTB_RM_KEY="$2" awk '$0 !~ "^" ENVIRON["OOTB_RM_KEY"] "="' "$1" > "$1.ootb.tmp") \
+    && mv "$1.ootb.tmp" "$1"
+}
+env_file="$TARGET_DIR/.env"
+wm_file="$TARGET_DIR/.env.webmanager"
+for key in WEBMANAGER_AUTH_PASSWORD_HASH WEBMANAGER_WEBDAV_PASSWORD_HASH; do
+  [ -n "$(get_env_var "$env_file" "$key")" ] || continue
+  wm_backup=""
+  echo "=== 1-3. .env에 남은 $key ==="
+  if [ -n "$(get_env_var "$wm_file" "$key")" ]; then
+    echo "  - .env.webmanager에 이미 값이 있어 그쪽이 적용되고 있습니다. .env의 값은 쓰이지 않는 옛 사본입니다."
+    if confirm "    헷갈리지 않게 .env에서 지울까요?" y; then
+      if backup="$(backup_env_file "$env_file")"; then
+        remove_env_line "$env_file" "$key"
+        echo "  - .env에서 지웠습니다 (백업: $(basename "$backup"))."
+      else
+        echo "  ! .env 백업을 만들지 못해 그대로 둡니다."
+      fi
+    else
+      echo "  - 그대로 둡니다 (동작에는 영향 없음)."
+    fi
+  else
+    echo "  ! 이 값은 .env.webmanager에서만 읽히므로 지금은 컨테이너에 전달되지 않습니다."
+    echo "    즉 이 비밀번호로 잠가 둔 기능이 현재 잠겨 있지 않습니다."
+    if confirm "    .env.webmanager로 옮길까요? (다음 up -d부터 그 비밀번호를 묻습니다)" y; then
+      if backup="$(backup_env_file "$env_file")" \
+         && { [ ! -f "$wm_file" ] || wm_backup="$(backup_env_file "$wm_file")"; }; then
+        set_env_var "$wm_file" "$key" "$(grep -E "^${key}=" "$env_file" | tail -1 | cut -d= -f2-)"
+        remove_env_line "$env_file" "$key"
+        echo "  - .env.webmanager로 옮겼습니다 (백업: $(basename "$backup")${wm_backup:+, $(basename "$wm_backup")})."
+      else
+        echo "  ! 백업을 만들지 못해 옮기지 않았습니다. 직접 옮기세요."
+      fi
+    else
+      echo "  - 옮기지 않았습니다. 비밀번호 게이트는 계속 꺼진 상태입니다."
+    fi
+  fi
+  echo
+done
+
 if [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
   echo "=== 2. docker-compose.yml 갱신 확인 ==="
   if diff -q <(git -C "$SCRIPT_DIR" show "$OLD_HEAD:docker-compose.yml") "$TARGET_DIR/docker-compose.yml" >/dev/null 2>&1; then
