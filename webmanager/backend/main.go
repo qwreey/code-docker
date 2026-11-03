@@ -273,9 +273,11 @@ func main() {
 
 	// Cached, explicit-trigger-only like /api/projects above — a full `du`
 	// over the container's root filesystem can take a while, so it never
-	// runs on a plain GET.
+	// runs on a plain GET. The trigger is gated like the other actions: each
+	// scan walks the whole filesystem, so it is not something every caller
+	// should be able to start on demand. Reading the cached result is not.
 	mux.HandleFunc("GET /api/system/disk-breakdown", s.handleDiskBreakdown)
-	mux.HandleFunc("POST /api/system/disk-breakdown/scan", s.handleScanDiskBreakdown)
+	mux.Handle("POST /api/system/disk-breakdown/scan", gate.RequirePassword(http.HandlerFunc(s.handleScanDiskBreakdown)))
 
 	// dind is DOCKER_HOST=tcp://dind:2375 (plaintext, no auth) — same trust
 	// boundary as the rest of code-docker-internal, not a new one (see
