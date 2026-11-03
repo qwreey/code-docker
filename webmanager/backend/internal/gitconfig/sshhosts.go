@@ -30,10 +30,10 @@ var (
 	// ErrInvalidHost is returned when host/hostname/user fail validation in
 	// AddSSHHost, before any file is touched. host must be safe to use as
 	// both a filesystem path component (filepath.Join(keysDir, host)) and an
-	// SSH config "Host" alias, so it's restricted to a conservative charset;
-	// hostname/user only need to be safe against SSH-config-line injection
-	// (a newline would let them start a bogus new directive/Host block), so
-	// they're checked for CR/LF only.
+	// SSH config "Host" alias, so it's restricted to a conservative charset.
+	// hostname/user are written as the single argument of a config line, so
+	// they're held to a charset with no whitespace, quote or `#` either
+	// (validHostNameRe/validUserRe).
 	ErrInvalidHost = errors.New("invalid host, hostname, or user")
 )
 
@@ -45,11 +45,17 @@ var hostLineRe = regexp.MustCompile(`(?i)^\s*Host\s+(\S+)\s*$`)
 // keysDir (path traversal) or break out of its "Host %s" config line.
 var validHostRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
+// A line like `HostName a b` or `User x #y` is not the value it looks like:
+// ssh splits on whitespace and treats `#` and quotes specially. These cover
+// DNS names, IPv4/IPv6 literals (written unbracketed in HostName), ssh's own
+// `%h`-style tokens, and `user@domain` logins.
+var (
+	validHostNameRe = regexp.MustCompile(`^[A-Za-z0-9._:%-]+$`)
+	validUserRe     = regexp.MustCompile(`^[A-Za-z0-9._@%-]+$`)
+)
+
 func validateAddSSHHostInput(host, hostname, user string) error {
-	if host == "" || !validHostRe.MatchString(host) {
-		return ErrInvalidHost
-	}
-	if strings.ContainsAny(hostname, "\r\n") || strings.ContainsAny(user, "\r\n") {
+	if !validHostRe.MatchString(host) || !validHostNameRe.MatchString(hostname) || !validUserRe.MatchString(user) {
 		return ErrInvalidHost
 	}
 	return nil

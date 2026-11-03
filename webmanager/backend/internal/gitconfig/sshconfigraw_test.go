@@ -58,3 +58,35 @@ func TestWriteRawSSHConfigRejectsMalformedSyntax(t *testing.T) {
 		t.Fatalf("WriteRawSSHConfig(malformed) = nil error, want a syntax error")
 	}
 }
+
+// An Include names another file, which `-G` would read and evaluate - so the
+// Match exec guard must hold for included files too. The saved file keeps the
+// Include line as written.
+func TestWriteRawSSHConfigDoesNotEvaluateIncludedFiles(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config")
+	marker := filepath.Join(dir, "PWNED")
+	included := filepath.Join(dir, "included")
+	if err := os.WriteFile(included, []byte("Match exec \"touch "+marker+"\"\n    HostName example.com\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	content := "Include " + included + "\nHost example\n    HostName example.com\n"
+
+	if err := WriteRawSSHConfig(path, content); err != nil {
+		t.Fatalf("WriteRawSSHConfig(Include) = %v, want success", err)
+	}
+	if _, statErr := os.Stat(marker); statErr == nil {
+		t.Fatalf("a Match exec in an included file ran as a side effect of validation")
+	}
+	got, err := ReadRawSSHConfig(path)
+	if err != nil {
+		t.Fatalf("ReadRawSSHConfig() = %v", err)
+	}
+	if got != content {
+		t.Fatalf("ReadRawSSHConfig() = %q, want %q", got, content)
+	}
+	leftovers, _ := filepath.Glob(filepath.Join(dir, ".ssh-config.*"))
+	if len(leftovers) != 0 {
+		t.Fatalf("temp files left behind: %v", leftovers)
+	}
+}

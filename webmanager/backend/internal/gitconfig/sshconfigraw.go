@@ -27,6 +27,13 @@ var ErrInvalidSSHConfigSyntax = errors.New("invalid ssh config")
 // file as a side effect of validation alone. Reject rather than evaluate.
 var matchExecRe = regexp.MustCompile(`(?im)^\s*match\b.*\bexec\b`)
 
+// includeLineRe matches an `Include` directive. The check above sees only the
+// submitted text, while `-G` would read every file an Include names and
+// evaluate its Match blocks the same way, so validation runs on a copy with
+// these lines left out. The saved file keeps them: ssh reads the included
+// files on every later connection, which is what the user asked for.
+var includeLineRe = regexp.MustCompile(`(?im)^[ \t]*include\b.*$`)
+
 // ReadRawSSHConfig returns the raw contents of the ssh_config file at path,
 // for the web-based raw editor (advanced Host/Match/ProxyJump editing beyond
 // what the structured SshHosts panel understands). A missing file reads as
@@ -79,10 +86,36 @@ func WriteRawSSHConfig(path, content string) error {
 		return err
 	}
 
-	out, err := exec.Command("ssh", "-F", tmpPath, "-G", "webmanager-ssh-config-validation").CombinedOutput()
+	checkPath, err := writeValidationCopy(dir, includeLineRe.ReplaceAllString(content, ""))
+	if err != nil {
+		return err
+	}
+	defer os.Remove(checkPath)
+
+	out, err := exec.Command("ssh", "-F", checkPath, "-G", "webmanager-ssh-config-validation").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrInvalidSSHConfigSyntax, strings.TrimSpace(string(out)))
 	}
 
 	return os.Rename(tmpPath, path)
+}
+
+// writeValidationCopy writes content to a fresh 0600 temp file in dir and
+// returns its path; the caller removes it.
+func writeValidationCopy(dir, content string) (string, error) {
+	f, err := os.CreateTemp(dir, ".ssh-config.check-*")
+	if err != nil {
+		return "", err
+	}
+	name := f.Name()
+	if _, err := f.WriteString(content); err != nil {
+		f.Close()
+		os.Remove(name)
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(name)
+		return "", err
+	}
+	return name, nil
 }
