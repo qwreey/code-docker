@@ -77,6 +77,25 @@ if [ -n "${TRUSTED_PROXIES:-}" ]; then
 fi
 export NGINX_TRUSTED_PROXIES_DIRECTIVES="$directives"
 
+# ROUTER_CLIENT_IP_TOKEN (docker-compose.yml, shared with router, empty by
+# default) - the secret router's nginx sends as X-Router-Token next to the
+# browser's address in X-Real-IP. Rendered as the one entry of the
+# $code_docker_client_ip map (nginx.default.conf says why a token and not the
+# peer address). Hex/alphanumeric only and at least 32 characters, since it
+# is pasted into a regex; anything else leaves the map empty, loudly.
+NGINX_ROUTER_CLIENT_IP_MAP=""
+client_ip_token="${ROUTER_CLIENT_IP_TOKEN:-}"
+if [ -n "$client_ip_token" ]; then
+    if [[ "$client_ip_token" =~ ^[A-Za-z0-9]{32,}$ ]]; then
+        NGINX_ROUTER_CLIENT_IP_MAP="
+        \"~^$client_ip_token (?<code_docker_router_client_ip>[0-9A-Fa-f:.]+)\$\" \$code_docker_router_client_ip;"
+        echo "nginx-service: ROUTER_CLIENT_IP_TOKEN set - webmanager sees the client address router reports"
+    else
+        echo "nginx-service: ROUTER_CLIENT_IP_TOKEN must be 32+ letters/digits (openssl rand -hex 32) - ignoring it, every browser behind router shares one lockout key" >&2
+    fi
+fi
+export NGINX_ROUTER_CLIENT_IP_MAP
+
 # code-server/webmanager's actual bind targets (code-runner.default.sh,
 # webmanager.default.sh) - nginx's proxy_pass has to point at the same
 # place, so overriding CODE_SERVER_BIND_ADDR/WEBMANAGER_ADDR moves both the
@@ -165,7 +184,7 @@ render_config() {
         deny all;"
     fi
     export NGINX_PEER_ACCESS
-    envsubst '${NGINX_ACCESS_LOG_IF} ${NGINX_ALLOWED_HOSTS_MAP} ${NGINX_TRUSTED_PROXIES_DIRECTIVES} ${NGINX_CODE_SERVER_UPSTREAM} ${NGINX_WEBMANAGER_UPSTREAM} ${NGINX_WEBDAV_PORT} ${NGINX_PEER_ACCESS}' < "$nginx_config" > "$generated_config"
+    envsubst '${NGINX_ACCESS_LOG_IF} ${NGINX_ALLOWED_HOSTS_MAP} ${NGINX_TRUSTED_PROXIES_DIRECTIVES} ${NGINX_ROUTER_CLIENT_IP_MAP} ${NGINX_CODE_SERVER_UPSTREAM} ${NGINX_WEBMANAGER_UPSTREAM} ${NGINX_WEBDAV_PORT} ${NGINX_PEER_ACCESS}' < "$nginx_config" > "$generated_config"
 }
 
 peer_addrs="$(resolve_peers | xargs)"

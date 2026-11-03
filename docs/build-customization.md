@@ -289,9 +289,9 @@ Host 헤더 화이트리스트도 이 파일에 있습니다(비워두면 로컬
 router로 프록시되지 않습니다 — router가 host:80을 직접 종단하도록 바뀌면서
 (router-docker의 [`config/nginx/`](https://github.com/qwreey/router-docker/tree/HEAD/config/nginx)) 이 파일에서는 빠졌고, webmanager의 Tailscale/Dev Proxy
 탭도 이제 router 자신의 `/router/` 경로로 직접 호출합니다. 자세한 내용은
-[router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고. `TRUSTED_PROXIES`(외부 리버스 프록시의 IP/CIDR를 알려주면 `$remote_addr`가
-그 프록시의 X-Forwarded-For를 신뢰해서 실제 클라이언트 IP로 채워짐, 기본 빈 값)도
-같이 있습니다.
+[router.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/router.md) 참고. `TRUSTED_PROXIES`도 이 파일에 반영되지만, router 뒤에서는 효과가 없습니다.
+이 값은 router의 nginx가 쓰는 값이고, webmanager까지 실제 클라이언트 주소를
+전달하는 건 `ROUTER_CLIENT_IP_TOKEN`입니다(둘 다 `example-env` 참고).
 
 access_log 상세도는 `docker-compose.yml`의 `NGINX_LOG_LEVEL`로 조절합니다.
 기본값 `errors`는 응답 상태코드가 4xx/5xx인 요청만 기록합니다(nginx의 표준

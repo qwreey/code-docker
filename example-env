@@ -302,11 +302,34 @@
 #   끄려면 any를 넣으세요.
 #NGINX_ALLOWED_PEERS=""
 
-# Comma-separated IP/CIDR list of upstream reverse proxies (e.g. your external
-# Caddy's container/host IP) whose X-Forwarded-For header nginx should trust to
-# determine the real client IP - otherwise $remote_addr is just the proxy's own
-# IP. Empty (default) disables this.
+# 바깥 리버스 프록시(예: 외부 Caddy의 컨테이너/호스트 IP)의 IP/CIDR 목록, 콤마
+# 구분. 여기서 온 X-Forwarded-For를 믿어 실제 클라이언트 주소를 정합니다. 비우면
+# 프록시 자신의 주소가 클라이언트 주소가 됩니다.
+# - 이 값을 쓰는 곳은 router의 nginx(바깥에서 들어오는 첫 홉)입니다. 바깥 프록시가
+#   router 앞에 있다면 그 주소를 넣으세요.
+# - code-docker의 nginx도 같은 값을 받지만, 그쪽 상대는 항상 router이고 router는
+#   X-Forwarded-For를 보내지 않으므로 효과가 없습니다. router 없이
+#   NGINX_ALLOWED_PEERS=any로 이 포트를 직접 받는 배포에서만 의미가 있습니다.
+# - webmanager까지 실제 클라이언트 주소를 전달하려면 아래
+#   ROUTER_CLIENT_IP_TOKEN을 설정하세요.
 #TRUSTED_PROXIES=""
+
+# router가 본 브라우저 주소를 webmanager까지 전달하기 위한 router와 code-docker의
+# 공유 비밀값. 32자 이상 영숫자, 예: openssl rand -hex 32
+# - 비우면(기본) router 뒤의 모든 브라우저가 webmanager에는 router 주소 하나로
+#   보입니다. 비밀번호 잠금(webmanager 잠금 해제, WebDAV)이 모두에게 한 묶음으로
+#   걸려서, 누군가 틀린 비밀번호를 반복하면 새 로그인은 전부 막힙니다. 이미 쓰던
+#   WebDAV 클라이언트와 지문 잠금 해제(마지막 비밀번호 입력 후 48시간 안)는
+#   계속 됩니다.
+# - 설정하면 router의 nginx가 이 값을 헤더로 붙여 보내고, code-docker의 nginx는 이
+#   값이 맞을 때만 router가 알려준 클라이언트 주소를 믿습니다. router를 거치지 않는
+#   경로(tailscale publish의 TCP 통과 등)로 들어온 클라이언트는 이 값을 모르므로
+#   주소를 꾸밀 수 없습니다.
+# - 실제로 사용자별로 나뉘려면 router가 진짜 클라이언트 주소를 알아야 합니다. 바깥
+#   프록시가 있다면 위 TRUSTED_PROXIES에 그 주소를 넣으세요. tailnet으로 들어오는
+#   접속은 router에게 전부 127.0.0.1로 보여 한 묶음입니다.
+# - 이 파일(.env)에 두세요. router와 code-docker가 모두 여기서 읽습니다.
+#ROUTER_CLIENT_IP_TOKEN=""
 
 # vector's own internal diagnostic log level (startup/healthcheck/file-watch
 # chatter). Doesn't touch the actual log pipeline data it carries (other programs'

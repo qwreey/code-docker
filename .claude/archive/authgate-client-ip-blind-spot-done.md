@@ -2,7 +2,7 @@
 
 > **2026-10-08: webmanager 쪽은 해결되지 않았음.** code-docker nginx가 넘기는 X-Real-IP가
 > 언제나 router 주소라 외부 클라이언트가 한 버킷에 들어간다(감사 A-03).
-> 후속: `.claude/backlog/client-ip-forwarding-plan.md`. 아래 09-29 메모는 router 쪽에만 맞다.
+> 후속: `.claude/archive/client-ip-forwarding-done.md`. 아래 09-29 메모는 router 쪽에만 맞다.
 >
 > 2026-09-29 확인: 해결된 것으로 보임 - router는 `handlers_auth.go` `rateLimitKey`(2026-09-07 H2,
 > 유닉스 소켓이면 X-Real-IP), webmanager는 감사 F11(`d1f747e`, loopback 바인드 + `authgate.ClientKey`).

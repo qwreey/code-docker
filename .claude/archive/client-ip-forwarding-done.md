@@ -1,6 +1,7 @@
-# Real client IP for webmanager's lockout (audit A-03, open)
+# Real client IP for webmanager's lockout (audit A-03, done)
 
-Status: **design needed, owner decision pending.** Nothing implemented. The
+Status: **done 2026-11-03** (owner picked option 3; see "What was built" at
+the end). The
 2026-10-06 audit (`~/Desktop/code-docker-audit-2026-10-06.md`, A-03) found that
 the F11 fix (`d1f747e`) doesn't separate external clients.
 
@@ -64,3 +65,33 @@ Option 1 can follow as an opt-in.
 `docs/tips/webdav.md`, `TODO.md` and
 `.claude/archive/authgate-client-ip-blind-spot-done.md` no longer claim the
 lockout is per-IP or that this is solved.
+
+## What was built (2026-11-03, Codex audit U-02/U-05/U-06)
+
+Option 3, with two departures from the sketch above:
+
+- **The always-on floor keeps the escalating lockout.** A flat "N per minute"
+  limit doesn't give the owner a way in either - an attacker spends the same
+  quota first - and it would raise the guessing rate on an internet-facing
+  password by an order of magnitude. The owner's way in is instead what an
+  attacker can't use:
+  - WebDAV's credential cache slides: 24h idle, renewed on every hit, and
+    answered before the backoff (`webdavshare.credCacheIdle`).
+  - Fingerprint unlock has its own backoff bucket (`webauthnAttemptKey`), so
+    password guessing doesn't shut it.
+- **Opt-in forwarding is a shared token, not "trust X-Real-IP from router's
+  address".** router passes raw TCP to code-docker too (a tailscale publish
+  to `code-docker:80`, documented in router's docs), and there the client
+  writes every header itself while arriving from router's address. Trusting
+  the peer would have handed tailnet clients a forgeable lockout key, i.e.
+  unlimited guessing. `ROUTER_CLIENT_IP_TOKEN` (shared `.env`): router's nginx
+  sends it as `X-Router-Token` on `location /` and on vhosts whose upstream
+  host is DEFAULT_UPSTREAM's; code-docker's nginx believes X-Real-IP only
+  next to it (`$code_docker_client_ip`) and clears the header on every
+  location. `set_real_ip_from` was avoided on purpose: realip rewrites
+  `$remote_addr` before `allow`/`deny`, so with NGINX_ALLOWED_PEERS it would
+  have refused every browser.
+- U-05: router's `location /` now sets X-Forwarded-Proto and caddy-adapter's
+  default block re-adds it (Caddy drops it on a unix-socket listener), so the
+  unlock cookie gets Secure behind TLS. U-06: TRUSTED_PROXIES docs now say it
+  is router's setting.

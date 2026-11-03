@@ -129,6 +129,8 @@ services:
       # Who may connect to nginx at all - empty means ROUTER_HOSTNAME (see example-env).
       NGINX_ALLOWED_PEERS: "${NGINX_ALLOWED_PEERS:-}"
       TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
+      # Shared with router (its compose file reads the same .env value) - see example-env.
+      ROUTER_CLIENT_IP_TOKEN: "${ROUTER_CLIENT_IP_TOKEN:-}"
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
       WEBMANAGER_ENV_TEMPLATE_PATH: "${WEBMANAGER_ENV_TEMPLATE_PATH:-/etc/code-docker/webmanager/example-env.webmanager}"
       # Egress lockdown - see example-env's own NETGATE_ENABLED entry for what this
