@@ -59,12 +59,19 @@ export NGINX_ALLOWED_HOSTS_MAP="$map_body"
 # real_ip_header/real_ip_recursive directives next to the placeholder in
 # nginx.*.conf. Empty means no directives at all, so real_ip_header has
 # nothing to match and $remote_addr behaves exactly as before this existed.
+# Each entry is pasted into the config, so only an address/CIDR character set
+# (or `unix:`) passes - the same check router's nginx-service applies.
 directives=""
 if [ -n "${TRUSTED_PROXIES:-}" ]; then
     IFS=',' read -ra trusted_proxies <<< "$TRUSTED_PROXIES"
     for proxy in "${trusted_proxies[@]}"; do
         proxy="$(echo "$proxy" | xargs)"
-        [ -n "$proxy" ] && directives="$directives
+        [ -n "$proxy" ] || continue
+        if ! [[ "$proxy" =~ ^[0-9A-Fa-f:./]+$ || "$proxy" == "unix:" ]]; then
+            echo "nginx-service: TRUSTED_PROXIES entry '$proxy' is not a plain IP or CIDR - skipping it" >&2
+            continue
+        fi
+        directives="$directives
     set_real_ip_from $proxy;"
     done
 fi
