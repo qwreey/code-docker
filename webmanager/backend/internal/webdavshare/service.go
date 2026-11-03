@@ -70,12 +70,19 @@ type Service struct {
 	secret []byte
 }
 
-// credCacheTTL is how long a successful credential check is remembered.
-// Short enough that a password change takes effect promptly on its own
-// (Reload/SetPassword also clear the cache outright, so this only bounds
-// the case where the hash changed underneath us some other way), long
-// enough that a burst of client requests costs one derivation.
-const credCacheTTL = 5 * time.Minute
+// credCacheIdle is how long a verified credential stays accepted without
+// being used, renewed on every request that presents it. A hit means the
+// exact pair already passed argon2id against the current hash - every change
+// that could invalidate it (SetPassword, SetUsername) drops the whole cache,
+// and an env-pinned hash only changes with a restart, which starts empty - so
+// the length is not what keeps a credential honest.
+//
+// It is what keeps the owner in: the failure backoff's key is router's
+// address for every browser unless ROUTER_CLIENT_IP_TOKEN is set, so anyone
+// guessing passwords locks out all new logins. A cache hit is answered
+// before that backoff is consulted, so a client that keeps using the share,
+// or comes back within a day, is never refused for someone else's guesses.
+const credCacheIdle = 24 * time.Hour
 
 // maxCachedCreds bounds the cache. Only *successful* checks are cached, so
 // this is bounded by real credentials in practice; the cap is here so a
@@ -310,7 +317,8 @@ func (s *Service) authenticate(clientKey, username, password string) (ok bool, r
 	hash := s.effectivePasswordHashLocked()
 	key := s.credKey(username, password)
 	if until, found := s.cache[key]; found {
-		if time.Now().Before(until) {
+		if now := time.Now(); now.Before(until) {
+			s.cache[key] = now.Add(credCacheIdle)
 			s.mu.Unlock()
 			return true, false
 		}
@@ -349,7 +357,7 @@ func (s *Service) authenticate(clientKey, username, password string) (ok bool, r
 	if len(s.cache) >= maxCachedCreds {
 		s.cache = map[string]time.Time{}
 	}
-	s.cache[key] = time.Now().Add(credCacheTTL)
+	s.cache[key] = time.Now().Add(credCacheIdle)
 	s.mu.Unlock()
 	return true, false
 }

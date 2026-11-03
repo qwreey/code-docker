@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func newTestService(t *testing.T, root string, opts Options) *Service {
@@ -128,7 +129,7 @@ func TestSuccessfulAuthIsCached(t *testing.T) {
 	}
 
 	// Changing the password must invalidate it, or the old credential would
-	// keep working for up to credCacheTTL.
+	// keep working for as long as it stays in use (credCacheIdle).
 	if _, err := s.SetPassword("different"); err != nil {
 		t.Fatal(err)
 	}
@@ -140,6 +141,46 @@ func TestSuccessfulAuthIsCached(t *testing.T) {
 	}
 	if ok, _ := s.authenticate("test", DefaultUsername, "s3cret"); ok {
 		t.Fatal("the old password still authenticates after a change")
+	}
+}
+
+// Someone else's wrong guesses under the same client key (router's address,
+// for every browser, without ROUTER_CLIENT_IP_TOKEN) must not refuse a
+// client already using the share, and each use must push its expiry out.
+func TestCachedCredentialSurvivesLockoutAndSlides(t *testing.T) {
+	s := newTestService(t, t.TempDir(), Options{})
+	if _, err := s.SetPassword("s3cret"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetEnabled(true); err != nil {
+		t.Fatal(err)
+	}
+	if ok, _ := s.authenticate("shared", DefaultUsername, "s3cret"); !ok {
+		t.Fatal("first authenticate() failed")
+	}
+	key := s.credKey(DefaultUsername, "s3cret")
+	s.mu.Lock()
+	s.cache[key] = time.Now().Add(time.Minute)
+	s.mu.Unlock()
+
+	limited := false
+	for range 10 {
+		if _, rl := s.authenticate("shared", DefaultUsername, "wrong"); rl {
+			limited = true
+			break
+		}
+	}
+	if !limited {
+		t.Fatal("wrong guesses never hit the backoff - the test isn't exercising a lockout")
+	}
+	if ok, rl := s.authenticate("shared", DefaultUsername, "s3cret"); !ok || rl {
+		t.Fatalf("cached credential refused during a lockout: ok=%v rateLimited=%v", ok, rl)
+	}
+	s.mu.Lock()
+	until := s.cache[key]
+	s.mu.Unlock()
+	if time.Until(until) < credCacheIdle-time.Minute {
+		t.Fatalf("cache hit didn't renew the expiry: %s left, want about %s", time.Until(until).Round(time.Second), credCacheIdle)
 	}
 }
 

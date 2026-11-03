@@ -88,15 +88,23 @@ func (s *Server) handleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
+// webauthnAttemptKey is the backoff key for fingerprint unlocks: the client
+// key in a bucket of its own, apart from typed passwords. An assertion can't
+// be guessed, so a password-guessing run - which, without
+// ROUTER_CLIENT_IP_TOKEN, shares one key with every browser - must not shut
+// the one unlock path it can't attack. Failed assertions still back off, in
+// their own count.
+func webauthnAttemptKey(r *http.Request) string { return "webauthn " + clientKey(r) }
+
 // POST /api/auth/webauthn/unlock/begin. Ungated (it *is* an unlock), but
-// shares the password path's per-IP backoff.
+// backs off after failed assertions (webauthnAttemptKey).
 func (s *Server) handleWebAuthnUnlockBegin(w http.ResponseWriter, r *http.Request) {
 	rpID, ok := s.webauthnRPID(r)
 	if !ok {
 		s.webauthnUnavailable(w)
 		return
 	}
-	if err := s.gate.CheckAttempt(clientKey(r)); err != nil {
+	if err := s.gate.CheckAttempt(webauthnAttemptKey(r)); err != nil {
 		writeError(w, http.StatusTooManyRequests, err.Error())
 		return
 	}
@@ -125,7 +133,7 @@ func (s *Server) handleWebAuthnUnlockFinish(w http.ResponseWriter, r *http.Reque
 		s.webauthnUnavailable(w)
 		return
 	}
-	key := clientKey(r)
+	key := webauthnAttemptKey(r)
 	if err := s.gate.CheckAttempt(key); err != nil {
 		writeError(w, http.StatusTooManyRequests, err.Error())
 		return
@@ -133,10 +141,10 @@ func (s *Server) handleWebAuthnUnlockFinish(w http.ResponseWriter, r *http.Reque
 	credID, err := s.webauthn.FinishUnlock(r.URL.Query().Get("ceremony"), rpID, r.Body)
 	if err != nil {
 		// Only a response that was actually checked and failed counts toward
-		// the backoff. The key (authgate.ClientKey) is in practice router's
-		// address for every browser, so counting a stale tab's expired
-		// ceremony or a garbled body would lock everyone out over ordinary
-		// client mishaps.
+		// the backoff. The key can be shared by every browser (see
+		// authgate.ClientKey), so counting a stale tab's expired ceremony or
+		// a garbled body would lock everyone out over ordinary client
+		// mishaps.
 		if !errors.Is(err, webauthnunlock.ErrUnknownCeremony) && !errors.Is(err, webauthnunlock.ErrMalformed) {
 			s.gate.RecordFailure(key)
 		}

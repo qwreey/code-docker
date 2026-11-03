@@ -407,8 +407,8 @@ func (g *Gate) RecordSuccess(key string) { g.recordSuccess(key) }
 //
 // Secure is set when the request reached us over TLS — which, in this
 // deployment, always means "the outer TLS-terminating proxy said so via
-// X-Forwarded-Proto", since webmanager itself is plain HTTP behind the
-// in-container nginx. It has to be conditional rather than always-on: a
+// X-Forwarded-Proto" (see requestIsHTTPS), since webmanager itself is plain
+// HTTP behind the in-container nginx. It has to be conditional rather than always-on: a
 // Secure cookie is dropped outright on a plain-HTTP origin, which would
 // break every local/LAN `http://host:81` access (and the container's own
 // loopback) by making the unlock silently never stick.
@@ -469,10 +469,12 @@ func (g *Gate) ClearCookie(w http.ResponseWriter, r *http.Request) {
 }
 
 // requestIsHTTPS reports whether the browser's own connection was HTTPS.
-// X-Forwarded-Proto is only meaningful because nothing reaches webmanager
-// except through the in-container nginx, which sets it from its own
-// $scheme; a client-supplied value can at worst set Secure on a cookie the
-// client then can't send back to itself.
+// The in-container nginx passes X-Forwarded-Proto through as it arrived:
+// router's nginx sets it on the default path (its $router_forwarded_proto -
+// the outer proxy's word, else router's own plain-http scheme). It is not
+// spoof-proof - a caller that reaches nginx some other way can send its own -
+// but a wrong value can at worst set Secure on a cookie the caller then
+// can't send back to itself.
 func requestIsHTTPS(r *http.Request) bool {
 	if r == nil {
 		return false
