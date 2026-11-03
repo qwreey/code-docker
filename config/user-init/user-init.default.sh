@@ -76,7 +76,9 @@ elif [ "$QWREEY_FISH_APPLIED" != "$QWREEY_FISH_QS_SETUP_SHA" ]; then
     echo "user-init: qwreey-fish ${QWREEY_FISH_APPLIED:-(nothing recorded on this volume)} -> $QWREEY_FISH_QS_SETUP_SHA - running qs_setup"
     QS_SETUP_URL="https://raw.githubusercontent.com/qwreey/qwreey-fish/${QWREEY_FISH_QS_SETUP_SHA}/functions/qs_setup.fish"
     QS_SETUP_TMP="$(mktemp)"
-    if curl -fsSL "$QS_SETUP_URL" -o "$QS_SETUP_TMP"; then
+    # Bounded: this runs before supervisord, so a stalled download would
+    # hold every service back. https only, redirects included.
+    if curl -fsSL --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 60 "$QS_SETUP_URL" -o "$QS_SETUP_TMP"; then
         QS_SETUP_ACTUAL_SHA256="$(sha256sum "$QS_SETUP_TMP" | awk '{ print $1 }')"
         if [ "$QS_SETUP_ACTUAL_SHA256" != "$QWREEY_FISH_QS_SETUP_SHA256" ]; then
             echo "user-init: WARNING - qs_setup.fish checksum mismatch (expected $QWREEY_FISH_QS_SETUP_SHA256, got $QS_SETUP_ACTUAL_SHA256) - refusing to source it. Skipping qwreey-fish setup; core services are unaffected. Bump QWREEY_FISH_QS_SETUP_SHA/_SHA256 with ./dev-bump-qwreey-fish.sh, which shows the diff to review." >&2

@@ -53,7 +53,7 @@ WORKDIR /src/webmanager/backend
 COPY webmanager/backend/go.mod webmanager/backend/go.sum ./
 RUN go mod download
 COPY webmanager/backend/ ./
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /webmanager .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /webmanager .
 
 # code-docker's built-in webmanager extension for code-server
 # (webmanager/vscode-extension/, plain JS - no build step beyond packaging).

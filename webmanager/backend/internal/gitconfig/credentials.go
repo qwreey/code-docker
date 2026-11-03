@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 
@@ -147,5 +146,5 @@ func DeleteCredential(credsPath, host string) error {
 }
 
 func ensureCredentialHelper(gitConfigPath, credsPath string) error {
-	return exec.Command("git", "config", "--file", gitConfigPath, "credential.helper", fmt.Sprintf("store --file=%s", credsPath)).Run()
+	return command("git", "config", "--file", gitConfigPath, "credential.helper", fmt.Sprintf("store --file=%s", credsPath)).Run()
 }

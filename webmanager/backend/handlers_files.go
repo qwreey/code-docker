@@ -86,8 +86,9 @@ func (s *Server) handleFilesDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 
-	filename := sanitizeContentDispositionFilename(filepath.Base(p))
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	filename := filepath.Base(p)
+	w.Header().Set("Content-Disposition", files.AttachmentDisposition(filename))
+	w.Header().Set("Content-Security-Policy", files.DownloadCSP)
 	http.ServeContent(w, r, filename, info.ModTime(), f)
 }
 
@@ -318,11 +319,4 @@ func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
-}
-
-func sanitizeContentDispositionFilename(name string) string {
-	name = strings.ReplaceAll(name, "\r", "")
-	name = strings.ReplaceAll(name, "\n", "")
-	name = strings.ReplaceAll(name, `"`, "'")
-	return name
 }

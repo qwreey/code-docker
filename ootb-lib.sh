@@ -161,7 +161,7 @@ fetch_router_env_template() {
   ref=$(get_env_var "$env" ROUTER_REF)
   [ -n "$ref" ] || ref=$(compose_default "$compose" ROUTER_REF)
   url="https://raw.githubusercontent.com/qwreey/router-docker/$ref/example-env.router"
-  if curl -fsSL "$url" -o "$dst.tmp" && mv "$dst.tmp" "$dst"; then
+  if curl -fsSL --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 60 "$url" -o "$dst.tmp" && mv "$dst.tmp" "$dst"; then
     echo "  - 생성: $dst (router-docker $ref)"
     return 0
   fi

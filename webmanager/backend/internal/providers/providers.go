@@ -291,8 +291,9 @@ func newProxy(p Provider, transport http.RoundTripper) http.Handler {
 			pr.Out.Header.Set("X-Forwarded-Prefix", browserPrefix)
 			pr.Out.Header.Set("X-Forwarded-Host", pr.In.Host)
 			// webmanager's own idea of the client, which is the address
-			// nginx passed on - behind router, router's, not the browser's.
-			pr.Out.Header.Set("X-Forwarded-For", authgate.ClientKey(pr.In))
+			// nginx passed on - behind router, router's unless
+			// ROUTER_CLIENT_IP_TOKEN is set.
+			pr.Out.Header.Set("X-Forwarded-For", authgate.ClientAddr(pr.In))
 		},
 		// A provider shares webmanager's origin, so a cookie it set would
 		// land on every /manager/ path - including one named like the

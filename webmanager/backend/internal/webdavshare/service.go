@@ -8,12 +8,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"log"
-	"mime"
 	"net/http"
 	"path"
 	"strings"
 	"sync"
 	"time"
+	filesjail "webmanager/internal/files"
 
 	"golang.org/x/net/webdav"
 
@@ -412,18 +412,15 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet, http.MethodHead, http.MethodPost:
 		w.Header().Set("Content-Disposition", contentDispositionAttachment(r.URL.Path))
+		w.Header().Set("Content-Security-Policy", filesjail.DownloadCSP)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 	}
 
 	s.handler.ServeHTTP(w, r)
 }
 
-// contentDispositionAttachment builds an `attachment; filename="..."` value
-// from the request path's base name. mime.FormatMediaType handles quoting
-// and non-ASCII (RFC 2231) itself; control characters are stripped first
-// since a filename can come straight from a client-chosen PUT path and CR/LF
-// in a header value is a response-splitting risk on some proxies even though
-// Go's own header writer already rejects them.
+// contentDispositionAttachment builds the attachment disposition
+// (files.AttachmentDisposition) from the request path's base name.
 func contentDispositionAttachment(urlPath string) string {
 	var name string
 	if strings.HasSuffix(urlPath, "/") {
@@ -435,19 +432,7 @@ func contentDispositionAttachment(urlPath string) string {
 	} else {
 		name = path.Base(urlPath)
 	}
-	if name == "" || name == "." || name == "/" {
-		name = "download"
-	}
-	name = strings.Map(func(r rune) rune {
-		if r == '\r' || r == '\n' {
-			return -1
-		}
-		return r
-	}, name)
-	if name == "" {
-		name = "download"
-	}
-	return mime.FormatMediaType("attachment", map[string]string{"filename": name})
+	return filesjail.AttachmentDisposition(name)
 }
 
 func unauthorized(w http.ResponseWriter) {

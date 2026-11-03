@@ -22,6 +22,17 @@ import (
 // paths (the WebDAV credential cache, the separate WebAuthn bucket) don't
 // lean on this key to keep the owner in.
 func ClientKey(r *http.Request) string {
+	addr := ClientAddr(r)
+	if ip := net.ParseIP(addr); ip != nil {
+		return addressKey(ip)
+	}
+	return addr
+}
+
+// ClientAddr is the caller's address as ClientKey derives it, before it is
+// grouped into a lockout bucket - for passing on (a provider page's
+// X-Forwarded-For), not for keying anything.
+func ClientAddr(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		host = r.RemoteAddr
@@ -32,4 +43,14 @@ func ClientKey(r *http.Request) string {
 		}
 	}
 	return host
+}
+
+// addressKey is the lockout bucket for an address: IPv4 as is, IPv6 by its
+// /64. One IPv6 host is normally handed a whole /64, so keyed per address
+// it could move to a fresh, unlocked bucket for every guess.
+func addressKey(ip net.IP) string {
+	if v4 := ip.To4(); v4 != nil {
+		return v4.String()
+	}
+	return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
 }

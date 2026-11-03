@@ -3,7 +3,6 @@ package gitconfig
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 )
 
@@ -16,7 +15,7 @@ import (
 // or pre-emptive removal of a previous keypair) since that policy differs
 // per caller.
 func generateEd25519Key(keyPath, comment string) (publicKey string, err error) {
-	cmd := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-f", keyPath, "-C", comment)
+	cmd := command("ssh-keygen", "-t", "ed25519", "-N", "", "-f", keyPath, "-C", comment)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("ssh-keygen: %w: %s", err, strings.TrimSpace(string(out)))
 	}

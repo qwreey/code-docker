@@ -544,9 +544,15 @@ func main() {
 	// non-GET/HEAD/OPTIONS requests a browser marks cross-origin
 	// (Sec-Fetch-Site, else Origin vs Host); requests with neither header -
 	// WebDAV clients, the code-server extension host, curl - pass untouched.
+	// Header-only timeouts: terminals and WebDAV transfers are long-lived, so
+	// no Read/WriteTimeout. Matters most with WEBMANAGER_ADDR off loopback,
+	// where nginx's own client limits aren't in front.
 	httpServer := &http.Server{
-		Addr:    cfg.Addr,
-		Handler: http.NewCrossOriginProtection().Handler(webdavRouter(s.webdav, limitRequestBody(mux))),
+		Addr:              cfg.Addr,
+		Handler:           http.NewCrossOriginProtection().Handler(webdavRouter(s.webdav, limitRequestBody(mux))),
+		ReadHeaderTimeout: 10 * time.Second,
+		MaxHeaderBytes:    64 << 10,
+		IdleTimeout:       2 * time.Minute,
 	}
 
 	// Shared cancel-on-shutdown context for every long-lived background

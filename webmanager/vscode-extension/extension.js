@@ -775,7 +775,8 @@ async function onMessage(host, m) {
       // creation) - a resumed `claude --resume` that ended would come back
       // as a fresh resume on the next refresh.
       if (host.state.session) delete host.state.command
-      if (typeof m.href === 'string') host.href = m.href
+      // Only ever handed to openExternal - an http(s) page, nothing else.
+      if (typeof m.href === 'string' && isHttpUrl(m.href)) host.href = m.href
       updateTitle(host)
       // A slot remembers what it shows so a refresh restores it - but only
       // something worth restoring: the terminal Home (no session) isn't.
@@ -910,6 +911,7 @@ async function openInBrowser(host) {
   // A terminal moves rather than duplicates, same as the titlebar widget's
   // pop-out: two clients on one session fight over its size. But only once
   // the browser tab really opened - a blocked popup must not cost the view.
+  if (!isHttpUrl(host.href)) return
   const opened = await vscode.env.openExternal(vscode.Uri.parse(host.href))
   if (opened && host.state.section === 'terminal') {
     if (host.kind === 'panel') host.panel.dispose()

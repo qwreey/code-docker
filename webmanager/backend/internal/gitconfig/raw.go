@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -57,7 +56,7 @@ func WriteRaw(path, content string) error {
 		return err
 	}
 
-	out, err := exec.Command("git", "config", "-f", tmpPath, "-l").CombinedOutput()
+	out, err := command("git", "config", "-f", tmpPath, "-l").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrInvalidGitConfigSyntax, strings.TrimSpace(string(out)))
 	}

@@ -140,7 +140,7 @@ func listSecretKeys(filter string) ([]GPGKey, error) {
 	if filter != "" {
 		args = append(args, filter)
 	}
-	out, err := exec.Command("gpg", args...).Output()
+	out, err := command("gpg", args...).Output()
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -184,7 +184,7 @@ func GenerateGPGKey(name, email string) (GPGKey, string, error) {
 	}
 
 	uid := fmt.Sprintf("%s <%s>", name, email)
-	cmd := exec.Command("gpg", "--batch", "--passphrase", "", "--quick-generate-key", uid, "default", "default", "never")
+	cmd := command("gpg", "--batch", "--passphrase", "", "--quick-generate-key", uid, "default", "default", "never")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -217,7 +217,7 @@ func ExportPublicKey(keyID string) (string, error) {
 	if err := ValidateKeyID(keyID); err != nil {
 		return "", err
 	}
-	out, err := exec.Command("gpg", "--armor", "--export", keyID).Output()
+	out, err := command("gpg", "--armor", "--export", keyID).Output()
 	if err != nil {
 		return "", gpgExecError("gpg --export", err)
 	}
@@ -245,7 +245,7 @@ func DeleteGPGKey(keyID string) error {
 		return ErrGPGKeyNotFound
 	}
 
-	cmd := exec.Command("gpg", "--batch", "--yes", "--delete-secret-and-public-key", keyID)
+	cmd := command("gpg", "--batch", "--yes", "--delete-secret-and-public-key", keyID)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {

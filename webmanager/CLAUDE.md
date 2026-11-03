@@ -575,8 +575,9 @@ The browser can reach only code-docker's nginx, never a container on
   see. The prefix is passed as `X-Forwarded-Prefix: /manager/providers/<id>/`
   for anything that must be absolute; `X-Forwarded-Host` and
   `X-Forwarded-For` are set too. The latter is the client as webmanager
-  sees it (`authgate.ClientKey`), which behind router is router's address,
-  not the browser's - don't key anything per-user on it.
+  sees it (`authgate.ClientAddr`), which behind router is router's address,
+  not the browser's, unless `ROUTER_CLIENT_IP_TOKEN` is set - don't key
+  anything per-user on it.
 - **No cookies or credentials, either direction**: `Cookie`,
   `Authorization`, `Proxy-Authorization` and `X-Real-IP` are dropped on the
   way in, `Set-Cookie` on the way out. The page shares webmanager's origin,

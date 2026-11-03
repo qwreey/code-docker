@@ -139,10 +139,19 @@ func requestBodyCap(r *http.Request) int64 {
 // to 400 "invalid request body", or 413 where the size is the likely cause)
 // instead of reading an unbounded amount of attacker-controlled data. The
 // routes requestBodyCap exempts are still bounded, by their own handlers.
+//
+// It also marks API responses no-store and nosniff (a handler may still set
+// its own Cache-Control): they carry file contents, session logs and keys,
+// none of which belongs in a cache, and nginx's nosniff doesn't apply when
+// WEBMANAGER_ADDR is reached directly.
 func limitRequestBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if limit := requestBodyCap(r); limit > 0 {
 			r.Body = http.MaxBytesReader(w, r.Body, limit)
+		}
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
 		}
 		next.ServeHTTP(w, r)
 	})

@@ -52,7 +52,7 @@ fi
 url="https://raw.githubusercontent.com/$REPO/$new/functions/qs_setup.fish"
 fetched=$(mktemp)
 trap 'rm -f "$fetched"' EXIT
-if ! curl -fsSL "$url" -o "$fetched"; then
+if ! curl -fsSL --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 60 "$url" -o "$fetched"; then
   echo "! $url 를 받지 못했습니다 - ${new:0:12} 가 GitHub에 push돼 있나요? 아무것도 고치지 않았습니다." >&2
   exit 1
 fi

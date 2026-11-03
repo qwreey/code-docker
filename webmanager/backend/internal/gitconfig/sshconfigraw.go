@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -92,7 +91,7 @@ func WriteRawSSHConfig(path, content string) error {
 	}
 	defer os.Remove(checkPath)
 
-	out, err := exec.Command("ssh", "-F", checkPath, "-G", "webmanager-ssh-config-validation").CombinedOutput()
+	out, err := command("ssh", "-F", checkPath, "-G", "webmanager-ssh-config-validation").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrInvalidSSHConfigSyntax, strings.TrimSpace(string(out)))
 	}
