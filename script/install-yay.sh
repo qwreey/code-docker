@@ -15,23 +15,23 @@ pacman -Suy --needed --noconfirm git base-devel sudo
 # Disable debug
 sed 's/^OPTIONS=.*/OPTIONS=(strip docs !libtool !staticlibs emptydirs zipman purge !debug lto)/g' -i /etc/makepkg.conf
 
-# Update yay bin
+# Update yay bin - pinned to YAY_BIN_COMMIT (Dockerfile ARG), not AUR's
+# moving master: everything makepkg runs here does so as a user with
+# passwordless sudo, so the PKGBUILD is root code at build time. The pin covers
+# the binary too, since the PKGBUILD carries the release tarball's sha256.
+: "${YAY_BIN_COMMIT:?YAY_BIN_COMMIT must name an aur.archlinux.org/yay-bin.git commit}"
 mkdir -p /var/yay-bin
 git config --global --add safe.directory /var/yay-bin
 cd /var/yay-bin
-if [ -e .git ]; then
-	# fetch+reset, not pull: this is a persisted --mount=type=cache repo, and
-	# a plain `git pull` fails outright if upstream AUR history is ever
-	# amended/rebased (non-fast-forward), aborting the whole image build on
-	# an opaque error. fetch+reset always lands on exactly what origin/master
-	# has now, regardless of history shape.
-	git fetch --depth 1 origin master
-	git reset --hard origin/master
-else
+if [ ! -e .git ]; then
 	git init -b master
 	git remote add origin https://aur.archlinux.org/yay-bin.git
-	git pull origin master
 fi
+# fetch+reset, not pull: this is a persisted --mount=type=cache repo, and a
+# pull fails outright on an amended/rebased upstream history. AUR serves a
+# commit by its full hash even when it is no longer master's tip.
+git fetch --depth 1 origin "$YAY_BIN_COMMIT"
+git reset --hard FETCH_HEAD
 chown -R makepkg:makepkg /var/yay-bin
 
 # Install yay

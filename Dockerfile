@@ -62,7 +62,10 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /webmanager .
 # default.sh compares it on every start to keep the installed copy in sync
 # with this image (installing, upgrading or downgrading as needed).
 FROM node:24-alpine AS code-extension
-RUN npm install -g @vscode/vsce@3
+# Exact version: vsce writes the .vsix code-server installs. This pins vsce
+# itself, not its dependency tree (no lockfile for a global install).
+ARG VSCE_VERSION=3.9.2
+RUN npm install -g "@vscode/vsce@${VSCE_VERSION}"
 WORKDIR /src
 COPY webmanager/vscode-extension/ ./
 RUN STAMP="$(find . -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-16)" \
@@ -74,12 +77,16 @@ RUN STAMP="$(find . -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum |
 
 FROM archlinux AS main
 
-# Init makepkg user and install yay
+# Init makepkg user and install yay. YAY_BIN_COMMIT pins the AUR package (see
+# install-yay.sh for why); to bump, take master's hash from
+# `git ls-remote https://aur.archlinux.org/yay-bin.git master` and read its
+# PKGBUILD diff first.
+ARG YAY_BIN_COMMIT=a2812a593d4017a657bbedf98761db78072b5e4c
 COPY --chown=root:root script/install-yay.sh /etc/code-docker/
 RUN --mount=type=cache,target=/home/makepkg \
     --mount=type=cache,target=/var/yay-bin \
     --mount=type=cache,target=/var/cache/pacman \
-    /etc/code-docker/install-yay.sh
+    YAY_BIN_COMMIT="$YAY_BIN_COMMIT" /etc/code-docker/install-yay.sh
 
 # Run build script
 COPY --chown=root:root script/override /etc/code-docker/
