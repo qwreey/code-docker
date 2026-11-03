@@ -54,6 +54,20 @@ code.yaeji.moe {
 }
 ```
 
+바깥 프록시에는 위처럼 **경로 목록만** 적으면 됩니다. 이 경로들에 필요한 나머지 제한은
+code-docker 컨테이너 안 nginx(`config/nginx/nginx.default.conf`)가 직접 겁니다:
+
+- GET/HEAD만 받고, 다른 메서드는 405입니다.
+- 프로토콜 업그레이드(WebSocket) 요청은 400입니다. code-server는 모든 경로에서
+  WebSocket을 받기 때문에, 정적 파일 경로에서는 막아야 합니다.
+- 경로를 정규화한 결과가 그 경로 밖이면(`..`, 인코딩된 `/` 등) 400입니다.
+- 대소문자만 다른 표기(`/_STATIC/...`)는 404입니다.
+
+다만 바깥 프록시 자체는 Caddy의 `path`나 nginx의 `location`처럼 **정규화한 경로로
+매칭**하는 방식을 쓰세요. 원래 URI의 접두사만 보고 통과시키는 프록시라면, 요청이
+code-docker에 닿기 전에 router가 자기 경로(`/router/`, `/exports/`, `/app/`)로 갈라
+보낼 수 있습니다.
+
 ### 사이드 프로젝트에 자기 도메인을 준 경우
 
 router의 vhost(`ROUTER_VHOST_*`, [router-docker의 docs/vhost.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/vhost.md))로 붙인 앱은
