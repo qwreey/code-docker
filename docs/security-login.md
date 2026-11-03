@@ -63,10 +63,10 @@ code-docker 컨테이너 안 nginx(`config/nginx/nginx.default.conf`)가 직접 
 - 경로를 정규화한 결과가 그 경로 밖이면(`..`, 인코딩된 `/` 등) 400입니다.
 - 대소문자만 다른 표기(`/_STATIC/...`)는 404입니다.
 
-다만 바깥 프록시 자체는 Caddy의 `path`나 nginx의 `location`처럼 **정규화한 경로로
-매칭**하는 방식을 쓰세요. 원래 URI의 접두사만 보고 통과시키는 프록시라면, 요청이
-code-docker에 닿기 전에 router가 자기 경로(`/router/`, `/exports/`, `/app/`)로 갈라
-보낼 수 있습니다.
+바깥 프록시가 원래 URI로 매칭하든 정규화한 경로로 매칭하든 결과는 같습니다. 그보다
+앞에서 router의 nginx가 정규화로 첫 경로 세그먼트가 바뀌는 요청을 400으로 거부하므로,
+공개 경로 이름을 단 요청이 router 자신의 경로(`/router/`, `/exports/`, `/app/`)로
+빠지지도 않습니다([router-docker의 docs/dev-proxy.md](https://github.com/qwreey/router-docker/blob/HEAD/docs/dev-proxy.md) 참고).
 
 ### 사이드 프로젝트에 자기 도메인을 준 경우
 
