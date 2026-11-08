@@ -304,13 +304,81 @@ has_env_var() {
   grep -qE "^$2=" "$1" 2>/dev/null
 }
 
-prompt_router_manager_password() {
-  # prompt_router_manager_password <TARGET_DIR>
+# 새로 정하는 비밀번호의 최소 길이. 정의는 webmanager/backend/internal/authgate의
+# MinPasswordLength(router-manager도 같은 규칙)이고 --hash-password가 그 값으로
+# 거부하는 마지막 관문입니다 - 여기 숫자는 같은 질문을 두 번 하지 않으려는 사전
+# 검사일 뿐이라, 둘이 어긋나도 쓸 수 없는 비밀번호가 저장되지는 않습니다.
+OOTB_MIN_PASSWORD_LENGTH=12
+# 불일치/길이 미달 재시도 횟수. 빈 입력과 EOF는 횟수와 무관하게 즉시 포기입니다 -
+# 입력이 없는 환경에서 같은 질문을 영원히 반복하지 않으려는 것입니다.
+OOTB_PASSWORD_MAX_TRIES=3
+
+password_length() {
+  # password_length <문자열> - 글자 수(유니코드 코드포인트)를 출력합니다. Go 쪽
+  # 검사가 utf8.RuneCountInString이라 같은 단위여야 하는데, bash의 ${#var}는
+  # UTF-8 로캘이어야만 글자 단위입니다(C 로캘이면 바이트). 로캘이 뭐든 같은
+  # 답이 나오게, 바이트 수에서 UTF-8 이어짐 바이트(0x80-0xBF)를 뺍니다 -
+  # 멀티바이트 글자는 시작 바이트 하나에 이어짐 바이트가 붙는 모양이라 남는 건
+  # 글자 수입니다. printf는 내장이라 비밀번호가 argv에 나타나지 않습니다.
+  printf '%s' "$1" | LC_ALL=C tr -d '\200-\277' | LC_ALL=C wc -c | tr -d '[:space:]'
+}
+
+ask_new_password() {
+  # ask_new_password - 새 비밀번호를 두 번 받아 전역 _ootb_new_pw에 담고 0을
+  # 반환합니다(호출한 쪽이 쓰고 나서 unset). 포기(빈 입력/EOF/재시도 초과)면 1.
+  # 입력은 항상 stdin에서 읽고, 화면에는 에코하지 않습니다. IFS=는 앞뒤 공백이
+  # 조용히 잘려 나가는 걸 막습니다(--hash-password도 줄바꿈만 떼므로 같아야 합니다).
+  _anp_try=0
+  _ootb_new_pw=""
+  while [ "$_anp_try" -lt "$OOTB_PASSWORD_MAX_TRIES" ]; do
+    printf "새 비밀번호 (%d자 이상, 비워 두면 건너뜀): " "$OOTB_MIN_PASSWORD_LENGTH"
+    if ! IFS= read -r -s _anp_pw1; then
+      echo
+      echo "  ! 입력이 없어 건너뜁니다."
+      unset _anp_pw1
+      return 1
+    fi
+    echo
+    if [ -z "$_anp_pw1" ]; then
+      echo "  - 건너뜀."
+      return 1
+    fi
+    _anp_len="$(password_length "$_anp_pw1")"
+    if [ "$_anp_len" -lt "$OOTB_MIN_PASSWORD_LENGTH" ]; then
+      echo "  ! 너무 짧습니다 (${_anp_len}자) - ${OOTB_MIN_PASSWORD_LENGTH}자 이상이어야 합니다."
+      _anp_try=$((_anp_try + 1))
+      continue
+    fi
+    printf "다시 한 번 입력: "
+    if ! IFS= read -r -s _anp_pw2; then
+      echo
+      echo "  ! 입력이 없어 건너뜁니다."
+      unset _anp_pw1 _anp_pw2
+      return 1
+    fi
+    echo
+    if [ "$_anp_pw1" != "$_anp_pw2" ]; then
+      echo "  ! 두 번 입력한 값이 일치하지 않습니다."
+      _anp_try=$((_anp_try + 1))
+      continue
+    fi
+    _ootb_new_pw=$_anp_pw1
+    unset _anp_pw1 _anp_pw2
+    return 0
+  done
+  unset _anp_pw1 _anp_pw2
+  echo "  ! ${OOTB_PASSWORD_MAX_TRIES}번 실패해 건너뜁니다."
+  return 1
+}
+
+prompt_password_hash() {
+  # prompt_password_hash <VAR> <env 파일> <서비스> <바이너리> <이름> <미설정 시 기본값 y|n> [안내문] [건너뛸 때 안내문]
   #
-  # router-manager 관리 API 비밀번호(ROUTER_MANAGER_AUTH_PASSWORD_HASH)를
-  # 물어보고 해시를 만들어 .env.router에 씁니다. 호출 전에 반드시
-  # `cd "$TARGET_DIR"`가 되어 있고 `docker compose build`가 성공한 상태여야
-  # 합니다 - 해시 생성이 방금 빌드한 이미지의 router-manager --hash-password를
+  # 비밀번호를 물어 argon2id 해시로 만들어 <env 파일>의 <VAR>에 씁니다.
+  # webmanager(WEBMANAGER_AUTH_PASSWORD_HASH, WEBMANAGER_WEBDAV_PASSWORD_HASH)와
+  # router-manager(ROUTER_MANAGER_AUTH_PASSWORD_HASH) 셋이 이 함수 하나를 씁니다.
+  # 호출 전에 반드시 `cd "$TARGET_DIR"`가 되어 있고 `docker compose build`가
+  # 성공한 상태여야 합니다 - 해시 생성이 방금 빌드한 이미지의 --hash-password를
   # 실행하는 것이기 때문입니다.
   #
   # ootb-config.sh가 아니라 여기 있는 이유: 대화형 값은 원칙적으로 전부
@@ -320,38 +388,72 @@ prompt_router_manager_password() {
   # 가진 ootb.sh와 migrate-continue.sh 양쪽에서 이 함수 하나를 부르는 방식으로
   # 단일 출처를 유지합니다.
   #
-  # 이미 설정돼 있으면 조용히 넘어가지 않고 그렇다고 말합니다 - 안 물어본
-  # 이유를 말하지 않으면 "안 물어봤다"와 "이미 돼 있다"가 구분되지 않습니다.
-  _prmp_dir=$1
-  if [ -n "$(get_env_var "$_prmp_dir/.env.router" ROUTER_MANAGER_AUTH_PASSWORD_HASH)" ]; then
-    echo "  - ROUTER_MANAGER_AUTH_PASSWORD_HASH가 이미 설정돼 있어 건너뜁니다."
-    return 0
-  fi
-  echo "router-manager(netgate egress 규칙 / DNS / 인바운드 포워드 / tinyauth 사용자)의"
-  echo "관리 API는 이 비밀번호로만 잠깁니다. 설정하지 않으면 잠기지 않는 게 아니라"
-  echo "아예 쓸 수 없습니다 - 비밀번호가 없으면 관리 API가 503으로 전부 거부되고,"
-  echo "/router/ 화면은 첫 설정 폼만 뜹니다. 앱 안(/router/ → 설정 탭)에서도"
-  echo "나중에 설정할 수 있지만, 여기서 설정하면 env로 고정됩니다."
-  if ! confirm "router-manager 관리자 비밀번호를 지금 설정할까요?" y; then
-    echo "  - 건너뜀. 컨테이너를 띄운 뒤 http://<host>/router/ 에서 설정하세요"
-    echo "    (그 전까지 Net 관리/DNS/tinyauth 등의 쓰기 동작은 503으로 거부됩니다)."
-    echo "    설정 폼은 router 로그의 1회용 토큰을 요구합니다:"
-    echo "      docker compose logs code-docker-router | grep setup-token"
-    return 0
-  fi
-  printf "Password: "; read -r -s _prmp_pw1; echo
-  printf "Confirm: "; read -r -s _prmp_pw2; echo
-  if [ "$_prmp_pw1" != "$_prmp_pw2" ] || [ -z "$_prmp_pw1" ]; then
-    echo "  ! 비밀번호가 비어있거나 일치하지 않아 건너뜁니다."
-    return 0
-  fi
-  _prmp_hash="$(printf '%s\n' "$_prmp_pw1" | docker compose run --rm -T \
-    --entrypoint /usr/local/bin/router-manager code-docker-router --hash-password)"
-  if [ -n "$_prmp_hash" ]; then
-    set_env_var "$_prmp_dir/.env.router" ROUTER_MANAGER_AUTH_PASSWORD_HASH "'$_prmp_hash'"
-    echo "  - ROUTER_MANAGER_AUTH_PASSWORD_HASH 설정 완료"
+  # 이미 설정돼 있으면 "바꿀까요?"(기본 N)를 묻습니다 - 저장된 해시는 길이를 볼
+  # 수 없어서, 예전에 짧게 정한 비밀번호를 바꿀 길은 이 질문과 env 직접 편집뿐입니다.
+  # 안 물어본 이유를 말하지 않으면 "안 물어봤다"와 "이미 돼 있다"가 구분되지
+  # 않으므로 N을 고른 경우에도 그렇게 말합니다.
+  #
+  # 비밀번호는 stdin 파이프로만 --hash-password에 넘깁니다(argv/환경변수에
+  # 올리지 않음 - ps나 /proc에 보이므로).
+  _pph_var=$1 _pph_file=$2 _pph_service=$3 _pph_bin=$4 _pph_label=$5 _pph_default=$6
+  _pph_intro=${7:-} _pph_skipnote=${8:-}
+
+  if [ -n "$(get_env_var "$_pph_file" "$_pph_var")" ]; then
+    if ! confirm "$_pph_label 비밀번호가 이미 설정돼 있습니다. 바꿀까요?" n; then
+      echo "  - $_pph_var 그대로 둡니다."
+      return 0
+    fi
   else
-    echo "  ! 해시 생성 실패"
+    [ -n "$_pph_intro" ] && printf '%s\n' "$_pph_intro"
+    if ! confirm "$_pph_label 비밀번호를 지금 설정할까요?" "$_pph_default"; then
+      [ -n "$_pph_skipnote" ] && printf '%s\n' "$_pph_skipnote"
+      return 0
+    fi
+  fi
+
+  if ! ask_new_password; then
+    echo "  - $_pph_var 는 바꾸지 않았습니다."
+    return 0
+  fi
+  _pph_hash="$(printf '%s\n' "$_ootb_new_pw" | docker compose run --rm -T \
+    --entrypoint "$_pph_bin" "$_pph_service" --hash-password)"
+  unset _ootb_new_pw
+  if [ -n "$_pph_hash" ]; then
+    set_env_var "$_pph_file" "$_pph_var" "'$_pph_hash'"
+    echo "  - $_pph_var 설정 완료 ($(basename "$_pph_file"))."
+    echo "    실행 중인 컨테이너에는 아직 적용되지 않습니다 - env_file은 컨테이너를 재생성할 때만"
+    echo "    읽으므로, 이 실행 끝의 docker compose up -d (또는 직접 실행)가 필요합니다."
+  else
+    echo "  ! 해시 생성 실패 - $_pph_var 는 바꾸지 않았습니다."
+  fi
+  unset _pph_hash
+}
+
+prompt_admin_passwords() {
+  # prompt_admin_passwords <TARGET_DIR> - ootb.sh와 migrate-continue.sh가 빌드
+  # 직후에 부르는, 비밀번호 질문 묶음. 전제는 prompt_password_hash와 같습니다
+  # (TARGET_DIR로 cd, 빌드 성공). 새 비밀번호 항목은 여기에 한 줄 추가하세요.
+  _pap_dir=$1
+  echo "새로 정하는 비밀번호는 ${OOTB_MIN_PASSWORD_LENGTH}자 이상이어야 합니다 (글자 수 기준, 한글도 한 글자)."
+  prompt_password_hash WEBMANAGER_AUTH_PASSWORD_HASH "$_pap_dir/.env.webmanager" \
+    code-docker /etc/code-docker/webmanager/webmanager "webmanager 관리자" n \
+    "webmanager 관리자 비밀번호는 Terminal/File Manager/Logs 등을 잠급니다."
+  prompt_password_hash ROUTER_MANAGER_AUTH_PASSWORD_HASH "$_pap_dir/.env.router" \
+    code-docker-router /usr/local/bin/router-manager "router-manager 관리자" y \
+    "router-manager(netgate egress 규칙 / DNS / 인바운드 포워드 / tinyauth 사용자)의
+관리 API는 이 비밀번호로만 잠깁니다. 설정하지 않으면 잠기지 않는 게 아니라
+아예 쓸 수 없습니다 - 비밀번호가 없으면 관리 API가 503으로 전부 거부되고,
+/router/ 화면은 첫 설정 폼만 뜹니다. 앱 안(/router/ → 설정 탭)에서도
+나중에 설정할 수 있지만, 여기서 설정하면 env로 고정됩니다." \
+    "  - 건너뜀. 컨테이너를 띄운 뒤 http://<host>/router/ 에서 설정하세요
+    (그 전까지 Net 관리/DNS/tinyauth 등의 쓰기 동작은 503으로 거부됩니다).
+    설정 폼은 router 로그의 1회용 토큰을 요구합니다:
+      docker compose logs code-docker-router | grep setup-token"
+  # WebDAV 해시는 .env.webmanager에 이미 있을 때만 묻습니다 - 없으면 File share
+  # 탭에서 만드는 게 정상 경로라 새 질문을 늘리지 않습니다.
+  if [ -n "$(get_env_var "$_pap_dir/.env.webmanager" WEBMANAGER_WEBDAV_PASSWORD_HASH)" ]; then
+    prompt_password_hash WEBMANAGER_WEBDAV_PASSWORD_HASH "$_pap_dir/.env.webmanager" \
+      code-docker /etc/code-docker/webmanager/webmanager "WebDAV(File share)" n
   fi
 }
 

@@ -12,7 +12,7 @@ git clone -b main https://github.com/qwreey/code-docker.git builds/code-docker
 
 아래 "수동으로 설치하기" 절의 모든 단계(컴포즈 파일/`example-env`류 복사, `.env`
 값 설정, `docker compose build`/`up`, 심지어 `WEBMANAGER_AUTH_PASSWORD_HASH`/
-`ROUTER_MANAGER_AUTH_PASSWORD_HASH` 생성까지)를 대화형으로 대신 해주는 스크립트입니다:
+`ROUTER_MANAGER_AUTH_PASSWORD_HASH` 생성까지 - 비밀번호는 12자 이상이어야 합니다)를 대화형으로 대신 해주는 스크립트입니다:
 
 ```sh
 builds/code-docker/ootb.sh
@@ -85,6 +85,12 @@ git pull → 손 안 댄 `docker-compose.yml`이면 최신으로 갱신(직접 �
 --entrypoint`로 딱 그 명령만 실행 - `ootb.sh`의 `--hash-password`와 같은 기법) →
 `docker compose up -d` 순서로 매 단계 물어보며 진행합니다. 최상위 `.env`는
 마이그레이션 도구가 없으므로(모든 키가 기본값을 가지므로 안전) 건드리지 않습니다.
+
+빌드 직후에는 webmanager/router-manager 관리자 비밀번호(그리고 `.env.webmanager`에
+`WEBMANAGER_WEBDAV_PASSWORD_HASH`가 이미 있으면 그 비밀번호도)를 **바꿀지** 물어봅니다 -
+이미 설정돼 있어도 묻고 기본값은 "아니오"입니다. 새 비밀번호는 12자 이상이어야 하고(글자 수
+기준, 한글도 한 글자), 12자보다 짧은 예전 비밀번호를 바꿀 기회이기도 합니다. 바꾼 값은 아래
+`docker compose up -d`로 컨테이너를 다시 만들 때 반영됩니다.
 
 빌드 이후, `up` 하기 전에 "설정값을 다시 검토할까요?"/"새 사이드 프로젝트를
 추가할까요?"도 물어봅니다 - 각각 `RECONFIGURE=1 ootb-config.sh`(현재 값을 보여주고

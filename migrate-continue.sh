@@ -248,17 +248,21 @@ if [ "$built" = "1" ]; then
   done
   echo
 
-  # router-manager 비밀번호는 RECONFIGURE(5단계의 ootb-config.sh)가 다룰 수
-  # 없습니다 - 그 스크립트는 docker를 전혀 안 쓰는 순수 env 편집기인데, 이
-  # 값은 방금 빌드한 이미지로 --hash-password를 돌려야 만들어집니다. 그래서
-  # "빌드 직후"인 여기서 묻습니다. 이미 설정돼 있으면 함수가 그렇다고 말하고
-  # 넘어가므로 매번 돌려도 시끄럽지 않습니다.
+  # 비밀번호는 RECONFIGURE(5단계의 ootb-config.sh)가 다룰 수 없습니다 - 그
+  # 스크립트는 docker를 전혀 안 쓰는 순수 env 편집기인데, 해시는 방금 빌드한
+  # 이미지로 --hash-password를 돌려야 만들어집니다. 그래서 "빌드 직후"인 여기서
+  # 묻습니다. 이미 설정돼 있으면 "바꿀까요?"(기본 N)라서 Enter만 치면 지나갑니다.
   #
-  # 기존 배포에 이 질문이 생긴 이유: 비밀번호 미설정 상태의 router-manager
-  # 관리 API는 이제 통과가 아니라 503입니다(fail-closed) - 즉 예전처럼
-  # "안 잠긴 채 동작"하는 게 아니라 아예 동작하지 않습니다.
-  echo "=== 4-1. router-manager 관리자 비밀번호 ==="
-  prompt_router_manager_password "$TARGET_DIR"
+  # 이미 있는 비밀번호도 묻는 이유: 최소 길이(12자) 규칙이 생기기 전에 정한
+  # 짧은 비밀번호는 저장된 해시로는 길이를 알 수 없어서, 바꿀 기회를 여기서
+  # 줍니다(짧은 채로 로그인하면 webmanager 화면 상단에도 안내가 뜹니다).
+  #
+  # router-manager가 목록에 있는 이유: 비밀번호 미설정 상태의 관리 API는
+  # 통과가 아니라 503입니다(fail-closed) - 예전처럼 "안 잠긴 채 동작"하는 게
+  # 아니라 아예 동작하지 않습니다.
+  #
+  echo "=== 4-1. 관리자 비밀번호 ==="
+  prompt_admin_passwords "$TARGET_DIR"
   echo
 fi
 

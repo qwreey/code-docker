@@ -14,7 +14,7 @@ import (
 func newOpenShare(t *testing.T, root string) func(method, target, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	s := newTestService(t, root, Options{})
-	if _, err := s.SetPassword("s3cret"); err != nil {
+	if _, err := s.SetPassword("s3cret-passphrase"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.SetEnabled(true); err != nil {
@@ -22,7 +22,7 @@ func newOpenShare(t *testing.T, root string) func(method, target, body string) *
 	}
 	return func(method, target, body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(method, URLPrefix+target, strings.NewReader(body))
-		req.SetBasicAuth(DefaultUsername, "s3cret")
+		req.SetBasicAuth(DefaultUsername, "s3cret-passphrase")
 		rec := httptest.NewRecorder()
 		s.ServeHTTP(rec, req)
 		return rec

@@ -17,7 +17,7 @@ func TestGetResponseForcesAttachmentAndNosniff(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := newTestService(t, root, Options{})
-	if _, err := s.SetPassword("s3cret"); err != nil {
+	if _, err := s.SetPassword("s3cret-passphrase"); err != nil {
 		t.Fatalf("SetPassword() = %v", err)
 	}
 	if _, err := s.SetEnabled(true); err != nil {
@@ -25,7 +25,7 @@ func TestGetResponseForcesAttachmentAndNosniff(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, URLPrefix+"/evil.html", nil)
-	req.SetBasicAuth(DefaultUsername, "s3cret")
+	req.SetBasicAuth(DefaultUsername, "s3cret-passphrase")
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 
@@ -52,7 +52,7 @@ func TestHeadResponseAlsoGetsHeaders(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := newTestService(t, root, Options{})
-	if _, err := s.SetPassword("s3cret"); err != nil {
+	if _, err := s.SetPassword("s3cret-passphrase"); err != nil {
 		t.Fatalf("SetPassword() = %v", err)
 	}
 	if _, err := s.SetEnabled(true); err != nil {
@@ -60,7 +60,7 @@ func TestHeadResponseAlsoGetsHeaders(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodHead, URLPrefix+"/file.txt", nil)
-	req.SetBasicAuth(DefaultUsername, "s3cret")
+	req.SetBasicAuth(DefaultUsername, "s3cret-passphrase")
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 
@@ -75,7 +75,7 @@ func TestHeadResponseAlsoGetsHeaders(t *testing.T) {
 func TestPropfindDoesNotGetAttachment(t *testing.T) {
 	root := t.TempDir()
 	s := newTestService(t, root, Options{})
-	if _, err := s.SetPassword("s3cret"); err != nil {
+	if _, err := s.SetPassword("s3cret-passphrase"); err != nil {
 		t.Fatalf("SetPassword() = %v", err)
 	}
 	if _, err := s.SetEnabled(true); err != nil {
@@ -83,7 +83,7 @@ func TestPropfindDoesNotGetAttachment(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("PROPFIND", URLPrefix+"/", nil)
-	req.SetBasicAuth(DefaultUsername, "s3cret")
+	req.SetBasicAuth(DefaultUsername, "s3cret-passphrase")
 	req.Header.Set("Depth", "0")
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)

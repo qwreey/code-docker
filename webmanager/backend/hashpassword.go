@@ -20,6 +20,10 @@ import (
 // see docker-compose.yml's WEBMANAGER_AUTH_PASSWORD_HASH comment for the
 // exact `docker compose exec` invocation this is meant to be run with.
 //
+// A password under authgate.MinPasswordLength is refused (exit 1) - this is
+// the one place WEBMANAGER_AUTH_PASSWORD_HASH and
+// WEBMANAGER_WEBDAV_PASSWORD_HASH values come from.
+//
 // Prompts twice (to catch typos) with echo disabled when stdin is a real
 // terminal (docker compose exec -it); falls back to reading one line when
 // it's not (piped/scripted input, e.g. `echo pw | docker compose exec -T
@@ -62,6 +66,13 @@ func hashPasswordCmd() int {
 
 	if password == "" {
 		fmt.Fprintln(os.Stderr, "password must not be empty")
+		return 1
+	}
+	if err := authgate.CheckNewPassword(password); err != nil {
+		// The setup scripts (ootb-lib.sh's prompt_password_hash) check this
+		// first with a friendlier retry; this refusal is what holds for
+		// anyone hashing by hand.
+		fmt.Fprintf(os.Stderr, "%v (counted in characters, not bytes)\n", err)
 		return 1
 	}
 

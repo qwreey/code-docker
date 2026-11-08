@@ -129,6 +129,8 @@ export interface WebDavStatus {
   enabledLocked: boolean
   usernameLocked: boolean
   passwordLocked: boolean
+  /** The password that last logged in is shorter than the minimum for a new one. */
+  weakPassword: boolean
 }
 
 export interface SshSigningKey {
@@ -648,6 +650,8 @@ export interface AuthStatus {
   // credential enrolled here. See components/common/WebAuthn.tsx.
   webauthnEnroll?: boolean
   webauthn?: boolean
+  /** The gate password is shorter than the minimum for a new one. Only present when unlocked. */
+  weakPassword?: boolean
 }
 
 export interface FileEntry {

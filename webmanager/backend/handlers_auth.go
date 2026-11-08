@@ -27,7 +27,10 @@ func (s *Server) handleAuthUnlock(w http.ResponseWriter, r *http.Request) {
 	if !s.passwordUnlock(w, r, body.Password) {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	// WeakPassword rides on the success response only: the caller just
+	// proved the password, so telling them it is short reveals nothing to
+	// anyone who didn't already know it.
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true, "weakPassword": s.gate.WeakPassword()})
 }
 
 type authStatusResponse struct {
@@ -39,6 +42,10 @@ type authStatusResponse struct {
 	// this *browser* can do WebAuthn is the frontend's call.
 	WebAuthnEnroll bool `json:"webauthnEnroll"`
 	WebAuthn       bool `json:"webauthn"`
+	// WeakPassword: the gate password is shorter than the minimum for a new
+	// one. Set only while the request carries a valid unlocked session - an
+	// anonymous caller must not learn anything about the credential.
+	WeakPassword bool `json:"weakPassword,omitempty"`
 }
 
 // handleAuthStatus lets the frontend know whether to show a password
@@ -56,6 +63,7 @@ func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 		resp.Unlocked = true
 		formatted := until.UTC().Format(time.RFC3339)
 		resp.UnlockedUntil = &formatted
+		resp.WeakPassword = s.gate.WeakPassword()
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

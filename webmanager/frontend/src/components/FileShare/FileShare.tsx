@@ -12,6 +12,10 @@ import './FileShare.css'
 // into a phone's file-manager dialog at least once.
 const PASSWORD_ALPHABET = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const PASSWORD_LENGTH = 24
+// Mirrors authgate.MinPasswordLength (backend), counted in characters
+// (code points), not UTF-16 units. The server refuses a shorter one too; this
+// only saves the round trip.
+const MIN_PASSWORD_LENGTH = 12
 
 // Rejection sampling rather than a plain modulo: the alphabet doesn't divide
 // 256 evenly, so `byte % len` would make the first few characters measurably
@@ -91,6 +95,10 @@ export function FileShare() {
   }
 
   async function savePassword(password: string) {
+    if (password !== '' && [...password].length < MIN_PASSWORD_LENGTH) {
+      setError(`비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.`)
+      return
+    }
     setSettingPassword(true)
     setError(null)
     try {
@@ -207,6 +215,23 @@ export function FileShare() {
 
           <div className="card">
             <h2>비밀번호</h2>
+            {status.weakPassword && (
+              <div className="warning-note">
+                {status.passwordLocked ? (
+                  <span>
+                    지금 비밀번호는 {MIN_PASSWORD_LENGTH}자보다 짧습니다. 호스트에서{' '}
+                    <code>migrate.sh</code>를 다시 실행하면 바꿀지 물어봅니다. 직접 바꾸려면{' '}
+                    <code>.env.webmanager</code>의 <code>WEBMANAGER_WEBDAV_PASSWORD_HASH</code>를
+                    수정하세요.
+                  </span>
+                ) : (
+                  <span>
+                    지금 비밀번호는 {MIN_PASSWORD_LENGTH}자보다 짧습니다. 아래에서 새 비밀번호로
+                    바꾸세요.
+                  </span>
+                )}
+              </div>
+            )}
             {status.passwordLocked ? (
               <>
                 <p className="section-description">
@@ -219,6 +244,7 @@ export function FileShare() {
                 <p className="section-description">
                   서버에는 argon2id 해시만 저장되므로, 만든 비밀번호는{' '}
                   <strong>이 화면에서 딱 한 번만</strong> 볼 수 있습니다. 잊어버렸다면 새로 만드세요.
+                  직접 정하는 비밀번호는 {MIN_PASSWORD_LENGTH}자 이상이어야 합니다.
                 </p>
 
                 {newPassword && (
@@ -268,7 +294,7 @@ export function FileShare() {
                       type="password"
                       value={manualPassword}
                       onChange={(e) => setManualPassword(e.target.value)}
-                      placeholder="직접 정한 비밀번호"
+                      placeholder={`직접 정한 비밀번호 (${MIN_PASSWORD_LENGTH}자 이상)`}
                     />
                   </div>
                 </div>

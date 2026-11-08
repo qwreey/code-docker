@@ -52,7 +52,12 @@ WEBMANAGER_ENV_VERSION=21
 #.   docker compose exec code-docker /etc/code-docker/webmanager/webmanager --hash-password
 #.
 #. 비밀번호를 두 번 입력받아 오타를 확인한 뒤, $argon2id$... 로 시작하는 해시
-#. 한 줄만 출력합니다 - 반드시 작은따옴표로 감싸서 아래에 붙여넣으세요
+#. 한 줄만 출력합니다. 비밀번호는 12자 이상이어야 하고(글자 수 기준, 한글도 한
+#. 글자) 더 짧으면 해시를 만들어 주지 않습니다. 12자보다 짧은 예전 비밀번호가
+#. 걸려 있으면 그 비밀번호로 풀었을 때 webmanager 화면 상단에 바꾸라는 안내가
+#. 뜹니다 - 호스트에서 migrate.sh를 다시 실행하면 바꿀지 물어봅니다(ootb.sh/
+#. migrate.sh가 위 명령을 대신 돌려 이 줄을 채워 줍니다).
+#. 반드시 작은따옴표로 감싸서 아래에 붙여넣으세요
 #. (예: WEBMANAGER_AUTH_PASSWORD_HASH='$argon2id$...') - docker compose가
 #. env_file도 $변수 형태로 해석해서, 따옴표 없이 붙이면 해시 안의 $ 뒤 조각들이
 #. 조용히 빈 문자열로 사라져 해시가 깨집니다.
@@ -95,8 +100,10 @@ WEBMANAGER_ENV_VERSION=21
 #WEBMANAGER_WEBDAV_ENABLED=
 #. Basic auth 사용자명 (기본 "webdav").
 #WEBMANAGER_WEBDAV_USER=
-#. argon2id 해시. 위 WEBMANAGER_AUTH_PASSWORD_HASH와 같은 방법으로 만들고,
-#. 같은 이유로 반드시 작은따옴표로 감싸세요.
+#. argon2id 해시. 위 WEBMANAGER_AUTH_PASSWORD_HASH와 같은 방법으로 만들고(12자
+#. 이상 규칙도 같습니다), 같은 이유로 반드시 작은따옴표로 감싸세요. 이 값이
+#. 이미 들어 있으면 migrate.sh가 바꿀지 물어보고, 12자보다 짧으면 File share
+#. 탭에 안내가 뜹니다. 비워 두면 File share 탭에서 비밀번호를 만들 수 있습니다.
 #WEBMANAGER_WEBDAV_PASSWORD_HASH=
 #. 공유할 최상위 경로. 기본 /code - File Manager와 달리 SSO 밖에 있어서
 #. WEBMANAGER_FILES_ROOT를 따라 컨테이너 전체로 넓어지지 않습니다. 드롭박스

@@ -149,7 +149,8 @@ WEBMANAGER_PROVIDER_CHROME="Chrome ports|http://chrome-front:8090/"
 > 무관합니다 — 예전엔 같은 토큰을 공유했지만, Dev Proxy가 router로 옮겨가면서 분리됐습니다.
 > **해시는 컨테이너가 이미 떠 있는 상태에서 아래 명령으로 직접
 > 생성합니다**(비밀번호를 두 번 입력받아 오타를 확인하고, 화면엔 안 보이며, 결과로
-> `$argon2id$...`로 시작하는 해시 한 줄만 출력됨 — 이 값을 그대로 `.env.webmanager`
+> `$argon2id$...`로 시작하는 해시 한 줄만 출력됨. 비밀번호는 **12자 이상**이어야 하며(글자 수
+> 기준이라 한글도 한 글자, 구성 규칙은 없음) 더 짧으면 해시를 만들어 주지 않음 — 이 값을 그대로 `.env.webmanager`
 > 파일([환경 변수](#환경-변수) 참고,
 > 없으면 저장소 루트의 `example-env.webmanager`를 복사해서 만드세요)의
 > `WEBMANAGER_AUTH_PASSWORD_HASH`에 붙여넣고 `docker compose up -d`로
@@ -165,6 +166,14 @@ WEBMANAGER_PROVIDER_CHROME="Chrome ports|http://chrome-front:8090/"
 > ```sh
 > docker compose exec code-docker /etc/code-docker/webmanager/webmanager --hash-password
 > ```
+>
+> `ootb.sh`와 `migrate.sh`는 이 과정을 대신 해 줍니다. `migrate.sh`는 비밀번호가 이미
+> 설정돼 있어도 "바꿀까요?"(기본 N)를 물어보므로, 최소 길이 규칙이 생기기 전에 정한 짧은
+> 비밀번호는 여기서 바꿀 수 있습니다(`.env.webmanager`를 직접 고쳐도 됩니다). 저장된
+> 해시로는 길이를 알 수 없어서, 12자보다 짧은 비밀번호는 **그 비밀번호로 한 번 풀었을 때**
+> 비로소 알게 되고, 그때부터 화면 상단에 바꾸라는 안내가 뜹니다(풀려 있는 세션에게만
+> 보이고, 프로세스를 다시 시작하면 다시 한 번 풀어야 알 수 있습니다). 이 해시는 환경변수
+> 전용이라 웹에서 바꾸는 화면은 없습니다.
 >
 > 원칙은 **조회(읽기)는 그대로 열어두고, 변경(쓰기)만 게이트** —
 > Supervisor의 start/stop/restart, Git Config의 모든 추가·수정·삭제(전역

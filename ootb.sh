@@ -98,25 +98,9 @@ if [ "$built" = "1" ]; then
   echo "명령(--hash-password)만 실행해 해시를 만듭니다. (script/entrypoint.sh /"
   echo "router/script/netgate-entrypoint.sh는 CMD를 무시하고 항상 supervisord를"
   echo "띄우므로, --entrypoint로 완전히 우회해서 바이너리를 직접 실행합니다.)"
-  if confirm "webmanager 관리자 비밀번호를 지금 설정할까요? (Terminal/File Manager/Logs 등을 잠급니다)" n; then
-    printf "Password: "; read -r -s pw1; echo
-    printf "Confirm: "; read -r -s pw2; echo
-    if [ "$pw1" != "$pw2" ] || [ -z "$pw1" ]; then
-      echo "  ! 비밀번호가 비어있거나 일치하지 않아 건너뜁니다."
-    else
-      hash="$(printf '%s\n' "$pw1" | docker compose run --rm -T \
-        --entrypoint /etc/code-docker/webmanager/webmanager code-docker --hash-password)"
-      if [ -n "$hash" ]; then
-        set_env_var "$TARGET_DIR/.env.webmanager" WEBMANAGER_AUTH_PASSWORD_HASH "'$hash'"
-        echo "  - WEBMANAGER_AUTH_PASSWORD_HASH 설정 완료"
-      else
-        echo "  ! 해시 생성 실패"
-      fi
-    fi
-  fi
-  # ootb-lib.sh에 함수로 있는 이유는 그 함수의 주석 참고 - migrate-continue.sh의
-  # 빌드 직후 지점에서도 같은 질문을 해야 하기 때문입니다.
-  prompt_router_manager_password "$TARGET_DIR"
+  # 같은 호출을 migrate-continue.sh의 빌드 직후 지점에서도 합니다 - 이유는 그
+  # 함수의 주석 참고.
+  prompt_admin_passwords "$TARGET_DIR"
   echo
 fi
 

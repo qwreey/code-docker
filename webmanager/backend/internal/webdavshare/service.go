@@ -178,6 +178,12 @@ type Status struct {
 	EnabledLocked  bool `json:"enabledLocked"`
 	UsernameLocked bool `json:"usernameLocked"`
 	PasswordLocked bool `json:"passwordLocked"`
+	// WeakPassword: the password that last authenticated a client is shorter
+	// than authgate.MinPasswordLength. A stored hash can't be measured, so
+	// this is unknown (false) until a client has logged in since the hash
+	// last changed. It is a statement about the credential: Status is only
+	// served to the File share tab, behind webmanager's own gate.
+	WeakPassword bool `json:"weakPassword"`
 }
 
 // Status snapshots the current effective configuration.
@@ -200,6 +206,7 @@ func (s *Service) statusLocked() Status {
 		EnabledLocked:  s.envEnabled != "",
 		UsernameLocked: s.envUsername != "",
 		PasswordLocked: s.envPasswordHash != "",
+		WeakPassword:   s.gate.WeakPassword(),
 	}
 	switch {
 	case st.Active:
@@ -262,7 +269,8 @@ func (s *Service) SetUsername(username string) (Status, error) {
 
 // SetPassword hashes plaintext and persists it. An empty plaintext clears
 // the stored password, which makes the share inactive (fail-closed) without
-// touching the enabled flag.
+// touching the enabled flag. Anything else must pass
+// authgate.CheckNewPassword (authgate.ErrPasswordTooShort otherwise).
 func (s *Service) SetPassword(plaintext string) (Status, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -272,6 +280,9 @@ func (s *Service) SetPassword(plaintext string) (Status, error) {
 	if plaintext == "" {
 		s.settings.PasswordHash = ""
 	} else {
+		if err := authgate.CheckNewPassword(plaintext); err != nil {
+			return s.statusLocked(), err
+		}
 		hash, err := authgate.HashPassword(plaintext)
 		if err != nil {
 			return s.statusLocked(), err

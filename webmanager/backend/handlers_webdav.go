@@ -12,8 +12,10 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
+	"webmanager/internal/authgate"
 	"webmanager/internal/webdavshare"
 )
 
@@ -84,10 +86,14 @@ func (s *Server) handlePutWebDAVPassword(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, s.webdav.Status())
 }
 
-// writeWebDAVError maps an env-pinned field to 409 (the request was
+// writeWebDAVError maps a too-short password to 400, an env-pinned field to 409 (the request was
 // well-formed, the server just refuses to let this value be changed from
 // here) and everything else to 500.
 func writeWebDAVError(w http.ResponseWriter, err error) {
+	if errors.Is(err, authgate.ErrPasswordTooShort) {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("비밀번호는 %d자 이상이어야 합니다", authgate.MinPasswordLength))
+		return
+	}
 	if errors.Is(err, webdavshare.ErrLocked) {
 		writeError(w, http.StatusConflict, "이 값은 환경변수로 고정돼 있어 여기서 바꿀 수 없습니다 (.env.webmanager 참고)")
 		return

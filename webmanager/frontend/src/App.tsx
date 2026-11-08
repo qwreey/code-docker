@@ -27,6 +27,7 @@ import { UnlockModalHost } from './components/common/UnlockModal'
 import { WebAuthnHost } from './components/common/WebAuthn'
 import { EnvVersionBanner } from './components/common/EnvVersionBanner'
 import { RouterAuthSetupBanner } from './components/common/RouterAuthSetupBanner'
+import { WeakPasswordBanner } from './components/common/WeakPasswordBanner'
 import { Skeleton } from './components/common/Skeleton'
 import { useAuthStatus } from './components/common/useAuthStatus'
 import { ensureUnlocked } from './components/common/useUnlockGate'
@@ -452,6 +453,7 @@ function App() {
       >
         {!EMBED && <EnvVersionBanner />}
         {!EMBED && <RouterAuthSetupBanner />}
+        {!EMBED && <WeakPasswordBanner />}
         <main className="app-content">
           {active === 'supervisor' && <Supervisor />}
           {active === 'ssh-keys' && <SshKeys />}

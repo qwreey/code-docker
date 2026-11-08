@@ -289,7 +289,11 @@ is dispatched by `server.go`'s `webdavRouter` *ahead* of the mux, not
 registered in it — `net/http.ServeMux` rejects a method-less `/webdav/`
 next to the `GET /` static handler at registration time, and WebDAV can't
 be pinned to a method set. See `.claude/archive/webdav-file-share-plan-done.md`
-in the repo root), a shared lazy-loaded CodeMirror 6 editor component (with a live-reconfigured
+in the repo root), a password policy (`authgate.CheckNewPassword`, minimum `MinPasswordLength` = 12 code points, no composition
+rules — same as router-docker; applied by `--hash-password` and the File share tab's `SetPassword`; a stored hash
+can't be measured, so `Gate.WeakPassword` is set when a plaintext that matched is short and is only ever exposed to an
+already-authorized caller: the unlock response, `/api/auth/status` only for an unlocked session, and the File share
+tab's status, which sits behind the gate), a shared lazy-loaded CodeMirror 6 editor component (with a live-reconfigured
 `EditorView.lineWrapping` compartment behind a per-device wrap toggle), a
 `FileManagerDialog` that renders the file browser as a full-screen overlay
 over whatever tab you are on — the same "don't cost the user the terminal

@@ -95,7 +95,8 @@ code.example.com {
 
 1. webmanager → **File share** 탭
 2. **무작위 비밀번호 생성** — 만들어진 비밀번호는 **이 화면에서 한 번만** 보입니다
-   (서버에는 argon2id 해시만 저장됩니다). 바로 복사해 두세요.
+   (서버에는 argon2id 해시만 저장됩니다). 바로 복사해 두세요. 직접 정하는 비밀번호는
+   **12자 이상**이어야 합니다(글자 수 기준, 한글도 한 글자).
 3. **WebDAV 공유 사용** 체크 → 저장
 
 사용자명은 기본 `webdav`이고 같은 탭에서 바꿀 수 있습니다.
@@ -103,7 +104,15 @@ code.example.com {
 호스트 쪽에서 값을 고정하고 싶다면 `.env.webmanager`의
 `WEBMANAGER_WEBDAV_ENABLED` / `WEBMANAGER_WEBDAV_USER` /
 `WEBMANAGER_WEBDAV_PASSWORD_HASH`를 쓰세요. 비어 있지 않은 값을 넣으면 그 항목은
-탭에서 잠기고, 잠긴 이유가 화면에 표시됩니다.
+탭에서 잠기고, 잠긴 이유가 화면에 표시됩니다. 해시는
+`webmanager --hash-password`로 만들고 12자 이상이어야 합니다
+([webmanager-config.md](../webmanager-config.md#비밀번호-게이트)).
+
+저장된 해시로는 길이를 알 수 없어서, 12자보다 짧은 예전 비밀번호는 클라이언트가 그
+비밀번호로 한 번 로그인한 뒤에야 File share 탭의 비밀번호 카드에 안내로 뜹니다.
+탭에서 만든 비밀번호면 거기서 새로 만들면 되고, `.env.webmanager`로 고정한 값이면
+`migrate.sh`를 다시 실행하거나(이미 있는 값이면 바꿀지 물어봅니다) 해당 줄을 직접
+고치세요. 바꾼 값은 `docker compose up -d`로 컨테이너를 다시 만들 때 반영됩니다.
 
 ### 공유 범위 좁히기
 

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -91,6 +92,14 @@ type Gate struct {
 	// maxSessionLifetime, each of which needs a valid session to begin with.
 	revokedMu sync.Mutex
 	revoked   map[string]time.Time
+
+	// weak records that the password which matched g.hash was shorter than
+	// MinPasswordLength. A Gate is built for exactly one hash and never
+	// re-pointed (a replaced hash means a new Gate - see New and
+	// webdavshare's resetAuthLocked), so this can only ever describe the
+	// current hash: it starts false and stays unknown until a plaintext is
+	// seen.
+	weak atomic.Bool
 }
 
 // New creates a Gate. An empty hash means the gate is disabled: Configured
@@ -361,7 +370,22 @@ func (g *Gate) TryUnlock(key, plaintext string) (token string, ok bool, err erro
 		return "", false, nil
 	}
 	g.recordSuccess(key)
+	// The only moment a plaintext is available to measure; a hash alone
+	// can't be length-checked.
+	g.weak.Store(CheckNewPassword(plaintext) != nil)
 	return g.issueToken(), true, nil
+}
+
+// WeakPassword reports whether the configured password, as last proven by
+// TryUnlock, is shorter than MinPasswordLength. False until a correct
+// password has been typed since this Gate was built, so "unknown" reads as
+// "not weak" rather than as a warning.
+//
+// It says something about the credential, so it must only ever be handed to
+// a caller that has itself been authorized (an unlocked session, or the
+// response to the unlock that just succeeded) - never to an anonymous one.
+func (g *Gate) WeakPassword() bool {
+	return g != nil && g.weak.Load()
 }
 
 // IssueFrom mints a token for an unlock that didn't involve typing the

@@ -18,9 +18,32 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/argon2"
 )
+
+// MinPasswordLength is the shortest password accepted wherever one is
+// *chosen* (--hash-password, the File share tab). Counted in Unicode code
+// points, with no composition rules: length is what resists guessing, and a
+// passphrase in any script should pass. router-docker applies the same rule
+// to its own password.
+const MinPasswordLength = 12
+
+// ErrPasswordTooShort is what CheckNewPassword returns for a password under
+// MinPasswordLength.
+var ErrPasswordTooShort = fmt.Errorf("password must be at least %d characters", MinPasswordLength)
+
+// CheckNewPassword is the single definition of the policy; every place that
+// accepts a newly chosen password calls it. It cannot be applied to a stored
+// hash - only to a plaintext - so a password that was set before the policy
+// existed is found out when it is next typed (Gate.WeakPassword).
+func CheckNewPassword(p string) error {
+	if utf8.RuneCountInString(p) < MinPasswordLength {
+		return ErrPasswordTooShort
+	}
+	return nil
+}
 
 // Argon2id parameters. These are commonly-cited safe defaults (RFC 9106's
 // "second recommended option" for memory-constrained environments), not

@@ -1,6 +1,7 @@
 package webdavshare
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -8,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"webmanager/internal/authgate"
 )
 
 func newTestService(t *testing.T, root string, opts Options) *Service {
@@ -57,7 +60,7 @@ func TestBasicAuthGatesTheShare(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := newTestService(t, root, Options{})
-	if _, err := s.SetPassword("s3cret"); err != nil {
+	if _, err := s.SetPassword("s3cret-passphrase"); err != nil {
 		t.Fatalf("SetPassword() = %v", err)
 	}
 	if _, err := s.SetEnabled(true); err != nil {
@@ -85,7 +88,7 @@ func TestBasicAuthGatesTheShare(t *testing.T) {
 
 	// Right password, wrong username.
 	req = httptest.NewRequest(http.MethodGet, URLPrefix+"/hello.txt", nil)
-	req.SetBasicAuth("someone-else", "s3cret")
+	req.SetBasicAuth("someone-else", "s3cret-passphrase")
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
@@ -94,7 +97,7 @@ func TestBasicAuthGatesTheShare(t *testing.T) {
 
 	// Correct pair.
 	req = httptest.NewRequest(http.MethodGet, URLPrefix+"/hello.txt", nil)
-	req.SetBasicAuth(DefaultUsername, "s3cret")
+	req.SetBasicAuth(DefaultUsername, "s3cret-passphrase")
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -111,14 +114,14 @@ func TestBasicAuthGatesTheShare(t *testing.T) {
 func TestSuccessfulAuthIsCached(t *testing.T) {
 	root := t.TempDir()
 	s := newTestService(t, root, Options{})
-	if _, err := s.SetPassword("s3cret"); err != nil {
+	if _, err := s.SetPassword("s3cret-passphrase"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.SetEnabled(true); err != nil {
 		t.Fatal(err)
 	}
 
-	if ok, _ := s.authenticate("test", DefaultUsername, "s3cret"); !ok {
+	if ok, _ := s.authenticate("test", DefaultUsername, "s3cret-passphrase"); !ok {
 		t.Fatal("first authenticate() failed")
 	}
 	s.mu.Lock()
@@ -130,7 +133,7 @@ func TestSuccessfulAuthIsCached(t *testing.T) {
 
 	// Changing the password must invalidate it, or the old credential would
 	// keep working for as long as it stays in use (credCacheIdle).
-	if _, err := s.SetPassword("different"); err != nil {
+	if _, err := s.SetPassword("different-passphrase"); err != nil {
 		t.Fatal(err)
 	}
 	s.mu.Lock()
@@ -139,7 +142,7 @@ func TestSuccessfulAuthIsCached(t *testing.T) {
 	if cached != 0 {
 		t.Fatalf("cache holds %d entries after a password change, want 0", cached)
 	}
-	if ok, _ := s.authenticate("test", DefaultUsername, "s3cret"); ok {
+	if ok, _ := s.authenticate("test", DefaultUsername, "s3cret-passphrase"); ok {
 		t.Fatal("the old password still authenticates after a change")
 	}
 }
@@ -149,16 +152,16 @@ func TestSuccessfulAuthIsCached(t *testing.T) {
 // client already using the share, and each use must push its expiry out.
 func TestCachedCredentialSurvivesLockoutAndSlides(t *testing.T) {
 	s := newTestService(t, t.TempDir(), Options{})
-	if _, err := s.SetPassword("s3cret"); err != nil {
+	if _, err := s.SetPassword("s3cret-passphrase"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.SetEnabled(true); err != nil {
 		t.Fatal(err)
 	}
-	if ok, _ := s.authenticate("shared", DefaultUsername, "s3cret"); !ok {
+	if ok, _ := s.authenticate("shared", DefaultUsername, "s3cret-passphrase"); !ok {
 		t.Fatal("first authenticate() failed")
 	}
-	key := s.credKey(DefaultUsername, "s3cret")
+	key := s.credKey(DefaultUsername, "s3cret-passphrase")
 	s.mu.Lock()
 	s.cache[key] = time.Now().Add(time.Minute)
 	s.mu.Unlock()
@@ -173,7 +176,7 @@ func TestCachedCredentialSurvivesLockoutAndSlides(t *testing.T) {
 	if !limited {
 		t.Fatal("wrong guesses never hit the backoff - the test isn't exercising a lockout")
 	}
-	if ok, rl := s.authenticate("shared", DefaultUsername, "s3cret"); !ok || rl {
+	if ok, rl := s.authenticate("shared", DefaultUsername, "s3cret-passphrase"); !ok || rl {
 		t.Fatalf("cached credential refused during a lockout: ok=%v rateLimited=%v", ok, rl)
 	}
 	s.mu.Lock()
@@ -276,7 +279,7 @@ func TestSymlinkEscapeIsRefused(t *testing.T) {
 	}
 
 	s := newTestService(t, root, Options{})
-	if _, err := s.SetPassword("s3cret"); err != nil {
+	if _, err := s.SetPassword("s3cret-passphrase"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.SetEnabled(true); err != nil {
@@ -284,7 +287,7 @@ func TestSymlinkEscapeIsRefused(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, URLPrefix+"/escape.txt", nil)
-	req.SetBasicAuth(DefaultUsername, "s3cret")
+	req.SetBasicAuth(DefaultUsername, "s3cret-passphrase")
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	if rec.Code == http.StatusOK {
@@ -308,7 +311,7 @@ func TestParentTraversalIsContained(t *testing.T) {
 	}
 
 	s := newTestService(t, root, Options{})
-	if _, err := s.SetPassword("s3cret"); err != nil {
+	if _, err := s.SetPassword("s3cret-passphrase"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.SetEnabled(true); err != nil {
@@ -316,10 +319,68 @@ func TestParentTraversalIsContained(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, URLPrefix+"/../secret.txt", nil)
-	req.SetBasicAuth(DefaultUsername, "s3cret")
+	req.SetBasicAuth(DefaultUsername, "s3cret-passphrase")
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	if strings.Contains(rec.Body.String(), "top secret") {
 		t.Fatalf("`..` traversal escaped the root: %d %q", rec.Code, rec.Body.String())
+	}
+}
+
+func TestSetPasswordRefusesShort(t *testing.T) {
+	s := newTestService(t, t.TempDir(), Options{})
+	if _, err := s.SetPassword("가나다라마바사아자차카"); !errors.Is(err, authgate.ErrPasswordTooShort) {
+		t.Fatalf("11-character SetPassword = %v, want ErrPasswordTooShort", err)
+	}
+	if s.Status().HasPassword {
+		t.Fatal("a refused password was stored")
+	}
+	if _, err := s.SetPassword("가나다라마바사아자차카타"); err != nil {
+		t.Fatalf("12-character SetPassword = %v", err)
+	}
+	// Clearing stays allowed.
+	if _, err := s.SetPassword(""); err != nil {
+		t.Fatalf("clearing = %v", err)
+	}
+}
+
+// The short password predates the policy: it sits in the settings file as a
+// hash, and only a successful login reveals it. Cache hits keep the verdict;
+// a new password drops it.
+func TestWeakPasswordFlagFollowsLogins(t *testing.T) {
+	hash, err := authgate.HashPassword("short-pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "webdav.json")
+	if err := Save(path, Settings{Enabled: true, PasswordHash: hash}); err != nil {
+		t.Fatal(err)
+	}
+	s := New(Options{SettingsPath: path, Root: t.TempDir()})
+
+	if s.Status().WeakPassword {
+		t.Fatal("flagged before any login")
+	}
+	if ok, _ := s.authenticate("c", DefaultUsername, "wrong"); ok || s.Status().WeakPassword {
+		t.Fatalf("a failed login set the flag (ok=%v)", ok)
+	}
+	if ok, _ := s.authenticate("c", DefaultUsername, "short-pw"); !ok {
+		t.Fatal("login failed")
+	}
+	if !s.Status().WeakPassword {
+		t.Fatal("a short password that logged in was not flagged")
+	}
+	if ok, _ := s.authenticate("c", DefaultUsername, "short-pw"); !ok || !s.Status().WeakPassword {
+		t.Fatal("the cache hit lost the verdict")
+	}
+
+	if _, err := s.SetPassword("long-enough-passphrase"); err != nil {
+		t.Fatal(err)
+	}
+	if s.Status().WeakPassword {
+		t.Fatal("flag survived a password change")
+	}
+	if ok, _ := s.authenticate("c", DefaultUsername, "long-enough-passphrase"); !ok || s.Status().WeakPassword {
+		t.Fatalf("a long password was flagged (ok=%v)", ok)
 	}
 }
