@@ -132,6 +132,7 @@ services:
       # Shared with router (its compose file reads the same .env value) - see example-env.
       ROUTER_CLIENT_IP_TOKEN: "${ROUTER_CLIENT_IP_TOKEN:-}"
       VECTOR_LOG_LEVEL: "${VECTOR_LOG_LEVEL:-warn}"
+      SSHD_PASSWORD_AUTH: "${SSHD_PASSWORD_AUTH:-false}"
       WEBMANAGER_ENV_TEMPLATE_PATH: "${WEBMANAGER_ENV_TEMPLATE_PATH:-/etc/code-docker/webmanager/example-env.webmanager}"
       # Egress lockdown - see example-env's own NETGATE_ENABLED entry for what this
       # does. "false" does NOT restore code-docker-external/ports below - those are

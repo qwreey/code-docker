@@ -245,6 +245,24 @@
 # says so and names the key).
 #CS_DISABLE_PROXY="1"
 
+# sshd의 인증 정책. sshd는 시작할 때마다 /etc/ssh/sshd_config.d/00-code-docker-policy.conf를
+# 다시 쓰고, `sshd -T`로 실제 적용값이 이 정책과 맞는지 (계정·접속 주소별로) 확인한 뒤에만
+# 뜹니다. 맞지 않으면 sshd는 시작하지 않고 로그(`docker compose logs`의 [sshd])에 어떤
+# 값이 어긋났는지 남깁니다.
+#
+# - "false"(기본): 공개키 로그인만 허용합니다(비밀번호·keyboard-interactive 끔, root도
+#   키로만). 그 밖에 터널·X11·GatewayPorts·사용자 환경변수 주입을 끄고, 인증 대기
+#   시간을 30초로 줄이고, 로그인에 쓰인 키 지문이 로그에 남도록 LogLevel VERBOSE로 둡니다
+#   (sshd 로그는 webmanager Logs 화면과 `docker compose logs`의 [sshd]에 나옵니다).
+# - "true": 비밀번호 로그인을 켭니다. 이 컨테이너의 계정은 사실상 root 하나라서 root
+#   비밀번호 로그인(PermitRootLogin yes)까지 같이 열립니다. `passwd`로 비밀번호를 정해야
+#   쓸 수 있습니다.
+#
+# 이 정책은 실수나 설정 표류를 막는 장치이지, 내부자를 막는 장치는 아닙니다 - 컨테이너
+# 안의 root나 SSHD_VOLUME/이미지에 쓸 수 있는 사람은 얼마든지 바꿀 수 있습니다. 정책 자체를
+# 바꾸려면 config/sshd/sshd-service.override.sh를 쓰세요.
+#SSHD_PASSWORD_AUTH="false"
+
 # code-server 버전 고정. 비워두면(기본) 컨테이너가 뜰 때마다(1시간에 한 번까지)
 # 최신 릴리스로 자동 업데이트합니다. 새 버전이 문제를 일으킬 때 "4.109.2"처럼
 # 정확한 버전을 적어 묶어두세요. 다운로드가 실패하면 설치된 버전이 그대로 유지됩니다.

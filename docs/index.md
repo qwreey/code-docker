@@ -193,6 +193,8 @@ Host code
 
 형태로 로컬 디바이스의 `~/.ssh/config` 를 설정하고, code-docker 내의 `/code/.ssh/authorized_keys` 에 디바이스 키를 적절히 추가하세요.
 
+기본값에서는 공개키 로그인만 됩니다(비밀번호 로그인 꺼짐). sshd는 시작할 때마다 인증 정책을 다시 쓰고, 실제 적용값이 그 정책과 다르면 뜨지 않습니다 — 정책 내용과 비밀번호 로그인을 켜는 법(`SSHD_PASSWORD_AUTH`)은 `example-env`를 참고하세요.
+
 ## adb 연결
 
 로컬 adb 서버를 ssh 터널 또는 tailscale 포트 가져오기로 code-docker에 연결해서, code-server 안에서 바로 `adb devices`/`gradle`/react native 배포까지 쓸 수 있게 하는 방법입니다.
