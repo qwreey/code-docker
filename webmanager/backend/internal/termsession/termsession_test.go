@@ -121,7 +121,7 @@ func TestSinkErrorDoesNotBlockPump(t *testing.T) {
 // A session created with Pinned survives idle GC like one pinned by hand,
 // and a later GetOrCreate for the same name (a reattach) doesn't unpin it.
 func TestCreatePinnedSurvivesReap(t *testing.T) {
-	r := NewRegistry(func() string { return "/bin/sh" }, 4096, time.Nanosecond)
+	r := NewRegistry(func() string { return "/bin/sh" }, 4096, time.Nanosecond, 0)
 	pinned, err := r.GetOrCreate("pinned", CreateOptions{Cwd: t.TempDir(), Pinned: true})
 	if err != nil {
 		t.Fatalf("GetOrCreate(pinned) = %v", err)
@@ -145,5 +145,52 @@ func TestCreatePinnedSurvivesReap(t *testing.T) {
 	}
 	if len(names) != 1 || names[0] != "pinned:true" {
 		t.Fatalf("after reap = %v, want [pinned:true]", names)
+	}
+}
+
+// The cap counts named sessions and Reserve slots together, refuses only new
+// PTYs (a reattach still works at the cap), and frees a slot when a session
+// ends or a reservation is released.
+func TestMaxSessions(t *testing.T) {
+	r := NewRegistry(func() string { return "/bin/sh" }, 4096, time.Hour, 2)
+	a, err := r.GetOrCreate("a", CreateOptions{Cwd: t.TempDir()})
+	if err != nil {
+		t.Fatalf("GetOrCreate(a) = %v", err)
+	}
+	defer a.Close()
+	release, err := r.Reserve()
+	if err != nil {
+		t.Fatalf("Reserve = %v", err)
+	}
+
+	if _, err := r.GetOrCreate("b", CreateOptions{Cwd: t.TempDir()}); !errors.Is(err, ErrTooMany) {
+		t.Fatalf("GetOrCreate(b) at the cap = %v, want ErrTooMany", err)
+	}
+	if _, err := r.Reserve(); !errors.Is(err, ErrTooMany) {
+		t.Fatalf("Reserve at the cap = %v, want ErrTooMany", err)
+	}
+	if _, err := r.GetOrCreate("a", CreateOptions{}); err != nil {
+		t.Fatalf("reattach at the cap = %v", err)
+	}
+
+	release()
+	release()
+	b, err := r.GetOrCreate("b", CreateOptions{Cwd: t.TempDir()})
+	if err != nil {
+		t.Fatalf("GetOrCreate(b) after release = %v", err)
+	}
+	b.Close()
+	<-b.Done()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		c, err := r.GetOrCreate("c", CreateOptions{Cwd: t.TempDir()})
+		if err == nil {
+			c.Close()
+			break
+		}
+		if !errors.Is(err, ErrTooMany) || time.Now().After(deadline) {
+			t.Fatalf("GetOrCreate(c) after b ended = %v", err)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

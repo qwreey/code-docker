@@ -312,7 +312,7 @@ code-docker/code-docker-dind/code-docker-router 각 컨테이너에 CPU/메모�
 
 스왑은 `CODE_MEMSWAP_LIMIT`/`DIND_MEMSWAP_LIMIT`/`ROUTER_MEMSWAP_LIMIT`로 정하고, 값은 스왑만이 아니라 **메모리+스왑 합계**입니다. 기본값(`"0"`)이면 스왑이 메모리 상한만큼 붙습니다. 실행 중인 컨테이너에 `docker update --memory`로 메모리만 늘리면 스왑이 줄어들다 0이 되는 이유와 예시는 `example-env`의 같은 절에 있습니다.
 
-router와 netinit-docker에는 프로세스(스레드 포함) 수 상한도 기본으로 걸려 있습니다(`ROUTER_PIDS_LIMIT` 1024, `NETINIT_DOCKER_PIDS_LIMIT` 256, `"0"`은 제한 없음). 두 컨테이너는 권한(capability)도 기본 세트를 전부 뺀 뒤 필요한 것만 다시 넣고, `no-new-privileges`로 돕니다.
+code-docker/router/netinit-docker에는 프로세스(스레드 포함) 수 상한도 기본으로 걸려 있습니다(`CODE_PIDS_LIMIT` 8192, `ROUTER_PIDS_LIMIT` 1024, `NETINIT_DOCKER_PIDS_LIMIT` 256, `"0"`은 제한 없음). router와 netinit-docker는 권한(capability)도 기본 세트를 전부 뺀 뒤 필요한 것만 다시 넣고, `no-new-privileges`로 돕니다.
 
 ## 환경 변수 설정 (.env)
 

@@ -186,8 +186,10 @@
 #ROUTER_MEM_LIMIT="0"
 #ROUTER_MEMSWAP_LIMIT="0"
 # 프로세스(스레드 포함) 수 상한입니다. 위 값들과 달리 기본으로 걸려 있습니다 -
-# router와 netinit-docker는 띄우는 프로그램이 정해져 있어서, 이 값에 닿는 건 폭주하는
-# 프로세스뿐입니다. "0"은 제한 없음.
+# router와 netinit-docker는 띄우는 프로그램이 정해져 있고, code-docker는 빌드·LSP·
+# 에이전트를 다 합쳐도 수백 개 수준이라 넉넉하게 잡았습니다. 이 값에 닿는 건 폭주하는
+# 프로세스(fork bomb 등)뿐입니다. "0"은 제한 없음.
+#CODE_PIDS_LIMIT="8192"
 #ROUTER_PIDS_LIMIT="1024"
 #NETINIT_DOCKER_PIDS_LIMIT="256"
 

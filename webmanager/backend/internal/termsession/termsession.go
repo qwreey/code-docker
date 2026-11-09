@@ -54,6 +54,7 @@ var (
 	ErrInvalidName = errors.New("session name must be 1-64 chars of letters, digits, spaces, _, -, .")
 	ErrSessionGone = errors.New("session no longer exists")
 	ErrNameTaken   = errors.New("a session with that name already exists")
+	ErrTooMany     = errors.New("too many terminal sessions - close one you no longer need")
 )
 
 // nameRe is deliberately permissive (spaces allowed, this is a display

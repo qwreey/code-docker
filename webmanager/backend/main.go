@@ -148,6 +148,11 @@ func main() {
 		log.Printf("main: invalid terminal session scrollback bytes %q, using 262144: %v", cfg.TerminalSessionScrollbackBytes, err)
 		termScrollbackBytes = 262144
 	}
+	termMaxSessions, err := strconv.Atoi(cfg.TerminalMaxSessions)
+	if err != nil || termMaxSessions < 0 {
+		log.Printf("main: invalid terminal max sessions %q, using 32: %v", cfg.TerminalMaxSessions, err)
+		termMaxSessions = 32
+	}
 
 	s := &Server{
 		cfg:         cfg,
@@ -176,7 +181,7 @@ func main() {
 		loginMgr:            claudecode.NewLoginManager(),
 		interactiveLoginMgr: claudecode.NewInteractiveLoginManager(),
 		diskUsage:           diskusage.NewAnalyzer(cfg.DiskBreakdownRoot, cfg.DiskBreakdownCachePath),
-		termSessions:        termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout),
+		termSessions:        termsession.NewRegistry(rootLoginShell, termScrollbackBytes, termIdleTimeout, termMaxSessions),
 		sessionHeartbeats:   sessionheartbeat.NewStore(),
 		gate:                gate,
 		webauthn:            webauthnMgr,

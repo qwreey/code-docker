@@ -32,7 +32,7 @@
 #. 아니라 `#`만 쓰세요.
 
 #!important
-WEBMANAGER_ENV_VERSION=21
+WEBMANAGER_ENV_VERSION=22
 #. ^ 마이그레이션 도구가 관리하는 값입니다. 직접 수정하지 마세요 - 고쳐도
 #. 다음 `--env-migrate` 실행 시 이 이미지가 기대하는 값으로 되돌아갑니다.
 
@@ -190,6 +190,11 @@ WEBMANAGER_ENV_VERSION=21
 #. 유휴 시간, 세션당 스크롤백 링버퍼 크기(바이트).
 #WEBMANAGER_TERMINAL_SESSION_IDLE_TIMEOUT=30m
 #WEBMANAGER_TERMINAL_SESSION_SCROLLBACK_BYTES=262144
+#. 웹 터미널 PTY를 동시에 몇 개까지 띄울지(이름 있는 세션 + 임시 세션 합계). PTY는
+#. 호스트 전체가 함께 쓰는 자원(kernel.pty.max)이라, 세션을 계속 만드는 클라이언트가
+#. 호스트와 다른 컨테이너의 터미널까지 막지 못하게 합니다. 이미 있는 세션에 다시 붙는
+#. 건 상한에 걸려도 됩니다. 0은 제한 없음.
+#WEBMANAGER_TERMINAL_MAX_SESSIONS=32
 #. 홈 탭에 저장하는 세션 실행 프로파일(이름 + 시작 위치/명령) 저장 경로.
 #WEBMANAGER_TERMINAL_PROFILES_PATH=
 

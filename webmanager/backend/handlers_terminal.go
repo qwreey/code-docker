@@ -136,6 +136,14 @@ func (s *Server) handleTerminal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	release, err := s.termSessions.Reserve()
+	if err != nil {
+		log.Printf("terminal: %v", err)
+		_ = conn.Close(websocket.StatusTryAgainLater, err.Error())
+		return
+	}
+	defer release()
+
 	shell := rootLoginShell()
 	cmd := exec.Command(shell)
 	cmd.Dir = "/code"
@@ -287,8 +295,12 @@ func (s *Server) handleNamedTerminal(ctx context.Context, conn *websocket.Conn, 
 	if err != nil {
 		log.Printf("terminal: session %q: %v", name, err)
 		status := websocket.StatusInternalError
-		if errors.Is(err, termsession.ErrInvalidName) {
+		switch {
+		case errors.Is(err, termsession.ErrInvalidName):
 			status = websocket.StatusPolicyViolation
+		case errors.Is(err, termsession.ErrTooMany):
+			// The frontend stops retrying on 1013 and says why.
+			status = websocket.StatusTryAgainLater
 		}
 		_ = conn.Close(status, err.Error())
 		return

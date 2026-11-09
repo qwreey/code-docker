@@ -19,19 +19,55 @@ type Registry struct {
 	scrollbackBytes int
 	idleTimeout     time.Duration
 	gcInterval      time.Duration
+	// maxSessions bounds the PTYs alive at once (0 = no bound): every named
+	// session plus every slot taken through Reserve (the ephemeral terminal)
+	// or by a creation still in flight. PTYs come out of the host's single
+	// kernel.pty.max pool, so a client stuck creating sessions in a loop
+	// would otherwise starve the host and every other container of them.
+	maxSessions int
 
 	mu       sync.Mutex
 	sessions map[string]*Session
+	reserved int
 }
 
-func NewRegistry(shellFunc func() string, scrollbackBytes int, idleTimeout time.Duration) *Registry {
+func NewRegistry(shellFunc func() string, scrollbackBytes int, idleTimeout time.Duration, maxSessions int) *Registry {
 	return &Registry{
 		shellFunc:       shellFunc,
 		scrollbackBytes: scrollbackBytes,
 		idleTimeout:     idleTimeout,
 		gcInterval:      time.Minute,
+		maxSessions:     maxSessions,
 		sessions:        make(map[string]*Session),
 	}
+}
+
+// reserveLocked takes one slot or returns ErrTooMany. r.mu must be held.
+func (r *Registry) reserveLocked() error {
+	if r.maxSessions > 0 && len(r.sessions)+r.reserved >= r.maxSessions {
+		return ErrTooMany
+	}
+	r.reserved++
+	return nil
+}
+
+// Reserve takes one slot for a PTY the registry doesn't track (the
+// ephemeral terminal), returning ErrTooMany when none is left. release gives
+// it back and is safe to call more than once.
+func (r *Registry) Reserve() (release func(), err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := r.reserveLocked(); err != nil {
+		return nil, err
+	}
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			r.mu.Lock()
+			r.reserved--
+			r.mu.Unlock()
+		})
+	}, nil
 }
 
 // GetOrCreate returns the named session, creating (and starting) a new PTY
@@ -47,14 +83,23 @@ func (r *Registry) GetOrCreate(name string, opts CreateOptions) (*Session, error
 		r.mu.Unlock()
 		return s, nil
 	}
+	// Reattaching above is never refused; only a new PTY counts. The slot
+	// is held while the PTY starts outside the lock, so two creations racing
+	// can't both pass the check.
+	if err := r.reserveLocked(); err != nil {
+		r.mu.Unlock()
+		return nil, err
+	}
 	r.mu.Unlock()
 
 	s, err := newSession(name, r.shellFunc(), r.scrollbackBytes, opts)
-	if err != nil {
-		return nil, err
-	}
 
 	r.mu.Lock()
+	r.reserved--
+	if err != nil {
+		r.mu.Unlock()
+		return nil, err
+	}
 	// Re-check: two requests for the same never-before-seen name could have
 	// raced past the first lock section above and both started spawning a
 	// PTY. Keep whichever won the map-insert race, discard the loser's.

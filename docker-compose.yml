@@ -157,6 +157,10 @@ services:
         limits:
           cpus: "${CODE_CPU_LIMIT:-0}"
           memory: "${CODE_MEM_LIMIT:-0}"
+          # Limited by default, unlike the two above, but loosely: builds, LSPs
+          # and agents use hundreds of threads at most, so only a fork bomb or a
+          # runaway spawner gets near it. "0" is unlimited.
+          pids: ${CODE_PIDS_LIMIT:-8192}
     # Memory+swap combined, not swap alone - see example-env. "0" leaves Docker's
     # default (swap as large as the memory limit), recomputed on every recreate.
     memswap_limit: "${CODE_MEMSWAP_LIMIT:-0}"

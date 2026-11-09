@@ -1233,6 +1233,16 @@ export function Terminal({
   // GET /auth/status is ungated, so asking this never prompts by itself.
   // A failed check counts as "not locked": a network problem is exactly the
   // case auto-reconnect exists for.
+  // The server refused to start another PTY (close 1013, its session cap -
+  // WEBMANAGER_TERMINAL_MAX_SESSIONS). Retrying can't help until a session
+  // is closed, so retries stop and the overlay says so.
+  const [tooMany, setTooMany] = useState(false)
+  const tooManyRef = useRef(false)
+  const setTooManyState = useCallback((value: boolean) => {
+    tooManyRef.current = value
+    setTooMany(value)
+  }, [])
+
   const gateLocked = useCallback(async () => {
     try {
       const status = await api.get<AuthStatus>('/auth/status')
@@ -1260,6 +1270,7 @@ export function Terminal({
   const scheduleReconnect = useCallback(() => {
     if (activeSessionRef.current === HOME_TAB_ID) return
     if (lockedOutRef.current) return
+    if (tooManyRef.current) return
     if (reconnectTimerRef.current !== null) return
     const attempt = reconnectAttemptRef.current + 1
     reconnectAttemptRef.current = attempt
@@ -1280,9 +1291,10 @@ export function Terminal({
   const reconnect = useCallback(() => {
     clearScheduledReconnect()
     setLockedOutState(false)
+    setTooManyState(false)
     reconnectAttemptRef.current = 0
     setReconnectNonce((n) => n + 1)
-  }, [clearScheduledReconnect, setLockedOutState])
+  }, [clearScheduledReconnect, setLockedOutState, setTooManyState])
 
   // Asks for the password and reconnects once it's given. Also what the
   // overlay's button does while locked out.
@@ -3123,6 +3135,9 @@ export function Terminal({
     params.set('cols', String(term.cols))
     params.set('rows', String(term.rows))
 
+    // Every attempt starts unrefused: a switch to an existing tab is a
+    // reattach the cap never refuses.
+    setTooManyState(false)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const ws = new WebSocket(`${protocol}//${window.location.host}${apiUrl(`/terminal?${params.toString()}`)}`)
     ws.binaryType = 'arraybuffer'
@@ -3170,6 +3185,11 @@ export function Terminal({
     ws.onclose = (event) => {
       if (wsRef.current !== ws) return
       setState('disconnected')
+      if (event.code === 1013) {
+        clearScheduledReconnect()
+        setTooManyState(true)
+        return
+      }
       // Checked before the session list is even fetched: that fetch is
       // gated too, so while locked it would answer 401 and pop the password
       // prompt again on every single retry.
@@ -3259,6 +3279,7 @@ export function Terminal({
     clearScheduledReconnect,
     gateLocked,
     setLockedOutState,
+    setTooManyState,
     embedded,
     embedResolving,
     fontReady,
@@ -3777,7 +3798,17 @@ export function Terminal({
         {activeSession !== HOME_TAB_ID && state === 'disconnected' && !sessionEnded && (
           <div className="terminal-disconnect-overlay">
             <div className="terminal-disconnect-card">
-              {lockedOut ? (
+              {tooMany ? (
+                <>
+                  <p>터미널 세션이 너무 많습니다</p>
+                  <p className="terminal-disconnect-subtext">
+                    안 쓰는 세션을 닫은 뒤 다시 시도하세요. 상한은 WEBMANAGER_TERMINAL_MAX_SESSIONS입니다.
+                  </p>
+                  <button type="button" className="btn btn-primary btn-small" onClick={reconnect}>
+                    다시 시도
+                  </button>
+                </>
+              ) : lockedOut ? (
                 <>
                   {/* Retrying is pointless until the gate is open, so this
                       says so and offers the prompt instead of counting

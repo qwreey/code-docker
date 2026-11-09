@@ -134,6 +134,9 @@ type Config struct {
 	// sessions are exempt entirely (see terminal-plan.md's "영속 세션 토글").
 	TerminalSessionIdleTimeout     string
 	TerminalSessionScrollbackBytes string
+	// TerminalMaxSessions caps how many terminal PTYs (named sessions plus
+	// ephemeral ones) are alive at once; "0" is no cap.
+	TerminalMaxSessions string
 
 	// EnvTemplatePath points at the image's shipped example-env.webmanager
 	// (see .claude/env-migration-plan.md) — `webmanager --env-migrate` reads
@@ -262,6 +265,7 @@ func loadConfig() Config {
 
 		TerminalSessionIdleTimeout:     getenv("WEBMANAGER_TERMINAL_SESSION_IDLE_TIMEOUT", "30m"),
 		TerminalSessionScrollbackBytes: getenv("WEBMANAGER_TERMINAL_SESSION_SCROLLBACK_BYTES", "262144"),
+		TerminalMaxSessions:            getenv("WEBMANAGER_TERMINAL_MAX_SESSIONS", "32"),
 
 		EnvTemplatePath:       getenv("WEBMANAGER_ENV_TEMPLATE_PATH", "/etc/code-docker/webmanager/example-env.webmanager"),
 		EnvVersion:            getenv("WEBMANAGER_ENV_VERSION", ""),
