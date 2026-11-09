@@ -2,7 +2,7 @@
 // app avoids adding new dependencies for what pre-split-lines + CSS covers.
 // Only line-prefix classification (+/-/@@/file-header/context), no
 // intra-line word diffing.
-export function DiffView({ text }: { text: string }) {
+export function DiffView({ text, truncated = false }: { text: string; truncated?: boolean }) {
   if (!text.trim()) {
     return <p className="empty-state">표시할 변경 사항이 없습니다.</p>
   }
@@ -10,7 +10,11 @@ export function DiffView({ text }: { text: string }) {
   const lines = text.split('\n')
 
   return (
-    <pre className="git-diff-view">
+    <>
+      {truncated && (
+        <p className="warning-note">diff가 너무 커서 앞부분만 표시합니다. 전체는 터미널에서 git으로 확인하세요.</p>
+      )}
+      <pre className="git-diff-view">
       {lines.map((line, i) => {
         let cls = 'git-diff-line-context'
         if (line.startsWith('+++') || line.startsWith('---')) {
@@ -28,6 +32,7 @@ export function DiffView({ text }: { text: string }) {
           </div>
         )
       })}
-    </pre>
+      </pre>
+    </>
   )
 }

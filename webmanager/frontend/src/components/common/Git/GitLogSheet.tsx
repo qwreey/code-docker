@@ -25,7 +25,7 @@ export function GitLogSheet({ path, initialHash, onClose }: { path: string; init
   const [error, setError] = useState<string | null>(null)
 
   const [selected, setSelected] = useState<GitCommit | null>(null)
-  const [diffText, setDiffText] = useState<string | null>(null)
+  const [diff, setDiff] = useState<GitDiffResponse | null>(null)
   const [diffLoading, setDiffLoading] = useState(false)
   // Guards against a stale diff response landing after a newer one was
   // requested: view commit A, go back, view commit B - if A's fetch
@@ -87,7 +87,7 @@ export function GitLogSheet({ path, initialHash, onClose }: { path: string; init
   function openCommit(commit: GitCommit) {
     const requestId = ++diffRequestIdRef.current
     setSelected(commit)
-    setDiffText(null)
+    setDiff(null)
     setDiffLoading(true)
     api
       .get<GitDiffResponse>(
@@ -95,7 +95,7 @@ export function GitLogSheet({ path, initialHash, onClose }: { path: string; init
       )
       .then((res) => {
         if (diffRequestIdRef.current !== requestId) return
-        setDiffText(res.text)
+        setDiff(res)
       })
       .catch((e) => {
         if (diffRequestIdRef.current !== requestId) return
@@ -123,7 +123,7 @@ export function GitLogSheet({ path, initialHash, onClose }: { path: string; init
             </div>
             <div className="mono-cell git-commit-hash">{selected.hash}</div>
           </div>
-          {diffLoading ? <Skeleton /> : <DiffView text={diffText ?? ''} />}
+          {diffLoading ? <Skeleton /> : <DiffView text={diff?.text ?? ''} truncated={diff?.truncated} />}
         </div>
       ) : loading ? (
         <Skeleton />

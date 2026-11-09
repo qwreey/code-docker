@@ -27,45 +27,43 @@ func ValidateHash(hash string) error {
 	return nil
 }
 
+// Diff is a diff view's text, cut at maxDiffBytes (on a line boundary)
+// when Truncated.
+type Diff struct {
+	Text      string `json:"text"`
+	Truncated bool   `json:"truncated"`
+}
+
 // CommitDiff returns `git show`'s raw output (commit metadata + unified
 // diff) for one commit. hash must pass ValidateHash first.
-func CommitDiff(path, hash string) (string, error) {
-	if !IsGitRepo(path) {
-		return "", ErrNotGitRepo
-	}
+func CommitDiff(path, hash string) (Diff, error) {
 	if err := ValidateHash(hash); err != nil {
-		return "", err
+		return Diff{}, err
 	}
-	out, err := runGit(path, "show", "--no-color", hash)
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
+	return runDiff(path, "show", hash)
 }
 
 // UnstagedDiff returns `git diff`'s raw unified-diff text: worktree changes
-// not yet staged. Empty string (no error) when there's nothing to show.
-func UnstagedDiff(path string) (string, error) {
-	if !IsGitRepo(path) {
-		return "", ErrNotGitRepo
-	}
-	out, err := runGit(path, "diff", "--no-color")
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
+// not yet staged. Empty text (no error) when there's nothing to show.
+func UnstagedDiff(path string) (Diff, error) {
+	return runDiff(path, "diff")
 }
 
 // StagedDiff returns `git diff --cached`'s raw unified-diff text: changes
-// staged for the next commit. Empty string (no error) when there's nothing
+// staged for the next commit. Empty text (no error) when there's nothing
 // to show.
-func StagedDiff(path string) (string, error) {
+func StagedDiff(path string) (Diff, error) {
+	return runDiff(path, "diff", "--cached")
+}
+
+func runDiff(path, subcommand string, rest ...string) (Diff, error) {
 	if !IsGitRepo(path) {
-		return "", ErrNotGitRepo
+		return Diff{}, ErrNotGitRepo
 	}
-	out, err := runGit(path, "diff", "--no-color", "--cached")
+	args := append(append([]string{subcommand}, gitReadDiffFlags...), rest...)
+	out, truncated, err := gitCall{path: path, args: args, maxOut: maxDiffBytes, truncate: true}.run()
 	if err != nil {
-		return "", err
+		return Diff{}, err
 	}
-	return string(out), nil
+	return Diff{Text: string(out), Truncated: truncated}, nil
 }

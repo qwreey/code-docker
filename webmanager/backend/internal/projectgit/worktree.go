@@ -71,7 +71,9 @@ func RemoveWorktree(projectPath, worktreePath string, force bool) error {
 		args = append(args, "--force")
 	}
 	args = append(args, "--", worktreePath)
-	_, err = runGit(projectPath, args...)
+	// git checks the worktree is clean by running status inside it, which
+	// reads that worktree's own config.worktree as well.
+	_, _, err = gitCall{path: projectPath, args: args, extraFilterPaths: []string{worktreePath}}.run()
 	return err
 }
 

@@ -101,12 +101,12 @@ func (s *Server) handleProjectGitDiffCommit(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "hash is required")
 		return
 	}
-	text, err := projectgit.CommitDiff(path, hash)
+	diff, err := projectgit.CommitDiff(path, hash)
 	if err != nil {
 		writeProjectGitErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"text": text})
+	writeJSON(w, http.StatusOK, diff)
 }
 
 // GET /api/projects/git/commit?path=&hash= - one commit by (abbreviated)
@@ -129,12 +129,12 @@ func (s *Server) handleProjectGitDiffUnstaged(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return
 	}
-	text, err := projectgit.UnstagedDiff(path)
+	diff, err := projectgit.UnstagedDiff(path)
 	if err != nil {
 		writeProjectGitErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"text": text})
+	writeJSON(w, http.StatusOK, diff)
 }
 
 func (s *Server) handleProjectGitDiffStaged(w http.ResponseWriter, r *http.Request) {
@@ -142,12 +142,12 @@ func (s *Server) handleProjectGitDiffStaged(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
-	text, err := projectgit.StagedDiff(path)
+	diff, err := projectgit.StagedDiff(path)
 	if err != nil {
 		writeProjectGitErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"text": text})
+	writeJSON(w, http.StatusOK, diff)
 }
 
 func (s *Server) handleProjectGitRemotes(w http.ResponseWriter, r *http.Request) {

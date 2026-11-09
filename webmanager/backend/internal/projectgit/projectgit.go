@@ -16,11 +16,8 @@
 package projectgit
 
 import (
-	"bytes"
-	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
 )
@@ -35,26 +32,12 @@ const gitTimeout = 5 * time.Second
 // comment) when path isn't a git working tree.
 var ErrNotGitRepo = errors.New("not a git repository")
 
-// runGit runs `git -C <path> <args...>` with gitTimeout, returning stdout on
-// success. On failure the error message is git's own stderr (trimmed), not
-// the opaque *exec.ExitError, so callers/logs get something actionable.
+// runGit runs `git -C <path> <args...>` with gitTimeout and the
+// safetyConfig environment (safety.go), returning stdout on success, or
+// ErrOutputTooLarge past maxOutputBytes.
 func runGit(path string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
-	defer cancel()
-
-	full := append([]string{"-C", path}, args...)
-	cmd := exec.CommandContext(ctx, "git", full...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if msg == "" {
-			msg = err.Error()
-		}
-		return stdout.Bytes(), fmt.Errorf("git %s: %s", strings.Join(args, " "), msg)
-	}
-	return stdout.Bytes(), nil
+	out, _, err := gitCall{path: path, args: args}.run()
+	return out, err
 }
 
 // IsGitRepo reports whether path is (the top of, or inside) a git working
@@ -97,7 +80,7 @@ func Status(path string) (RepoStatus, error) {
 		return RepoStatus{IsGitRepo: false}, nil
 	}
 
-	out, err := runGit(path, "status", "--porcelain=v1", "-b")
+	out, err := runGit(path, append([]string{"status", "--porcelain=v1", "-b"}, gitStatusFlags...)...)
 	if err != nil {
 		return RepoStatus{}, err
 	}

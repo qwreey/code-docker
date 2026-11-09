@@ -820,6 +820,7 @@ export interface GitLogResponse {
 
 export interface GitDiffResponse {
   text: string // raw unified diff, "" if nothing to show
+  truncated: boolean // text was cut at the backend's size cap, on a line boundary
 }
 
 export interface GitRemote {

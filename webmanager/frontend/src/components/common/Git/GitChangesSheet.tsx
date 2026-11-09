@@ -14,8 +14,8 @@ type Mode = 'unstaged' | 'staged'
 // back and forth doesn't re-hit the backend.
 export function GitChangesSheet({ path, onClose }: { path: string; onClose: () => void }) {
   const [mode, setMode] = useState<Mode>('unstaged')
-  const [unstagedText, setUnstagedText] = useState<string | null>(null)
-  const [stagedText, setStagedText] = useState<string | null>(null)
+  const [unstagedText, setUnstagedText] = useState<GitDiffResponse | null>(null)
+  const [stagedText, setStagedText] = useState<GitDiffResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -31,8 +31,8 @@ export function GitChangesSheet({ path, onClose }: { path: string; onClose: () =
       .get<GitDiffResponse>(`/projects/git/diff/${mode}?path=${encodeURIComponent(path)}`)
       .then((res) => {
         if (cancelled) return
-        if (mode === 'unstaged') setUnstagedText(res.text)
-        else setStagedText(res.text)
+        if (mode === 'unstaged') setUnstagedText(res)
+        else setStagedText(res)
         setError(null)
       })
       .catch((e) => {
@@ -47,7 +47,7 @@ export function GitChangesSheet({ path, onClose }: { path: string; onClose: () =
     // eslint-disable-next-line react-hooks/exhaustive-deps -- unstagedText/stagedText read only as a cache check, not to re-trigger
   }, [path, mode])
 
-  const text = mode === 'unstaged' ? unstagedText : stagedText
+  const diff = mode === 'unstaged' ? unstagedText : stagedText
 
   return (
     <Sheet open onClose={onClose} title="변경사항">
@@ -70,7 +70,7 @@ export function GitChangesSheet({ path, onClose }: { path: string; onClose: () =
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
-      {loading ? <Skeleton /> : <DiffView text={text ?? ''} />}
+      {loading ? <Skeleton /> : <DiffView text={diff?.text ?? ''} truncated={diff?.truncated} />}
     </Sheet>
   )
 }

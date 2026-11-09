@@ -453,7 +453,9 @@ second forward-auth TTL to carry. A
 per-project git status panel (`.claude/qa-request/project-git-status-plan-done.md`,
 `internal/projectgit`) reports status/log/diff/remotes/branches/tags for one
 already-known project path — read-only only (no stage/commit/push/pull yet),
-ungated since it's read-only, and deliberately placed in
+ungated since it's read-only (so every git call there runs under
+`internal/projectgit/safety.go`'s overrides — a repo's own fsmonitor/diff/
+filter/gpg/hook commands never run; that file lists them), and deliberately placed in
 `components/common/Git/` so it isn't tied to the Projects tab specifically.
 The Projects tab's per-project detail sheet (opened from `ProjectTable.tsx`)
 now also carries a git worktree list/remove panel
