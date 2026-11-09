@@ -388,6 +388,16 @@ services:
       # checkout - see example-env.
       context: "${NETINIT_DOCKER_CONTEXT:-${ROUTER_CLIENT_SOURCE:-https://github.com/qwreey/router-docker-client.git#${ROUTER_CLIENT_REF:-v0.1.2}:}netinit-docker}"
     network_mode: host
+    # An allow-list like router's: every default capability dropped, only these
+    # two added back. Mostly hygiene - the docker.sock mount already makes this
+    # service root-on-host equivalent - but it keeps a bug in the script from
+    # having more than it needs.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # "0" is unlimited.
+    pids_limit: ${NETINIT_DOCKER_PIDS_LIMIT:-256}
     cap_add:
       - NET_ADMIN
       # setns() into a target container's netns, so netinit-docker can plant that
