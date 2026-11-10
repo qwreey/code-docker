@@ -298,6 +298,8 @@ access_log 상세도는 `docker-compose.yml`의 `NGINX_LOG_LEVEL`로 조절합�
 `map $status $loggable` + `access_log ... if=$loggable` 기법) — 매 요청이 다
 찍히던 예전 동작(`all`로 설정하면 복원됩니다)이 정상적인 200 OK 트래픽까지
 `docker compose logs`에 전부 쏟아내서 다른 프로그램 로그를 묻어버렸기 때문입니다.
+어느 쪽이든 요청 줄과 Referer의 쿼리 문자열은 `?...`로 바꿔 기록합니다 — URL에
+실린 토큰이 로그 파일에 남지 않도록(이유는 conf의 `log_format noquery` 주석).
 이 conf 파일은 nginx가 자체적으로 셸 환경변수를 치환하지 못하므로, 정적 파일이
 아니라 템플릿입니다 — `nginx-service.default.sh`가 시작 시 `envsubst`로
 `${NGINX_ACCESS_LOG_IF}` 자리를 채운 렌더링 결과(`/run/nginx.generated.conf`)를

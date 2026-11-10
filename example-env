@@ -218,7 +218,8 @@
 # In-container nginx (config/nginx/nginx.default.conf) access_log verbosity:
 #   errors - only log non-2xx/3xx responses (via an nginx map/if on
 #     $status), so routine traffic doesn't flood `docker compose logs`.
-#   all - log every request, combined format (the old behavior).
+#   all - log every request.
+# Either way query strings are left out (see the log_format there).
 #NGINX_LOG_LEVEL="errors"
 
 # code-server's actual bind address, default "127.0.0.1:8080" - loopback, because
