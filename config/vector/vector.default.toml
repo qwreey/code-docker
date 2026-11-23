@@ -101,6 +101,21 @@ is_bare_timestamp = match(msg, r'^\[\d{2}:\d{2}:\d{2}\]$')
 !is_vsda_noise && !is_bare_timestamp
 '''
 
+# nginx's access log leaves query strings out (log_format noquery in
+# nginx.default.conf), but its error log has no format: an upstream failure
+# prints the request line, the upstream URL and the Referer whole, token
+# and all. This cuts the query from those three fields the same way
+# ("?..."), before either sink keeps the line. The raw stderr.log inside
+# the container still has it, until supervisord rotates it away.
+[transforms.redact_nginx_queries]
+type = "remap"
+inputs = ["filter_code_noise"]
+source = '''
+if .app_name == "nginx" {
+  .message = replace(string!(.message), r'((?:request|upstream|referrer): "[^"?]*)\?[^" ]*', "$1?...")
+}
+'''
+
 # tailscaled used to be uniquely chatty compared to every other program
 # here (a single restart alone logs dozens of internal-plumbing lines, and
 # steady-state runtime chatter could run into the hundreds of thousands of
@@ -120,7 +135,7 @@ is_bare_timestamp = match(msg, r'^\[\d{2}:\d{2}:\d{2}\]$')
 # original message still reaches the webmanager_logs sink below.
 [transforms.format_console]
 type = "remap"
-inputs = ["filter_code_noise"]
+inputs = ["redact_nginx_queries"]
 source = '''
 .message = "[" + string!(.app_name) + "] " + string!(.message)
 '''
@@ -135,11 +150,12 @@ encoding.codec = "text"
 # backend reads directly (no vector API involved): every line is a JSON
 # object with exactly these 4 fields - timestamp (RFC3339Nano, vector's
 # default event timestamp field), app_name, level ("info"|"warn"|"error"),
-# message (the original, unmodified log line). `encoding.only_fields`
+# message (the original log line, but for the query strings
+# redact_nginx_queries cuts from nginx's). `encoding.only_fields`
 # strips vector's other auto-added fields (file, host, source_type).
 [sinks.webmanager_logs]
 type = "file"
-inputs = ["filter_code_noise"]
+inputs = ["redact_nginx_queries"]
 path = "/code/.local/share/code-docker/vector/logs/%Y-%m-%d.jsonl"
 encoding.codec = "json"
 encoding.only_fields = ["timestamp", "app_name", "level", "message"]
