@@ -2,7 +2,7 @@
 
 `config/` 아래는 프로그램별 폴더(`build/`, `code/`, `dns-local/`, `git/`, `nginx/`, `shell/`, `sshd/`, `user-init/`, `vector/`, `webmanager/`)로 나뉘어 있습니다 — 각 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 `config/build/build.default.sh` 를 같은 폴더에 `build.override.sh` 로 복사하여 원하는대로 변경할 수 있습니다. 단, sh 파일들은 꼭 `chmod u+x` 를 적용하여 실행가능한 파일로 만들어야합니다.
 가급적 업스트림의 변경사항에 따라 필수 바이너리가 따라가도록 하려면 override 파일에서 `/etc/code-docker/build/build.default.sh` 를 실행하는것을 추천합니다. 다만 원치 않는 경우 하지 않아도 됩니다.
-각 override 파일은 편집 후, 컨테이너 재빌드가 필요합니다. `docker compose build 컨테이너명 && docker compose up -d` 를 수행하세요
+각 override 파일은 편집 후, 컨테이너 재빌드가 필요합니다. `docker compose build --pull 컨테이너명 && docker compose up -d` 를 수행하세요
 
 ## 파일 목록
 

@@ -11,9 +11,9 @@ Five external projects are pulled in as tag-pinned remote references (Docker/Com
 ## Commands
 
 ```sh
-docker compose build   # rebuild the image after Dockerfile/config/script changes
+docker compose build --pull   # rebuild; always --pull: BuildKit never moves the local base tag, so a build without it falls back to the months-old base and packages
 docker compose up -d   # (re)start
-docker compose build code-docker && docker compose up -d   # after editing a config/*.override.* file
+docker compose build --pull code-docker && docker compose up -d   # after editing a config/*.override.* file
 ```
 
 ```sh

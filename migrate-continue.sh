@@ -205,8 +205,12 @@ cd "$TARGET_DIR" || exit 1
 # 컨테이너는 옛 이미지 그대로 다시 뜹니다. EXTRA_INCLUDE로 붙은 builds/ 프로젝트도
 # 같은 compose 프로젝트의 서비스라 이 한 번으로 같이 빌드됩니다.
 built=0
+# --pull: the images build FROM floating tags (archlinux, docker:dind,
+# node, golang) and install packages in a cached layer, so without it a
+# rebuild keeps whatever base and packages it got first - months-old nginx/
+# openssl included. A newer base invalidates the cached package layers too.
 if confirm "지금 docker compose build를 수행할까요? (code-docker와 연동된 사이드 프로젝트 전부)" y; then
-  if docker compose build; then
+  if docker compose build --pull; then
     built=1
   else
     echo "  ! docker compose build 실패 - 이후 env 마이그레이션 단계는 건너뜁니다."
@@ -281,7 +285,7 @@ echo
 
 if [ "$built" != "1" ]; then
   echo "  ! 이번에 이미지를 빌드하지 않았습니다 - up -d는 기존 이미지로 뜨므로 방금 받은"
-  echo "    업데이트는 반영되지 않습니다. 나중에 docker compose build 후 up -d 하세요."
+  echo "    업데이트는 반영되지 않습니다. 나중에 docker compose build --pull 후 up -d 하세요."
 fi
 if confirm "지금 docker compose up -d를 수행할까요?" y; then
   docker compose up -d

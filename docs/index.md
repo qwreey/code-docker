@@ -59,7 +59,11 @@ touch empty-extra-include.yml # docker-compose.yml의 include: 대상 - 없으�
 > `example-env`의 `EXTRA_INCLUDE` 항목과
 > [tips/roblox-studio.md](tips/roblox-studio.md)(실사용 예시)를 참고.
 
-이제 `docker compose build` 를 수행하고 잘 빌드가 되는지 확인합니다.
+이제 `docker compose build --pull` 을 수행하고 잘 빌드가 되는지 확인합니다.
+`--pull`은 베이스 이미지(`archlinux` 등)를 새로 받게 하는 옵션입니다 — 빼면 Docker가
+처음 받은 베이스와 그때 설치한 패키지를 캐시에서 계속 재사용해서, nginx·openssl 같은
+보안 업데이트가 몇 달씩 반영되지 않습니다. 한 번 `--pull`로 빌드했어도 다음 빌드에서
+빼면 다시 옛 베이스로 돌아가니(로컬의 `archlinux` 태그는 그대로라서) 매번 붙이세요.
 만약 빌드에 성공했다면 `docker compose up -d` 를 수행하세요.
 잘 구동된다면 성공입니다!
 > Note: 시스템 패키지 업데이트를 위해 주기적으로 build 와 up 을 다시 수행해주세요.
@@ -79,7 +83,7 @@ git pull → 손 안 댄 `docker-compose.yml`이면 최신으로 갱신(직접 �
 덮어쓰지 않고 diff만 보여줌) → 사이드 프로젝트의
 [`ootb-manifest.env`](tips/ootb-manifest.md)가 선언한 declarative 필드 재적용(pull로
 매니페스트에 새 필드가 생겼을 수 있으므로 - 사람에게 묻는 값은 다시 안 물어봅니다) →
-`docker compose build` → 빌드 직후 이미지로
+`docker compose build --pull` → 빌드 직후 이미지로
 `.env.webmanager`/`.env.router`를 각각 `webmanager --env-migrate`/`router-manager
 --env-migrate`로 마이그레이션(컨테이너를 실제로 안 띄우고 `docker compose run --rm
 --entrypoint`로 딱 그 명령만 실행 - `ootb.sh`의 `--hash-password`와 같은 기법) →
@@ -427,7 +431,7 @@ webmanager 자체 비밀번호 게이트를 켜는 방법과, 이미지를 업�
 
 # 빌드 커스터마이징
 
-`config/` 아래는 프로그램별 폴더(`build/`, `code/`, `nginx/`, ...)로 나뉘어 있고, 각 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 `config/build/build.default.sh` 를 같은 폴더에 `build.override.sh` 로 복사하여 원하는대로 변경할 수 있습니다. 단, sh 파일들은 꼭 `chmod u+x` 를 적용하여 실행가능한 파일로 만들어야합니다. 각 override 파일은 편집 후, 컨테이너 재빌드가 필요합니다 (`docker compose build 컨테이너명 && docker compose up -d`).
+`config/` 아래는 프로그램별 폴더(`build/`, `code/`, `nginx/`, ...)로 나뉘어 있고, 각 폴더 안 파일들은 \*.default.\* 를 복사하여 \*.override.\* 로 바꾸어 원하는대로 작성할 수 있습니다. 예를들면 `config/build/build.default.sh` 를 같은 폴더에 `build.override.sh` 로 복사하여 원하는대로 변경할 수 있습니다. 단, sh 파일들은 꼭 `chmod u+x` 를 적용하여 실행가능한 파일로 만들어야합니다. 각 override 파일은 편집 후, 컨테이너 재빌드가 필요합니다 (`docker compose build --pull 컨테이너명 && docker compose up -d`).
 
 전체 파일 목록과 각 파일의 역할은 [build-customization.md](build-customization.md)에 정리되어 있습니다:
 

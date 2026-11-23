@@ -84,7 +84,7 @@ cd "$TARGET_DIR" || exit 1
 
 built=0
 if confirm "지금 docker compose build를 수행할까요?" y; then
-  if docker compose build; then
+  if docker compose build --pull; then # why --pull: see migrate-continue.sh
     built=1
   else
     echo "  ! docker compose build 실패 - 이후 비밀번호 설정 단계는 건너뜁니다."
