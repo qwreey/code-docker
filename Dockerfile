@@ -45,7 +45,7 @@ RUN npm ci
 COPY webmanager/frontend/ webmanager/frontend/
 RUN npm run build --workspace webmanager/frontend
 
-FROM golang:1.25-alpine AS webmanager-backend
+FROM golang:1.27-alpine AS webmanager-backend
 # github.com/qwreey/envmigrate (shared with router-docker) is an ordinary tagged
 # module now, downloaded by `go mod download` like any other dependency - it used
 # to be a repo-root submodule wired in with a `replace` directive.
