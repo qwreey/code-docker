@@ -15,6 +15,7 @@ import {
   ZoomOut,
 } from 'lucide-react'
 import { FitAddon } from '@xterm/addon-fit'
+import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import '../common/common.css'
 import { copyText } from '../../utils/clipboard'
@@ -560,6 +561,51 @@ function saveTouchMomentumEnabled(enabled: boolean) {
   }
 }
 
+// GPU (WebGL) rendering: on by default. xterm's DOM renderer lays text out
+// as HTML, so where the browser's text metrics give a fractional cell width
+// or a glyph comes from a fallback font (Windows at 100% scaling was the
+// report), the error adds up along a row and box-drawing borders - Claude
+// Code's side panel - no longer line up. WebGL draws every glyph into its
+// own cell from an atlas, and draws box-drawing and block characters
+// itself (xterm's customGlyphs) instead of taking them from the font. Where
+// WebGL can't start, or its context is lost, the terminal stays on (or
+// falls back to) the DOM renderer; the toggle is for a device whose GPU
+// path renders worse.
+const WEBGL_KEY = 'webmanager.terminal.webgl'
+
+function loadWebglEnabled(): boolean {
+  try {
+    return localStorage.getItem(WEBGL_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function saveWebglEnabled(enabled: boolean) {
+  try {
+    if (enabled) localStorage.removeItem(WEBGL_KEY)
+    else localStorage.setItem(WEBGL_KEY, '0')
+  } catch {
+    // localStorage unavailable (e.g. private browsing) - the toggle just won't persist
+  }
+}
+
+// Loads the WebGL renderer onto term, or returns null and leaves the DOM
+// renderer in place when the browser has no usable WebGL2.
+function attachWebgl(term: XTerm, onLost: () => void): WebglAddon | null {
+  try {
+    const addon = new WebglAddon()
+    addon.onContextLoss(() => {
+      addon.dispose()
+      onLost()
+    })
+    term.loadAddon(addon)
+    return addon
+  } catch {
+    return null
+  }
+}
+
 // Auto-reconnect: on by default, unlike the two experimental toggles above
 // (this is a plain convenience with a safe failure mode - worst case it
 // behaves like the toggle was off - not an unstable input workaround). Same
@@ -796,6 +842,10 @@ export function Terminal({
   // altScreenScrollRef right above, this time for the real wheel handler.
   const altScreenWheelScrollRef = useRef(altScreenWheelScrollEnabled)
   altScreenWheelScrollRef.current = altScreenWheelScrollEnabled
+  const [webglEnabled, setWebglEnabledState] = useState<boolean>(loadWebglEnabled)
+  const webglEnabledRef = useRef(webglEnabled)
+  webglEnabledRef.current = webglEnabled
+  const webglAddonRef = useRef<WebglAddon | null>(null)
   const [autoReconnectEnabled, setAutoReconnectEnabledState] = useState<boolean>(loadAutoReconnectEnabled)
   // Unlike mobileInputWorkaroundEnabled above (only read once, at xterm
   // creation - toggling it requires leaving/re-entering the tab), this one
@@ -1155,6 +1205,25 @@ export function Terminal({
       cancelled = true
     }
   }, [settingsLoaded, effectiveSettings.fontFamily, fitIfVisible, sendResize])
+
+  // The renderer toggle applies live: loading or disposing the addon swaps
+  // renderers on the same terminal, and the cell size can change with it.
+  useEffect(() => {
+    const term = termRef.current
+    if (!term) return
+    if (webglEnabled && !webglAddonRef.current) {
+      webglAddonRef.current = attachWebgl(term, () => {
+        webglAddonRef.current = null
+      })
+    } else if (!webglEnabled && webglAddonRef.current) {
+      webglAddonRef.current.dispose()
+      webglAddonRef.current = null
+    } else {
+      return
+    }
+    fitIfVisible()
+    sendResize()
+  }, [webglEnabled, fitIfVisible, sendResize])
 
   // Apply the zoom (font size) level live — same "initial value at creation,
   // then kept in sync by its own effect" shape as theme/fontFamily above.
@@ -1540,6 +1609,11 @@ export function Terminal({
     setAltScreenWheelScrollEnabled(enabled)
   }, [])
 
+  const toggleWebgl = useCallback((enabled: boolean) => {
+    saveWebglEnabled(enabled)
+    setWebglEnabledState(enabled)
+  }, [])
+
   const toggleAutoReconnect = useCallback((enabled: boolean) => {
     saveAutoReconnectEnabled(enabled)
     setAutoReconnectEnabledState(enabled)
@@ -1621,12 +1695,21 @@ export function Terminal({
       theme: themeToXterm(currentTheme),
       fontFamily: resolveFontFamily(effectiveSettings.fontFamily),
       fontSize,
+      // WebGL only: squeeze a glyph wider than its cell (an ambiguous-width
+      // character from a fallback font) back into it instead of letting it
+      // spill over the next one.
+      rescaleOverlappingGlyphs: true,
     })
     termRef.current = term
     const fitAddon = new FitAddon()
     fitAddonRef.current = fitAddon
     term.loadAddon(fitAddon)
     term.open(container)
+    if (webglEnabledRef.current) {
+      webglAddonRef.current = attachWebgl(term, () => {
+        webglAddonRef.current = null
+      })
+    }
     // Ctrl+click URLs, commit hashes and (in code-server) file paths -
     // disposed with term.
     registerTerminalLinks(term, {
@@ -2295,6 +2378,7 @@ export function Terminal({
       term.dispose()
       termRef.current = null
       fitAddonRef.current = null
+      webglAddonRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -3891,6 +3975,8 @@ export function Terminal({
         onToggleAltScreenWheelScroll={toggleAltScreenWheelScroll}
         autoReconnectEnabled={autoReconnectEnabled}
         onToggleAutoReconnect={toggleAutoReconnect}
+        webglEnabled={webglEnabled}
+        onToggleWebgl={toggleWebgl}
         controlBarEnabled={controlBarEnabled}
         onToggleControlBarEnabled={toggleControlBarEnabled}
       />

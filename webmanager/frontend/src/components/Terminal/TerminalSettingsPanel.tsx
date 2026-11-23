@@ -53,6 +53,8 @@ export function TerminalSettingsPanel({
   onToggleAltScreenWheelScroll,
   autoReconnectEnabled,
   onToggleAutoReconnect,
+  webglEnabled,
+  onToggleWebgl,
   controlBarEnabled,
   onToggleControlBarEnabled,
 }: {
@@ -81,6 +83,8 @@ export function TerminalSettingsPanel({
   onToggleAltScreenWheelScroll: (enabled: boolean) => void
   autoReconnectEnabled: boolean
   onToggleAutoReconnect: (enabled: boolean) => void
+  webglEnabled: boolean
+  onToggleWebgl: (enabled: boolean) => void
   controlBarEnabled: boolean
   onToggleControlBarEnabled: (enabled: boolean) => void
 }) {
@@ -293,6 +297,21 @@ export function TerminalSettingsPanel({
             ))}
           </select>
         </div>
+      </section>
+
+      <section className="terminal-settings-section">
+        <h4>렌더링</h4>
+        <p className="section-description">
+          GPU(WebGL)로 글자를 칸마다 그립니다. 브라우저의 글자 배치에 맡기면 Windows처럼 칸 폭이 소수점이
+          되거나 다른 글꼴로 대체되는 환경에서 오차가 줄을 따라 쌓여, Claude Code 패널 같은 테두리 선이
+          어긋납니다. 이 방식은 선 문자를 직접 그려서 칸에 맞춥니다. WebGL을 쓸 수 없는 브라우저에서는 자동으로
+          기존 방식으로 그립니다. 이 기기에서 오히려 이상하게 보일 때만 끄세요. 바로 적용되며 기기마다 따로
+          저장됩니다.
+        </p>
+        <label className="checkbox-option">
+          <input type="checkbox" checked={webglEnabled} onChange={(e) => onToggleWebgl(e.target.checked)} />
+          GPU(WebGL)로 그리기
+        </label>
       </section>
 
       <section className="terminal-settings-section">
