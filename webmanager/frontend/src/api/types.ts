@@ -471,8 +471,16 @@ export interface DiskBreakdownResponse {
 
 export interface SystemResources {
   memory: {
-    usedBytes: number
+    usedBytes: number // memory.current, page cache included
     limitBytes: number | null
+    // usedBytes without the inactive page cache - what the limit is really up
+    // against. anon/file/shmem split usedBytes; all zero (and workingSetBytes
+    // == usedBytes) when statAvailable is false.
+    workingSetBytes: number
+    anonBytes: number
+    fileBytes: number
+    shmemBytes: number
+    statAvailable: boolean
     available: boolean
   }
   cpu: {
@@ -523,6 +531,7 @@ export interface ResourceHistoryPoint {
   timestamp: number // unix ms
   cpuPercent: number
   memUsedBytes: number
+  memWorkingSetBytes: number // memUsedBytes without the inactive page cache
   memLimitBytes: number | null
   diskReadBytesPerSec: number
   diskWriteBytesPerSec: number

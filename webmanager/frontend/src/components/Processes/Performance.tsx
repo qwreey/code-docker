@@ -60,9 +60,7 @@ export function Performance() {
           numCpu={cpu.numCpu}
         />
         <MemoryBreakdown
-          cgroupUsedBytes={memory.usedBytes}
-          cgroupLimitBytes={memory.limitBytes}
-          cgroupAvailable={memory.available}
+          cgroup={memory}
           hostTotalBytes={hostMemory.totalBytes}
           hostFreeBytes={hostMemory.freeBytes}
           hostBuffersBytes={hostMemory.buffersBytes}

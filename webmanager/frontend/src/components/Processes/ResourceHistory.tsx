@@ -322,13 +322,14 @@ export function ResourceHistory() {
 
   const memLimit = latest.memLimitBytes
   const memMaxUsed = Math.max(...points.map((p) => p.memUsedBytes))
+  const workingSet = (p: ResourceHistoryPoint) => p.memWorkingSetBytes
   const memDomainMax = memLimit != null ? memLimit : niceMax(memMaxUsed)
   const memTicks = buildTicks(0, memDomainMax)
   const memTickFormat = (v: number) => (memLimit != null ? `${Math.round((v / memLimit) * 100)}%` : formatBytes(v))
   const memHeaderValue =
     memLimit != null
-      ? `${formatBytes(latest.memUsedBytes)} (${Math.round((latest.memUsedBytes / memLimit) * 100)}%)`
-      : formatBytes(latest.memUsedBytes)
+      ? `실사용 ${formatBytes(workingSet(latest))} (${Math.round((workingSet(latest) / memLimit) * 100)}%)`
+      : `실사용 ${formatBytes(workingSet(latest))}`
 
   const diskMax = niceMax(Math.max(1, ...points.flatMap((p) => [p.diskReadBytesPerSec, p.diskWriteBytesPerSec])))
   const netMax = niceMax(Math.max(1, ...points.flatMap((p) => [p.netRxBytesPerSec, p.netTxBytesPerSec])))
@@ -366,8 +367,15 @@ export function ResourceHistory() {
           series={[
             {
               key: 'mem',
-              label: '메모리 사용량',
+              label: '실사용',
               color: 'var(--viz-cat-1)',
+              getValue: workingSet,
+              format: (v) => formatBytes(v),
+            },
+            {
+              key: 'mem-total',
+              label: '캐시 포함',
+              color: 'var(--viz-cat-2)',
               getValue: (p) => p.memUsedBytes,
               format: (v) => formatBytes(v),
             },

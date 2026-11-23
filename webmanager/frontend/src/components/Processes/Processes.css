@@ -706,6 +706,11 @@
   color: var(--text-muted);
 }
 
+.perf-mem-scope-danger {
+  color: var(--color-red-fg);
+  font-weight: 600;
+}
+
 .perf-mem-stack {
   display: flex;
   gap: 2px;

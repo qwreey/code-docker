@@ -10,9 +10,12 @@ import (
 // as a time.Time here (rather than unix-ms) since this package has no
 // business knowing about JSON wire shapes — handlers_system.go converts.
 type Point struct {
-	Timestamp            time.Time
-	CPUPercent           float64
-	MemUsedBytes         uint64
+	Timestamp    time.Time
+	CPUPercent   float64
+	MemUsedBytes uint64
+	// MemWorkingSetBytes is MemUsedBytes without the inactive page cache
+	// (MemoryStat.WorkingSet); equal to it when memory.stat can't be read.
+	MemWorkingSetBytes   uint64
 	MemLimitBytes        *uint64
 	DiskReadBytesPerSec  float64
 	DiskWriteBytesPerSec float64
@@ -188,6 +191,10 @@ func (h *HistorySampler) sample() {
 	if !memOK {
 		memUsed, memLimit = 0, nil
 	}
+	memWorkingSet := memUsed
+	if stat, ok := ReadMemoryStat(); ok {
+		memWorkingSet = stat.WorkingSet(memUsed)
+	}
 
 	var diskReadRate, diskWriteRate float64
 	diskRead, diskWrite, diskOK := DiskIOBytes()
@@ -217,6 +224,7 @@ func (h *HistorySampler) sample() {
 		Timestamp:            now,
 		CPUPercent:           cpuPercent,
 		MemUsedBytes:         memUsed,
+		MemWorkingSetBytes:   memWorkingSet,
 		MemLimitBytes:        memLimit,
 		DiskReadBytesPerSec:  diskReadRate,
 		DiskWriteBytesPerSec: diskWriteRate,

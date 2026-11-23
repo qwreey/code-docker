@@ -14,6 +14,7 @@ type ResourceHistoryPoint struct {
 	Timestamp            int64   `json:"timestamp"`
 	CPUPercent           float64 `json:"cpuPercent"`
 	MemUsedBytes         uint64  `json:"memUsedBytes"`
+	MemWorkingSetBytes   uint64  `json:"memWorkingSetBytes"`
 	MemLimitBytes        *uint64 `json:"memLimitBytes"`
 	DiskReadBytesPerSec  float64 `json:"diskReadBytesPerSec"`
 	DiskWriteBytesPerSec float64 `json:"diskWriteBytesPerSec"`
@@ -52,8 +53,18 @@ type ResourceHistoryResponse struct {
 }
 
 type memoryResources struct {
+	// UsedBytes is memory.current, page cache included.
 	UsedBytes  uint64  `json:"usedBytes"`
 	LimitBytes *uint64 `json:"limitBytes"`
+	// WorkingSetBytes is UsedBytes without the inactive page cache - what
+	// the limit is really up against (cgroup.MemoryStat.WorkingSet). The
+	// three below split UsedBytes; StatAvailable false means memory.stat
+	// couldn't be read, they're zero and WorkingSetBytes equals UsedBytes.
+	WorkingSetBytes uint64 `json:"workingSetBytes"`
+	AnonBytes       uint64 `json:"anonBytes"`
+	FileBytes       uint64 `json:"fileBytes"`
+	ShmemBytes      uint64 `json:"shmemBytes"`
+	StatAvailable   bool   `json:"statAvailable"`
 	// Available is false when this section degraded to zeroed fields
 	// because its cgroup read failed, so callers can distinguish
 	// "unavailable" from "genuinely zero" — the other fields keep their
@@ -150,6 +161,12 @@ type systemResources struct {
 // read at all does this fall back to 503, as a last resort.
 func (s *Server) handleSystemResources(w http.ResponseWriter, r *http.Request) {
 	usedBytes, limitBytes, memOK := cgroup.Memory()
+	memory := memoryResources{UsedBytes: usedBytes, LimitBytes: limitBytes, WorkingSetBytes: usedBytes, Available: memOK}
+	if stat, ok := cgroup.ReadMemoryStat(); ok && memOK {
+		memory.WorkingSetBytes = stat.WorkingSet(usedBytes)
+		memory.AnonBytes, memory.FileBytes, memory.ShmemBytes = stat.AnonBytes, stat.FileBytes, stat.ShmemBytes
+		memory.StatAvailable = true
+	}
 	percent, limitCores, numCPU, cpuOK := s.cgroupSampler.CPU()
 	disk, diskOK := readDiskUsage(s.cfg.SystemDiskPath)
 
@@ -173,7 +190,7 @@ func (s *Server) handleSystemResources(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, systemResources{
-		Memory: memoryResources{UsedBytes: usedBytes, LimitBytes: limitBytes, Available: memOK},
+		Memory: memory,
 		CPU:    cpuResources{Percent: percent, LimitCores: limitCores, NumCPU: numCPU, Available: cpuOK},
 		Disk:   disk,
 		HostMemory: hostMemoryResources{
@@ -205,6 +222,7 @@ func (s *Server) handleSystemResourcesHistory(w http.ResponseWriter, r *http.Req
 			Timestamp:            p.Timestamp.UnixMilli(),
 			CPUPercent:           p.CPUPercent,
 			MemUsedBytes:         p.MemUsedBytes,
+			MemWorkingSetBytes:   p.MemWorkingSetBytes,
 			MemLimitBytes:        p.MemLimitBytes,
 			DiskReadBytesPerSec:  p.DiskReadBytesPerSec,
 			DiskWriteBytesPerSec: p.DiskWriteBytesPerSec,

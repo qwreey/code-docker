@@ -87,6 +87,69 @@ func Memory() (usedBytes uint64, limitBytes *uint64, ok bool) {
 	return used, limitBytes, true
 }
 
+// MemoryStat is memory.current split the way memory.stat accounts it.
+// memory.current counts the page cache too, and the kernel leaves that
+// cache in place until the limit forces it out, so a container that has
+// read a lot of files sits near 100% with little of it in use. Anon is what
+// processes allocated; File is page cache, Shmem the part of it that is
+// tmpfs/shared memory (counted as file, but nothing can reclaim it while
+// it's held); InactiveFile the cache the kernel reclaims first.
+type MemoryStat struct {
+	AnonBytes         uint64
+	FileBytes         uint64
+	ShmemBytes        uint64
+	InactiveFileBytes uint64
+}
+
+// WorkingSet is used minus the inactive file cache: what the container
+// can't give back without something failing. It's the figure `docker
+// stats` and Kubernetes report as memory usage.
+func (m MemoryStat) WorkingSet(usedBytes uint64) uint64 {
+	if m.InactiveFileBytes >= usedBytes {
+		return 0
+	}
+	return usedBytes - m.InactiveFileBytes
+}
+
+// ReadMemoryStat reads memory.stat for the calling process's cgroup. ok is
+// false when the file can't be read or carries none of the keys.
+func ReadMemoryStat() (MemoryStat, bool) {
+	d, err := dir()
+	if err != nil {
+		return MemoryStat{}, false
+	}
+	data, err := os.ReadFile(filepath.Join(d, "memory.stat"))
+	if err != nil {
+		return MemoryStat{}, false
+	}
+	return parseMemoryStat(string(data))
+}
+
+func parseMemoryStat(content string) (MemoryStat, bool) {
+	var m MemoryStat
+	fields := map[string]*uint64{
+		"anon":          &m.AnonBytes,
+		"file":          &m.FileBytes,
+		"shmem":         &m.ShmemBytes,
+		"inactive_file": &m.InactiveFileBytes,
+	}
+	found := 0
+	for _, line := range strings.Split(content, "\n") {
+		key, value, ok := strings.Cut(line, " ")
+		dst, want := fields[key]
+		if !ok || !want {
+			continue
+		}
+		v, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+		if err != nil {
+			continue
+		}
+		*dst = v
+		found++
+	}
+	return m, found > 0
+}
+
 // parseMemoryMax parses memory.max's contents: either the literal "max"
 // (no limit, nil) or a byte count.
 func parseMemoryMax(content string) *uint64 {
