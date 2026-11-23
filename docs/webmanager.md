@@ -516,3 +516,6 @@ nginx는 `/manager/`에 `X-Frame-Options: SAMEORIGIN`을 붙여, 다른 origin�
 code-server 자신이 같은 origin에서 `/manager/`를 iframe으로 여는 launcher
 (webmanager-launcher 코드패치)는 그대로 동작합니다. `X-Content-Type-Options:
 nosniff`는 이 nginx가 서빙/프록시하는 모든 응답에 전역으로 붙습니다.
+webmanager 화면 자체에는 스크립트를 자기 파일에서만 받도록 하는 CSP가 붙습니다
+(`script-src 'self'`; 이유는 `webmanager/backend/static.go`의 `spaCSP` 주석).
+provider 페이지는 그 프로젝트 자신의 정책을 따릅니다.

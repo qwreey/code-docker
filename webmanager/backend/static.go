@@ -7,6 +7,17 @@ import (
 	"strings"
 )
 
+// spaCSP is the second line behind an XSS sink that doesn't exist today:
+// the build already loads every script from its own files (no inline
+// script, eval or javascript: URL), so the policy pins only that, plus no
+// plugins and no <base> to re-point relative URLs. Styles and frames stay
+// open - CodeMirror and xterm insert <style> elements, and the router and
+// provider embeds can sit on other origins. Set on every file this serves,
+// not only index.html: favicon.svg is a document too when opened directly.
+// Provider pages are proxied elsewhere (handlers_providers.go) and keep
+// their own policy.
+const spaCSP = "script-src 'self'; object-src 'none'; base-uri 'none'"
+
 // staticHandler serves pre-built frontend assets from dir. Any GET path that
 // doesn't map to a real file falls back to index.html (SPA client-side
 // routing) — and if dir/index.html doesn't exist either (e.g. the frontend
@@ -26,6 +37,7 @@ import (
 func staticHandler(dir string) http.Handler {
 	fileServer := http.FileServer(http.Dir(dir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", spaCSP)
 		requested := filepath.Join(dir, filepath.Clean("/"+r.URL.Path))
 		if info, err := os.Stat(requested); err == nil && !info.IsDir() {
 			if strings.HasPrefix(filepath.ToSlash(r.URL.Path), "/assets/") {
