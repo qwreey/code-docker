@@ -2175,12 +2175,53 @@ export function Terminal({
     const onContextMenu = (e: MouseEvent) => {
       if (touchActive || performance.now() - lastTouchEndAt < 800) e.preventDefault()
     }
-    container.addEventListener('touchstart', onTouchStart, { passive: true })
-    container.addEventListener('touchmove', onTouchMove, { passive: false })
+    // Everything above is for a finger. A browser that also delivers a
+    // mouse's press-and-drag as touch events (iPadOS does, for pages written
+    // against touch only) would otherwise turn a mouse drag on a tablet into
+    // a scroll - dragging a split or a panel border in a full-screen app
+    // then needed switching the touch mode to 'mouse' first. Pointer events
+    // still say what the device really is, so a touch sequence made while a
+    // mouse button is down (whichever of pointerdown and touchstart comes
+    // first) is left to xterm's own mouse handling, which already does
+    // drag, selection and wheel for a mouse.
+    let mouseButtonDown = false
+    let touchFromMouse = false
+    const onPointerDown = (e: PointerEvent) => {
+      // A device whose OS turns the mouse into a finger reports 'touch'
+      // here, and nothing in the page can tell the two apart; the debug log
+      // shows which one a device sends.
+      debugLogRef.current?.(`  (pointerdown ${e.pointerType})`)
+      if (e.pointerType !== 'mouse') return
+      mouseButtonDown = true
+      if (touchActive && !touchFromMouse) {
+        // touchstart came first and already set up a gesture; drop it.
+        clearLongPress()
+        touchFromMouse = true
+        touchActive = false
+      }
+    }
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') mouseButtonDown = false
+    }
+    const gatedTouchStart = (e: TouchEvent) => {
+      touchFromMouse = mouseButtonDown
+      if (!touchFromMouse) onTouchStart(e)
+    }
+    const gatedTouchMove = (e: TouchEvent) => {
+      if (!touchFromMouse) onTouchMove(e)
+    }
+    const gatedTouchEnd = (e: TouchEvent) => {
+      if (!touchFromMouse) onTouchEnd(e)
+    }
+    container.addEventListener('pointerdown', onPointerDown, { capture: true, passive: true })
+    window.addEventListener('pointerup', onPointerUp, { capture: true, passive: true })
+    window.addEventListener('pointercancel', onPointerUp, { capture: true, passive: true })
+    container.addEventListener('touchstart', gatedTouchStart, { passive: true })
+    container.addEventListener('touchmove', gatedTouchMove, { passive: false })
     // Not passive: onTouchEnd has to be able to cancel compatibility mouse
     // events after a drag (see its comment).
-    container.addEventListener('touchend', onTouchEnd, { passive: false })
-    container.addEventListener('touchcancel', onTouchEnd, { passive: false })
+    container.addEventListener('touchend', gatedTouchEnd, { passive: false })
+    container.addEventListener('touchcancel', gatedTouchEnd, { passive: false })
     container.addEventListener('contextmenu', onContextMenu)
     // Drives the copy affordance below: xterm's selection is its own state,
     // invisible to window.getSelection(), so nothing else would ever know a
@@ -2190,10 +2231,13 @@ export function Terminal({
     })
     const touchCleanup = () => {
       cancelMomentum()
-      container.removeEventListener('touchstart', onTouchStart)
-      container.removeEventListener('touchmove', onTouchMove)
-      container.removeEventListener('touchend', onTouchEnd)
-      container.removeEventListener('touchcancel', onTouchEnd)
+      container.removeEventListener('pointerdown', onPointerDown, { capture: true })
+      window.removeEventListener('pointerup', onPointerUp, { capture: true })
+      window.removeEventListener('pointercancel', onPointerUp, { capture: true })
+      container.removeEventListener('touchstart', gatedTouchStart)
+      container.removeEventListener('touchmove', gatedTouchMove)
+      container.removeEventListener('touchend', gatedTouchEnd)
+      container.removeEventListener('touchcancel', gatedTouchEnd)
       container.removeEventListener('contextmenu', onContextMenu)
       clearLongPress()
       selectionDisposable.dispose()
