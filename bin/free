@@ -1,0 +1,92 @@
+#!/bin/bash
+# free, scoped to this container. /proc/meminfo (which /usr/bin/free reads)
+# describes the host, so with a memory limit set (CODE_MEM_LIMIT) the real
+# free reports gigabytes this container can never use. With a limit this
+# prints the same table from the container's own cgroup; without one the
+# host's figures are the right ones and this just runs /usr/bin/free.
+#
+# Mapping (cgroup v2): total = memory.max, shared = shmem, buff/cache =
+# file (page cache, shmem included, as procps counts it), free = total -
+# memory.current, used = what's left, available = total minus the working
+# set (memory.current - inactive_file) - the same split webmanager's 작업
+# 관리자 shows. Tools that read /proc/meminfo themselves (htop, btop,
+# os.totalmem(), psutil) still see the host.
+set -u
+
+real=/usr/bin/free
+
+cg=$(sed -n 's/^0:://p' /proc/self/cgroup 2>/dev/null)
+cg=/sys/fs/cgroup${cg%/}
+limit=$(cat "$cg/memory.max" 2>/dev/null)
+case "$limit" in
+'' | max | *[!0-9]*) exec "$real" "$@" ;;
+esac
+
+unit=k si=0 wide=0 total=0
+for arg in "$@"; do
+    case "$arg" in
+    -b | --bytes) unit=b ;;
+    -k | --kibi) unit=k ;;
+    -m | --mebi) unit=m ;;
+    -g | --gibi) unit=g ;;
+    --tebi) unit=t ;;
+    --pebi) unit=p ;;
+    --kilo) unit=k si=1 ;;
+    --mega) unit=m si=1 ;;
+    --giga) unit=g si=1 ;;
+    --tera) unit=t si=1 ;;
+    --peta) unit=p si=1 ;;
+    -h | --human) unit=h ;;
+    --si) si=1 ;;
+    -w | --wide) wide=1 ;;
+    -t | --total) total=1 ;;
+    *)
+        # -s/-c/-l/-L/-v and anything combined: not reproduced here.
+        echo "free: '$arg' isn't supported for the container's limit - showing the host's memory instead" >&2
+        exec "$real" "$@"
+        ;;
+    esac
+done
+
+current=$(cat "$cg/memory.current")
+swap_max=$(cat "$cg/memory.swap.max" 2>/dev/null || echo 0)
+swap_used=$(cat "$cg/memory.swap.current" 2>/dev/null || echo 0)
+if [ "$swap_max" = max ]; then
+    swap_max=$(awk '$1 == "SwapTotal:" { print $2 * 1024 }' /proc/meminfo)
+fi
+
+awk -v limit="$limit" -v current="$current" -v swap_max="$swap_max" -v swap_used="$swap_used" \
+    -v unit="$unit" -v si="$si" -v wide="$wide" -v total="$total" '
+    $1 == "file" { file = $2 }
+    $1 == "shmem" { shmem = $2 }
+    $1 == "inactive_file" { inactive = $2 }
+    function clamp(v) { return v < 0 ? 0 : v }
+    function fmt(v,   base, units, i, x) {
+        base = si ? 1000 : 1024
+        if (unit == "b") return sprintf("%.0f", v)
+        if (unit != "h") {
+            i = index("kmgtp", unit)
+            return sprintf("%.0f", v / base ^ i)
+        }
+        split(si ? "B K M G T P" : "B Ki Mi Gi Ti Pi", units, " ")
+        x = v; i = 1
+        while (x >= base && i < 6) { x /= base; i++ }
+        return (i == 1 || x >= 10) ? sprintf("%.0f%s", x, units[i]) : sprintf("%.1f%s", x, units[i])
+    }
+    END {
+        mem_free = clamp(limit - current)
+        cache = file
+        mem_used = clamp(limit - mem_free - cache)
+        available = clamp(limit - clamp(current - inactive))
+        swap_free = clamp(swap_max - swap_used)
+        if (wide) {
+            printf "               total        used        free      shared     buffers       cache   available\n"
+            printf "%-9s%11s %11s %11s %11s %11s %11s %11s\n", "Mem:", fmt(limit), fmt(mem_used), fmt(mem_free), fmt(shmem), fmt(0), fmt(cache), fmt(available)
+        } else {
+            printf "               total        used        free      shared  buff/cache   available\n"
+            printf "%-9s%11s %11s %11s %11s %11s %11s\n", "Mem:", fmt(limit), fmt(mem_used), fmt(mem_free), fmt(shmem), fmt(cache), fmt(available)
+        }
+        printf "%-9s%11s %11s %11s\n", "Swap:", fmt(swap_max), fmt(swap_used), fmt(swap_free)
+        if (total)
+            printf "%-9s%11s %11s %11s\n", "Total:", fmt(limit + swap_max), fmt(mem_used + swap_used), fmt(mem_free + swap_free)
+    }' "$cg/memory.stat"
